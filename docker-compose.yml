@@ -1,0 +1,143 @@
+version: '3.8'
+
+networks:
+  pos_network:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: pos_postgres
+    environment:
+      POSTGRES_USER: posadmin
+      POSTGRES_PASSWORD: pospassword
+      POSTGRES_DB: posdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./deploy/db:/docker-entrypoint-initdb.d
+    networks:
+      - pos_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U posadmin -d posdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: pos_pgbouncer
+    environment:
+      DB_USER: posadmin
+      DB_PASSWORD: pospassword
+      DB_HOST: postgres
+      DB_NAME: posdb
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 50
+      MIN_POOL_SIZE: 10
+      RESERVE_POOL_SIZE: 10
+      SERVER_IDLE_TIMEOUT: 60
+    ports:
+      - "6432:5432"
+    networks:
+      - pos_network
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U posadmin"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    container_name: pos_redis
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - pos_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: pos_ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - pos_network
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          # Enable GPU if available
+          # devices:
+          #   - driver: nvidia
+          #     count: 1
+          #     capabilities: [gpu]
+
+  # pos_backend:
+  #   build:
+  #     context: ./src/Backend
+  #     dockerfile: Dockerfile
+  #   container_name: pos_backend
+  #   environment:
+  #     - ASPNETCORE_ENVIRONMENT=Production
+  #     - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
+  #     - ConnectionStrings__Redis=redis:6379,abortConnect=false
+  #   ports:
+  #     - "5000:8080"
+  #   networks:
+  #     - pos_network
+  #   depends_on:
+  #     pgbouncer:
+  #       condition: service_healthy
+  #     redis:
+  #       condition: service_healthy
+  #   restart: unless-stopped
+
+  # pos_frontend:
+  #   build:
+  #     context: ./src/Frontend
+  #     dockerfile: Dockerfile
+  #   container_name: pos_frontend
+  #   ports:
+  #     - "3000:80"
+  #   networks:
+  #     - pos_network
+  #   restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    container_name: pos_nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./deploy/nginx/certs:/etc/nginx/certs:ro
+    networks:
+      - pos_network
+    restart: unless-stopped
+    # depends_on:
+    #   - pos_backend
+    #   - pos_frontend
+
+volumes:
+  postgres_data:
+  redis_data:
+  ollama_data:

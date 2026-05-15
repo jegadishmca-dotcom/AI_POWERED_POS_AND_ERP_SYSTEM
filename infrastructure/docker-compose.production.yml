@@ -1,0 +1,79 @@
+﻿version: '3.8'
+
+services:
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: \
+      POSTGRES_PASSWORD: \
+      POSTGRES_DB: \
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - erp-net
+    restart: unless-stopped
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    environment:
+      DB_USER: \
+      DB_PASSWORD: \
+      DB_HOST: db
+      DB_NAME: \
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 1000
+      DEFAULT_POOL_SIZE: 50
+    ports:
+      - "6432:5432"
+    depends_on:
+      - db
+    networks:
+      - erp-net
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --requirepass \
+    volumes:
+      - redisdata:/data
+    networks:
+      - erp-net
+    restart: unless-stopped
+
+  backend:
+    build: 
+      context: ./src/Backend
+      dockerfile: Dockerfile
+    environment:
+      - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=\;Username=\;Password=\;Pooling=true;
+      - Redis__ConnectionString=redis:6379,password=\
+      - ASPNETCORE_ENVIRONMENT=Production
+    depends_on:
+      - pgbouncer
+      - redis
+    networks:
+      - erp-net
+    restart: unless-stopped
+
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./infrastructure/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./src/Frontend/dist:/usr/share/nginx/html:ro # Vite Build Output
+      - ./certs:/etc/nginx/certs:ro
+    depends_on:
+      - backend
+    networks:
+      - erp-net
+    restart: unless-stopped
+
+networks:
+  erp-net:
+    driver: bridge
+
+volumes:
+  pgdata:
+  redisdata:

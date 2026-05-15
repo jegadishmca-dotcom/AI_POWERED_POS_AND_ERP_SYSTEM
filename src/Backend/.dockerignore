@@ -1,0 +1,11 @@
+**/.git
+**/.vs
+**/.vscode
+**/bin
+**/obj
+**/.dockerignore
+**/Dockerfile
+**/docker-compose*
+**/*.md
+**/*.user
+**/*.suo

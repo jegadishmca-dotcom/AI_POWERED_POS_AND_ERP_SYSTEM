@@ -1,15 +1,12 @@
 # =============================================================
-# Enterprise Supermarket POS & ERP System
-# Production Docker Compose — Ubuntu 24.04 LTS
+# Enterprise Supermarket POS & ERP System - Production Docker Compose
+# Final Version - Optimized for Ubuntu 24.04
 # =============================================================
-# Usage:
-#   cd infrastructure
-#   docker compose -f docker-compose.production.yml up -d --build
-# =============================================================
+
+version: '3.9'
 
 services:
-
-  # ── PostgreSQL 16 ──────────────────────────────────────────
+  # ── PostgreSQL 16 ─────────────────────────────────────────────
   db:
     image: postgres:16-alpine
     container_name: erp-db
@@ -24,73 +21,60 @@ services:
       - erp-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-PosErpDb}"]
+      test: [ "CMD-SHELL", "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-PosErpDb}" ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
 
-  # ── PgBouncer Connection Pooler ────────────────────────────
+  # ── PgBouncer ────────────────────────────────────────────────
   pgbouncer:
     image: edoburu/pgbouncer:latest
     container_name: erp-pgbouncer
     environment:
       DB_USER: ${DB_USER:-postgres}
-      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required}
+      DB_PASSWORD: ${DB_PASSWORD}
       DB_HOST: db
       DB_NAME: ${DB_NAME:-PosErpDb}
       POOL_MODE: transaction
       MAX_CLIENT_CONN: 1000
       DEFAULT_POOL_SIZE: 50
-      MIN_POOL_SIZE: 10
-      RESERVE_POOL_SIZE: 10
-      SERVER_IDLE_TIMEOUT: 60
     depends_on:
       db:
         condition: service_healthy
     networks:
       - erp-net
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U ${DB_USER:-postgres}"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
 
-  # ── Redis 7 (Cache + Session) ──────────────────────────────
+  # ── Redis ────────────────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: erp-redis
-    command: >
-      redis-server
-      --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required}
-      --appendonly yes
-      --maxmemory 512mb
-      --maxmemory-policy allkeys-lru
+    command: redis-server --requirepass ${REDIS_PASSWORD:?REDIS_PASSWORD is required} --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
     volumes:
       - redisdata:/data
     networks:
       - erp-net
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping"]
+      test: [ "CMD", "redis-cli", "-a", "${REDIS_PASSWORD}", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # ── ASP.NET Core 8 Backend ─────────────────────────────────
+  # ── Backend API (.NET 8) ─────────────────────────────────────
   backend:
     build:
       context: ../src/Backend
-      dockerfile: Dockerfile
+      dockerfile: PosErp.Api/Dockerfile
     container_name: erp-backend
     environment:
-      - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=${DB_NAME:-PosErpDb};Username=${DB_USER:-postgres};Password=${DB_PASSWORD};Pooling=true;Minimum Pool Size=5;Maximum Pool Size=100;
-      - Redis__ConnectionString=redis:6379,password=${REDIS_PASSWORD},abortConnect=false
-      - JWT__Key=${JWT_SECRET:?JWT_SECRET is required}
-      - JWT__Issuer=${JWT_ISSUER:-PosErpSystem}
-      - JWT__Audience=${JWT_AUDIENCE:-PosErpFrontend}
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: "Host=pgbouncer;Port=5432;Database=${DB_NAME:-PosErpDb};Username=${DB_USER:-postgres};Password=${DB_PASSWORD};Pooling=true;Minimum Pool Size=5;Maximum Pool Size=100;"
+      Redis__ConnectionString: "redis:6379,password=${REDIS_PASSWORD},abortConnect=false"
+      JWT__Key: ${JWT_SECRET:?JWT_SECRET is required}
+      JWT__Issuer: ${JWT_ISSUER:-PosErpSystem}
+      JWT__Audience: ${JWT_AUDIENCE:-PosErpFrontend}
     depends_on:
       pgbouncer:
         condition: service_healthy
@@ -100,15 +84,14 @@ services:
       - erp-net
     restart: unless-stopped
 
-  # ── Nginx Reverse Proxy + Static Files ─────────────────────
+  # ── Nginx (Frontend + Reverse Proxy) ─────────────────────────
   nginx:
     image: nginx:alpine
     container_name: erp-nginx
     ports:
       - "80:80"
-      - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
       - ../src/Frontend/dist:/usr/share/nginx/html:ro
     depends_on:
       backend:
@@ -123,6 +106,4 @@ networks:
 
 volumes:
   pgdata:
-    name: erp-pgdata
   redisdata:
-    name: erp-redisdata

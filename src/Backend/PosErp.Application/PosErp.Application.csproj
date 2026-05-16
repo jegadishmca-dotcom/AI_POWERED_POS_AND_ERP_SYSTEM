@@ -1,16 +1,36 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
+
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Core EF Core -->
+    <PackageReference Include="Hangfire.AspNetCore" Version="1.8.14" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.0" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.0" />
+    
+    <!-- ASP.NET & MVC -->
+    <PackageReference Include="Microsoft.AspNetCore.Mvc" Version="2.2.0" />
+    
+    <!-- MediatR & Validation -->
+    <PackageReference Include="MediatR" Version="12.4.0" />
+    <PackageReference Include="FluentValidation" Version="11.9.0" />
+    <PackageReference Include="Mapster" Version="7.4.0" />
+    
+    <!-- Hangfire -->
+    <PackageReference Include="Hangfire" Version="1.8.14" />
+    <PackageReference Include="Hangfire.PostgreSql" Version="1.20.0" />
+    
+    <!-- Redis Cache -->
+    <PackageReference Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="8.0.0" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\PosErp.Domain\PosErp.Domain.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="MediatR" Version="12.2.0" />
-    <PackageReference Include="FluentValidation" Version="11.9.0" />
-    <PackageReference Include="FluentValidation.DependencyInjectionExtensions" Version="11.9.0" />
-    <PackageReference Include="Mapster" Version="7.4.0" />
-  </ItemGroup>
+
 </Project>

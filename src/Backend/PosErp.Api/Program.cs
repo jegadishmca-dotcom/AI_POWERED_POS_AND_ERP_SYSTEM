@@ -75,4 +75,51 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHealthChecks("/health");
 
+// Seed Database
+using (var scope = app.Services.CreateScope())
+{
+    var services = scope.ServiceProvider;
+    try
+    {
+        var context = services.GetRequiredService<ApplicationDbContext>();
+        
+        // Ensure database exists
+        context.Database.EnsureCreated();
+        
+        if (!await context.Users.AnyAsync())
+        {
+            var passwordHasher = services.GetRequiredService<IPasswordHasher>();
+            
+            // Seed Admin User
+            var adminUser = new PosErp.Domain.Entities.Auth.User
+            {
+                Username = "admin@supermarket.local",
+                PasswordHash = passwordHasher.HashPassword("Admin@123!"),
+                FullName = "System Administrator",
+                RoleId = Guid.Parse("00000000-0000-0000-0000-000000000001"), // Owner
+                IsActive = true
+            };
+            context.Users.Add(adminUser);
+            
+            // Seed Cashier User
+            var cashierUser = new PosErp.Domain.Entities.Auth.User
+            {
+                Username = "cashier@supermarket.local",
+                PasswordHash = passwordHasher.HashPassword("Cashier@123!"),
+                FullName = "Terminal Cashier 01",
+                RoleId = Guid.Parse("00000000-0000-0000-0000-000000000002"), // Cashier
+                IsActive = true
+            };
+            context.Users.Add(cashierUser);
+            
+            await context.SaveChangesAsync();
+            Console.WriteLine("Database seeded successfully with default users.");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"An error occurred seeding the DB: {ex.Message}");
+    }
+}
+
 app.Run();

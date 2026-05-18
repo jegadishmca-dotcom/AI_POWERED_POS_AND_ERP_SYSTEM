@@ -89,7 +89,7 @@ export const PurchaseOrderForm = () => {
                 />
               </td>
               <td className="p-3 text-right font-bold text-slate-700">
-                â‚¹{(item.orderedQty * item.unitCost).toFixed(2)}
+                ₹{(item.orderedQty * item.unitCost).toFixed(2)}
               </td>
               <td className="p-3 text-center">
                 <button onClick={() => handleRemoveItem(idx)} className="text-red-500 hover:text-red-700">
@@ -104,7 +104,7 @@ export const PurchaseOrderForm = () => {
       <div className="flex justify-end border-t pt-4">
         <div className="text-right">
           <p className="text-gray-500 font-bold mb-1">Total PO Amount</p>
-          <p className="text-4xl font-black text-slate-800">â‚¹{totalAmount.toFixed(2)}</p>
+          <p className="text-4xl font-black text-slate-800">₹{totalAmount.toFixed(2)}</p>
         </div>
       </div>
     </div>

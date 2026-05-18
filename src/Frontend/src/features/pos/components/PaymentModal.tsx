@@ -63,7 +63,7 @@ export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompleteP
           <div className="w-1/2 pl-6 flex flex-col">
             <div className="bg-slate-100 p-4 rounded-lg mb-4 text-center">
               <p className="text-gray-500 font-bold uppercase text-sm">Total Due</p>
-              <p className="text-4xl font-black text-indigo-700">â‚¹{cartTotal.toFixed(2)}</p>
+              <p className="text-4xl font-black text-indigo-700">₹{cartTotal.toFixed(2)}</p>
             </div>
 
             {customer && customer.walletBalance > 0 && (
@@ -72,19 +72,19 @@ export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompleteP
                   <p className="font-bold flex items-center text-indigo-900"><Wallet className="w-4 h-4 mr-1"/> Pay via Wallet</p>
                   <input type="checkbox" checked={useWalletMax} onChange={() => {}} className="w-4 h-4" />
                 </div>
-                <p className="text-sm text-indigo-700 font-bold">Balance: â‚¹{customer.walletBalance.toFixed(2)}</p>
-                {useWalletMax && <p className="text-xs font-bold text-emerald-600 mt-1">Applying â‚¹{tenders.wallet.toFixed(2)}</p>}
+                <p className="text-sm text-indigo-700 font-bold">Balance: ₹{customer.walletBalance.toFixed(2)}</p>
+                {useWalletMax && <p className="text-xs font-bold text-emerald-600 mt-1">Applying ₹{tenders.wallet.toFixed(2)}</p>}
               </div>
             )}
 
             <div className="mt-auto space-y-2">
               <div className="flex justify-between text-lg">
                 <span className="text-gray-600">Remaining</span>
-                <span className="font-bold text-red-500">â‚¹{balanceDue.toFixed(2)}</span>
+                <span className="font-bold text-red-500">₹{balanceDue.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-lg border-t pt-2 border-slate-300">
                 <span className="text-gray-600">Change Due</span>
-                <span className="font-bold text-emerald-600">â‚¹{changeDue.toFixed(2)}</span>
+                <span className="font-bold text-emerald-600">₹{changeDue.toFixed(2)}</span>
               </div>
             </div>
           </div>

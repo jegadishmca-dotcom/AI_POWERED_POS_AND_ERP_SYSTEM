@@ -43,7 +43,7 @@ export const StockPositionReport = () => {
               <th className="p-3 border">Product Name</th>
               <th className="p-3 border">Category</th>
               <th className="p-3 border text-right">Current Stock</th>
-              <th className="p-3 border text-right">Stock Value (â‚¹)</th>
+              <th className="p-3 border text-right">Stock Value (₹)</th>
             </tr>
           </thead>
           <tbody>
@@ -55,14 +55,14 @@ export const StockPositionReport = () => {
                 <td className="p-3 text-right font-black text-lg text-slate-800">
                   <span className={item.stock < 20 ? 'text-red-600' : ''}>{item.stock}</span>
                 </td>
-                <td className="p-3 text-right font-bold text-gray-600">â‚¹{item.value.toLocaleString()}</td>
+                <td className="p-3 text-right font-bold text-gray-600">₹{item.value.toLocaleString()}</td>
               </tr>
             ))}
           </tbody>
           <tfoot className="bg-slate-50 font-bold">
             <tr>
               <td colSpan={4} className="p-3 text-right">Total Inventory Value:</td>
-              <td className="p-3 text-right text-indigo-700 text-lg">â‚¹34,730.00</td>
+              <td className="p-3 text-right text-indigo-700 text-lg">₹34,730.00</td>
             </tr>
           </tfoot>
         </table>

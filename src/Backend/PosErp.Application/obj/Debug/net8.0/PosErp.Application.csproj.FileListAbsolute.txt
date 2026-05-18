@@ -4,3 +4,15 @@ D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Back
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\obj\Debug\net8.0\PosErp.Application.AssemblyInfo.cs
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\obj\Debug\net8.0\PosErp.Application.csproj.CoreCompileInputs.cache
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\obj\Debug\net8.0\PosErp.Application.sourcelink.json
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\bin\Debug\net8.0\PosErp.Application.deps.json
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\bin\Debug\net8.0\PosErp.Application.runtimeconfig.json
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\bin\Debug\net8.0\PosErp.Application.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\bin\Debug\net8.0\PosErp.Application.pdb
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\bin\Debug\net8.0\PosErp.Domain.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\bin\Debug\net8.0\PosErp.Domain.pdb
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\obj\Debug\net8.0\PosErp.A.C94816AB.Up2Date
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\obj\Debug\net8.0\PosErp.Application.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\obj\Debug\net8.0\refint\PosErp.Application.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\obj\Debug\net8.0\PosErp.Application.pdb
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\obj\Debug\net8.0\PosErp.Application.genruntimeconfig.cache
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Application\obj\Debug\net8.0\ref\PosErp.Application.dll

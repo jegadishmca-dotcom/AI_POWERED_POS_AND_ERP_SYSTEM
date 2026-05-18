@@ -1,4 +1,4 @@
-﻿using FluentValidation;
+using FluentValidation;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
@@ -12,7 +12,7 @@ namespace PosErp.Application.Features.Auth.Commands.Login;
 public record LoginCommand(string Username, string Password, string TerminalCode) : IRequest<LoginResponse>;
 
 public record LoginResponse(string AccessToken, string RefreshToken, UserDto User);
-public record UserDto(Guid Id, string Username, string FullName, Guid RoleId, Guid? StoreId);
+public record UserDto(Guid Id, string Username, string FullName, string Role, Guid? StoreId);
 
 public class LoginCommandValidator : AbstractValidator<LoginCommand>
 {
@@ -52,9 +52,15 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
             throw new UnauthorizedAccessException("Invalid credentials.");
         }
 
+        // Retrieve actual Role name
+        var roleName = await _context.Roles
+            .Where(r => r.Id == user.RoleId)
+            .Select(r => r.Name)
+            .FirstOrDefaultAsync(cancellationToken) ?? "Staff";
+
         // TODO: Validate TerminalCode exists and is active
         
-        var accessToken = _jwtGenerator.GenerateToken(user, "UserRolePlaceholder");
+        var accessToken = _jwtGenerator.GenerateToken(user, roleName);
         var refreshTokenStr = _jwtGenerator.GenerateRefreshToken();
 
         var refreshToken = new RefreshToken
@@ -77,6 +83,6 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
         return new LoginResponse(
             accessToken, 
             refreshTokenStr, 
-            new UserDto(user.Id, user.Username, user.FullName, user.RoleId, user.StoreId));
+            new UserDto(user.Id, user.Username, user.FullName, roleName, user.StoreId));
     }
 }

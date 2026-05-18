@@ -49,7 +49,7 @@ export const PurchaseOrderList = () => {
                 <td className="p-3 font-bold text-blue-600 cursor-pointer">{po.poNumber}</td>
                 <td className="p-3 text-slate-800">{po.supplier}</td>
                 <td className="p-3 text-gray-600">{po.date}</td>
-                <td className="p-3 font-bold">â‚¹{po.amount.toFixed(2)}</td>
+                <td className="p-3 font-bold">₹{po.amount.toFixed(2)}</td>
                 <td className="p-3 text-center">
                   <span className={`px-2 py-1 rounded text-xs font-bold ${po.status === 'APPROVED' ? 'bg-green-100 text-green-800' : po.status === 'DRAFT' ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-800'}`}>
                     {po.status.replace('_', ' ')}

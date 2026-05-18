@@ -25,6 +25,7 @@ import { StockTakeForm } from './features/inventory/components/StockTakeForm';
 import { StockLedgerView } from './features/inventory/components/StockLedgerView';
 import { StockPositionReport } from './features/inventory/components/StockPositionReport';
 import { WarehouseLocationsList } from './features/inventory/components/WarehouseLocationsList';
+import { ShiftReport } from './features/analytics/components/ShiftReport';
 
 const AppLayout: React.FC = () => {
   const { user, clearAuth } = useAuthStore();
@@ -39,7 +40,8 @@ const AppLayout: React.FC = () => {
   const navItems = [
     { path: '/dashboard', name: 'Dashboard', icon: LayoutDashboard, roles: ['Owner', 'Manager'] },
     { path: '/pos', name: 'POS Billing', icon: ShoppingCart, roles: ['Owner', 'Manager', 'Cashier'] },
-    { path: '/products', name: 'Product Catalog', icon: Package, roles: ['Owner', 'Manager', 'Cashier'] },
+    { path: '/shift-report', name: 'Shift & Sales Report', icon: ClipboardCheck, roles: ['Owner', 'Manager', 'Cashier'] },
+    { path: '/products', name: 'Product Catalog', icon: Package, roles: ['Owner', 'Manager'] },
     { path: '/grn', name: 'Goods Receipt (GRN)', icon: ClipboardCheck, roles: ['Owner', 'Manager'] },
     { path: '/stock-adjustment', name: 'Stock Adjustment', icon: ArrowUpDown, roles: ['Owner', 'Manager'] },
     { path: '/stock-take', name: 'Stock Take', icon: ClipboardCheck, roles: ['Owner', 'Manager'] },
@@ -134,17 +136,34 @@ const AppLayout: React.FC = () => {
         {/* Screen Content Wrapper */}
         <main className="flex-1 overflow-y-auto bg-slate-50 dark:bg-slate-900 transition-colors duration-200 relative">
           <Routes>
-            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/dashboard" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <Dashboard />
+            } />
             <Route path="/pos" element={<PosTerminal />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/grn" element={<GrnForm />} />
-            <Route path="/stock-adjustment" element={<StockAdjustmentForm />} />
-            <Route path="/stock-take" element={<StockTakeForm />} />
-            <Route path="/stock-ledger" element={<StockLedgerView />} />
-            <Route path="/stock-position" element={<StockPositionReport />} />
-            <Route path="/warehouses" element={<WarehouseLocationsList />} />
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="*" element={<Navigate to="/dashboard" replace />} />
+            <Route path="/shift-report" element={<ShiftReport />} />
+            <Route path="/products" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <Products />
+            } />
+            <Route path="/grn" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <GrnForm />
+            } />
+            <Route path="/stock-adjustment" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <StockAdjustmentForm />
+            } />
+            <Route path="/stock-take" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <StockTakeForm />
+            } />
+            <Route path="/stock-ledger" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <StockLedgerView />
+            } />
+            <Route path="/stock-position" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <StockPositionReport />
+            } />
+            <Route path="/warehouses" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <WarehouseLocationsList />
+            } />
+            <Route path="/" element={<Navigate to={user?.role === 'Cashier' ? "/pos" : "/dashboard"} replace />} />
+            <Route path="*" element={<Navigate to={user?.role === 'Cashier' ? "/pos" : "/dashboard"} replace />} />
           </Routes>
         </main>
       </div>

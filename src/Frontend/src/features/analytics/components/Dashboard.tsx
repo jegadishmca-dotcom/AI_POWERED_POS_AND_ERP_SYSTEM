@@ -56,8 +56,8 @@ export const Dashboard = () => {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
           <div>
             <p className="text-sm font-bold text-gray-500 mb-1">Today's Net Sales</p>
-            <h2 className="text-3xl font-black text-slate-800">â‚¹{kpis.sales.toLocaleString()}</h2>
-            <p className="text-sm font-bold mt-2 text-emerald-500">â†‘ {kpis.growth}% vs Yesterday</p>
+            <h2 className="text-3xl font-black text-slate-800">₹{kpis.sales.toLocaleString()}</h2>
+            <p className="text-sm font-bold mt-2 text-emerald-500">↑ {kpis.growth}% vs Yesterday</p>
           </div>
           <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
             <DollarSign className="w-6 h-6" />
@@ -77,7 +77,7 @@ export const Dashboard = () => {
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
           <div>
             <p className="text-sm font-bold text-gray-500 mb-1">Avg Basket Value</p>
-            <h2 className="text-3xl font-black text-slate-800">â‚¹{kpis.avg.toFixed(2)}</h2>
+            <h2 className="text-3xl font-black text-slate-800">₹{kpis.avg.toFixed(2)}</h2>
           </div>
           <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-purple-600">
             <TrendingUp className="w-6 h-6" />
@@ -112,7 +112,7 @@ export const Dashboard = () => {
                   <p className="font-bold text-slate-800 text-sm">{prod.name}</p>
                   <p className="text-xs text-gray-500">{prod.qty} Units Sold</p>
                 </div>
-                <p className="font-black text-indigo-600">â‚¹{prod.rev.toLocaleString()}</p>
+                <p className="font-black text-indigo-600">₹{prod.rev.toLocaleString()}</p>
               </div>
             ))}
           </div>

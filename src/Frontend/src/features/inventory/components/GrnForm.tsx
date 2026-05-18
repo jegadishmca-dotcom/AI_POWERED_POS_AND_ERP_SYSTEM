@@ -94,7 +94,7 @@ export const GrnForm = () => {
                 <tr key={item.id} className="border-b">
                   <td className="p-3">
                     <p className="font-bold">{item.name}</p>
-                    <p className="text-xs text-gray-500">Cost: â‚¹{item.unitCost.toFixed(2)}</p>
+                    <p className="text-xs text-gray-500">Cost: ₹{item.unitCost.toFixed(2)}</p>
                   </td>
                   <td className="p-3 text-center text-lg font-bold text-gray-600">{item.pending}</td>
                   <td className="p-3 bg-blue-50/30">

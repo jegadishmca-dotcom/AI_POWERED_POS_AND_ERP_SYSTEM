@@ -102,7 +102,7 @@ export const PosTerminal = () => {
                 <p className="text-xs text-gray-500">{customer.phone}</p>
               </div>
               <div className="text-right border-l pl-3">
-                <p className="text-xs text-gray-600 flex items-center justify-end"><Wallet className="w-3 h-3 mr-1 text-blue-500"/> â‚¹{customer.walletBalance}</p>
+                <p className="text-xs text-gray-600 flex items-center justify-end"><Wallet className="w-3 h-3 mr-1 text-blue-500"/> ₹{customer.walletBalance}</p>
                 <p className="text-xs text-gray-600 flex items-center justify-end"><Award className="w-3 h-3 mr-1 text-orange-500"/> {customer.points} Pts</p>
               </div>
               <button onClick={() => setCustomer(null)} className="text-gray-400 hover:text-red-500 ml-2"><X className="w-5 h-5"/></button>
@@ -133,10 +133,10 @@ export const PosTerminal = () => {
                     )}
                   </td>
                   <td className="p-3 text-center font-bold text-xl">{item.qty}</td>
-                  <td className="p-3 text-right">â‚¹{item.unitPrice}</td>
+                  <td className="p-3 text-right">₹{item.unitPrice}</td>
                   <td className="p-3 text-right">
-                    {item.discountAmount > 0 && <p className="text-sm text-gray-400 line-through">â‚¹{item.lineTotal}</p>}
-                    <p className="font-black text-xl text-slate-800">â‚¹{item.finalLineTotal}</p>
+                    {item.discountAmount > 0 && <p className="text-sm text-gray-400 line-through">₹{item.lineTotal}</p>}
+                    <p className="font-black text-xl text-slate-800">₹{item.finalLineTotal}</p>
                   </td>
                 </tr>
               ))}
@@ -162,19 +162,19 @@ export const PosTerminal = () => {
             <button className="bg-slate-800 text-white px-4 rounded-r font-bold hover:bg-slate-700">Apply</button>
           </div>
 
-          <div className="flex justify-between text-lg mb-2"><span>Subtotal</span><span className="font-bold text-slate-700">â‚¹{cart.subtotal.toFixed(2)}</span></div>
+          <div className="flex justify-between text-lg mb-2"><span>Subtotal</span><span className="font-bold text-slate-700">₹{cart.subtotal.toFixed(2)}</span></div>
           <div className="flex justify-between text-lg mb-2 text-emerald-600">
             <span>Discounts</span>
-            <span className="font-bold">-â‚¹{cart.totalDiscount.toFixed(2)}</span>
+            <span className="font-bold">-₹{cart.totalDiscount.toFixed(2)}</span>
           </div>
           {cart.appliedOfferNames.length > 0 && (
              <div className="text-xs text-emerald-600 mb-2 italic">Applied: {cart.appliedOfferNames.join(', ')}</div>
           )}
           
-          <div className="flex justify-between text-lg mb-6"><span>Tax (GST)</span><span>â‚¹{cart.taxTotal.toFixed(2)}</span></div>
+          <div className="flex justify-between text-lg mb-6"><span>Tax (GST)</span><span>₹{cart.taxTotal.toFixed(2)}</span></div>
           
           <div className="flex justify-between text-4xl font-black text-indigo-700 mb-8 border-t pt-4">
-            <span>Total</span><span>â‚¹{cart.finalTotal.toFixed(2)}</span>
+            <span>Total</span><span>₹{cart.finalTotal.toFixed(2)}</span>
           </div>
 
           {/* Payment Methods */}
@@ -189,7 +189,7 @@ export const PosTerminal = () => {
               onClick={() => setPaymentModalOpen(true)}
             >
               WALLET
-              {customer && <span className="text-sm">Bal: â‚¹{customer.walletBalance}</span>}
+              {customer && <span className="text-sm">Bal: ₹{customer.walletBalance}</span>}
             </button>
           </div>
         </div>

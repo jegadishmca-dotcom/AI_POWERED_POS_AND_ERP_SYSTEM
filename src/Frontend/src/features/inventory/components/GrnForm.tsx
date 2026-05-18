@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { PackageCheck, Save, AlertCircle } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/utils/api';
@@ -26,7 +26,7 @@ export const GrnForm = () => {
     // Validate Expiry for hasExpiry items
     const invalidItem = grnItems.find(i => i.hasExpiry && i.accepted > 0 && !i.expiry);
     if (invalidItem) {
-      alert(Expiry Date is mandatory for \);
+      alert(`Expiry Date is mandatory for ${invalidItem.name}`);
       return;
     }
 
@@ -132,7 +132,7 @@ export const GrnForm = () => {
                     <div className="flex items-center">
                       <input 
                         type="date" 
-                        className={w-full p-2 border rounded text-sm \}
+                        className={`w-full p-2 border rounded text-sm ${item.hasExpiry ? 'border-orange-300' : ''}`}
                         value={item.expiry}
                         onChange={(e) => handleQuantityChange(idx, 'expiry', e.target.value)}
                       />

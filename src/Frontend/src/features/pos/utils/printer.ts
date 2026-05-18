@@ -1,4 +1,4 @@
-﻿import { api } from '@/utils/api';
+import { api } from '@/utils/api';
 import { Invoice } from '../types';
 
 /**
@@ -8,16 +8,16 @@ const generateEscPosText = (invoice: Invoice): string => {
   let text = "     ENTERPRISE SUPERMARKET\n";
   text += "          Tax Invoice\n";
   text += "--------------------------------\n";
-  text += \Inv: \\n\;
-  text += \Date: \\n\;
+  text += `Inv: ${invoice.invoiceNumber}\n`;
+  text += `Date: ${invoice.createdAt}\n`;
   text += "--------------------------------\n";
   invoice.items.forEach(item => {
-    text += \\\n\;
-    text += \\ x \    \\n\;
+    text += `${item.name}\n`;
+    text += `${item.qty} x ${item.unitPrice}    ${item.finalLineTotal}\n`;
   });
   text += "--------------------------------\n";
-  text += \TOTAL:           \\n\;
-  text += \NET PAYABLE:     \\n\;
+  text += `TOTAL:           ${invoice.totalAmount}\n`;
+  text += `NET PAYABLE:     ${invoice.netPayable}\n`;
   text += "--------------------------------\n";
   text += "   Thank you for shopping!   \n\n\n\n";
   return text;

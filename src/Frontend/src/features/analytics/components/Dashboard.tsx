@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { TrendingUp, ShoppingBag, Users, DollarSign, Download } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
@@ -31,7 +31,7 @@ export const Dashboard = () => {
   }, []);
 
   const handleExport = (type: 'pdf' | 'excel') => {
-    alert(Downloading \ report from /api/analytics/export/\);
+    alert(`Downloading ${type} report from /api/analytics/export/${type}`);
   };
 
   return (
@@ -94,8 +94,8 @@ export const Dashboard = () => {
               <LineChart data={salesTrend}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => â‚¹\k} />
-                <Tooltip formatter={(value) => â‚¹\} />
+                <YAxis axisLine={false} tickLine={false} tickFormatter={(value) => `₹${(value/1000).toFixed(0)}k`} />
+                <Tooltip formatter={(value) => [`₹${Number(value).toLocaleString()}`, 'Sales']} />
                 <Line type="monotone" dataKey="NetSales" stroke="#4f46e5" strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 8 }} />
               </LineChart>
             </ResponsiveContainer>

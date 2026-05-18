@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { AlertTriangle, Clock } from 'lucide-react';
 
 export const NearExpiryDashboardWidget = () => {
@@ -24,7 +24,7 @@ export const NearExpiryDashboardWidget = () => {
               <p className="text-xs text-gray-500">Batch: {alert.batch} | Stock: {alert.stock}</p>
             </div>
             <div className="text-right">
-              <p className={ont-bold text-sm flex items-center justify-end \}>
+              <p className={`font-bold text-sm flex items-center justify-end ${alert.days <= 3 ? 'text-red-600' : 'text-orange-500'}`}>
                 <Clock className="w-3 h-3 mr-1" /> {alert.days} Days
               </p>
             </div>

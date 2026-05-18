@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { Save, ShieldAlert, Plus, Search } from 'lucide-react';
 
 export const StockAdjustmentForm = () => {
@@ -49,7 +49,7 @@ export const StockAdjustmentForm = () => {
               <td className="p-3">
                 <input 
                   type="number" 
-                  className={w-full p-1 border rounded text-right \}
+                  className={`w-full p-1 border rounded text-right ${items[idx].qty < 0 ? 'text-red-600' : 'text-green-600'}`}
                   value={item.qty} 
                   onChange={(e) => {
                     const newItems = [...items];

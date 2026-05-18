@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag } from 'lucide-react';
 import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistrationModal';
 import { PaymentModal } from './PaymentModal';
@@ -184,7 +184,7 @@ export const PosTerminal = () => {
             <button className="bg-slate-800 text-white p-4 rounded-lg font-bold text-xl shadow hover:bg-slate-900">CARD</button>
             
             <button 
-              className={p-4 rounded-lg font-bold text-xl shadow flex flex-col items-center justify-center \}
+              className={`p-4 rounded-lg font-bold text-xl shadow flex flex-col items-center justify-center ${!customer || customer.walletBalance <= 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
               disabled={!customer || customer.walletBalance <= 0}
               onClick={() => setPaymentModalOpen(true)}
             >
@@ -206,7 +206,7 @@ export const PosTerminal = () => {
         }} 
       />
 
-      </div\>
+      </div>
 
       <CustomerRegistrationModal 
         isOpen={isCustomerModalOpen} 

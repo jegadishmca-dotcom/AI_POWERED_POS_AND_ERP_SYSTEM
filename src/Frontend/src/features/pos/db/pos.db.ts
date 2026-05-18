@@ -1,4 +1,4 @@
-﻿import Dexie, { Table } from 'dexie';
+import Dexie, { Table } from 'dexie';
 import { Invoice } from '../types';
 
 export interface LocalProduct {
@@ -19,7 +19,7 @@ export class PosDatabase extends Dexie {
   constructor() {
     super('PosDatabase');
     this.version(2).stores({
-      catalog: 'id, code, barcode, name' // Proper indexes added for <100ms lookup, 
+      catalog: 'id, code, barcode, name', // Proper indexes added for <100ms lookup
       invoices: 'id, status',
       sync_queue: 'id',
       held_invoices: 'id' // Held carts
@@ -28,4 +28,3 @@ export class PosDatabase extends Dexie {
 }
 
 export const posDb = new PosDatabase();
-

@@ -1,4 +1,4 @@
-﻿import axios from 'axios';
+import axios from 'axios';
 import { useAuthStore } from '../features/auth/store/auth.store';
 
 export const api = axios.create({
@@ -9,7 +9,7 @@ export const api = axios.create({
 api.interceptors.request.use((config) => {
   const token = useAuthStore.getState().accessToken;
   if (token) {
-    config.headers.Authorization = \Bearer \\;
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
@@ -22,7 +22,7 @@ api.interceptors.response.use(
       originalRequest._retry = true;
       try {
         const res = await axios.post(
-          \\/api/auth/refresh\,
+          `/api/auth/refresh`,
           {},
           { withCredentials: true }
         );
@@ -30,7 +30,7 @@ api.interceptors.response.use(
           useAuthStore.getState().user!,
           res.data.accessToken
         );
-        originalRequest.headers.Authorization = \Bearer \\;
+        originalRequest.headers.Authorization = `Bearer ${res.data.accessToken}`;
         return api(originalRequest);
       } catch (refreshError) {
         useAuthStore.getState().clearAuth();

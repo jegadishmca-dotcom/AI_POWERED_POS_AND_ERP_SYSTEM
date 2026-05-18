@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { ClipboardCheck, Save, CheckCircle } from 'lucide-react';
 
 export const StockTakeForm = () => {
@@ -52,7 +52,7 @@ export const StockTakeForm = () => {
                     }}
                   />
                 </td>
-                <td className={p-3 text-center font-bold \}>
+                <td className={`p-3 text-center font-bold ${variance > 0 ? 'text-green-600' : variance < 0 ? 'text-red-600' : 'text-gray-600'}`}>
                   {variance > 0 ? '+' : ''}{variance}
                 </td>
               </tr>

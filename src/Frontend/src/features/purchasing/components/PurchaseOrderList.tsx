@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Plus, CheckCircle, Clock, Search } from 'lucide-react';
 
 export const PurchaseOrderList = () => {
@@ -51,7 +51,7 @@ export const PurchaseOrderList = () => {
                 <td className="p-3 text-gray-600">{po.date}</td>
                 <td className="p-3 font-bold">â‚¹{po.amount.toFixed(2)}</td>
                 <td className="p-3 text-center">
-                  <span className={px-2 py-1 rounded text-xs font-bold \}>
+                  <span className={`px-2 py-1 rounded text-xs font-bold ${po.status === 'APPROVED' ? 'bg-green-100 text-green-800' : po.status === 'DRAFT' ? 'bg-gray-100 text-gray-700' : 'bg-blue-100 text-blue-800'}`}>
                     {po.status.replace('_', ' ')}
                   </span>
                 </td>

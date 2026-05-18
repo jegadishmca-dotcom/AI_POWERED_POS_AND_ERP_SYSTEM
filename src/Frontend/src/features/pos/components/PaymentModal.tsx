@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { CreditCard, Wallet, Banknote, QrCode, CheckCircle } from 'lucide-react';
 
 export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompletePayment }: any) => {
@@ -94,7 +94,7 @@ export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompleteP
           <button 
             onClick={handleComplete}
             disabled={balanceDue > 0}
-            className={px-8 py-3 rounded text-white font-black text-xl flex items-center shadow \}
+            className={`px-8 py-3 rounded text-white font-black text-xl flex items-center shadow ${balanceDue > 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}
           >
             <CheckCircle className="w-6 h-6 mr-2" /> COMPLETE INVOICE
           </button>

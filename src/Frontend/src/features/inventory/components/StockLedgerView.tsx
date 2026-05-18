@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { History, FileText, TrendingUp, TrendingDown } from 'lucide-react';
 
 export const StockLedgerView = () => {
@@ -46,14 +46,14 @@ export const StockLedgerView = () => {
                 <td className="p-3 text-sm text-gray-600">{entry.date}</td>
                 <td className="p-3 font-bold text-slate-800">{entry.product}</td>
                 <td className="p-3 text-center">
-                  <span className={px-2 py-1 rounded text-xs font-bold \}>
+                  <span className={`px-2 py-1 rounded text-xs font-bold ${entry.type === 'GRN' ? 'bg-green-100 text-green-800' : entry.type === 'SALE' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
                     {entry.type}
                   </span>
                 </td>
                 <td className="p-3 text-sm text-blue-600 flex items-center cursor-pointer hover:underline">
                   <FileText className="w-4 h-4 mr-1" /> {entry.ref}
                 </td>
-                <td className={p-3 text-right font-bold flex items-center justify-end \}>
+                <td className={`p-3 text-right font-bold flex items-center justify-end ${entry.qty > 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {entry.qty > 0 ? <TrendingUp className="w-4 h-4 mr-1" /> : <TrendingDown className="w-4 h-4 mr-1" />}
                   {entry.qty > 0 ? '+' : ''}{entry.qty}
                 </td>

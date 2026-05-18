@@ -174,24 +174,11 @@ using (var scope = app.Services.CreateScope())
             await context.SaveChangesAsync();
         }
 
-        // Seed default Unit of Measure if empty
-        var uom = await context.UnitOfMeasures.FirstOrDefaultAsync();
-        if (uom == null)
-        {
-            uom = new PosErp.Domain.Entities.Catalog.UnitOfMeasure
-            {
-                Id = Guid.NewGuid(),
-                Name = "Pieces",
-                Code = "PCS",
-                Description = "Individual Item Pack"
-            };
-            context.UnitOfMeasures.Add(uom);
-            await context.SaveChangesAsync();
-        }
-
         // Seed initial products if empty
         if (!await context.Products.AnyAsync())
         {
+            var defaultUomId = Guid.Parse("00000000-0000-0000-0000-000000000003");
+
             var p1 = new PosErp.Domain.Entities.Catalog.Product
             {
                 Id = Guid.NewGuid(),
@@ -200,7 +187,7 @@ using (var scope = app.Services.CreateScope())
                 TamilName = "பிரிட்டானியா போர்பன்",
                 Description = "Chocolate sandwich biscuits",
                 TaxSlabId = taxSlab.Id,
-                UnitOfMeasureId = uom.Id,
+                UnitOfMeasureId = defaultUomId,
                 Mrp = 30.00m,
                 SellingPrice = 30.00m,
                 PurchasePrice = 24.00m,
@@ -222,7 +209,7 @@ using (var scope = app.Services.CreateScope())
                 TamilName = "ஆசிர்வாத் கோதுமை மாவு",
                 Description = "Whole wheat flour",
                 TaxSlabId = taxSlab.Id,
-                UnitOfMeasureId = uom.Id,
+                UnitOfMeasureId = defaultUomId,
                 Mrp = 290.00m,
                 SellingPrice = 290.00m,
                 PurchasePrice = 240.00m,
@@ -244,7 +231,7 @@ using (var scope = app.Services.CreateScope())
                 TamilName = "டாடா உப்பு",
                 Description = "Iodized table salt",
                 TaxSlabId = taxSlab.Id,
-                UnitOfMeasureId = uom.Id,
+                UnitOfMeasureId = defaultUomId,
                 Mrp = 28.00m,
                 SellingPrice = 28.00m,
                 PurchasePrice = 22.00m,
@@ -266,7 +253,7 @@ using (var scope = app.Services.CreateScope())
                 TamilName = "டைரி மில்க் சில்க்",
                 Description = "Smooth milk chocolate",
                 TaxSlabId = taxSlab.Id,
-                UnitOfMeasureId = uom.Id,
+                UnitOfMeasureId = defaultUomId,
                 Mrp = 170.00m,
                 SellingPrice = 170.00m,
                 PurchasePrice = 136.00m,
@@ -288,7 +275,7 @@ using (var scope = app.Services.CreateScope())
                 TamilName = "சர்ஃப் எக்செல்",
                 Description = "Premium detergent powder",
                 TaxSlabId = taxSlab.Id,
-                UnitOfMeasureId = uom.Id,
+                UnitOfMeasureId = defaultUomId,
                 Mrp = 140.00m,
                 SellingPrice = 140.00m,
                 PurchasePrice = 112.00m,

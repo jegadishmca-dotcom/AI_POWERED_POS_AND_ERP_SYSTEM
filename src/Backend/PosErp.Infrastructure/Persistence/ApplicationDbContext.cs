@@ -109,7 +109,14 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
             foreach (var property in entity.GetProperties())
             {
-                entity.FindProperty(property.Name)?.SetColumnName(ToSnakeCase(property.Name));
+                if (entity.ClrType == typeof(PosErp.Domain.Entities.Catalog.Barcode) && property.Name == nameof(PosErp.Domain.Entities.Catalog.Barcode.BarcodeValue))
+                {
+                    property.SetColumnName("barcode");
+                }
+                else
+                {
+                    entity.FindProperty(property.Name)?.SetColumnName(ToSnakeCase(property.Name));
+                }
             }
         }
     }

@@ -79,6 +79,11 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Invoice>()
             .Property(i => i.BusinessDate)
             .HasColumnType("date");
+
+        modelBuilder.Entity<Invoice>()
+            .Ignore(i => i.TotalDiscount)
+            .Ignore(i => i.TaxTotal)
+            .Ignore(i => i.QrCodeUrl);
             
         modelBuilder.Entity<InvoiceItem>()
             .HasKey(ii => new { ii.Id, ii.BusinessDate });
@@ -86,6 +91,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<InvoiceItem>()
             .Property(ii => ii.BusinessDate)
             .HasColumnType("date");
+
+        modelBuilder.Entity<InvoiceItem>()
+            .Ignore(ii => ii.FinalTotal);
             
         modelBuilder.Entity<InvoiceItem>()
             .HasOne(ii => ii.Invoice)

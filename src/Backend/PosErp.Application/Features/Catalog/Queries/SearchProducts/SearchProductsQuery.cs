@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using System;
@@ -52,7 +52,7 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, L
                 p.Name, 
                 p.TamilName, 
                 p.SellingPrice, 
-                p.Barcodes.FirstOrDefault(b => b.IsPrimary).BarcodeValue ?? string.Empty
+                p.Barcodes.Where(b => b.IsPrimary).Select(b => b.BarcodeValue).FirstOrDefault() ?? string.Empty
             ))
             .ToListAsync(cancellationToken);
 

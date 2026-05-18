@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { searchProducts } from '../api/catalog.api';
 import { Search, Package, Plus } from 'lucide-react';
@@ -64,19 +64,19 @@ export const ProductList = ({ onImportClick }: { onImportClick: () => void }) =>
           <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
             {isLoading ? (
               <tr><td colSpan={4} className="text-center py-4 text-slate-500">Loading...</td></tr>
-            ) : products?.length === 0 ? (
+            ) : !Array.isArray(products) || products.length === 0 ? (
               <tr><td colSpan={4} className="text-center py-4 text-slate-500">No products found.</td></tr>
             ) : (
-              products?.map((p) => (
+              products.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-white">
-                    {p.name}
-                    <div className="text-xs text-slate-500">{p.productCode}</div>
+                    {p.name || 'Unnamed Product'}
+                    <div className="text-xs text-slate-500">{p.productCode || 'N/A'}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">{p.primaryBarcode}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">{p.primaryBarcode || '-'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 font-tamil">{p.tamilName || '-'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-white text-right font-semibold">
-                    {p.sellingPrice.toFixed(2)}
+                    {(p.sellingPrice ?? 0).toFixed(2)}
                   </td>
                 </tr>
               ))

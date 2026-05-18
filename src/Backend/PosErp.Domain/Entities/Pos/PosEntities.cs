@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace PosErp.Domain.Entities.Pos;
@@ -14,6 +14,7 @@ public class Invoice
     public Guid TerminalId { get; set; }
     public int TerminalSequence { get; set; }
     public Guid CashierId { get; set; }
+    public Guid? CustomerId { get; set; }
     
     public decimal SubTotal { get; set; }
     public decimal DiscountAmount { get; set; }
@@ -21,6 +22,10 @@ public class Invoice
     public decimal TotalAmount { get; set; }
     public decimal RoundOff { get; set; }
     public decimal NetPayable { get; set; }
+    // Aliases for compatibility
+    public decimal TotalDiscount { get => DiscountAmount; set => DiscountAmount = value; }
+    public decimal TaxTotal { get => TaxAmount; set => TaxAmount = value; }
+    public string? QrCodeUrl { get => QrCode; set => QrCode = value; }
     
     // E-Invoicing Hooks
     public string? Irn { get; set; }
@@ -63,11 +68,15 @@ public class InvoiceItem
     public decimal CessRate { get; set; }
     public decimal CessAmount { get; set; }
     
+    public decimal Total { get; set; }
     public decimal TotalAmount { get; set; }
+    // Alias for compatibility
+    public decimal FinalTotal { get => TotalAmount; set => TotalAmount = value; }
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public Guid? CreatedBy { get; set; }
     public bool IsDeleted { get; set; }
     
     public Invoice Invoice { get; set; } = null!;
+    public PosErp.Domain.Entities.Catalog.Product? Product { get; set; }
 }

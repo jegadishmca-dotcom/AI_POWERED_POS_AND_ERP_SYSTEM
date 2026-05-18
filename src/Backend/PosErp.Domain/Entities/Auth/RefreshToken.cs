@@ -1,4 +1,5 @@
-﻿using System;
+using System;
+using PosErp.Domain.Entities.Auth;
 
 namespace PosErp.Domain.Entities.Auth;
 
@@ -12,4 +13,7 @@ public class RefreshToken
     public bool IsRevoked { get; set; }
     public string DeviceId { get; set; } = string.Empty;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    // Navigation property
+    public User User { get; set; } = null!;
 }

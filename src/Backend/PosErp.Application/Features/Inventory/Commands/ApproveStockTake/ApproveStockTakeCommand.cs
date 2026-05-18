@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Application.Features.Inventory.Services;
@@ -28,7 +28,7 @@ public class ApproveStockTakeCommandHandler : IRequestHandler<ApproveStockTakeCo
         {
             // Note: Uses DbSet mapped in DbContext
             // For scaffold, assume context.Set<StockTakeHeader>()
-            var take = await _context.Set<PosErp.Domain.Entities.Inventory.StockTakeHeader>()
+            var take = await _context.StockTakeHeaders
                 .Include(t => t.Items)
                 .FirstOrDefaultAsync(t => t.Id == request.StockTakeId, cancellationToken);
                 

@@ -70,14 +70,14 @@ services:
     container_name: erp-backend
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      ConnectionStrings__DefaultConnection: "Host=pgbouncer;Port=5432;Database=${DB_NAME:-PosErpDb};Username=${DB_USER:-postgres};Password=${DB_PASSWORD};Pooling=true;Minimum Pool Size=5;Maximum Pool Size=100;"
+      ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=${DB_NAME:-PosErpDb};Username=${DB_USER:-postgres};Password=${DB_PASSWORD};Pooling=true;Minimum Pool Size=5;Maximum Pool Size=100;"
       Redis__ConnectionString: "redis:6379,password=${REDIS_PASSWORD},abortConnect=false"
       JWT__Key: ${JWT_SECRET:?JWT_SECRET is required}
       JWT__Issuer: ${JWT_ISSUER:-PosErpSystem}
       JWT__Audience: ${JWT_AUDIENCE:-PosErpFrontend}
     depends_on:
-      pgbouncer:
-        condition: service_started
+      db:
+        condition: service_healthy
       redis:
         condition: service_healthy
     networks:

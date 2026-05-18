@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Offers;
@@ -159,6 +159,7 @@ public class OfferEngine : IOfferEngine
         }
 
         cart.TotalDiscount += cart.Items.Sum(i => i.DiscountAmount);
+        cart.TaxTotal = Math.Round((cart.Subtotal - cart.TotalDiscount) * 0.05m, 2);
         cart.FinalTotal = cart.Subtotal - cart.TotalDiscount + cart.TaxTotal;
         return cart;
     }

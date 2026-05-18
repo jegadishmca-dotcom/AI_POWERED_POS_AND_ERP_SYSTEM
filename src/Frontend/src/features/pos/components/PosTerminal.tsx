@@ -4,6 +4,7 @@ import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistra
 import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
 import { searchCustomers, registerCustomer } from '../../crm/api/crm.api';
+import { createInvoice } from '../api/pos.api';
 
 export const PosTerminal = () => {
   const [customer, setCustomer] = useState<any>(null);
@@ -373,11 +374,36 @@ export const PosTerminal = () => {
         onClose={() => setPaymentModalOpen(false)} 
         cartTotal={cart.finalTotal}
         customer={customer}
-        onCompletePayment={(tenders: any) => {
-          setPaymentModalOpen(false);
-          alert('Invoice Created! Backend hit: OfferEngine -> LoyaltyService -> WalletService -> DB. Points Awarded!');
-          setCart({items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: []});
-          setCustomer(null);
+        onCompletePayment={async (tenders: any) => {
+          try {
+            // Generate dynamic invoice payload matching CreateInvoiceCommand
+            const payload = {
+              invoiceNumber: `INV-${localStorage.getItem('pos_terminal_code') || 'POS-01'}-${Date.now().toString().slice(-6)}`,
+              terminalId: '00000000-0000-0000-0000-000000000001', // Default Logical Terminal Ref GUID
+              customerId: customer?.id || undefined,
+              promoCode: promoCode || undefined,
+              walletAmountUsed: tenders.wallet || 0,
+              cashAmount: tenders.cash || 0,
+              upiAmount: tenders.upi || 0,
+              cardAmount: tenders.card || 0,
+              items: cart.items.map((item: any) => ({
+                productId: item.productId,
+                quantity: item.qty,
+                unitPrice: item.unitPrice
+              }))
+            };
+
+            await createInvoice(payload);
+
+            setPaymentModalOpen(false);
+            alert(`Invoice ${payload.invoiceNumber} Created Successfully in Database!\nFinancial journals, tax lines & loyalty ledger recorded!`);
+            setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
+            setCustomer(null);
+            setPromoCode('');
+          } catch (err: any) {
+            console.error('Checkout error:', err);
+            alert('Failed to complete invoice in DB: ' + (err.response?.data?.message || err.message));
+          }
         }} 
       />
 

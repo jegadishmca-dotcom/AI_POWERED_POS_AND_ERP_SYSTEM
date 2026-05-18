@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Pos;
@@ -123,7 +123,8 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             var journalLines = new List<JournalLineDto>();
 
             // Debits (What we received)
-            if (request.CashAmount > 0) journalLines.Add(new JournalLineDto { AccountCode = "1000", Description = "Cash Tender", Debit = request.CashAmount, Credit = 0 });
+            decimal actualCashPaid = cartEvaluation.FinalTotal - request.UpiAmount - request.CardAmount - request.WalletAmountUsed;
+            if (actualCashPaid > 0) journalLines.Add(new JournalLineDto { AccountCode = "1000", Description = "Cash Tender", Debit = actualCashPaid, Credit = 0 });
             if (request.UpiAmount > 0 || request.CardAmount > 0) journalLines.Add(new JournalLineDto { AccountCode = "1100", Description = "Digital Tender", Debit = request.UpiAmount + request.CardAmount, Credit = 0 });
             if (request.WalletAmountUsed > 0) journalLines.Add(new JournalLineDto { AccountCode = "2100", Description = "Wallet Redemption", Debit = request.WalletAmountUsed, Credit = 0 }); // Reducing liability
             

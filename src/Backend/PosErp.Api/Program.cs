@@ -108,8 +108,7 @@ using (var scope = app.Services.CreateScope())
             {
                 Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
                 Name = "Owner",
-                Description = "System Owner / Administrator",
-                IsSystem = true
+                Description = "System Owner / Administrator"
             };
             context.Roles.Add(ownerRole);
             await context.SaveChangesAsync();
@@ -122,8 +121,7 @@ using (var scope = app.Services.CreateScope())
             {
                 Id = Guid.Parse("00000000-0000-0000-0000-000000000002"),
                 Name = "Cashier",
-                Description = "POS Cashier Clerk",
-                IsSystem = true
+                Description = "POS Cashier Clerk"
             };
             context.Roles.Add(cashierRole);
             await context.SaveChangesAsync();

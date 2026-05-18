@@ -21,7 +21,10 @@ public class User
 public class Role
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid? StoreId { get; set; }
     public string Name { get; set; } = string.Empty;
     public string? Description { get; set; }
-    public bool IsSystem { get; set; } = false;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public Guid? CreatedBy { get; set; }
+    public bool IsDeleted { get; set; } = false;
 }

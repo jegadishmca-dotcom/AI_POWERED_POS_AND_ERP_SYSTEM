@@ -100,51 +100,33 @@ using (var scope = app.Services.CreateScope())
             );
         ");
 
-        // Retrieve or insert 'Owner' and 'Cashier' roles dynamically to satisfy FK constraints 
-        // without violating UNIQUE name constraints if roles already exist under other IDs.
-        Guid ownerRoleId = Guid.Empty;
-        Guid cashierRoleId = Guid.Empty;
-
-        try
+        // Retrieve or insert 'Owner' and 'Cashier' roles dynamically using EF Core
+        var ownerRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Owner");
+        if (ownerRole == null)
         {
-            await context.Database.OpenConnectionAsync();
-            using (var command = context.Database.GetDbConnection().CreateCommand())
+            ownerRole = new PosErp.Domain.Entities.Auth.Role
             {
-                // Query Owner Role
-                command.CommandText = "SELECT id FROM roles WHERE name = 'Owner' OR name = 'owner' LIMIT 1;";
-                var result = await command.ExecuteScalarAsync();
-                if (result != null && result != DBNull.Value)
-                {
-                    ownerRoleId = (Guid)result;
-                }
-                else
-                {
-                    ownerRoleId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-                    command.CommandText = "INSERT INTO roles (id, name, description, is_system) VALUES ('00000000-0000-0000-0000-000000000001', 'Owner', 'System Owner / Administrator', true);";
-                    await command.ExecuteNonQueryAsync();
-                }
-
-                // Query Cashier Role
-                command.CommandText = "SELECT id FROM roles WHERE name = 'Cashier' OR name = 'cashier' LIMIT 1;";
-                result = await command.ExecuteScalarAsync();
-                if (result != null && result != DBNull.Value)
-                {
-                    cashierRoleId = (Guid)result;
-                }
-                else
-                {
-                    cashierRoleId = Guid.Parse("00000000-0000-0000-0000-000000000002");
-                    command.CommandText = "INSERT INTO roles (id, name, description, is_system) VALUES ('00000000-0000-0000-0000-000000000002', 'Cashier', 'POS Cashier Clerk', true);";
-                    await command.ExecuteNonQueryAsync();
-                }
-            }
+                Id = Guid.Parse("00000000-0000-0000-0000-000000000001"),
+                Name = "Owner",
+                Description = "System Owner / Administrator",
+                IsSystem = true
+            };
+            context.Roles.Add(ownerRole);
+            await context.SaveChangesAsync();
         }
-        catch (Exception ex)
+
+        var cashierRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Cashier");
+        if (cashierRole == null)
         {
-            Console.WriteLine($"Error seeding or fetching roles: {ex.Message}");
-            // Fallback to static IDs if query fails
-            ownerRoleId = Guid.Parse("00000000-0000-0000-0000-000000000001");
-            cashierRoleId = Guid.Parse("00000000-0000-0000-0000-000000000002");
+            cashierRole = new PosErp.Domain.Entities.Auth.Role
+            {
+                Id = Guid.Parse("00000000-0000-0000-0000-000000000002"),
+                Name = "Cashier",
+                Description = "POS Cashier Clerk",
+                IsSystem = true
+            };
+            context.Roles.Add(cashierRole);
+            await context.SaveChangesAsync();
         }
         
         if (!await context.Users.AnyAsync())
@@ -157,7 +139,7 @@ using (var scope = app.Services.CreateScope())
                 Username = "admin@supermarket.local",
                 PasswordHash = passwordHasher.HashPassword("Admin@123!"),
                 FullName = "System Administrator",
-                RoleId = ownerRoleId,
+                RoleId = ownerRole.Id,
                 IsActive = true
             };
             context.Users.Add(adminUser);
@@ -168,7 +150,7 @@ using (var scope = app.Services.CreateScope())
                 Username = "cashier@supermarket.local",
                 PasswordHash = passwordHasher.HashPassword("Cashier@123!"),
                 FullName = "Terminal Cashier 01",
-                RoleId = cashierRoleId,
+                RoleId = cashierRole.Id,
                 IsActive = true
             };
             context.Users.Add(cashierUser);

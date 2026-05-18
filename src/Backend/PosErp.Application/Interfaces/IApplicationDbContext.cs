@@ -1,4 +1,4 @@
-﻿using System.Threading;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Domain.Entities.Auth;
@@ -16,6 +16,7 @@ public interface IApplicationDbContext
 {
     DbSet<User> Users { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
+    DbSet<Role> Roles { get; }
     
     DbSet<Product> Products { get; }
     DbSet<ProductVariant> ProductVariants { get; }

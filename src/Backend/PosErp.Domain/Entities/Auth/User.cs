@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace PosErp.Domain.Entities.Auth;
 
@@ -16,4 +16,12 @@ public class User
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public Guid? CreatedBy { get; set; }
     public bool IsDeleted { get; set; }
+}
+
+public class Role
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = string.Empty;
+    public string? Description { get; set; }
+    public bool IsSystem { get; set; } = false;
 }

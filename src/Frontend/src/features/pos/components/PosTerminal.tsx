@@ -8,6 +8,7 @@ import { createInvoice } from '../api/pos.api';
 
 export const PosTerminal = () => {
   const [customer, setCustomer] = useState<any>(null);
+  const [customerQuery, setCustomerQuery] = useState('');
   const [isCustomerModalOpen, setCustomerModalOpen] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [isPaymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -142,7 +143,7 @@ export const PosTerminal = () => {
 
   const handleCustomerSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      const val = e.currentTarget.value.trim();
+      const val = customerQuery.trim();
       if (!val) return;
       try {
         const results = await searchCustomers(val);
@@ -178,6 +179,8 @@ export const PosTerminal = () => {
               type="text" 
               placeholder="F3: Search Customer (Phone/Name)..." 
               className="w-full pl-10 p-2 rounded-l border border-indigo-200 outline-none focus:ring-2 ring-indigo-500 font-bold"
+              value={customerQuery}
+              onChange={(e) => setCustomerQuery(e.target.value)}
               onKeyDown={handleCustomerSearch}
             />
             <button 
@@ -198,7 +201,7 @@ export const PosTerminal = () => {
                 <p className="text-xs text-gray-600 flex items-center justify-end"><Wallet className="w-3 h-3 mr-1 text-blue-500"/> ₹{customer.walletBalance}</p>
                 <p className="text-xs text-gray-600 flex items-center justify-end"><Award className="w-3 h-3 mr-1 text-orange-500"/> {customer.points} Pts</p>
               </div>
-              <button onClick={() => setCustomer(null)} className="text-gray-400 hover:text-red-500 ml-2"><X className="w-5 h-5"/></button>
+              <button onClick={() => { setCustomer(null); setCustomerQuery(''); }} className="text-gray-400 hover:text-red-500 ml-2"><X className="w-5 h-5"/></button>
             </div>
           )}
         </div>
@@ -399,6 +402,7 @@ export const PosTerminal = () => {
             alert(`Invoice ${payload.invoiceNumber} Created Successfully in Database!\nFinancial journals, tax lines & loyalty ledger recorded!`);
             setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
             setCustomer(null);
+            setCustomerQuery('');
             setPromoCode('');
           } catch (err: any) {
             console.error('Checkout error:', err);
@@ -430,6 +434,7 @@ export const PosTerminal = () => {
               points: 0,
               tier: 'Base'
             });
+            setCustomerQuery('');
             alert('Customer registered successfully!');
           } catch (err) {
             console.error('Error registering customer:', err);

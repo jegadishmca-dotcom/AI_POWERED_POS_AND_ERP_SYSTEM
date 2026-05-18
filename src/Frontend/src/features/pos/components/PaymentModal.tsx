@@ -2,23 +2,35 @@ import React, { useState } from 'react';
 import { CreditCard, Wallet, Banknote, QrCode, CheckCircle } from 'lucide-react';
 
 export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompletePayment }: any) => {
-  const [tenders, setTenders] = useState({ cash: 0, upi: 0, card: 0, wallet: 0 });
+  const [tenders, setTenders] = useState({ cash: '', upi: '', card: '', wallet: '' });
   const [useWalletMax, setUseWalletMax] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setTenders({ cash: '', upi: '', card: '', wallet: '' });
+      setUseWalletMax(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const totalTendered = tenders.cash + tenders.upi + tenders.card + tenders.wallet;
+  const cashNum = parseFloat(tenders.cash) || 0;
+  const upiNum = parseFloat(tenders.upi) || 0;
+  const cardNum = parseFloat(tenders.card) || 0;
+  const walletNum = parseFloat(tenders.wallet) || 0;
+
+  const totalTendered = cashNum + upiNum + cardNum + walletNum;
   const balanceDue = Math.max(0, cartTotal - totalTendered);
   const changeDue = Math.max(0, totalTendered - cartTotal);
 
   const handleWalletToggle = () => {
     if (!customer) return;
     if (useWalletMax) {
-      setTenders({ ...tenders, wallet: 0 });
+      setTenders({ ...tenders, wallet: '' });
       setUseWalletMax(false);
     } else {
       const walletToUse = Math.min(customer.walletBalance, cartTotal);
-      setTenders({ ...tenders, wallet: walletToUse });
+      setTenders({ ...tenders, wallet: walletToUse.toString() });
       setUseWalletMax(true);
     }
   };
@@ -28,7 +40,12 @@ export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompleteP
       alert("Payment incomplete!");
       return;
     }
-    onCompletePayment(tenders);
+    onCompletePayment({
+      cash: cashNum,
+      upi: upiNum,
+      card: cardNum,
+      wallet: walletNum
+    });
   };
 
   return (
@@ -42,20 +59,20 @@ export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompleteP
         <div className="flex p-6">
           {/* Tender Inputs */}
           <div className="w-1/2 pr-6 border-r space-y-4">
-            <div>
+             <div>
               <label className="flex items-center text-sm font-bold text-gray-700 mb-1"><Banknote className="w-4 h-4 mr-1 text-emerald-600"/> Cash Amount</label>
-              <input type="number" className="w-full p-2 border rounded focus:ring-2 outline-none text-lg font-bold" 
-                     value={tenders.cash} onChange={e => setTenders({...tenders, cash: parseFloat(e.target.value) || 0})} />
+              <input type="text" inputMode="decimal" className="w-full p-2 border rounded focus:ring-2 outline-none text-lg font-bold" 
+                     value={tenders.cash} onChange={e => setTenders({...tenders, cash: e.target.value})} />
             </div>
             <div>
               <label className="flex items-center text-sm font-bold text-gray-700 mb-1"><QrCode className="w-4 h-4 mr-1 text-blue-600"/> UPI / QR Amount</label>
-              <input type="number" className="w-full p-2 border rounded focus:ring-2 outline-none text-lg font-bold" 
-                     value={tenders.upi} onChange={e => setTenders({...tenders, upi: parseFloat(e.target.value) || 0})} />
+              <input type="text" inputMode="decimal" className="w-full p-2 border rounded focus:ring-2 outline-none text-lg font-bold" 
+                     value={tenders.upi} onChange={e => setTenders({...tenders, upi: e.target.value})} />
             </div>
             <div>
               <label className="flex items-center text-sm font-bold text-gray-700 mb-1"><CreditCard className="w-4 h-4 mr-1 text-slate-800"/> Card Amount</label>
-              <input type="number" className="w-full p-2 border rounded focus:ring-2 outline-none text-lg font-bold" 
-                     value={tenders.card} onChange={e => setTenders({...tenders, card: parseFloat(e.target.value) || 0})} />
+              <input type="text" inputMode="decimal" className="w-full p-2 border rounded focus:ring-2 outline-none text-lg font-bold" 
+                     value={tenders.card} onChange={e => setTenders({...tenders, card: e.target.value})} />
             </div>
           </div>
 

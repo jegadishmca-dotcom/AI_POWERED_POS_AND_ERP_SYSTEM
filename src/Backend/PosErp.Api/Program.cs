@@ -174,6 +174,38 @@ using (var scope = app.Services.CreateScope())
             await context.SaveChangesAsync();
         }
 
+        // Seed default Customer Tiers if empty
+        if (!await context.CustomerTiers.AnyAsync())
+        {
+            var t1 = new PosErp.Domain.Entities.Crm.CustomerTier
+            {
+                Id = Guid.Parse("00000000-0000-0000-0000-000000000011"),
+                Name = "Silver",
+                Level = 1,
+                MinimumSpend = 0.00m,
+                PointsEarnMultiplier = 1.0m
+            };
+            var t2 = new PosErp.Domain.Entities.Crm.CustomerTier
+            {
+                Id = Guid.Parse("00000000-0000-0000-0000-000000000012"),
+                Name = "Gold",
+                Level = 2,
+                MinimumSpend = 5000.00m,
+                PointsEarnMultiplier = 1.2m
+            };
+            var t3 = new PosErp.Domain.Entities.Crm.CustomerTier
+            {
+                Id = Guid.Parse("00000000-0000-0000-0000-000000000013"),
+                Name = "Platinum",
+                Level = 3,
+                MinimumSpend = 15000.00m,
+                PointsEarnMultiplier = 1.5m
+            };
+            context.CustomerTiers.AddRange(t1, t2, t3);
+            await context.SaveChangesAsync();
+            Console.WriteLine("Database seeded successfully with default customer tiers.");
+        }
+
         // Seed initial products if empty
         if (!await context.Products.AnyAsync())
         {

@@ -433,7 +433,7 @@ export const PosTerminal = () => {
             alert('Customer registered successfully!');
           } catch (err) {
             console.error('Error registering customer:', err);
-            alert('Failed to register customer. Phone number must be unique.');
+            throw err;
           }
         }} 
       />

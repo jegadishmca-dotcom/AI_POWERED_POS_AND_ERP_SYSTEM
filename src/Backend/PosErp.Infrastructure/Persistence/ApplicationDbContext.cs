@@ -75,14 +75,34 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         // Composite Key configurations for POS Invoices & Items
         modelBuilder.Entity<Invoice>()
             .HasKey(i => new { i.Id, i.BusinessDate });
+
+        modelBuilder.Entity<Invoice>()
+            .Property(i => i.BusinessDate)
+            .HasColumnType("date");
             
         modelBuilder.Entity<InvoiceItem>()
             .HasKey(ii => new { ii.Id, ii.BusinessDate });
+
+        modelBuilder.Entity<InvoiceItem>()
+            .Property(ii => ii.BusinessDate)
+            .HasColumnType("date");
             
         modelBuilder.Entity<InvoiceItem>()
             .HasOne(ii => ii.Invoice)
             .WithMany(i => i.Items)
             .HasForeignKey(ii => new { ii.InvoiceId, ii.BusinessDate });
+
+        modelBuilder.Entity<Customer>()
+            .Property(c => c.Dob)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<Customer>()
+            .Property(c => c.Anniversary)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<LoyaltyLedgerEntry>()
+            .Property(l => l.ExpiryDate)
+            .HasColumnType("date");
 
         modelBuilder.Entity<PosErp.Domain.Entities.Catalog.Barcode>()
             .Property(b => b.BarcodeValue)

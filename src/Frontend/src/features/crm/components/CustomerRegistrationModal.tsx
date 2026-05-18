@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { UserPlus, Save, ShieldCheck } from 'lucide-react';
 
 export const CustomerRegistrationModal = ({ isOpen, onClose, onRegister }: any) => {
@@ -7,13 +7,34 @@ export const CustomerRegistrationModal = ({ isOpen, onClose, onRegister }: any) 
   const [tamilName, setTamilName] = useState('');
   const [dob, setDob] = useState('');
   const [marketingConsent, setMarketingConsent] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
-    // In real app: mutate with React Query to RegisterCustomerCommand
-    onRegister({ phone, name, tamilName, dob, marketingConsent });
-    onClose();
+  const handleSave = async () => {
+    if (!phone.trim() || !name.trim()) {
+      setError("Mobile Number and Full Name are required.");
+      return;
+    }
+    setError(null);
+    setIsSubmitting(true);
+    try {
+      await onRegister({ phone, name, tamilName, dob: dob || undefined, marketingConsent });
+      // Clear fields on success
+      setPhone('');
+      setName('');
+      setTamilName('');
+      setDob('');
+      setMarketingConsent(false);
+      onClose();
+    } catch (err: any) {
+      console.error('Registration error:', err);
+      const msg = err.response?.data?.message || err.message || "Failed to register customer.";
+      setError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -25,6 +46,11 @@ export const CustomerRegistrationModal = ({ isOpen, onClose, onRegister }: any) 
         </div>
         
         <div className="p-6 space-y-4">
+          {error && (
+            <div className="bg-red-50 border-l-4 border-red-500 p-3 text-red-700 text-sm font-bold rounded">
+              {error}
+            </div>
+          )}
           <div>
             <label className="block text-sm font-bold text-gray-700 mb-1">Mobile Number *</label>
             <input 
@@ -84,9 +110,10 @@ export const CustomerRegistrationModal = ({ isOpen, onClose, onRegister }: any) 
         <div className="p-4 bg-gray-50 border-t flex justify-end">
           <button 
             onClick={handleSave}
-            className="px-6 py-2 bg-indigo-600 text-white rounded font-bold shadow hover:bg-indigo-700 flex items-center"
+            disabled={isSubmitting}
+            className={`px-6 py-2 text-white rounded font-bold shadow flex items-center ${isSubmitting ? 'bg-indigo-400 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700'}`}
           >
-            <Save className="w-5 h-5 mr-2" /> Register Customer
+            <Save className="w-5 h-5 mr-2" /> {isSubmitting ? 'Registering...' : 'Register Customer'}
           </button>
         </div>
       </div>

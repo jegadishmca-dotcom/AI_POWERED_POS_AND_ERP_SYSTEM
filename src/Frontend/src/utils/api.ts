@@ -2,7 +2,7 @@ import axios from 'axios';
 import { useAuthStore } from '../features/auth/store/auth.store';
 
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: import.meta.env.VITE_API_URL || '',
   withCredentials: true, // Important for HttpOnly cookies
 });
 

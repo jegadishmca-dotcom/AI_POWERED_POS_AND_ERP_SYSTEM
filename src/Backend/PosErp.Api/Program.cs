@@ -86,34 +86,35 @@ using (var scope = app.Services.CreateScope())
         // Ensure database exists
         context.Database.EnsureCreated();
         
-        // Execute raw DDL to guarantee Users and RefreshTokens tables exist 
-        // (EnsureCreated skips table creation entirely if any tables are already present in DB)
+        // Execute raw DDL to guarantee refresh_tokens table exists (EnsureCreated skips if other tables are present)
         await context.Database.ExecuteSqlRawAsync(@"
-            CREATE TABLE IF NOT EXISTS ""Users"" (
-                ""Id"" UUID PRIMARY KEY,
-                ""StoreId"" UUID NULL,
-                ""Username"" VARCHAR(255) NOT NULL UNIQUE,
-                ""PasswordHash"" VARCHAR(255) NOT NULL,
-                ""FullName"" VARCHAR(255) NOT NULL,
-                ""PinHash"" VARCHAR(255) NULL,
-                ""RoleId"" UUID NOT NULL,
-                ""IsActive"" BOOLEAN NOT NULL DEFAULT TRUE,
-                ""CreatedAt"" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-                ""CreatedBy"" UUID NULL,
-                ""IsDeleted"" BOOLEAN NOT NULL DEFAULT FALSE
-            );
-
-            CREATE TABLE IF NOT EXISTS ""RefreshTokens"" (
-                ""Id"" UUID PRIMARY KEY,
-                ""UserId"" UUID NOT NULL,
-                ""Token"" VARCHAR(512) NOT NULL,
-                ""TokenFamily"" VARCHAR(255) NOT NULL,
-                ""ExpiresAt"" TIMESTAMP WITH TIME ZONE NOT NULL,
-                ""DeviceId"" VARCHAR(255) NOT NULL,
-                ""IsRevoked"" BOOLEAN NOT NULL DEFAULT FALSE,
-                ""CreatedAt"" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+            CREATE TABLE IF NOT EXISTS refresh_tokens (
+                id UUID PRIMARY KEY,
+                user_id UUID NOT NULL,
+                token VARCHAR(512) NOT NULL,
+                token_family VARCHAR(255) NOT NULL,
+                expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                device_id VARCHAR(255) NOT NULL,
+                is_revoked BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
             );
         ");
+
+        // Seed Roles first to satisfy foreign key constraint in users table
+        try
+        {
+            await context.Database.ExecuteSqlRawAsync(@"
+                INSERT INTO roles (id, name, description, is_system) 
+                VALUES 
+                ('00000000-0000-0000-0000-000000000001', 'Owner', 'System Owner / Administrator', true),
+                ('00000000-0000-0000-0000-000000000002', 'Cashier', 'POS Cashier Clerk', true)
+                ON CONFLICT (id) DO NOTHING;
+            ");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Skipping roles seed: {ex.Message}");
+        }
         
         if (!await context.Users.AnyAsync())
         {

@@ -82,5 +82,58 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasOne(ii => ii.Invoice)
             .WithMany(i => i.Items)
             .HasForeignKey(ii => new { ii.InvoiceId, ii.BusinessDate });
+        // Map every entity and property to lowercase snake_case to match SQL Schema exactly
+        foreach (var entity in modelBuilder.Model.GetEntityTypes())
+        {
+            var tableName = entity.GetTableName();
+            if (tableName != null)
+            {
+                // Pluralize/SnakeCase overrides for explicit table names
+                string snakeTableName = ToSnakeCase(tableName);
+                if (snakeTableName == "purchase_orders") snakeTableName = "purchase_order_headers";
+                else if (snakeTableName == "purchase_bills") snakeTableName = "purchase_bill_headers";
+                else if (snakeTableName == "g_r_n_headers") snakeTableName = "grn_headers";
+                else if (snakeTableName == "g_r_n_items") snakeTableName = "grn_items";
+                else if (snakeTableName == "refresh_tokens") snakeTableName = "refresh_tokens";
+                else if (snakeTableName == "stock_ledger_entrys" || snakeTableName == "stock_ledger_entries") snakeTableName = "stock_ledger";
+                else if (snakeTableName == "wallet_ledger_entrys" || snakeTableName == "wallet_ledger_entries") snakeTableName = "wallet_ledger";
+                else if (snakeTableName == "loyalty_ledger_entrys" || snakeTableName == "loyalty_ledger_entries") snakeTableName = "loyalty_ledger";
+                
+                entity.SetTableName(snakeTableName);
+            }
+
+            foreach (var property in entity.GetProperties())
+            {
+                entity.FindProperty(property.Name)?.SetColumnName(ToSnakeCase(property.Name));
+            }
+        }
+    }
+
+    private static string ToSnakeCase(string input)
+    {
+        if (string.IsNullOrEmpty(input)) return input;
+        
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < input.Length; i++)
+        {
+            if (char.IsUpper(input[i]))
+            {
+                if (i > 0 && input[i - 1] != '_' && !char.IsUpper(input[i - 1]))
+                {
+                    sb.Append('_');
+                }
+                sb.Append(char.ToLower(input[i]));
+            }
+            else
+            {
+                sb.Append(input[i]);
+            }
+        }
+        // Normalize abbreviations like GRN or UOM
+        return sb.ToString()
+            .Replace("g_r_n", "grn")
+            .Replace("u_o_m", "uom")
+            .Replace("c_o_a", "coa")
+            .Replace("p_o_s", "pos");
     }
 }

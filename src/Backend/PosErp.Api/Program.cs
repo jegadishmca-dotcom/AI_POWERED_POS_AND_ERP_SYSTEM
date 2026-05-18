@@ -156,6 +156,156 @@ using (var scope = app.Services.CreateScope())
             await context.SaveChangesAsync();
             Console.WriteLine("Database seeded successfully with default users.");
         }
+
+        // Seed default Tax Slab if empty
+        var taxSlab = await context.TaxSlabs.FirstOrDefaultAsync();
+        if (taxSlab == null)
+        {
+            taxSlab = new PosErp.Domain.Entities.Catalog.TaxSlab
+            {
+                Id = Guid.NewGuid(),
+                Name = "GST 18%",
+                CgstRate = 9.0m,
+                SgstRate = 9.0m,
+                IgstRate = 18.0m,
+                CessRate = 0.0m
+            };
+            context.TaxSlabs.Add(taxSlab);
+            await context.SaveChangesAsync();
+        }
+
+        // Seed default Unit of Measure if empty
+        var uom = await context.UnitOfMeasures.FirstOrDefaultAsync();
+        if (uom == null)
+        {
+            uom = new PosErp.Domain.Entities.Catalog.UnitOfMeasure
+            {
+                Id = Guid.NewGuid(),
+                Name = "Pieces",
+                Code = "PCS",
+                Description = "Individual Item Pack"
+            };
+            context.UnitOfMeasures.Add(uom);
+            await context.SaveChangesAsync();
+        }
+
+        // Seed initial products if empty
+        if (!await context.Products.AnyAsync())
+        {
+            var p1 = new PosErp.Domain.Entities.Catalog.Product
+            {
+                Id = Guid.NewGuid(),
+                ProductCode = "PROD-001",
+                Name = "Britannia Bourbon 150g",
+                TamilName = "பிரிட்டானியா போர்பன்",
+                Description = "Chocolate sandwich biscuits",
+                TaxSlabId = taxSlab.Id,
+                UnitOfMeasureId = uom.Id,
+                Mrp = 30.00m,
+                SellingPrice = 30.00m,
+                PurchasePrice = 24.00m,
+                IsWeighable = false,
+                IsActive = true
+            };
+            p1.Barcodes.Add(new PosErp.Domain.Entities.Catalog.Barcode
+            {
+                Id = Guid.NewGuid(),
+                BarcodeValue = "8901063012345",
+                IsPrimary = true
+            });
+
+            var p2 = new PosErp.Domain.Entities.Catalog.Product
+            {
+                Id = Guid.NewGuid(),
+                ProductCode = "PROD-002",
+                Name = "Aashirvaad Shudh Chakki Atta 5kg",
+                TamilName = "ஆசிர்வாத் கோதுமை மாவு",
+                Description = "Whole wheat flour",
+                TaxSlabId = taxSlab.Id,
+                UnitOfMeasureId = uom.Id,
+                Mrp = 290.00m,
+                SellingPrice = 290.00m,
+                PurchasePrice = 240.00m,
+                IsWeighable = false,
+                IsActive = true
+            };
+            p2.Barcodes.Add(new PosErp.Domain.Entities.Catalog.Barcode
+            {
+                Id = Guid.NewGuid(),
+                BarcodeValue = "8901725181224",
+                IsPrimary = true
+            });
+
+            var p3 = new PosErp.Domain.Entities.Catalog.Product
+            {
+                Id = Guid.NewGuid(),
+                ProductCode = "PROD-003",
+                Name = "Tata Salt 1kg",
+                TamilName = "டாடா உப்பு",
+                Description = "Iodized table salt",
+                TaxSlabId = taxSlab.Id,
+                UnitOfMeasureId = uom.Id,
+                Mrp = 28.00m,
+                SellingPrice = 28.00m,
+                PurchasePrice = 22.00m,
+                IsWeighable = false,
+                IsActive = true
+            };
+            p3.Barcodes.Add(new PosErp.Domain.Entities.Catalog.Barcode
+            {
+                Id = Guid.NewGuid(),
+                BarcodeValue = "8901058002313",
+                IsPrimary = true
+            });
+
+            var p4 = new PosErp.Domain.Entities.Catalog.Product
+            {
+                Id = Guid.NewGuid(),
+                ProductCode = "PROD-004",
+                Name = "Cadbury Dairy Milk Silk 150g",
+                TamilName = "டைரி மில்க் சில்க்",
+                Description = "Smooth milk chocolate",
+                TaxSlabId = taxSlab.Id,
+                UnitOfMeasureId = uom.Id,
+                Mrp = 170.00m,
+                SellingPrice = 170.00m,
+                PurchasePrice = 136.00m,
+                IsWeighable = false,
+                IsActive = true
+            };
+            p4.Barcodes.Add(new PosErp.Domain.Entities.Catalog.Barcode
+            {
+                Id = Guid.NewGuid(),
+                BarcodeValue = "7622210825988",
+                IsPrimary = true
+            });
+
+            var p5 = new PosErp.Domain.Entities.Catalog.Product
+            {
+                Id = Guid.NewGuid(),
+                ProductCode = "PROD-005",
+                Name = "Surf Excel Easy Wash 1kg",
+                TamilName = "சர்ஃப் எக்செல்",
+                Description = "Premium detergent powder",
+                TaxSlabId = taxSlab.Id,
+                UnitOfMeasureId = uom.Id,
+                Mrp = 140.00m,
+                SellingPrice = 140.00m,
+                PurchasePrice = 112.00m,
+                IsWeighable = false,
+                IsActive = true
+            };
+            p5.Barcodes.Add(new PosErp.Domain.Entities.Catalog.Barcode
+            {
+                Id = Guid.NewGuid(),
+                BarcodeValue = "8901030753448",
+                IsPrimary = true
+            });
+
+            context.Products.AddRange(p1, p2, p3, p4, p5);
+            await context.SaveChangesAsync();
+            Console.WriteLine("Database seeded successfully with initial products.");
+        }
     }
     catch (Exception ex)
     {

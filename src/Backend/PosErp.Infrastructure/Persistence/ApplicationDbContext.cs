@@ -93,7 +93,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasColumnType("date");
 
         modelBuilder.Entity<InvoiceItem>()
-            .Ignore(ii => ii.FinalTotal);
+            .Ignore(ii => ii.FinalTotal)
+            .Ignore(ii => ii.Total);
             
         modelBuilder.Entity<InvoiceItem>()
             .HasOne(ii => ii.Invoice)

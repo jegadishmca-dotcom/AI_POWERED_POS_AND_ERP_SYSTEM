@@ -32,16 +32,11 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, L
 
         if (!string.IsNullOrEmpty(q))
         {
-            // Mandatory Full-Text Search using Postgres MATCHES operator (@@)
-            // It relies on the pre-computed 'search_vector' column.
-            
-            // Note: In EF Core for PostgreSQL (Npgsql), ToTsQuery formats words with '&' for exact match logic
-            string formattedQuery = string.Join(" & ", q.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(w => w + ":*"));
-            
             productsQuery = productsQuery.Where(p => 
-                EF.Functions.ToTsVector("english", p.SearchVector!).Matches(EF.Functions.ToTsQuery("english", formattedQuery))
-                || EF.Functions.ILike(p.ProductCode, $"%{q}%") // Direct code fallback
-                || p.Barcodes.Any(b => b.BarcodeValue == q)); // Exact barcode match is faster
+                EF.Functions.ILike(p.Name, $"%{q}%")
+                || EF.Functions.ILike(p.ProductCode, $"%{q}%")
+                || (p.TamilName != null && EF.Functions.ILike(p.TamilName, $"%{q}%"))
+                || p.Barcodes.Any(b => b.BarcodeValue == q));
         }
 
         var results = await productsQuery

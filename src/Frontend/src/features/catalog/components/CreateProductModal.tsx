@@ -55,7 +55,8 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
       setPurchasePrice('');
       setBarcodeValue('');
     } catch (err: any) {
-      setError(err?.response?.data?.Message || 'Failed to create product. Check that your product code and barcodes are unique.');
+      const msg = err?.response?.data?.Message || err?.response?.data?.Detailed || 'Failed to create product. Check that your product code and barcodes are unique.';
+      setError(msg);
     } finally {
       setIsSubmitting(false);
     }

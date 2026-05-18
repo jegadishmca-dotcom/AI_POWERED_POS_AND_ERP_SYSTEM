@@ -56,7 +56,6 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             TamilName = request.TamilName,
             Description = request.Description,
             TaxSlabId = taxSlab.Id,
-            UnitOfMeasureId = Guid.Parse("00000000-0000-0000-0000-000000000003"), // Default PCS Guid
             Mrp = request.Mrp,
             SellingPrice = request.SellingPrice,
             PurchasePrice = request.PurchasePrice,

@@ -177,7 +177,7 @@ using (var scope = app.Services.CreateScope())
         // Seed initial products if empty
         if (!await context.Products.AnyAsync())
         {
-            var defaultUomId = Guid.Parse("00000000-0000-0000-0000-000000000003");
+
 
             var p1 = new PosErp.Domain.Entities.Catalog.Product
             {
@@ -187,7 +187,6 @@ using (var scope = app.Services.CreateScope())
                 TamilName = "பிரிட்டானியா போர்பன்",
                 Description = "Chocolate sandwich biscuits",
                 TaxSlabId = taxSlab.Id,
-                UnitOfMeasureId = defaultUomId,
                 Mrp = 30.00m,
                 SellingPrice = 30.00m,
                 PurchasePrice = 24.00m,
@@ -209,7 +208,6 @@ using (var scope = app.Services.CreateScope())
                 TamilName = "ஆசிர்வாத் கோதுமை மாவு",
                 Description = "Whole wheat flour",
                 TaxSlabId = taxSlab.Id,
-                UnitOfMeasureId = defaultUomId,
                 Mrp = 290.00m,
                 SellingPrice = 290.00m,
                 PurchasePrice = 240.00m,
@@ -231,7 +229,6 @@ using (var scope = app.Services.CreateScope())
                 TamilName = "டாடா உப்பு",
                 Description = "Iodized table salt",
                 TaxSlabId = taxSlab.Id,
-                UnitOfMeasureId = defaultUomId,
                 Mrp = 28.00m,
                 SellingPrice = 28.00m,
                 PurchasePrice = 22.00m,
@@ -253,7 +250,6 @@ using (var scope = app.Services.CreateScope())
                 TamilName = "டைரி மில்க் சில்க்",
                 Description = "Smooth milk chocolate",
                 TaxSlabId = taxSlab.Id,
-                UnitOfMeasureId = defaultUomId,
                 Mrp = 170.00m,
                 SellingPrice = 170.00m,
                 PurchasePrice = 136.00m,
@@ -275,7 +271,6 @@ using (var scope = app.Services.CreateScope())
                 TamilName = "சர்ஃப் எக்செல்",
                 Description = "Premium detergent powder",
                 TaxSlabId = taxSlab.Id,
-                UnitOfMeasureId = defaultUomId,
                 Mrp = 140.00m,
                 SellingPrice = 140.00m,
                 PurchasePrice = 112.00m,
@@ -297,6 +292,7 @@ using (var scope = app.Services.CreateScope())
     catch (Exception ex)
     {
         Console.WriteLine($"An error occurred seeding the DB: {ex.Message}");
+        if (ex.InnerException != null) Console.WriteLine($"Inner: {ex.InnerException.Message}");
     }
 }
 

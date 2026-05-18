@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Net;
@@ -36,11 +36,12 @@ public class GlobalExceptionMiddleware
         context.Response.ContentType = "application/json";
         context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
 
+        var innerMsg = exception.InnerException != null ? exception.InnerException.Message : "";
         var response = new
         {
             StatusCode = context.Response.StatusCode,
-            Message = "Internal Server Error from the custom middleware.",
-            Detailed = exception.Message // In production, hide stack trace and details
+            Message = $"{exception.Message} {innerMsg}".Trim(),
+            Detailed = exception.ToString()
         };
 
         return context.Response.WriteAsync(JsonSerializer.Serialize(response));

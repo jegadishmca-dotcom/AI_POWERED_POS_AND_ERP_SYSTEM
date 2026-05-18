@@ -92,7 +92,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .Ignore(p => p.UnitOfMeasureId)
             .Ignore(p => p.HasExpiry)
             .Ignore(p => p.MinStockLevel)
-            .Ignore(p => p.ReorderPoint);
+            .Ignore(p => p.ReorderPoint)
+            .Ignore(p => p.SearchVector);
         // Map every entity and property to lowercase snake_case to match SQL Schema exactly
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {

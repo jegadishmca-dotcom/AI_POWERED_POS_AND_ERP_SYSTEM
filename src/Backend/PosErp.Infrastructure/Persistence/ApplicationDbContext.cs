@@ -83,6 +83,10 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasOne(ii => ii.Invoice)
             .WithMany(i => i.Items)
             .HasForeignKey(ii => new { ii.InvoiceId, ii.BusinessDate });
+
+        modelBuilder.Entity<PosErp.Domain.Entities.Catalog.Barcode>()
+            .Property(b => b.BarcodeValue)
+            .HasColumnName("barcode");
         // Map every entity and property to lowercase snake_case to match SQL Schema exactly
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {

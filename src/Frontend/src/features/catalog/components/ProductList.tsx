@@ -4,7 +4,13 @@ import { searchProducts } from '../api/catalog.api';
 import { Search, Package, Plus } from 'lucide-react';
 // import { useDebounce } from '@/hooks/useDebounce'; // Assuming generic debounce hook
 
-export const ProductList = ({ onImportClick }: { onImportClick: () => void }) => {
+export const ProductList = ({ 
+  onImportClick, 
+  onNewProductClick 
+}: { 
+  onImportClick: () => void; 
+  onNewProductClick: () => void; 
+}) => {
   const [searchTerm, setSearchTerm] = useState('');
   
   // Custom quick debounce implementation for this snippet
@@ -32,7 +38,10 @@ export const ProductList = ({ onImportClick }: { onImportClick: () => void }) =>
           >
             Import CSV
           </button>
-          <button className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 transition flex items-center">
+          <button 
+            onClick={onNewProductClick}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 transition flex items-center"
+          >
             <Plus className="w-4 h-4 mr-1" /> New Product
           </button>
         </div>

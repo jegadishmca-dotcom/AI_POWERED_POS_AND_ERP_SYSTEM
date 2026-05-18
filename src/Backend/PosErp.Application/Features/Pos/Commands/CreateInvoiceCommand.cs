@@ -75,12 +75,20 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             if (totalTender < cartEvaluation.FinalTotal)
                 throw new Exception("Total tender is less than the final invoice amount.");
 
+            var today = DateTime.UtcNow.Date;
+            var lastSeq = await _context.Invoices
+                .Where(i => i.TerminalId == request.TerminalId && i.BusinessDate == today)
+                .Select(i => (int?)i.TerminalSequence)
+                .MaxAsync(cancellationToken) ?? 0;
+            var nextSeq = lastSeq + 1;
+
             var invoice = new Invoice
             {
                 InvoiceNumber = request.InvoiceNumber,
                 TerminalId = request.TerminalId,
+                TerminalSequence = nextSeq,
                 CustomerId = customer?.Id,
-                BusinessDate = DateTime.UtcNow.Date,
+                BusinessDate = today,
                 SubTotal = cartEvaluation.Subtotal,
                 TotalDiscount = cartEvaluation.TotalDiscount,
                 TaxTotal = cartEvaluation.TaxTotal,

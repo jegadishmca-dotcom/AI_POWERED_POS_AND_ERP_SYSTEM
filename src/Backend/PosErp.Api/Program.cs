@@ -86,6 +86,35 @@ using (var scope = app.Services.CreateScope())
         // Ensure database exists
         context.Database.EnsureCreated();
         
+        // Execute raw DDL to guarantee Users and RefreshTokens tables exist 
+        // (EnsureCreated skips table creation entirely if any tables are already present in DB)
+        await context.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS ""Users"" (
+                ""Id"" UUID PRIMARY KEY,
+                ""StoreId"" UUID NULL,
+                ""Username"" VARCHAR(255) NOT NULL UNIQUE,
+                ""PasswordHash"" VARCHAR(255) NOT NULL,
+                ""FullName"" VARCHAR(255) NOT NULL,
+                ""PinHash"" VARCHAR(255) NULL,
+                ""RoleId"" UUID NOT NULL,
+                ""IsActive"" BOOLEAN NOT NULL DEFAULT TRUE,
+                ""CreatedAt"" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                ""CreatedBy"" UUID NULL,
+                ""IsDeleted"" BOOLEAN NOT NULL DEFAULT FALSE
+            );
+
+            CREATE TABLE IF NOT EXISTS ""RefreshTokens"" (
+                ""Id"" UUID PRIMARY KEY,
+                ""UserId"" UUID NOT NULL,
+                ""Token"" VARCHAR(512) NOT NULL,
+                ""TokenFamily"" VARCHAR(255) NOT NULL,
+                ""ExpiresAt"" TIMESTAMP WITH TIME ZONE NOT NULL,
+                ""DeviceId"" VARCHAR(255) NOT NULL,
+                ""IsRevoked"" BOOLEAN NOT NULL DEFAULT FALSE,
+                ""CreatedAt"" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
+            );
+        ");
+        
         if (!await context.Users.AnyAsync())
         {
             var passwordHasher = services.GetRequiredService<IPasswordHasher>();

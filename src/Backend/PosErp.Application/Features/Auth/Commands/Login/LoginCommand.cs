@@ -25,7 +25,7 @@ public class LoginCommandValidator : AbstractValidator<LoginCommand>
             .Matches("[a-z]").WithMessage("Password must contain at least one lowercase letter.")
             .Matches("[0-9]").WithMessage("Password must contain at least one number.")
             .Matches("[^a-zA-Z0-9]").WithMessage("Password must contain at least one special character.");
-        RuleFor(x => x.TerminalCode).NotEmpty();
+        RuleFor(x => x.TerminalCode).MaximumLength(50).WithMessage("Terminal Code must be under 50 characters.");
     }
 }
 
@@ -69,7 +69,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
             Token = refreshTokenStr,
             TokenFamily = Guid.NewGuid().ToString(),
             ExpiresAt = DateTime.UtcNow.AddDays(7),
-            DeviceId = request.TerminalCode,
+            DeviceId = string.IsNullOrEmpty(request.TerminalCode) ? "BACK-OFFICE" : request.TerminalCode,
             IsRevoked = false,
             CreatedAt = DateTime.UtcNow
         };

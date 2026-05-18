@@ -40,7 +40,7 @@ const AppLayout: React.FC = () => {
   const navItems = [
     { path: '/dashboard', name: 'Dashboard', icon: LayoutDashboard, roles: ['Owner', 'Manager'] },
     { path: '/pos', name: 'POS Billing', icon: ShoppingCart, roles: ['Owner', 'Manager', 'Cashier'] },
-    { path: '/shift-report', name: 'Shift & Sales Report', icon: ClipboardCheck, roles: ['Owner', 'Manager', 'Cashier'] },
+    { path: '/shift-report', name: 'Shift & Sales Report', icon: ClipboardCheck, roles: ['Cashier'] },
     { path: '/products', name: 'Product Catalog', icon: Package, roles: ['Owner', 'Manager'] },
     { path: '/grn', name: 'Goods Receipt (GRN)', icon: ClipboardCheck, roles: ['Owner', 'Manager'] },
     { path: '/stock-adjustment', name: 'Stock Adjustment', icon: ArrowUpDown, roles: ['Owner', 'Manager'] },

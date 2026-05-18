@@ -87,6 +87,12 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<PosErp.Domain.Entities.Catalog.Barcode>()
             .Property(b => b.BarcodeValue)
             .HasColumnName("barcode");
+
+        modelBuilder.Entity<PosErp.Domain.Entities.Catalog.Product>()
+            .Ignore(p => p.UnitOfMeasureId)
+            .Ignore(p => p.HasExpiry)
+            .Ignore(p => p.MinStockLevel)
+            .Ignore(p => p.ReorderPoint);
         // Map every entity and property to lowercase snake_case to match SQL Schema exactly
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {

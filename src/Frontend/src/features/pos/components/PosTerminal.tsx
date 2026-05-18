@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag } from 'lucide-react';
+import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle } from 'lucide-react';
 import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistrationModal';
 import { PaymentModal } from './PaymentModal';
+import { searchProducts } from '../../catalog/api/catalog.api';
+import { searchCustomers, registerCustomer } from '../../crm/api/crm.api';
 
 export const PosTerminal = () => {
   const [customer, setCustomer] = useState<any>(null);
@@ -9,31 +11,31 @@ export const PosTerminal = () => {
   const [promoCode, setPromoCode] = useState('');
   const [isPaymentModalOpen, setPaymentModalOpen] = useState(false);
   
-  // Mock Cart State mimicking CartEvaluationDto
+  // Product Search State
+  const [productQuery, setProductQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [showProductDropdown, setShowProductDropdown] = useState(false);
+
+  // Dynamic Cart State initializing empty
   const [cart, setCart] = useState<any>({
-    items: [
-      { id: '1', productId: 'p1', name: 'Aashirvaad Atta 5kg', qty: 2, unitPrice: 200, lineTotal: 400, discountAmount: 0, finalLineTotal: 400, appliedOfferName: null },
-      { id: '2', productId: 'p2', name: 'Tata Salt 1kg', qty: 1, unitPrice: 20, lineTotal: 20, discountAmount: 0, finalLineTotal: 20, appliedOfferName: null }
-    ],
-    subtotal: 420,
+    items: [],
+    subtotal: 0,
     totalDiscount: 0,
-    taxTotal: 21,
-    finalTotal: 441,
+    taxTotal: 0,
+    finalTotal: 0,
     appliedOfferNames: []
   });
 
-  // Mock Offer Engine Evaluation
-  const evaluateCart = () => {
-    let newCart = { ...cart };
-    let subtotal = newCart.items.reduce((sum: number, item: any) => sum + (item.qty * item.unitPrice), 0);
+  const recalculateCart = (items: any[]) => {
+    let subtotal = items.reduce((sum: number, item: any) => sum + (item.qty * item.unitPrice), 0);
     let totalDiscount = 0;
     let appliedOffers: string[] = [];
 
-    // Mock logic: 10% off Atta (Line Level)
-    newCart.items = newCart.items.map((item: any) => {
+    // Mock/Demo offer logic: 10% off Atta (Line Level)
+    const evaluatedItems = items.map((item: any) => {
       let discount = 0;
       let offerName = null;
-      if (item.productId === 'p1') {
+      if (item.name.toLowerCase().includes('atta')) {
         discount = item.lineTotal * 0.10; // 10%
         offerName = '10% OFF Staples';
         if (!appliedOffers.includes(offerName)) appliedOffers.push(offerName);
@@ -41,7 +43,7 @@ export const PosTerminal = () => {
       return { ...item, discountAmount: discount, finalLineTotal: item.lineTotal - discount, appliedOfferName: offerName };
     });
 
-    totalDiscount += newCart.items.reduce((sum: number, item: any) => sum + item.discountAmount, 0);
+    totalDiscount += evaluatedItems.reduce((sum: number, item: any) => sum + item.discountAmount, 0);
 
     // Mock logic: Flat 50 off if promo code applied (Bill Level)
     if (promoCode === 'SAVE50') {
@@ -49,25 +51,115 @@ export const PosTerminal = () => {
       appliedOffers.push('SAVE50 Promo');
     }
 
-    newCart.subtotal = subtotal;
-    newCart.totalDiscount = totalDiscount;
-    newCart.finalTotal = subtotal - totalDiscount + newCart.taxTotal;
-    newCart.appliedOfferNames = appliedOffers;
-    
-    setCart(newCart);
+    let taxTotal = subtotal * 0.05; // 5% GST tax rate
+    let finalTotal = Math.max(0, subtotal - totalDiscount + taxTotal);
+
+    setCart({
+      items: evaluatedItems,
+      subtotal,
+      totalDiscount,
+      taxTotal,
+      finalTotal,
+      appliedOfferNames: appliedOffers
+    });
   };
 
   // Evaluate whenever promo code changes
   useEffect(() => {
-    evaluateCart();
+    recalculateCart(cart.items);
   }, [promoCode]);
 
+  const addProductToCart = (product: any) => {
+    const existing = cart.items.find((item: any) => item.productId === product.id);
+    let updatedItems = [];
 
-  const handleCustomerSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (existing) {
+      updatedItems = cart.items.map((item: any) =>
+        item.productId === product.id 
+          ? { ...item, qty: item.qty + 1, lineTotal: (item.qty + 1) * item.unitPrice } 
+          : item
+      );
+    } else {
+      updatedItems = [
+        ...cart.items,
+        {
+          id: Math.random().toString(),
+          productId: product.id,
+          name: product.name,
+          qty: 1,
+          unitPrice: product.sellingPrice,
+          lineTotal: product.sellingPrice,
+          discountAmount: 0,
+          finalLineTotal: product.sellingPrice,
+          appliedOfferName: null
+        }
+      ];
+    }
+
+    recalculateCart(updatedItems);
+  };
+
+  const updateItemQty = (productId: string, delta: number) => {
+    const updatedItems = cart.items.map((item: any) => {
+      if (item.productId === productId) {
+        const newQty = Math.max(1, item.qty + delta);
+        return { ...item, qty: newQty, lineTotal: newQty * item.unitPrice };
+      }
+      return item;
+    });
+    recalculateCart(updatedItems);
+  };
+
+  const removeItem = (productId: string) => {
+    const updatedItems = cart.items.filter((item: any) => item.productId !== productId);
+    recalculateCart(updatedItems);
+  };
+
+  const handleProductSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {
-      const val = e.currentTarget.value;
-      if (val === '9988776655') {
-        setCustomer({ id: '1', name: 'Rahul Sharma', phone: '9988776655', walletBalance: 500, points: 120, tier: 'Gold' });
+      const val = productQuery.trim();
+      if (!val) return;
+
+      try {
+        const results = await searchProducts(val);
+        if (results.length === 1) {
+          addProductToCart(results[0]);
+          setProductQuery('');
+          setSearchResults([]);
+          setShowProductDropdown(false);
+        } else if (results.length > 1) {
+          setSearchResults(results);
+          setShowProductDropdown(true);
+        } else {
+          alert('Product not found.');
+        }
+      } catch (err) {
+        console.error('Error searching products:', err);
+      }
+    }
+  };
+
+  const handleCustomerSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const val = e.currentTarget.value.trim();
+      if (!val) return;
+      try {
+        const results = await searchCustomers(val);
+        if (results.length > 0) {
+          const cust = results[0];
+          setCustomer({
+            id: cust.id,
+            name: cust.name,
+            phone: cust.phone,
+            walletBalance: cust.walletBalance,
+            points: cust.loyaltyPoints,
+            tier: cust.tierName
+          });
+        } else {
+          alert('Customer not found. Click "+" to register a new customer!');
+        }
+      } catch (err) {
+        console.error('Error searching customer:', err);
       }
     }
   };
@@ -110,38 +202,105 @@ export const PosTerminal = () => {
           )}
         </div>
 
-        {/* Cart Table with Offers */}
-        <div className="p-0 flex-1 overflow-y-auto">
-          <table className="w-full text-left">
-            <thead className="bg-slate-100 sticky top-0 border-b">
-              <tr>
-                <th className="p-3">Item</th>
-                <th className="p-3 text-center">Qty</th>
-                <th className="p-3 text-right">Price</th>
-                <th className="p-3 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {cart.items.map((item: any) => (
-                <tr key={item.id} className="border-b">
-                  <td className="p-3">
-                    <p className="font-bold text-lg">{item.name}</p>
-                    {item.appliedOfferName && (
-                      <p className="text-xs text-emerald-600 flex items-center font-bold bg-emerald-50 w-max px-2 py-0.5 rounded mt-1">
-                        <Tag className="w-3 h-3 mr-1" /> {item.appliedOfferName}
-                      </p>
-                    )}
-                  </td>
-                  <td className="p-3 text-center font-bold text-xl">{item.qty}</td>
-                  <td className="p-3 text-right">₹{item.unitPrice}</td>
-                  <td className="p-3 text-right">
-                    {item.discountAmount > 0 && <p className="text-sm text-gray-400 line-through">₹{item.lineTotal}</p>}
-                    <p className="font-black text-xl text-slate-800">₹{item.finalLineTotal}</p>
-                  </td>
-                </tr>
+        {/* Product Search / Barcode Input Bar */}
+        <div className="p-4 bg-slate-50 border-b border-slate-200 relative">
+          <div className="relative">
+            <Search className="absolute left-3 top-2.5 text-slate-400 w-5 h-5" />
+            <input 
+              type="text"
+              placeholder="Scan Barcode or Type Product Name (Press Enter)..."
+              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-850"
+              value={productQuery}
+              onChange={(e) => setProductQuery(e.target.value)}
+              onKeyDown={handleProductSearch}
+            />
+          </div>
+
+          {/* Search Dropdown Overlay */}
+          {showProductDropdown && searchResults.length > 0 && (
+            <div className="absolute left-4 right-4 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+              <div className="p-2 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <span className="text-xs font-semibold text-slate-500">Multiple items found. Select one:</span>
+                <button onClick={() => setShowProductDropdown(false)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">Close</button>
+              </div>
+              {searchResults.map((p) => (
+                <div 
+                  key={p.id}
+                  onClick={() => {
+                    addProductToCart(p);
+                    setProductQuery('');
+                    setSearchResults([]);
+                    setShowProductDropdown(false);
+                  }}
+                  className="px-4 py-2.5 hover:bg-blue-50 cursor-pointer flex justify-between items-center border-b border-slate-100 transition"
+                >
+                  <div>
+                    <p className="font-bold text-slate-800">{p.name}</p>
+                    <p className="text-xs text-slate-400">Code: {p.productCode} | Barcode: {p.primaryBarcode || 'N/A'}</p>
+                  </div>
+                  <span className="font-extrabold text-blue-600">₹{p.sellingPrice.toFixed(2)}</span>
+                </div>
               ))}
-            </tbody>
-          </table>
+            </div>
+          )}
+        </div>
+
+        {/* Cart Table with Dynamic Controls */}
+        <div className="p-0 flex-1 overflow-y-auto">
+          {cart.items.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center text-slate-400">
+              <ShoppingCart className="w-16 h-16 mb-2 stroke-1" />
+              <p className="font-semibold">Billing cart is empty</p>
+              <p className="text-xs">Scan items or search products above to start checkout</p>
+            </div>
+          ) : (
+            <table className="w-full text-left">
+              <thead className="bg-slate-100 sticky top-0 border-b">
+                <tr>
+                  <th className="p-3">Item</th>
+                  <th className="p-3 text-center">Qty</th>
+                  <th className="p-3 text-right">Price</th>
+                  <th className="p-3 text-right">Total</th>
+                  <th className="p-3 text-center w-16"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {cart.items.map((item: any) => (
+                  <tr key={item.id} className="border-b hover:bg-slate-50/50">
+                    <td className="p-3">
+                      <p className="font-bold text-slate-800">{item.name}</p>
+                      {item.appliedOfferName && (
+                        <p className="text-xs text-emerald-600 flex items-center font-bold bg-emerald-50 w-max px-2 py-0.5 rounded mt-1">
+                          <Tag className="w-3 h-3 mr-1" /> {item.appliedOfferName}
+                        </p>
+                      )}
+                    </td>
+                    <td className="p-3">
+                      <div className="flex items-center justify-center gap-2">
+                        <button onClick={() => updateItemQty(item.productId, -1)} className="text-slate-400 hover:text-indigo-600 transition">
+                          <MinusCircle className="w-6 h-6" />
+                        </button>
+                        <span className="font-black text-xl w-8 text-center">{item.qty}</span>
+                        <button onClick={() => updateItemQty(item.productId, 1)} className="text-slate-400 hover:text-indigo-600 transition">
+                          <PlusCircle className="w-6 h-6" />
+                        </button>
+                      </div>
+                    </td>
+                    <td className="p-3 text-right font-medium">₹{item.unitPrice.toFixed(2)}</td>
+                    <td className="p-3 text-right">
+                      {item.discountAmount > 0 && <p className="text-xs text-slate-400 line-through">₹{item.lineTotal.toFixed(2)}</p>}
+                      <p className="font-black text-xl text-slate-800">₹{item.finalLineTotal.toFixed(2)}</p>
+                    </td>
+                    <td className="p-3 text-center">
+                      <button onClick={() => removeItem(item.productId)} className="text-slate-300 hover:text-red-500 transition">
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 
@@ -179,13 +338,29 @@ export const PosTerminal = () => {
 
           {/* Payment Methods */}
           <div className="grid grid-cols-2 gap-4">
-            <button className="bg-emerald-600 text-white p-4 rounded-lg font-bold text-xl shadow hover:bg-emerald-700" onClick={() => setPaymentModalOpen(true)}>CASH</button>
-            <button className="bg-blue-600 text-white p-4 rounded-lg font-bold text-xl shadow hover:bg-blue-700">UPI / QR</button>
-            <button className="bg-slate-800 text-white p-4 rounded-lg font-bold text-xl shadow hover:bg-slate-900">CARD</button>
+            <button 
+              disabled={cart.items.length === 0}
+              className="bg-emerald-600 text-white p-4 rounded-lg font-bold text-xl shadow hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed" 
+              onClick={() => setPaymentModalOpen(true)}
+            >
+              CASH
+            </button>
+            <button 
+              disabled={cart.items.length === 0}
+              className="bg-blue-600 text-white p-4 rounded-lg font-bold text-xl shadow hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              UPI / QR
+            </button>
+            <button 
+              disabled={cart.items.length === 0}
+              className="bg-slate-800 text-white p-4 rounded-lg font-bold text-xl shadow hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              CARD
+            </button>
             
             <button 
-              className={`p-4 rounded-lg font-bold text-xl shadow flex flex-col items-center justify-center ${!customer || customer.walletBalance <= 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
-              disabled={!customer || customer.walletBalance <= 0}
+              className={`p-4 rounded-lg font-bold text-xl shadow flex flex-col items-center justify-center ${!customer || customer.walletBalance <= 0 || cart.items.length === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+              disabled={!customer || customer.walletBalance <= 0 || cart.items.length === 0}
               onClick={() => setPaymentModalOpen(true)}
             >
               WALLET
@@ -201,7 +376,7 @@ export const PosTerminal = () => {
         onCompletePayment={(tenders: any) => {
           setPaymentModalOpen(false);
           alert('Invoice Created! Backend hit: OfferEngine -> LoyaltyService -> WalletService -> DB. Points Awarded!');
-          setCart({...cart, items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0});
+          setCart({items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: []});
           setCustomer(null);
         }} 
       />
@@ -211,9 +386,31 @@ export const PosTerminal = () => {
       <CustomerRegistrationModal 
         isOpen={isCustomerModalOpen} 
         onClose={() => setCustomerModalOpen(false)} 
-        onRegister={() => {}} 
+        onRegister={async (newCust: any) => {
+          try {
+            const customerId = await registerCustomer({
+              phone: newCust.phone,
+              name: newCust.name,
+              tamilName: newCust.tamilName || undefined,
+              dob: newCust.dob || undefined,
+              marketingConsent: newCust.marketingConsent
+            });
+            // Automatically select registered customer
+            setCustomer({
+              id: customerId,
+              name: newCust.name,
+              phone: newCust.phone,
+              walletBalance: 0,
+              points: 0,
+              tier: 'Base'
+            });
+            alert('Customer registered successfully!');
+          } catch (err) {
+            console.error('Error registering customer:', err);
+            alert('Failed to register customer. Phone number must be unique.');
+          }
+        }} 
       />
     </div>
   );
 };
-

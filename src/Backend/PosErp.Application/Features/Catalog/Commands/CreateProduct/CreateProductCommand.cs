@@ -75,8 +75,16 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             });
         }
 
-        _context.Products.Add(product);
-        await _context.SaveChangesAsync(cancellationToken);
+        try
+        {
+            _context.Products.Add(product);
+            await _context.SaveChangesAsync(cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            var inner = ex.InnerException != null ? ex.InnerException.Message : "";
+            throw new Exception($"DB Save Fail: {ex.Message}. Inner: {inner}");
+        }
 
         return product.Id;
     }

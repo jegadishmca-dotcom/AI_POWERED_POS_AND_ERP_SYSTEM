@@ -59,11 +59,18 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 ? await _context.Customers.Include(c => c.Tier).FirstOrDefaultAsync(c => c.Id == request.CustomerId.Value) 
                 : null;
 
+            var productIds = request.Items.Select(i => i.ProductId).ToList();
+            var productCategories = await _context.Products
+                .Where(p => productIds.Contains(p.Id))
+                .Select(p => new { p.Id, p.CategoryId })
+                .ToDictionaryAsync(p => p.Id, p => p.CategoryId, cancellationToken);
+
             var cartEvaluation = new CartEvaluationDto
             {
                 Items = request.Items.Select(i => new CartItemEvaluationDto
                 {
                     ProductId = i.ProductId,
+                    CategoryId = productCategories.TryGetValue(i.ProductId, out var catId) ? catId : null,
                     Quantity = i.Quantity,
                     UnitPrice = i.UnitPrice
                 }).ToList()

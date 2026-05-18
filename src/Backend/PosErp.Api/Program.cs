@@ -1,3 +1,7 @@
+using System;
+using System.IO;
+using System.Linq;
+using System.Text.Json;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -35,6 +39,11 @@ builder.Services.AddHealthChecks();
 // Redis Configuration
 string redisConnectionString = builder.Configuration.GetSection("Redis:ConnectionString").Value ?? "localhost:6379";
 builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString));
+builder.Services.AddStackExchangeRedisCache(options =>
+{
+    options.Configuration = redisConnectionString;
+    options.InstanceName = "AppleSupermarket_";
+});
 
 // Register MediatR
 builder.Services.AddMediatR(cfg => {
@@ -85,6 +94,58 @@ using (var scope = app.Services.CreateScope())
         
         // Ensure database exists
         context.Database.EnsureCreated();
+
+        // Create migration history table if not exists
+        await context.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS migration_history (
+                migration_name VARCHAR(255) PRIMARY KEY,
+                applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+        ");
+
+        // Scan and execute all pending raw SQL migrations in alphabetical order
+        var migrationsDir = Path.Combine(AppContext.BaseDirectory, "Persistence", "Migrations");
+        if (Directory.Exists(migrationsDir))
+        {
+            var sqlFiles = Directory.GetFiles(migrationsDir, "*.sql")
+                                    .OrderBy(f => Path.GetFileName(f))
+                                    .ToList();
+
+            foreach (var sqlFile in sqlFiles)
+            {
+                var filename = Path.GetFileName(sqlFile);
+                bool exists = false;
+
+                var connection = context.Database.GetDbConnection();
+                var wasOpen = connection.State == System.Data.ConnectionState.Open;
+                if (!wasOpen) await connection.OpenAsync();
+
+                using (var cmd = connection.CreateCommand())
+                {
+                    cmd.CommandText = "SELECT EXISTS(SELECT 1 FROM migration_history WHERE migration_name = @p0)";
+                    var param = cmd.CreateParameter();
+                    param.ParameterName = "@p0";
+                    param.Value = filename;
+                    cmd.Parameters.Add(param);
+
+                    var result = await cmd.ExecuteScalarAsync();
+                    exists = result != null && (bool)result;
+                }
+
+                if (!wasOpen) await connection.CloseAsync();
+
+                if (!exists)
+                {
+                    Console.WriteLine($"Applying database migration: {filename}...");
+                    var sqlContent = await File.ReadAllTextAsync(sqlFile);
+                    await context.Database.ExecuteSqlRawAsync(sqlContent);
+
+                    await context.Database.ExecuteSqlRawAsync(
+                        "INSERT INTO migration_history (migration_name) VALUES ({0})", filename);
+                    Console.WriteLine($"Migration {filename} applied successfully!");
+                }
+            }
+        }
         
         // Execute raw DDL to guarantee refresh_tokens table exists (EnsureCreated skips if other tables are present)
         await context.Database.ExecuteSqlRawAsync(@"

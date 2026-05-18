@@ -402,7 +402,7 @@ export const PosTerminal = () => {
             setPromoCode('');
           } catch (err: any) {
             console.error('Checkout error:', err);
-            alert('Failed to complete invoice in DB: ' + (err.response?.data?.message || err.message));
+            alert('Failed to complete invoice in DB: ' + (err.response?.data?.message || err.response?.data?.Message || err.message));
           }
         }} 
       />

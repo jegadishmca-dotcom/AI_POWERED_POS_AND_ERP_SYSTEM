@@ -30,7 +30,7 @@ export const CustomerRegistrationModal = ({ isOpen, onClose, onRegister }: any) 
       onClose();
     } catch (err: any) {
       console.error('Registration error:', err);
-      const msg = err.response?.data?.message || err.message || "Failed to register customer.";
+      const msg = err.response?.data?.message || err.response?.data?.Message || err.message || "Failed to register customer.";
       setError(msg);
     } finally {
       setIsSubmitting(false);

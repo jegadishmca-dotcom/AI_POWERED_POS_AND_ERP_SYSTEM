@@ -1,5 +1,5 @@
 import { api } from '@/utils/api';
-import { Invoice } from '../types';
+import { Invoice } from '../types/index';
 
 /**
  * Converts the invoice object into a raw text string suitable for thermal printers.
@@ -9,11 +9,11 @@ const generateEscPosText = (invoice: Invoice): string => {
   text += "          Tax Invoice\n";
   text += "--------------------------------\n";
   text += `Inv: ${invoice.invoiceNumber}\n`;
-  text += `Date: ${invoice.createdAt}\n`;
+  text += `Date: ${invoice.businessDate}\n`;
   text += "--------------------------------\n";
   invoice.items.forEach(item => {
     text += `${item.name}\n`;
-    text += `${item.qty} x ${item.unitPrice}    ${item.finalLineTotal}\n`;
+    text += `${item.quantity} x ${item.unitPrice}    ${item.totalAmount}\n`;
   });
   text += "--------------------------------\n";
   text += `TOTAL:           ${invoice.totalAmount}\n`;

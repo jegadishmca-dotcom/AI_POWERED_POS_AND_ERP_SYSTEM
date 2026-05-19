@@ -188,11 +188,12 @@ using (var scope = app.Services.CreateScope())
             await context.SaveChangesAsync();
         }
         
-        if (!await context.Users.AnyAsync())
+        var passwordHasher = services.GetRequiredService<IPasswordHasher>();
+        bool usersChanged = false;
+        
+        // Seed Admin User
+        if (!await context.Users.AnyAsync(u => u.Username == "admin@supermarket.local"))
         {
-            var passwordHasher = services.GetRequiredService<IPasswordHasher>();
-            
-            // Seed Admin User
             var adminUser = new PosErp.Domain.Entities.Auth.User
             {
                 Username = "admin@supermarket.local",
@@ -202,8 +203,12 @@ using (var scope = app.Services.CreateScope())
                 IsActive = true
             };
             context.Users.Add(adminUser);
-            
-            // Seed Cashier User
+            usersChanged = true;
+        }
+        
+        // Seed Cashier 01 User
+        if (!await context.Users.AnyAsync(u => u.Username == "cashier@supermarket.local"))
+        {
             var cashierUser = new PosErp.Domain.Entities.Auth.User
             {
                 Username = "cashier@supermarket.local",
@@ -213,9 +218,43 @@ using (var scope = app.Services.CreateScope())
                 IsActive = true
             };
             context.Users.Add(cashierUser);
-            
+            usersChanged = true;
+        }
+
+        // Seed Cashier 02 User
+        if (!await context.Users.AnyAsync(u => u.Username == "cashier02@supermarket.local"))
+        {
+            var cashierUser2 = new PosErp.Domain.Entities.Auth.User
+            {
+                Username = "cashier02@supermarket.local",
+                PasswordHash = passwordHasher.HashPassword("Cashier@123!"),
+                FullName = "Terminal Cashier 02",
+                RoleId = cashierRole.Id,
+                IsActive = true
+            };
+            context.Users.Add(cashierUser2);
+            usersChanged = true;
+        }
+
+        // Seed Cashier 03 User
+        if (!await context.Users.AnyAsync(u => u.Username == "cashier03@supermarket.local"))
+        {
+            var cashierUser3 = new PosErp.Domain.Entities.Auth.User
+            {
+                Username = "cashier03@supermarket.local",
+                PasswordHash = passwordHasher.HashPassword("Cashier@123!"),
+                FullName = "Terminal Cashier 03",
+                RoleId = cashierRole.Id,
+                IsActive = true
+            };
+            context.Users.Add(cashierUser3);
+            usersChanged = true;
+        }
+        
+        if (usersChanged)
+        {
             await context.SaveChangesAsync();
-            Console.WriteLine("Database seeded successfully with default users.");
+            Console.WriteLine("Database seeded/updated successfully with default users.");
         }
 
         // Seed default Tax Slab if empty

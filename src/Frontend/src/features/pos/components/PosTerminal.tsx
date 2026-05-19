@@ -5,6 +5,7 @@ import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
 import { searchCustomers, registerCustomer } from '../../crm/api/crm.api';
 import { createInvoice } from '../api/pos.api';
+import { ThermalReceipt } from './ThermalReceipt';
 
 export const PosTerminal = () => {
   const [customer, setCustomer] = useState<any>(null);
@@ -12,6 +13,7 @@ export const PosTerminal = () => {
   const [isCustomerModalOpen, setCustomerModalOpen] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [isPaymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [completedInvoice, setCompletedInvoice] = useState<any>(null);
   
   // Product Search State
   const [productQuery, setProductQuery] = useState('');
@@ -398,7 +400,41 @@ export const PosTerminal = () => {
 
             await createInvoice(payload);
 
+            // Construct invoice object to be printed
+            const invoiceToPrint = {
+              invoiceNumber: payload.invoiceNumber,
+              businessDate: new Date().toISOString(),
+              terminalId: payload.terminalId,
+              terminalSequence: 1,
+              cashierId: '00000000-0000-0000-0000-000000000001',
+              subTotal: cart.subtotal,
+              discountAmount: cart.totalDiscount,
+              taxAmount: cart.taxTotal,
+              totalAmount: cart.finalTotal,
+              roundOff: 0,
+              netPayable: cart.finalTotal,
+              paymentMode: tenders.cash > 0 ? 'CASH' : tenders.upi > 0 ? 'UPI' : tenders.card > 0 ? 'CARD' : 'WALLET',
+              status: 'COMPLETED',
+              items: cart.items.map((item: any) => ({
+                id: item.id || '',
+                productId: item.productId,
+                name: item.name,
+                quantity: item.qty,
+                unitPrice: item.unitPrice,
+                discountAmount: item.discountAmount || 0,
+                totalAmount: item.finalLineTotal || item.lineTotal
+              }))
+            };
+
+            setCompletedInvoice(invoiceToPrint);
             setPaymentModalOpen(false);
+
+            // Give React a frame to render the printable receipt component, then trigger print
+            setTimeout(() => {
+              window.print();
+              setCompletedInvoice(null);
+            }, 250);
+
             alert(`Invoice ${payload.invoiceNumber} Created Successfully in Database!\nFinancial journals, tax lines & loyalty ledger recorded!`);
             setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
             setCustomer(null);
@@ -442,6 +478,9 @@ export const PosTerminal = () => {
           }
         }} 
       />
+
+      {/* Hidden print container for thermal receipt printer */}
+      <ThermalReceipt invoice={completedInvoice} />
     </div>
   );
 };

@@ -1,10 +1,11 @@
-﻿import React from 'react';
+import React from 'react';
 import { Invoice } from '../types';
 
 // Used for printing via CSS media queries (@media print)
-export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: Invoice }>(({ invoice }, ref) => {
+export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>(({ invoice }, ref) => {
+  if (!invoice) return null;
   return (
-    <div ref={ref} className="hidden print:block w-[80mm] text-black font-mono text-xs bg-white p-2">
+    <div ref={ref} className="hidden print:block print-receipt-container w-[80mm] text-black font-mono text-xs bg-white p-2">
       <div className="text-center font-bold text-lg mb-2">ENTERPRISE SUPERMARKET</div>
       <div className="text-center mb-4">Tax Invoice</div>
       

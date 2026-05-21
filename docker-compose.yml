@@ -90,36 +90,36 @@ services:
           #     count: 1
           #     capabilities: [gpu]
 
-  # pos_backend:
-  #   build:
-  #     context: ./src/Backend
-  #     dockerfile: Dockerfile
-  #   container_name: pos_backend
-  #   environment:
-  #     - ASPNETCORE_ENVIRONMENT=Production
-  #     - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
-  #     - ConnectionStrings__Redis=redis:6379,abortConnect=false
-  #   ports:
-  #     - "5000:8080"
-  #   networks:
-  #     - pos_network
-  #   depends_on:
-  #     pgbouncer:
-  #       condition: service_healthy
-  #     redis:
-  #       condition: service_healthy
-  #   restart: unless-stopped
+  pos_backend:
+    build:
+      context: ./src/Backend
+      dockerfile: Dockerfile
+    container_name: pos_backend
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
+      - ConnectionStrings__Redis=redis:6379,abortConnect=false
+    ports:
+      - "5000:8080"
+    networks:
+      - pos_network
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
 
-  # pos_frontend:
-  #   build:
-  #     context: ./src/Frontend
-  #     dockerfile: Dockerfile
-  #   container_name: pos_frontend
-  #   ports:
-  #     - "3000:80"
-  #   networks:
-  #     - pos_network
-  #   restart: unless-stopped
+  pos_frontend:
+    build:
+      context: ./src/Frontend
+      dockerfile: Dockerfile
+    container_name: pos_frontend
+    ports:
+      - "3000:80"
+    networks:
+      - pos_network
+    restart: unless-stopped
 
   nginx:
     image: nginx:alpine
@@ -133,9 +133,9 @@ services:
     networks:
       - pos_network
     restart: unless-stopped
-    # depends_on:
-    #   - pos_backend
-    #   - pos_frontend
+    depends_on:
+      - pos_backend
+      - pos_frontend
 
 volumes:
   postgres_data:

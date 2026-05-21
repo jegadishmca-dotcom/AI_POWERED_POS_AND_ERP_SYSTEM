@@ -34,6 +34,7 @@ services:
       DB_PASSWORD: pospassword
       DB_HOST: postgres
       DB_NAME: posdb
+      AUTH_TYPE: scram-sha-256
       POOL_MODE: transaction
       MAX_CLIENT_CONN: 1000
       DEFAULT_POOL_SIZE: 50
@@ -97,14 +98,14 @@ services:
     container_name: pos_backend
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
       - Redis__ConnectionString=pos_redis:6379,abortConnect=false
     ports:
       - "5000:8080"
     networks:
       - pos_network
     depends_on:
-      pgbouncer:
+      postgres:
         condition: service_healthy
       redis:
         condition: service_healthy

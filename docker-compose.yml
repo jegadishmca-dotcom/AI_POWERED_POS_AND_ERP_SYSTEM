@@ -75,7 +75,7 @@ services:
     image: ollama/ollama:latest
     container_name: pos_ollama
     ports:
-      - "11435:11434"
+      - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
     networks:

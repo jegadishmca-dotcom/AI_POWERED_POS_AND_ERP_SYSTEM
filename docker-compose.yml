@@ -81,14 +81,14 @@ services:
     networks:
       - pos_network
     restart: unless-stopped
-    deploy:
-      resources:
-        reservations:
-          # Enable GPU if available
-          # devices:
-          #   - driver: nvidia
-          #     count: 1
-          #     capabilities: [gpu]
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       # Enable GPU if available
+    #       # devices:
+    #       #   - driver: nvidia
+    #       #     count: 1
+    #       #     capabilities: [gpu]
 
   pos_backend:
     build:

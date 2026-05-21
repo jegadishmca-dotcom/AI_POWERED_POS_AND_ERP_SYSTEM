@@ -93,7 +93,7 @@ services:
   pos_backend:
     build:
       context: ./src/Backend
-      dockerfile: Dockerfile
+      dockerfile: backend.Dockerfile
     container_name: pos_backend
     environment:
       - ASPNETCORE_ENVIRONMENT=Production

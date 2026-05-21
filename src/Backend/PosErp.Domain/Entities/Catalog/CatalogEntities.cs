@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace PosErp.Domain.Entities.Catalog;
@@ -91,6 +91,7 @@ public class Product
     public ICollection<Barcode> Barcodes { get; set; } = new List<Barcode>();
     public ICollection<ProductVariant> Variants { get; set; } = new List<ProductVariant>();
     public ICollection<ProductPriceList> PriceLists { get; set; } = new List<ProductPriceList>();
+    public TaxSlab TaxSlab { get; set; } = null!;
 }
 
 public class Barcode

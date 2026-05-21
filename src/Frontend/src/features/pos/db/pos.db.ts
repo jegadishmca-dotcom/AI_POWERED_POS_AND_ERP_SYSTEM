@@ -8,6 +8,8 @@ export interface LocalProduct {
   barcode: string;
   price: number;
   isWeighable: boolean;
+  cgstRate: number;
+  sgstRate: number;
 }
 
 export class PosDatabase extends Dexie {

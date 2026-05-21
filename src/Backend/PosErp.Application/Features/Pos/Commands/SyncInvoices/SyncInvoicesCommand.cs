@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Pos;
@@ -52,10 +52,16 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
     private readonly IApplicationDbContext _context;
 
     private readonly PosErp.Application.Features.Offers.Services.IOfferEngine _offerEngine;
-    public SyncInvoicesCommandHandler(IApplicationDbContext context, PosErp.Application.Features.Offers.Services.IOfferEngine offerEngine)
+    private readonly PosErp.Application.Features.Finance.Services.IFinancialPostingService _financialPostingService;
+
+    public SyncInvoicesCommandHandler(
+        IApplicationDbContext context, 
+        PosErp.Application.Features.Offers.Services.IOfferEngine offerEngine,
+        PosErp.Application.Features.Finance.Services.IFinancialPostingService financialPostingService)
     {
         _context = context;
         _offerEngine = offerEngine;
+        _financialPostingService = financialPostingService;
     }
 
     public async Task<SyncResult> Handle(SyncInvoicesCommand request, CancellationToken cancellationToken)
@@ -100,6 +106,28 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                     });
                 }
                 _context.Invoices.Add(invoice);
+
+                // Financial Double-Entry Posting for Sync
+                decimal cgst = dto.TaxAmount / 2m;
+                decimal sgst = dto.TaxAmount / 2m;
+                decimal taxableValue = dto.TotalAmount - dto.TaxAmount;
+
+                var journalLines = new List<PosErp.Application.Features.Finance.Services.JournalLineDto>();
+                if (dto.PaymentMode == "Cash") 
+                    journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = "1000", Description = "Cash Tender", Debit = dto.NetPayable, Credit = 0 });
+                else 
+                    journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = "1100", Description = "Digital Tender", Debit = dto.NetPayable, Credit = 0 });
+
+                journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = "4000", Description = "Sales Revenue", Debit = 0, Credit = taxableValue });
+                if (cgst > 0) journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = "2200", Description = "Output CGST", Debit = 0, Credit = cgst });
+                if (sgst > 0) journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = "2201", Description = "Output SGST", Debit = 0, Credit = sgst });
+
+                await _financialPostingService.PostJournalEntryAsync(
+                    null, dto.BusinessDate.Date, $"Offline POS Invoice {dto.InvoiceNumber}", $"INV-{dto.Id}", journalLines, cancellationToken);
+
+                await _financialPostingService.RecordGstTransactionAsync(
+                    null, "SALE", dto.InvoiceNumber, dto.BusinessDate.Date, taxableValue, cgst, sgst, null, cancellationToken);
+
                 synced++;
             }
             catch (Exception ex)

@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert } from 'lucide-react';
 import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistrationModal';
 import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
 import { searchCustomers, registerCustomer } from '../../crm/api/crm.api';
 import { createInvoice } from '../api/pos.api';
 import { ThermalReceipt } from './ThermalReceipt';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
+import { usePosKeyboardShortcuts } from '../hooks/usePosKeyboardShortcuts';
+import { HoldResumeModal } from './modals/HoldResumeModal';
+import { ManagerPinModal } from './modals/ManagerPinModal';
+import { posDb } from '../db/pos.db';
 
 export const PosTerminal = () => {
   const [customer, setCustomer] = useState<any>(null);
@@ -14,6 +19,12 @@ export const PosTerminal = () => {
   const [promoCode, setPromoCode] = useState('');
   const [isPaymentModalOpen, setPaymentModalOpen] = useState(false);
   const [completedInvoice, setCompletedInvoice] = useState<any>(null);
+  
+  // Modals & Hooks State
+  const [isHoldModalOpen, setHoldModalOpen] = useState(false);
+  const [isManagerModalOpen, setManagerModalOpen] = useState(false);
+  const [managerAction, setManagerAction] = useState<any>(null);
+  const customerInputRef = useRef<HTMLInputElement>(null);
   
   // Product Search State
   const [productQuery, setProductQuery] = useState('');
@@ -55,7 +66,12 @@ export const PosTerminal = () => {
       appliedOffers.push('SAVE50 Promo');
     }
 
-    let taxTotal = subtotal * 0.05; // 5% GST tax rate
+    // Dynamic GST calculation based on item rates
+    let taxTotal = evaluatedItems.reduce((sum: number, item: any) => {
+        const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0);
+        return sum + (item.finalLineTotal * (itemTaxRate / 100));
+    }, 0);
+
     let finalTotal = Math.max(0, subtotal - totalDiscount + taxTotal);
 
     setCart({
@@ -73,14 +89,15 @@ export const PosTerminal = () => {
     recalculateCart(cart.items);
   }, [promoCode]);
 
-  const addProductToCart = (product: any) => {
+  const addProductToCart = (product: any, overrideQty?: number) => {
     const existing = cart.items.find((item: any) => item.productId === product.id);
     let updatedItems = [];
+    const qtyToAdd = overrideQty !== undefined ? overrideQty : 1;
 
     if (existing) {
       updatedItems = cart.items.map((item: any) =>
         item.productId === product.id 
-          ? { ...item, qty: item.qty + 1, lineTotal: (item.qty + 1) * item.unitPrice } 
+          ? { ...item, qty: item.qty + qtyToAdd, lineTotal: (item.qty + qtyToAdd) * item.unitPrice } 
           : item
       );
     } else {
@@ -90,12 +107,15 @@ export const PosTerminal = () => {
           id: Math.random().toString(),
           productId: product.id,
           name: product.name,
-          qty: 1,
+          qty: qtyToAdd,
           unitPrice: product.sellingPrice,
-          lineTotal: product.sellingPrice,
+          lineTotal: product.sellingPrice * qtyToAdd,
           discountAmount: 0,
-          finalLineTotal: product.sellingPrice,
-          appliedOfferName: null
+          finalLineTotal: product.sellingPrice * qtyToAdd,
+          appliedOfferName: null,
+          cgstRate: product.cgstRate || 0,
+          sgstRate: product.sgstRate || 0,
+          isWeighable: product.isWeighable || false
         }
       ];
     }
@@ -117,6 +137,64 @@ export const PosTerminal = () => {
   const removeItem = (productId: string) => {
     const updatedItems = cart.items.filter((item: any) => item.productId !== productId);
     recalculateCart(updatedItems);
+  };
+
+  // Barcode Scanner Integration
+  useBarcodeScanner(async (barcode: string, weight?: number) => {
+    try {
+        const results = await searchProducts(barcode);
+        const product = results.find(p => p.primaryBarcode === barcode || p.productCode === barcode);
+        if (product) {
+            addProductToCart(product, weight);
+        } else {
+            alert('Barcode not found: ' + barcode);
+        }
+    } catch (err) {
+        console.error('Barcode lookup failed', err);
+    }
+  });
+
+  // Keyboard Shortcuts Integration
+  usePosKeyboardShortcuts({
+    onF1Search: () => customerInputRef.current?.focus(),
+    onF4Payment: () => {
+        if (cart.items.length > 0) setPaymentModalOpen(true);
+    },
+    onF9Park: () => {
+        if (cart.items.length > 0) handleHoldCart();
+    }
+  });
+
+  const handleHoldCart = async () => {
+    if (cart.items.length === 0) return;
+    const holdInvoice = {
+        id: Math.random().toString(),
+        invoiceNumber: `HOLD-${Date.now()}`,
+        businessDate: new Date().toISOString(),
+        items: cart.items,
+        totalAmount: cart.finalTotal
+    };
+    await posDb.held_invoices.put(holdInvoice as any);
+    setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
+    alert('Cart parked successfully (F9).');
+  };
+
+  const handleResumeCart = (invoice: any) => {
+      setCart({
+          items: invoice.items,
+          subtotal: 0, 
+          totalDiscount: 0,
+          taxTotal: 0,
+          finalTotal: 0,
+          appliedOfferNames: []
+      });
+      recalculateCart(invoice.items);
+      setHoldModalOpen(false);
+  };
+
+  const requestManagerOverride = (action: string, onSuccess: () => void) => {
+      setManagerAction({ name: action, callback: onSuccess });
+      setManagerModalOpen(true);
   };
 
   const handleProductSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -178,8 +256,9 @@ export const PosTerminal = () => {
           <div className="flex items-center w-1/2 relative">
             <User className="absolute left-3 text-indigo-400" />
             <input 
+              ref={customerInputRef}
               type="text" 
-              placeholder="F3: Search Customer (Phone/Name)..." 
+              placeholder="F1: Search Customer (Phone/Name)..." 
               className="w-full pl-10 p-2 rounded-l border border-indigo-200 outline-none focus:ring-2 ring-indigo-500 font-bold"
               value={customerQuery}
               onChange={(e) => setCustomerQuery(e.target.value)}
@@ -298,7 +377,7 @@ export const PosTerminal = () => {
                       <p className="font-black text-xl text-slate-800">₹{item.finalLineTotal.toFixed(2)}</p>
                     </td>
                     <td className="p-3 text-center">
-                      <button onClick={() => removeItem(item.productId)} className="text-slate-300 hover:text-red-500 transition">
+                      <button onClick={() => requestManagerOverride('Void Item', () => removeItem(item.productId))} className="text-slate-300 hover:text-red-500 transition" title="Void Item (Manager)">
                         <Trash2 className="w-5 h-5" />
                       </button>
                     </td>
@@ -398,7 +477,16 @@ export const PosTerminal = () => {
               }))
             };
 
-            await createInvoice(payload);
+            try {
+              await createInvoice(payload);
+              alert(`Invoice ${payload.invoiceNumber} Created Successfully in Database!\nFinancial journals, tax lines & loyalty ledger recorded!`);
+            } catch (err: any) {
+              console.warn('Network issue during checkout, saving offline...', err);
+              // Save to offline db
+              await posDb.invoices.put({ ...payload, id: payload.invoiceNumber, businessDate: new Date().toISOString(), status: 'COMPLETED' } as any);
+              await posDb.sync_queue.put({ ...payload, id: payload.invoiceNumber, businessDate: new Date().toISOString() } as any);
+              alert(`Saved Offline: Invoice ${payload.invoiceNumber} queued for sync.`);
+            }
 
             // Construct invoice object to be printed
             const invoiceToPrint = {
@@ -435,14 +523,13 @@ export const PosTerminal = () => {
               setCompletedInvoice(null);
             }, 250);
 
-            alert(`Invoice ${payload.invoiceNumber} Created Successfully in Database!\nFinancial journals, tax lines & loyalty ledger recorded!`);
             setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
             setCustomer(null);
             setCustomerQuery('');
             setPromoCode('');
           } catch (err: any) {
             console.error('Checkout error:', err);
-            alert('Failed to complete invoice in DB: ' + (err.response?.data?.message || err.response?.data?.Message || err.message));
+            alert('Failed to process checkout: ' + (err.message));
           }
         }} 
       />
@@ -477,6 +564,30 @@ export const PosTerminal = () => {
             throw err;
           }
         }} 
+      />
+
+      {/* Action Bar / Modals */}
+      <div className="absolute top-4 right-4 flex space-x-2">
+         <button onClick={() => setHoldModalOpen(true)} className="bg-orange-600 text-white p-2 rounded shadow flex items-center text-sm font-bold">
+            <Hand className="w-4 h-4 mr-1" /> F9: Hold/Resume
+         </button>
+      </div>
+
+      <HoldResumeModal 
+        isOpen={isHoldModalOpen} 
+        onClose={() => setHoldModalOpen(false)} 
+        onResume={handleResumeCart} 
+      />
+
+      <ManagerPinModal
+        isOpen={isManagerModalOpen}
+        onClose={() => setManagerModalOpen(false)}
+        actionName={managerAction?.name}
+        onSuccess={() => {
+            setManagerModalOpen(false);
+            managerAction?.callback();
+            setManagerAction(null);
+        }}
       />
 
       {/* Hidden print container for thermal receipt printer */}

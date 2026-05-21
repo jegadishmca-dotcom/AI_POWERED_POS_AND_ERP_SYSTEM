@@ -1,8 +1,8 @@
-﻿-- ==============================================================================
+-- ==============================================================================
 -- PHASE 2: WAREHOUSE & STOCK TAKE SCHEMA
 -- ==============================================================================
 
-CREATE TABLE suppliers (
+CREATE TABLE IF NOT EXISTS suppliers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     name VARCHAR(200) NOT NULL,
     gstin VARCHAR(15),
@@ -12,7 +12,7 @@ CREATE TABLE suppliers (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE warehouses (
+CREATE TABLE IF NOT EXISTS warehouses (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     store_id UUID,
     name VARCHAR(100) NOT NULL,
@@ -20,7 +20,7 @@ CREATE TABLE warehouses (
     is_active BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE bins (
+CREATE TABLE IF NOT EXISTS bins (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     warehouse_id UUID NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
     code VARCHAR(50) NOT NULL,
@@ -29,7 +29,7 @@ CREATE TABLE bins (
     UNIQUE(warehouse_id, code)
 );
 
-CREATE TABLE stock_take_headers (
+CREATE TABLE IF NOT EXISTS stock_take_headers (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     store_id UUID,
     take_number VARCHAR(100) UNIQUE NOT NULL,
@@ -39,7 +39,7 @@ CREATE TABLE stock_take_headers (
     approved_by UUID
 );
 
-CREATE TABLE stock_take_items (
+CREATE TABLE IF NOT EXISTS stock_take_items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     stock_take_header_id UUID NOT NULL REFERENCES stock_take_headers(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(id),

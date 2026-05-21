@@ -1,19 +1,55 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { PackageCheck, Save, AlertCircle } from 'lucide-react';
-import { useQuery } from '@tanstack/react-query';
-import { api } from '@/utils/api';
 
 export const GrnForm = () => {
-  const [selectedPo, setSelectedPo] = useState<string | null>(null);
+  const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
+  const [selectedPoId, setSelectedPoId] = useState<string>('');
+  const [selectedPo, setSelectedPo] = useState<any>(null);
   const [grnItems, setGrnItems] = useState<any[]>([]);
+  const [invoiceNumber, setInvoiceNumber] = useState('');
+  const [receivedDate, setReceivedDate] = useState(new Date().toISOString().slice(0,10));
 
-  // Mock fetching PO lines for the selected PO
-  const fetchPoLines = (poId: string) => {
-    // In real app, fetch from API. We mock it for the UI structure.
-    setGrnItems([
-      { id: '1', productId: 'p1', name: 'Aashirvaad Atta 5kg', ordered: 100, received: 0, pending: 100, accepted: 0, rejected: 0, rejectionReason: '', batch: '', expiry: '', hasExpiry: true, unitCost: 200 },
-      { id: '2', productId: 'p2', name: 'Tata Salt 1kg', ordered: 50, received: 0, pending: 50, accepted: 0, rejected: 0, rejectionReason: '', batch: '', expiry: '', hasExpiry: false, unitCost: 20 },
-    ]);
+  useEffect(() => {
+    fetch('/api/purchasing/purchase-orders')
+      .then(res => res.json())
+      .then(data => {
+        // Only show POs that are not fully received
+        setPurchaseOrders(data.filter((po: any) => po.status === 'DRAFT' || po.status === 'PARTIAL_GRN'));
+      })
+      .catch(err => console.error(err));
+  }, []);
+
+  const fetchPoLines = async (poId: string) => {
+    if (!poId) {
+      setGrnItems([]);
+      setSelectedPo(null);
+      return;
+    }
+    try {
+      const res = await fetch(`/api/purchasing/purchase-orders/${poId}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSelectedPo(data);
+        setGrnItems(data.items.map((item: any) => ({
+          id: item.id,
+          purchaseOrderItemId: item.id,
+          productId: item.productId,
+          name: item.productName,
+          ordered: item.orderedQuantity,
+          received: item.receivedQuantity,
+          pending: item.orderedQuantity - item.receivedQuantity,
+          accepted: 0,
+          rejected: 0,
+          rejectionReason: '',
+          batch: '',
+          expiry: '',
+          hasExpiry: true, // simplified for now
+          unitCost: item.unitCost
+        })));
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const handleQuantityChange = (idx: number, field: string, value: any) => {
@@ -31,10 +67,48 @@ export const GrnForm = () => {
     }
 
     try {
-      // await api.post('/api/purchasing/confirm-grn', { poId: selectedPo, items: grnItems });
-      alert('GRN Confirmed and Stock Ledger updated successfully!');
+      // 1. Create GRN
+      const grnPayload = {
+        purchaseOrderHeaderId: selectedPo.id,
+        supplierId: selectedPo.supplierId,
+        supplierInvoiceNumber: invoiceNumber,
+        receivedDate: receivedDate,
+        items: grnItems.filter(i => i.accepted > 0 || i.rejected > 0).map(i => ({
+          purchaseOrderItemId: i.purchaseOrderItemId,
+          productId: i.productId,
+          batchNumber: i.batch,
+          mfgDate: null,
+          expiryDate: i.expiry ? i.expiry : null,
+          receivedQuantity: i.accepted + i.rejected,
+          acceptedQuantity: i.accepted,
+          rejectedQuantity: i.rejected,
+          rejectionReason: i.rejectionReason,
+          unitCost: i.unitCost
+        }))
+      };
+
+      const res = await fetch('/api/inventory/grn', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(grnPayload)
+      });
+      
+      if (res.ok) {
+        const { id } = await res.json();
+        // 2. Confirm GRN
+        const confirmRes = await fetch(`/api/inventory/grn/${id}/confirm`, { method: 'POST' });
+        if (confirmRes.ok) {
+          alert('GRN Confirmed and Stock Ledger updated successfully!');
+          window.location.reload();
+        } else {
+          alert('Failed to confirm GRN.');
+        }
+      } else {
+        alert('Failed to create GRN draft.');
+      }
     } catch (e) {
       console.error(e);
+      alert('Error saving GRN');
     }
   };
 
@@ -57,23 +131,25 @@ export const GrnForm = () => {
           <label className="block text-sm font-bold text-gray-700 mb-2">Select Purchase Order</label>
           <select 
             className="w-full p-2 border rounded"
+            value={selectedPoId}
             onChange={(e) => {
-              setSelectedPo(e.target.value);
+              setSelectedPoId(e.target.value);
               fetchPoLines(e.target.value);
             }}
           >
             <option value="">-- Select PO --</option>
-            <option value="PO-001">PO-001 (ITC Limited)</option>
-            <option value="PO-002">PO-002 (Unilever)</option>
+            {purchaseOrders.map(po => (
+              <option key={po.id} value={po.id}>{po.poNumber} ({po.supplierName})</option>
+            ))}
           </select>
         </div>
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">Supplier Invoice No.</label>
-          <input type="text" className="w-full p-2 border rounded" placeholder="Enter Invoice No." />
+          <input type="text" className="w-full p-2 border rounded" placeholder="Enter Invoice No." value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} />
         </div>
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">Received Date</label>
-          <input type="date" className="w-full p-2 border rounded" defaultValue={new Date().toISOString().slice(0,10)} />
+          <input type="date" className="w-full p-2 border rounded" value={receivedDate} onChange={e => setReceivedDate(e.target.value)} />
         </div>
       </div>
 

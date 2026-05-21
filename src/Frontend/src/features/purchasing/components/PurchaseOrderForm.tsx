@@ -1,9 +1,18 @@
-﻿import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, Search, Plus, Trash2 } from 'lucide-react';
+import { Supplier } from './SupplierList';
 
 export const PurchaseOrderForm = () => {
   const [items, setItems] = useState([{ productId: '', name: '', orderedQty: 1, unitCost: 0 }]);
-  const [supplier, setSupplier] = useState('');
+  const [supplierId, setSupplierId] = useState('');
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+
+  useEffect(() => {
+    fetch('/api/suppliers')
+      .then(res => res.json())
+      .then(data => setSuppliers(data))
+      .catch(err => console.error('Failed to load suppliers', err));
+  }, []);
 
   const handleAddItem = () => setItems([...items, { productId: '', name: '', orderedQty: 1, unitCost: 0 }]);
   const handleRemoveItem = (index: number) => setItems(items.filter((_, i) => i !== index));
@@ -26,10 +35,11 @@ export const PurchaseOrderForm = () => {
       <div className="grid grid-cols-2 gap-6 mb-8">
         <div>
           <label className="block text-sm font-bold text-gray-700 mb-2">Supplier</label>
-          <select className="w-full p-2 border rounded" value={supplier} onChange={(e) => setSupplier(e.target.value)}>
+          <select className="w-full p-2 border rounded" value={supplierId} onChange={(e) => setSupplierId(e.target.value)}>
             <option value="">-- Select Supplier --</option>
-            <option value="S1">ITC Limited</option>
-            <option value="S2">Unilever</option>
+            {suppliers.map(s => (
+              <option key={s.id} value={s.id}>{s.name} ({s.paymentTerms})</option>
+            ))}
           </select>
         </div>
         <div>

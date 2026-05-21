@@ -27,6 +27,7 @@ import { StockLedgerView } from './features/inventory/components/StockLedgerView
 import { StockPositionReport } from './features/inventory/components/StockPositionReport';
 import { WarehouseLocationsList } from './features/inventory/components/WarehouseLocationsList';
 import { ShiftReport } from './features/analytics/components/ShiftReport';
+import { Suppliers } from './features/purchasing/routes/Suppliers';
 
 const AppLayout: React.FC = () => {
   const { user, clearAuth } = useAuthStore();
@@ -44,6 +45,7 @@ const AppLayout: React.FC = () => {
     { path: '/shift-report', name: 'Shift & Sales Report', icon: ClipboardCheck, roles: ['Cashier'] },
     { path: '/products', name: 'Product Catalog', icon: Package, roles: ['Owner', 'Manager'] },
     { path: '/grn', name: 'Goods Receipt (GRN)', icon: ClipboardCheck, roles: ['Owner', 'Manager'] },
+    { path: '/suppliers', name: 'Supplier Master', icon: UserIcon, roles: ['Owner', 'Manager'] },
     { path: '/stock-adjustment', name: 'Stock Adjustment', icon: ArrowUpDown, roles: ['Owner', 'Manager'] },
     { path: '/stock-take', name: 'Stock Take', icon: ClipboardCheck, roles: ['Owner', 'Manager'] },
     { path: '/stock-ledger', name: 'Stock Ledger', icon: History, roles: ['Owner', 'Manager'] },
@@ -147,6 +149,9 @@ const AppLayout: React.FC = () => {
             } />
             <Route path="/grn" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <GrnForm />
+            } />
+            <Route path="/suppliers" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <Suppliers />
             } />
             <Route path="/stock-adjustment" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <StockAdjustmentForm />

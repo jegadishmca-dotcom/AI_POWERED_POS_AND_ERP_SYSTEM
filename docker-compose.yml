@@ -98,7 +98,7 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
-      - ConnectionStrings__Redis=redis:6379,abortConnect=false
+      - Redis__ConnectionString=pos_redis:6379,abortConnect=false
     ports:
       - "5000:8080"
     networks:

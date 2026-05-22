@@ -22,9 +22,9 @@ public class PosController : ControllerBase
     }
 
     [HttpGet("z-report")]
-    public async Task<IActionResult> GetZReport([FromQuery] Guid terminalId, [FromQuery] DateTime businessDate)
+    public async Task<IActionResult> GetZReport([FromQuery] Guid terminalId, [FromQuery] DateTime businessDate, [FromQuery] Guid? cashierId = null)
     {
-        return Ok(await _mediator.Send(new GetZReportQuery(terminalId, businessDate)));
+        return Ok(await _mediator.Send(new GetZReportQuery(terminalId, businessDate, cashierId)));
     }
 
     [HttpPost("sync")]

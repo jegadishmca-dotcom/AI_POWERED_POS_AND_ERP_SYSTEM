@@ -23,10 +23,10 @@ export const ShiftReport = () => {
           const sessionData = await res.json();
           setSession(sessionData);
 
-          // If there is an active session, fetch Z-Report (which uses terminalId and date)
+          // If there is an active session, fetch X-Report (which uses terminalId, cashierId, and date)
           if (sessionData && sessionData.status === 'OPEN') {
             const today = new Date().toISOString().split('T')[0];
-            const zRes = await fetch(`/api/pos/z-report?terminalId=${terminalId}&businessDate=${today}`);
+            const zRes = await fetch(`/api/pos/z-report?terminalId=${terminalId}&businessDate=${today}&cashierId=${cashierId}`);
             if (zRes.ok) {
               setReportData(await zRes.json());
             }

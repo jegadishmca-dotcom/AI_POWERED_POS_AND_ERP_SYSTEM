@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert } from 'lucide-react';
+import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert, Printer } from 'lucide-react';
 import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistrationModal';
 import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
@@ -10,6 +10,7 @@ import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { usePosKeyboardShortcuts } from '../hooks/usePosKeyboardShortcuts';
 import { HoldResumeModal } from './modals/HoldResumeModal';
 import { ManagerPinModal } from './modals/ManagerPinModal';
+import { ReprintModal } from './modals/ReprintModal';
 import { posDb } from '../db/pos.db';
 
 export const PosTerminal = () => {
@@ -22,6 +23,7 @@ export const PosTerminal = () => {
   
   // Modals & Hooks State
   const [isHoldModalOpen, setHoldModalOpen] = useState(false);
+  const [isReprintModalOpen, setReprintModalOpen] = useState(false);
   const [isManagerModalOpen, setManagerModalOpen] = useState(false);
   const [managerAction, setManagerAction] = useState<any>(null);
   const customerInputRef = useRef<HTMLInputElement>(null);
@@ -433,34 +435,13 @@ export const PosTerminal = () => {
           </div>
 
           {/* Payment Methods */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="mt-4">
             <button 
               disabled={cart.items.length === 0}
-              className="bg-emerald-600 text-white p-4 rounded-lg font-bold text-xl shadow hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed" 
+              className="w-full bg-emerald-600 text-white p-4 rounded-lg font-black text-2xl shadow-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors" 
               onClick={() => setPaymentModalOpen(true)}
             >
-              CASH
-            </button>
-            <button 
-              disabled={cart.items.length === 0}
-              className="bg-blue-600 text-white p-4 rounded-lg font-bold text-xl shadow hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              UPI / QR
-            </button>
-            <button 
-              disabled={cart.items.length === 0}
-              className="bg-slate-800 text-white p-4 rounded-lg font-bold text-xl shadow hover:bg-slate-900 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              CARD
-            </button>
-            
-            <button 
-              className={`p-4 rounded-lg font-bold text-xl shadow flex flex-col items-center justify-center ${!customer || customer.walletBalance <= 0 || cart.items.length === 0 ? 'bg-gray-200 text-gray-400 cursor-not-allowed' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
-              disabled={!customer || customer.walletBalance <= 0 || cart.items.length === 0}
-              onClick={() => setPaymentModalOpen(true)}
-            >
-              WALLET
-              {customer && <span className="text-sm">Bal: ₹{customer.walletBalance}</span>}
+              <CreditCard className="w-8 h-8 mr-3" /> PAYMENT (F4)
             </button>
           </div>
         </div>
@@ -525,6 +506,8 @@ export const PosTerminal = () => {
               }))
             };
 
+            await posDb.invoices.put(invoiceToPrint as any);
+
             setCompletedInvoice(invoiceToPrint);
             setPaymentModalOpen(false);
 
@@ -580,7 +563,10 @@ export const PosTerminal = () => {
 
       {/* Action Bar / Modals */}
       <div className="absolute top-4 right-4 flex space-x-2">
-         <button onClick={() => setHoldModalOpen(true)} className="bg-orange-600 text-white p-2 rounded shadow flex items-center text-sm font-bold">
+         <button onClick={() => setReprintModalOpen(true)} className="bg-slate-700 text-white p-2 rounded shadow flex items-center text-sm font-bold hover:bg-slate-800 transition-colors">
+            <Printer className="w-4 h-4 mr-1" /> Reprint
+         </button>
+         <button onClick={() => setHoldModalOpen(true)} className="bg-orange-600 text-white p-2 rounded shadow flex items-center text-sm font-bold hover:bg-orange-700 transition-colors">
             <Hand className="w-4 h-4 mr-1" /> F9: Hold/Resume
          </button>
       </div>
@@ -589,6 +575,18 @@ export const PosTerminal = () => {
         isOpen={isHoldModalOpen} 
         onClose={() => setHoldModalOpen(false)} 
         onResume={handleResumeCart} 
+      />
+
+      <ReprintModal
+        isOpen={isReprintModalOpen}
+        onClose={() => setReprintModalOpen(false)}
+        onReprint={(inv: any) => {
+          setCompletedInvoice(inv);
+          setTimeout(() => {
+            window.print();
+            setCompletedInvoice(null);
+          }, 250);
+        }}
       />
 
       <ManagerPinModal

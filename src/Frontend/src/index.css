@@ -21,6 +21,8 @@
     padding: 0;
     margin: 0;
     background: white;
+    -webkit-font-smoothing: none;
+    text-rendering: optimizeSpeed;
   }
   
   /* Remove page margins and header/footer for clean receipt print */

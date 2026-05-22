@@ -18,4 +18,4 @@ SELECT DISTINCT ON (store_id, product_id)
 FROM stock_ledger
 ORDER BY store_id, product_id, created_at DESC;
 
-CREATE UNIQUE INDEX idx_mv_current_stock_unique ON mv_current_stock (store_id, product_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_current_stock_unique ON mv_current_stock (store_id, product_id);

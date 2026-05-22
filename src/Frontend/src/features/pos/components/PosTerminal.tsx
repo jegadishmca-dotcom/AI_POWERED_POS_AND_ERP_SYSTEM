@@ -176,6 +176,8 @@ export const PosTerminal = () => {
     };
     await posDb.held_invoices.put(holdInvoice as any);
     setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
+    setCustomer(null);
+    setCustomerQuery('');
     alert('Cart parked successfully (F9).');
   };
 

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>System Restarting - Apple Supermarket POS</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            text-align: center;
+            max-width: 480px;
+            padding: 40px 20px;
+        }
+        .icon {
+            font-size: 80px;
+            margin-bottom: 24px;
+            animation: spin 3s linear infinite;
+            display: inline-block;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        h1 {
+            font-size: 28px;
+            font-weight: 800;
+            color: #f8fafc;
+            margin-bottom: 12px;
+        }
+        p {
+            font-size: 16px;
+            color: #94a3b8;
+            line-height: 1.6;
+            margin-bottom: 32px;
+        }
+        .badge {
+            background: #1e293b;
+            border: 1px solid #334155;
+            border-radius: 50px;
+            padding: 8px 20px;
+            font-size: 13px;
+            color: #64748b;
+            display: inline-block;
+            margin-bottom: 32px;
+        }
+        .badge span {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            background: #f59e0b;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+        button {
+            background: #6366f1;
+            color: white;
+            border: none;
+            padding: 14px 32px;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        button:hover { background: #4f46e5; }
+        .countdown {
+            margin-top: 16px;
+            font-size: 13px;
+            color: #64748b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="icon">⚙️</div>
+        <h1>System is Restarting</h1>
+        <p>The POS server is currently starting up after an update. This usually takes about 30–60 seconds. Please wait a moment and then refresh the page.</p>
+        <div class="badge">
+            <span></span>System update in progress
+        </div>
+        <br>
+        <button onclick="window.location.reload()">↻ Refresh Now</button>
+        <div class="countdown" id="countdown">Auto-refreshing in <strong id="sec">30</strong> seconds...</div>
+    </div>
+    <script>
+        let seconds = 30;
+        const el = document.getElementById('sec');
+        const timer = setInterval(() => {
+            seconds--;
+            el.textContent = seconds;
+            if (seconds <= 0) {
+                clearInterval(timer);
+                window.location.reload();
+            }
+        }, 1000);
+    </script>
+</body>
+</html>

@@ -1,4 +1,4 @@
-﻿-- ==============================================================================
+-- ==============================================================================
 -- PHASE 3: SEED OFFERS
 -- ==============================================================================
 INSERT INTO offers (name, description, offer_type, promo_code, priority, is_stackable, is_exclusive, start_date, end_date, rules_json)
@@ -26,4 +26,5 @@ VALUES
     CURRENT_TIMESTAMP, 
     CURRENT_TIMESTAMP + INTERVAL '30 days',
     '{"Conditions": {"MinCartValue": 2000}, "Reward": {"DiscountType": "FlatAmount", "Value": 500, "ApplyTo": "BILL"}}'
-);
+)
+ON CONFLICT DO NOTHING;

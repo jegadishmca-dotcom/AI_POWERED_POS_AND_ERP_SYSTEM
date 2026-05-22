@@ -3,7 +3,10 @@
 -- Updates search_vector automatically on INSERT/UPDATE of product or its barcodes
 -- ==============================================================================
 
--- 1. Create the function
+-- 1. Add search_vector column if it doesn't exist
+ALTER TABLE products ADD COLUMN IF NOT EXISTS search_vector tsvector;
+
+-- 2. Create the function
 CREATE OR REPLACE FUNCTION products_search_vector_trigger() RETURNS trigger AS $$
 DECLARE
   barcodes_str TEXT;

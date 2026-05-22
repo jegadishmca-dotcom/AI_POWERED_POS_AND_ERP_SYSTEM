@@ -1,4 +1,4 @@
-﻿-- ==============================================================================
+-- ==============================================================================
 -- PHASE 2: PURCHASING (PO -> GRN -> BILL) SCHEMA
 -- ==============================================================================
 
@@ -6,8 +6,8 @@
 DROP TABLE IF EXISTS goods_receipt_note_items CASCADE;
 DROP TABLE IF EXISTS goods_receipt_notes CASCADE;
 
-CREATE TABLE purchase_order_headers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS purchase_order_headers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     supplier_id UUID NOT NULL,
     po_number VARCHAR(100) UNIQUE NOT NULL,
@@ -19,8 +19,8 @@ CREATE TABLE purchase_order_headers (
     created_by UUID
 );
 
-CREATE TABLE purchase_order_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS purchase_order_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     purchase_order_header_id UUID NOT NULL REFERENCES purchase_order_headers(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(id),
     ordered_quantity DECIMAL(18,4) NOT NULL,
@@ -29,8 +29,8 @@ CREATE TABLE purchase_order_items (
     total_cost DECIMAL(18,4) NOT NULL
 );
 
-CREATE TABLE grn_headers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS grn_headers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     purchase_order_header_id UUID REFERENCES purchase_order_headers(id),
     supplier_id UUID NOT NULL,
@@ -43,8 +43,8 @@ CREATE TABLE grn_headers (
     created_by UUID
 );
 
-CREATE TABLE grn_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS grn_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     grn_header_id UUID NOT NULL REFERENCES grn_headers(id) ON DELETE CASCADE,
     purchase_order_item_id UUID NOT NULL REFERENCES purchase_order_items(id),
     product_id UUID NOT NULL REFERENCES products(id),
@@ -59,8 +59,8 @@ CREATE TABLE grn_items (
     total_cost DECIMAL(18,4) NOT NULL
 );
 
-CREATE TABLE purchase_bill_headers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS purchase_bill_headers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     supplier_id UUID NOT NULL,
     grn_header_id UUID REFERENCES grn_headers(id),
@@ -74,8 +74,8 @@ CREATE TABLE purchase_bill_headers (
     created_by UUID
 );
 
-CREATE TABLE purchase_bill_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS purchase_bill_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     purchase_bill_header_id UUID NOT NULL REFERENCES purchase_bill_headers(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(id),
     quantity DECIMAL(18,4) NOT NULL,

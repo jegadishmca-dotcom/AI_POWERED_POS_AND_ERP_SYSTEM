@@ -1,4 +1,4 @@
-﻿-- ==============================================================================
+-- ==============================================================================
 -- PHASE 2: STOCK POSITION VIEWS
 -- ==============================================================================
 
@@ -6,7 +6,7 @@
 -- We use a MATERIALIZED VIEW for near-instant reporting on massive catalogs.
 -- A Hangfire job should be scheduled to run REFRESH MATERIALIZED VIEW CONCURRENTLY mv_current_stock every 5-10 minutes.
 
-CREATE MATERIALIZED VIEW mv_current_stock AS
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_current_stock AS
 SELECT DISTINCT ON (store_id, product_id)
     id as latest_ledger_id,
     store_id,
@@ -18,4 +18,4 @@ SELECT DISTINCT ON (store_id, product_id)
 FROM stock_ledger
 ORDER BY store_id, product_id, created_at DESC;
 
-CREATE UNIQUE INDEX idx_mv_current_stock_unique ON mv_current_stock (store_id, product_id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_current_stock_unique ON mv_current_stock (store_id, product_id);

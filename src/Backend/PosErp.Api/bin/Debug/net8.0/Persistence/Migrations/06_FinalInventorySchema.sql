@@ -1,9 +1,9 @@
-﻿-- ==============================================================================
+-- ==============================================================================
 -- PHASE 2: WAREHOUSE & STOCK TAKE SCHEMA
 -- ==============================================================================
 
-CREATE TABLE suppliers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS suppliers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(200) NOT NULL,
     gstin VARCHAR(15),
     phone VARCHAR(20),
@@ -12,16 +12,16 @@ CREATE TABLE suppliers (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE warehouses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS warehouses (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     name VARCHAR(100) NOT NULL,
     code VARCHAR(50) UNIQUE NOT NULL,
     is_active BOOLEAN DEFAULT TRUE
 );
 
-CREATE TABLE bins (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS bins (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     warehouse_id UUID NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
     code VARCHAR(50) NOT NULL,
     description VARCHAR(200),
@@ -29,8 +29,8 @@ CREATE TABLE bins (
     UNIQUE(warehouse_id, code)
 );
 
-CREATE TABLE stock_take_headers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS stock_take_headers (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     take_number VARCHAR(100) UNIQUE NOT NULL,
     scheduled_date DATE NOT NULL,
@@ -39,8 +39,8 @@ CREATE TABLE stock_take_headers (
     approved_by UUID
 );
 
-CREATE TABLE stock_take_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+CREATE TABLE IF NOT EXISTS stock_take_items (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     stock_take_header_id UUID NOT NULL REFERENCES stock_take_headers(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(id),
     batch_id UUID REFERENCES product_batches(id),

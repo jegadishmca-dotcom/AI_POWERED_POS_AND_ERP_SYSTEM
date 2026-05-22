@@ -26,4 +26,5 @@ VALUES
     CURRENT_TIMESTAMP, 
     CURRENT_TIMESTAMP + INTERVAL '30 days',
     '{"Conditions": {"MinCartValue": 2000}, "Reward": {"DiscountType": "FlatAmount", "Value": 500, "ApplyTo": "BILL"}}'
-);
+)
+ON CONFLICT DO NOTHING;

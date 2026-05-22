@@ -491,11 +491,19 @@ export const PosTerminal = () => {
           <div className="mt-4">
             <button 
               disabled={cart.items.length === 0}
-              className="w-full bg-emerald-600 text-white p-4 rounded-lg font-black text-2xl shadow-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors" 
+              className="w-full bg-emerald-600 text-white p-4 rounded-lg font-black text-2xl shadow-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors mb-4" 
               onClick={() => setPaymentModalOpen(true)}
             >
               <CreditCard className="w-8 h-8 mr-3" /> PAYMENT (F4)
             </button>
+            <div className="flex gap-2">
+               <button onClick={() => setHoldModalOpen(true)} className="flex-1 bg-orange-600 text-white p-3 rounded-lg shadow-md flex items-center justify-center text-sm font-bold hover:bg-orange-700 transition-colors">
+                  <Hand className="w-4 h-4 mr-2" /> F9: Hold/Resume
+               </button>
+               <button onClick={() => setReprintModalOpen(true)} className="flex-1 bg-slate-700 text-white p-3 rounded-lg shadow-md flex items-center justify-center text-sm font-bold hover:bg-slate-800 transition-colors">
+                  <Printer className="w-4 h-4 mr-2" /> Reprint Invoice
+               </button>
+            </div>
           </div>
         </div>
       <PaymentModal 
@@ -615,15 +623,7 @@ export const PosTerminal = () => {
         }} 
       />
 
-      {/* Action Bar / Modals */}
-      <div className="absolute top-4 right-4 flex space-x-2">
-         <button onClick={() => setReprintModalOpen(true)} className="bg-slate-700 text-white p-2 rounded shadow flex items-center text-sm font-bold hover:bg-slate-800 transition-colors">
-            <Printer className="w-4 h-4 mr-1" /> Reprint
-         </button>
-         <button onClick={() => setHoldModalOpen(true)} className="bg-orange-600 text-white p-2 rounded shadow flex items-center text-sm font-bold hover:bg-orange-700 transition-colors">
-            <Hand className="w-4 h-4 mr-1" /> F9: Hold/Resume
-         </button>
-      </div>
+      {/* Modals */}
 
       <HoldResumeModal 
         isOpen={isHoldModalOpen} 

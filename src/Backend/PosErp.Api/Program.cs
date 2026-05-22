@@ -138,10 +138,29 @@ using (var scope = app.Services.CreateScope())
                 {
                     Console.WriteLine($"Applying database migration: {filename}...");
                     var sqlContent = await File.ReadAllTextAsync(sqlFile);
-                    await context.Database.ExecuteSqlRawAsync(sqlContent);
 
-                    await context.Database.ExecuteSqlRawAsync(
-                        "INSERT INTO migration_history (migration_name) VALUES ({0})", filename);
+                    // Use raw ADO.NET to avoid ExecuteSqlRawAsync interpreting { } in JSON as format placeholders
+                    var conn = context.Database.GetDbConnection();
+                    var connWasOpen = conn.State == System.Data.ConnectionState.Open;
+                    if (!connWasOpen) await conn.OpenAsync();
+
+                    using (var execCmd = conn.CreateCommand())
+                    {
+                        execCmd.CommandText = sqlContent;
+                        await execCmd.ExecuteNonQueryAsync();
+                    }
+
+                    using (var histCmd = conn.CreateCommand())
+                    {
+                        histCmd.CommandText = "INSERT INTO migration_history (migration_name) VALUES (@mig)";
+                        var migParam = histCmd.CreateParameter();
+                        migParam.ParameterName = "@mig";
+                        migParam.Value = filename;
+                        histCmd.Parameters.Add(migParam);
+                        await histCmd.ExecuteNonQueryAsync();
+                    }
+
+                    if (!connWasOpen) await conn.CloseAsync();
                     Console.WriteLine($"Migration {filename} applied successfully!");
                 }
             }

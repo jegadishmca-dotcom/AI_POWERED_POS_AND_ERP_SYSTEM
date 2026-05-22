@@ -27,6 +27,7 @@ public interface IApplicationDbContext
 
     DbSet<Invoice> Invoices { get; }
     DbSet<InvoiceItem> InvoiceItems { get; }
+    DbSet<PosSession> PosSessions { get; }
     
     // Inventory
     DbSet<ProductBatch> ProductBatches { get; }

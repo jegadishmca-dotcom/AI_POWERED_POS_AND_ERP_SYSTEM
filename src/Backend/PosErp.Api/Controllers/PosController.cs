@@ -39,6 +39,25 @@ public class PosController : ControllerBase
         return Ok(await _mediator.Send(command));
     }
 
+    [HttpPost("session/open")]
+    public async Task<IActionResult> OpenSession([FromBody] PosErp.Application.Features.Pos.Commands.CreatePosSessionCommand command)
+    {
+        return Ok(await _mediator.Send(command));
+    }
+
+    [HttpGet("session/current")]
+    public async Task<IActionResult> GetCurrentSession([FromQuery] Guid terminalId, [FromQuery] Guid cashierId)
+    {
+        var session = await _mediator.Send(new PosErp.Application.Features.Pos.Queries.GetActivePosSessionQuery(terminalId, cashierId));
+        return Ok(session);
+    }
+
+    [HttpPost("session/close")]
+    public async Task<IActionResult> CloseSession([FromBody] PosErp.Application.Features.Pos.Commands.ClosePosSessionCommand command)
+    {
+        return Ok(await _mediator.Send(command));
+    }
+
     [HttpPost("print/{invoiceId}")]
     public async Task<IActionResult> PrintReceipt(Guid invoiceId)
     {

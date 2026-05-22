@@ -11,6 +11,7 @@ import { usePosKeyboardShortcuts } from '../hooks/usePosKeyboardShortcuts';
 import { HoldResumeModal } from './modals/HoldResumeModal';
 import { ManagerPinModal } from './modals/ManagerPinModal';
 import { ReprintModal } from './modals/ReprintModal';
+import { OpenShiftModal } from './modals/OpenShiftModal';
 import { posDb } from '../db/pos.db';
 
 export const PosTerminal = () => {
@@ -29,11 +30,63 @@ export const PosTerminal = () => {
   const customerInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
 
+  // Shift Management State
+  const [activeSession, setActiveSession] = useState<any>(null);
+  const [isOpenShiftModalOpen, setOpenShiftModalOpen] = useState(false);
+  const terminalId = '00000000-0000-0000-0000-000000000001';
+  const cashierId = '00000000-0000-0000-0000-000000000001';
+
   useEffect(() => {
     // Focus barcode scanner input on mount
     productInputRef.current?.focus();
+    
+    // Check for active shift
+    const fetchSession = async () => {
+      try {
+        const res = await fetch(`/api/pos/session/current?terminalId=${terminalId}&cashierId=${cashierId}`);
+        if (res.ok) {
+          const sessionData = await res.json();
+          if (sessionData && sessionData.status === 'OPEN') {
+            setActiveSession(sessionData);
+          } else {
+            setOpenShiftModalOpen(true);
+          }
+        } else {
+          setOpenShiftModalOpen(true);
+        }
+      } catch (err) {
+        console.error('Failed to fetch session', err);
+        setOpenShiftModalOpen(true); // Default to forcing open shift on network error
+      }
+    };
+    fetchSession();
   }, []);
   
+  const handleOpenShift = async (openingCash: number) => {
+    try {
+      const payload = {
+        terminalId,
+        cashierId,
+        openingFloatCash: openingCash
+      };
+      const res = await fetch('/api/pos/session/open', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        const sessionId = await res.json();
+        setActiveSession({ id: sessionId, terminalId, cashierId, openingFloatCash: openingCash, status: 'OPEN' });
+        setOpenShiftModalOpen(false);
+      } else {
+        alert('Failed to open shift.');
+      }
+    } catch (err) {
+      console.error('Error opening shift', err);
+      alert('Error opening shift');
+    }
+  };
+
   // Product Search State
   const [productQuery, setProductQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
@@ -599,6 +652,11 @@ export const PosTerminal = () => {
             managerAction?.callback();
             setManagerAction(null);
         }}
+      />
+
+      <OpenShiftModal
+        isOpen={isOpenShiftModalOpen}
+        onOpenShift={handleOpenShift}
       />
 
       {/* Hidden print container for thermal receipt printer */}

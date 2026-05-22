@@ -444,7 +444,8 @@ INSERT INTO migration_history (migration_name) VALUES
 ('11_EInvoiceAndReportsSchema.sql'),
 ('12_SeedChartOfAccounts.sql'),
 ('13_AnalyticsViewsSchema.sql'),
-('14_AuditLogsSchema.sql')
+('14_AuditLogsSchema.sql'),
+('15_PosSessionSchema.sql')
 ON CONFLICT (migration_name) DO NOTHING;
 
 -- Done!

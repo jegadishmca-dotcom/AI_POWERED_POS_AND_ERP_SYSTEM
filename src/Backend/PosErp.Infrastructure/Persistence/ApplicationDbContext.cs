@@ -33,6 +33,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
+    public DbSet<PosSession> PosSessions => Set<PosSession>();
     
     // Inventory
     public DbSet<ProductBatch> ProductBatches => Set<ProductBatch>();

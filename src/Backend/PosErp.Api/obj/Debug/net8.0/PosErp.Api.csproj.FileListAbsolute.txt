@@ -176,3 +176,16 @@ D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Back
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\obj\Debug\net8.0\PosErp.Api.pdb
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\obj\Debug\net8.0\PosErp.Api.genruntimeconfig.cache
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\obj\Debug\net8.0\ref\PosErp.Api.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\02_ProductSearchTrigger.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\03_InventorySchema.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\04_PurchasingSchema.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\05_StockViewsSchema.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\06_FinalInventorySchema.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\07_CrmAndOffersSchema.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\08_OfferEnhancementsSchema.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\09_SeedOffers.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\10_AccountingSchema.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\11_EInvoiceAndReportsSchema.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\12_SeedChartOfAccounts.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\13_AnalyticsViewsSchema.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\14_AuditLogsSchema.sql

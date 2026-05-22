@@ -12,7 +12,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- ROLES
 CREATE TABLE roles (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID, -- Multi-store readiness
     name VARCHAR(50) NOT NULL,
     description TEXT,
@@ -29,7 +29,7 @@ CREATE TABLE roles (
 
 -- PERMISSIONS
 CREATE TABLE permissions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(100) NOT NULL UNIQUE,
     module VARCHAR(50) NOT NULL,
     -- Audit & Soft Delete
@@ -53,7 +53,7 @@ CREATE TABLE role_permissions (
 
 -- USERS
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID, -- Multi-store readiness
     username VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(255) NOT NULL,
@@ -78,7 +78,7 @@ CREATE INDEX idx_users_username ON users(username) WHERE is_deleted = FALSE;
 -- ==========================================
 
 CREATE TABLE terminals (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID, -- Multi-store readiness
     terminal_code VARCHAR(20) NOT NULL,
     name VARCHAR(100) NOT NULL,
@@ -103,7 +103,7 @@ CREATE INDEX idx_terminals_code ON terminals(terminal_code) WHERE is_deleted = F
 
 -- CATEGORIES
 CREATE TABLE categories (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID, -- Multi-store readiness
     name VARCHAR(100) NOT NULL,
     parent_category_id UUID REFERENCES categories(id),
@@ -119,7 +119,7 @@ CREATE TABLE categories (
 
 -- BRANDS
 CREATE TABLE brands (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID, -- Multi-store readiness
     name VARCHAR(100) NOT NULL,
     -- Audit & Soft Delete
@@ -134,7 +134,7 @@ CREATE TABLE brands (
 
 -- TAX SLABS
 CREATE TABLE tax_slabs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID, -- Multi-store readiness
     name VARCHAR(50) NOT NULL,
     cgst_rate DECIMAL(18,4) DEFAULT 0 NOT NULL,
@@ -153,7 +153,7 @@ CREATE TABLE tax_slabs (
 
 -- PRODUCTS
 CREATE TABLE products (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID, -- Multi-store readiness
     product_code VARCHAR(50) NOT NULL,
     name VARCHAR(200) NOT NULL,
@@ -207,7 +207,7 @@ CREATE INDEX idx_products_search ON products USING GIN(search_vector);
 
 -- BARCODES
 CREATE TABLE barcodes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID, -- Multi-store readiness
     product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
     barcode VARCHAR(100) NOT NULL,
@@ -232,7 +232,7 @@ CREATE INDEX idx_barcodes_product ON barcodes(product_id) WHERE is_deleted = FAL
 
 -- INVOICES (Partitioned by business_date)
 CREATE TABLE invoices (
-    id UUID NOT NULL DEFAULT uuid_generate_v4(),
+    id UUID NOT NULL DEFAULT gen_random_uuid(),
     store_id UUID, -- Multi-store readiness
     business_date DATE NOT NULL,
     invoice_number VARCHAR(50) NOT NULL,
@@ -282,7 +282,7 @@ CREATE TABLE invoices_y2026m05 PARTITION OF invoices
 
 -- INVOICE ITEMS (Partitioned by business_date)
 CREATE TABLE invoice_items (
-    id UUID NOT NULL DEFAULT uuid_generate_v4(),
+    id UUID NOT NULL DEFAULT gen_random_uuid(),
     store_id UUID, -- Multi-store readiness
     invoice_id UUID NOT NULL,
     business_date DATE NOT NULL,

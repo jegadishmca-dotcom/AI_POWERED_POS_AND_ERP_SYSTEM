@@ -38,7 +38,7 @@ FOR EACH ROW EXECUTE FUNCTION products_search_vector_update();
 
 -- ── Phase 2: Inventory Schema ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS product_batches (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     product_id UUID NOT NULL REFERENCES products(id),
     batch_number VARCHAR(100) NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS product_batches (
 CREATE INDEX IF NOT EXISTS idx_batches_product_expiry ON product_batches(product_id, expiry_date);
 
 CREATE TABLE IF NOT EXISTS stock_ledger (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     warehouse_id UUID,
     terminal_id UUID,
@@ -74,7 +74,7 @@ CREATE INDEX IF NOT EXISTS idx_stock_ledger_store_product ON stock_ledger(store_
 CREATE INDEX IF NOT EXISTS idx_stock_ledger_ref ON stock_ledger(reference_document_id);
 
 CREATE TABLE IF NOT EXISTS stock_adjustments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     adjustment_number VARCHAR(100) UNIQUE NOT NULL,
     reason VARCHAR(100) NOT NULL,
@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS stock_adjustments (
     approved_by UUID
 );
 CREATE TABLE IF NOT EXISTS stock_adjustment_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     stock_adjustment_id UUID NOT NULL REFERENCES stock_adjustments(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(id),
     batch_id UUID REFERENCES product_batches(id),
@@ -93,7 +93,7 @@ CREATE TABLE IF NOT EXISTS stock_adjustment_items (
 
 -- ── Phase 2: Purchasing Schema ────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS purchase_order_headers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     supplier_id UUID NOT NULL,
     po_number VARCHAR(100) UNIQUE NOT NULL,
@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS purchase_order_headers (
     created_by UUID
 );
 CREATE TABLE IF NOT EXISTS purchase_order_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     purchase_order_header_id UUID NOT NULL REFERENCES purchase_order_headers(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(id),
     ordered_quantity DECIMAL(18,4) NOT NULL,
@@ -114,7 +114,7 @@ CREATE TABLE IF NOT EXISTS purchase_order_items (
     total_cost DECIMAL(18,4) NOT NULL
 );
 CREATE TABLE IF NOT EXISTS grn_headers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     purchase_order_header_id UUID REFERENCES purchase_order_headers(id),
     supplier_id UUID NOT NULL,
@@ -127,7 +127,7 @@ CREATE TABLE IF NOT EXISTS grn_headers (
     created_by UUID
 );
 CREATE TABLE IF NOT EXISTS grn_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     grn_header_id UUID NOT NULL REFERENCES grn_headers(id) ON DELETE CASCADE,
     purchase_order_item_id UUID NOT NULL REFERENCES purchase_order_items(id),
     product_id UUID NOT NULL REFERENCES products(id),
@@ -142,7 +142,7 @@ CREATE TABLE IF NOT EXISTS grn_items (
     total_cost DECIMAL(18,4) NOT NULL
 );
 CREATE TABLE IF NOT EXISTS purchase_bill_headers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     supplier_id UUID NOT NULL,
     grn_header_id UUID REFERENCES grn_headers(id),
@@ -156,7 +156,7 @@ CREATE TABLE IF NOT EXISTS purchase_bill_headers (
     created_by UUID
 );
 CREATE TABLE IF NOT EXISTS purchase_bill_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     purchase_bill_header_id UUID NOT NULL REFERENCES purchase_bill_headers(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(id),
     quantity DECIMAL(18,4) NOT NULL,
@@ -181,7 +181,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_current_stock_unique ON mv_current_stoc
 
 -- ── Phase 2: Warehouse & Stock Take ──────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS suppliers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(200) NOT NULL,
     gstin VARCHAR(15),
     phone VARCHAR(20),
@@ -190,14 +190,14 @@ CREATE TABLE IF NOT EXISTS suppliers (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS warehouses (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     name VARCHAR(100) NOT NULL,
     code VARCHAR(50) UNIQUE NOT NULL,
     is_active BOOLEAN DEFAULT TRUE
 );
 CREATE TABLE IF NOT EXISTS bins (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     warehouse_id UUID NOT NULL REFERENCES warehouses(id) ON DELETE CASCADE,
     code VARCHAR(50) NOT NULL,
     description VARCHAR(200),
@@ -205,7 +205,7 @@ CREATE TABLE IF NOT EXISTS bins (
     UNIQUE(warehouse_id, code)
 );
 CREATE TABLE IF NOT EXISTS stock_take_headers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     take_number VARCHAR(100) UNIQUE NOT NULL,
     scheduled_date DATE NOT NULL,
@@ -214,7 +214,7 @@ CREATE TABLE IF NOT EXISTS stock_take_headers (
     approved_by UUID
 );
 CREATE TABLE IF NOT EXISTS stock_take_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     stock_take_header_id UUID NOT NULL REFERENCES stock_take_headers(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(id),
     batch_id UUID REFERENCES product_batches(id),
@@ -224,7 +224,7 @@ CREATE TABLE IF NOT EXISTS stock_take_items (
 
 -- ── Phase 3: CRM, Loyalty, Wallet & Offers ───────────────────────────────────
 CREATE TABLE IF NOT EXISTS customer_tiers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(50) NOT NULL UNIQUE,
     level INT NOT NULL,
     minimum_spend DECIMAL(18,4) NOT NULL DEFAULT 0,
@@ -232,7 +232,7 @@ CREATE TABLE IF NOT EXISTS customer_tiers (
 );
 
 CREATE TABLE IF NOT EXISTS customers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     phone VARCHAR(20) UNIQUE NOT NULL,
     name VARCHAR(200) NOT NULL,
     tamil_name VARCHAR(200),
@@ -253,7 +253,7 @@ CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 ALTER TABLE invoices ADD COLUMN IF NOT EXISTS customer_id UUID REFERENCES customers(id);
 
 CREATE TABLE IF NOT EXISTS wallet_ledger (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     store_id UUID,
     transaction_type VARCHAR(50) NOT NULL,
@@ -266,7 +266,7 @@ CREATE TABLE IF NOT EXISTS wallet_ledger (
 CREATE INDEX IF NOT EXISTS idx_wallet_ledger_customer ON wallet_ledger(customer_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS loyalty_ledger (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     store_id UUID,
     transaction_type VARCHAR(50) NOT NULL,
@@ -280,7 +280,7 @@ CREATE TABLE IF NOT EXISTS loyalty_ledger (
 CREATE INDEX IF NOT EXISTS idx_loyalty_ledger_customer ON loyalty_ledger(customer_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS offers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(200) NOT NULL,
     description TEXT,
     offer_type VARCHAR(50) NOT NULL,
@@ -322,7 +322,7 @@ WHERE NOT EXISTS (SELECT 1 FROM offers WHERE promo_code = 'FESTIVAL500');
 
 -- ── Phase 4: Accounting & GST ─────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS accounts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_code VARCHAR(20) UNIQUE NOT NULL,
     name VARCHAR(200) NOT NULL,
     account_type VARCHAR(50) NOT NULL,
@@ -331,7 +331,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 CREATE TABLE IF NOT EXISTS journal_entries (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     entry_number VARCHAR(100) UNIQUE NOT NULL,
     entry_date DATE NOT NULL,
@@ -342,7 +342,7 @@ CREATE TABLE IF NOT EXISTS journal_entries (
     created_by UUID
 );
 CREATE TABLE IF NOT EXISTS journal_entry_lines (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     journal_entry_id UUID NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
     account_id UUID NOT NULL REFERENCES accounts(id),
     description TEXT,
@@ -350,7 +350,7 @@ CREATE TABLE IF NOT EXISTS journal_entry_lines (
     credit_amount DECIMAL(18,4) DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS tax_transactions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     transaction_type VARCHAR(50) NOT NULL,
     document_number VARCHAR(100) NOT NULL,
@@ -412,7 +412,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_mv_product_sales_stats ON mv_product_sales
 
 -- ── Phase 6: Audit Logs ───────────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS audit_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID,
     action VARCHAR(100) NOT NULL,
     entity_name VARCHAR(100),

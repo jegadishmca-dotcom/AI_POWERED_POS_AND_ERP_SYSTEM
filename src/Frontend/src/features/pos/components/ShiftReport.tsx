@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { IndianRupee, Printer, Calculator, FileText, CheckCircle } from 'lucide-react';
 import { posDb } from '../db/pos.db';
+import { useAuthStore } from '../../auth/store/auth.store';
 
 export const ShiftReport = () => {
   const [session, setSession] = useState<any>(null);
@@ -9,8 +10,10 @@ export const ShiftReport = () => {
   const [isClosing, setIsClosing] = useState(false);
   const [isClosed, setIsClosed] = useState(false);
 
-  const terminalId = '00000000-0000-0000-0000-000000000001';
-  const cashierId = '00000000-0000-0000-0000-000000000001';
+  const { user } = useAuthStore();
+  const terminalId = localStorage.getItem('pos_terminal_id') || '00000000-0000-0000-0000-000000000001';
+  const cashierId = user?.id || '00000000-0000-0000-0000-000000000001';
+  const terminalCode = localStorage.getItem('pos_terminal_code') || 'POS-01';
 
   useEffect(() => {
     const fetchSessionAndReport = async () => {
@@ -96,7 +99,7 @@ export const ShiftReport = () => {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-black text-slate-800 tracking-tight">Shift & Sales Report</h1>
-            <p className="text-slate-500 font-medium mt-1">Terminal: POS-01 • Cashier: Cashier 01</p>
+            <p className="text-slate-500 font-medium mt-1">Terminal: {terminalCode} • Cashier: {user?.fullName || 'Cashier'}</p>
           </div>
           <button className="bg-white border-2 border-slate-200 text-slate-700 font-bold px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-2">
             <Printer className="w-5 h-5" />

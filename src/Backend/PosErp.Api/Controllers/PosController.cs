@@ -45,6 +45,12 @@ public class PosController : ControllerBase
         return Ok(await _mediator.Send(command));
     }
 
+    [HttpPost("calculate-cart")]
+    public async Task<IActionResult> CalculateCart([FromBody] PosErp.Application.Features.Pos.Queries.CalculateCart.CalculateCartQuery query)
+    {
+        return Ok(await _mediator.Send(query));
+    }
+
     [HttpGet("session/current")]
     public async Task<IActionResult> GetCurrentSession([FromQuery] Guid terminalId, [FromQuery] Guid cashierId)
     {
@@ -59,12 +65,12 @@ public class PosController : ControllerBase
     }
 
     [HttpPost("print/{invoiceId}")]
-    public async Task<IActionResult> PrintReceipt(Guid invoiceId)
+    public async Task<IActionResult> PrintReceipt(Guid invoiceId, [FromQuery] string printerIp = "192.168.1.100")
     {
         // Fetch invoice from DB using MediatR query (assumed)
         // Convert to ESC/POS bytes
         // Send to Printer IP
-        await _printService.PrintReceiptAsync("192.168.1.100", 9100, "Receipt Content Placeholder for " + invoiceId);
+        await _printService.PrintReceiptAsync(printerIp, 9100, "Receipt Content Placeholder for " + invoiceId);
         return Ok();
     }
 }

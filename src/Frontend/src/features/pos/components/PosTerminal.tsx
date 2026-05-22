@@ -13,6 +13,7 @@ import { ManagerPinModal } from './modals/ManagerPinModal';
 import { ReprintModal } from './modals/ReprintModal';
 import { OpenShiftModal } from './modals/OpenShiftModal';
 import { posDb } from '../db/pos.db';
+import { useAuthStore } from '../../auth/store/auth.store';
 
 export const PosTerminal = () => {
   const [customer, setCustomer] = useState<any>(null);
@@ -33,8 +34,9 @@ export const PosTerminal = () => {
   // Shift Management State
   const [activeSession, setActiveSession] = useState<any>(null);
   const [isOpenShiftModalOpen, setOpenShiftModalOpen] = useState(false);
-  const terminalId = '00000000-0000-0000-0000-000000000001';
-  const cashierId = '00000000-0000-0000-0000-000000000001';
+  const { user } = useAuthStore();
+  const terminalId = localStorage.getItem('pos_terminal_id') || '00000000-0000-0000-0000-000000000001';
+  const cashierId = user?.id || '00000000-0000-0000-0000-000000000001';
 
   useEffect(() => {
     // Focus barcode scanner input on mount
@@ -102,47 +104,70 @@ export const PosTerminal = () => {
     appliedOfferNames: []
   });
 
-  const recalculateCart = (items: any[]) => {
-    let subtotal = items.reduce((sum: number, item: any) => sum + (item.qty * item.unitPrice), 0);
-    let totalDiscount = 0;
-    let appliedOffers: string[] = [];
-
-    // Mock/Demo offer logic: 10% off Atta (Line Level)
-    const evaluatedItems = items.map((item: any) => {
-      let discount = 0;
-      let offerName = null;
-      if (item.name.toLowerCase().includes('atta')) {
-        discount = item.lineTotal * 0.10; // 10%
-        offerName = '10% OFF Staples';
-        if (!appliedOffers.includes(offerName)) appliedOffers.push(offerName);
-      }
-      return { ...item, discountAmount: discount, finalLineTotal: item.lineTotal - discount, appliedOfferName: offerName };
-    });
-
-    totalDiscount += evaluatedItems.reduce((sum: number, item: any) => sum + item.discountAmount, 0);
-
-    // Mock logic: Flat 50 off if promo code applied (Bill Level)
-    if (promoCode === 'SAVE50') {
-      totalDiscount += 50;
-      appliedOffers.push('SAVE50 Promo');
+  const recalculateCart = async (items: any[]) => {
+    if (items.length === 0) {
+      setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
+      return;
     }
 
-    // Dynamic GST calculation based on item rates
-    let taxTotal = evaluatedItems.reduce((sum: number, item: any) => {
-        const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0);
-        return sum + (item.finalLineTotal * (itemTaxRate / 100));
-    }, 0);
+    try {
+      const payload = {
+        items: items.map(i => ({ productId: i.productId, quantity: i.qty })),
+        promoCode: promoCode,
+        customerId: customer?.id
+      };
 
-    let finalTotal = Math.max(0, subtotal - totalDiscount + taxTotal);
+      const res = await fetch('/api/pos/calculate-cart', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
-    setCart({
-      items: evaluatedItems,
-      subtotal,
-      totalDiscount,
-      taxTotal,
-      finalTotal,
-      appliedOfferNames: appliedOffers
-    });
+      if (!res.ok) throw new Error('API failed');
+
+      const data = await res.json();
+      
+      // Map API response back to UI cart format
+      const evaluatedItems = items.map((origItem: any) => {
+        const calcItem = data.items.find((i: any) => i.productId === origItem.productId);
+        if (!calcItem) return origItem;
+        return {
+          ...origItem,
+          discountAmount: calcItem.discountAmount,
+          finalLineTotal: calcItem.finalLineTotal,
+          appliedOfferName: calcItem.appliedOfferName,
+          cgstRate: calcItem.cgstRate,
+          sgstRate: calcItem.sgstRate
+        };
+      });
+
+      setCart({
+        items: evaluatedItems,
+        subtotal: data.subTotal,
+        totalDiscount: data.totalDiscount,
+        taxTotal: data.taxTotal,
+        finalTotal: data.finalTotal,
+        appliedOfferNames: data.appliedOfferNames
+      });
+
+    } catch (err) {
+      console.warn('Backend calculation failed, falling back to basic offline calculation', err);
+      // Basic offline fallback (no promos, just basic tax)
+      let subtotal = items.reduce((sum: number, item: any) => sum + (item.qty * item.unitPrice), 0);
+      let taxTotal = items.reduce((sum: number, item: any) => {
+          const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0);
+          return sum + ((item.qty * item.unitPrice) * (itemTaxRate / 100));
+      }, 0);
+
+      setCart({
+        items: items.map(i => ({ ...i, finalLineTotal: i.qty * i.unitPrice, discountAmount: 0, appliedOfferName: null })),
+        subtotal,
+        totalDiscount: 0,
+        taxTotal,
+        finalTotal: subtotal + taxTotal,
+        appliedOfferNames: []
+      });
+    }
   };
 
   // Evaluate whenever promo code changes
@@ -516,7 +541,7 @@ export const PosTerminal = () => {
             // Generate dynamic invoice payload matching CreateInvoiceCommand
             const payload = {
               invoiceNumber: `INV-${localStorage.getItem('pos_terminal_code') || 'POS-01'}-${Date.now().toString().slice(-6)}`,
-              terminalId: '00000000-0000-0000-0000-000000000001', // Default Logical Terminal Ref GUID
+              terminalId: terminalId,
               customerId: customer?.id || undefined,
               promoCode: promoCode || undefined,
               walletAmountUsed: tenders.wallet || 0,
@@ -548,7 +573,7 @@ export const PosTerminal = () => {
               businessDate: new Date().toISOString(),
               terminalId: payload.terminalId,
               terminalSequence: 1,
-              cashierId: '00000000-0000-0000-0000-000000000001',
+              cashierId: cashierId,
               subTotal: cart.subtotal,
               discountAmount: cart.totalDiscount,
               taxAmount: cart.taxTotal,

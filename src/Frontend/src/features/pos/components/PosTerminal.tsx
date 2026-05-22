@@ -25,6 +25,12 @@ export const PosTerminal = () => {
   const [isManagerModalOpen, setManagerModalOpen] = useState(false);
   const [managerAction, setManagerAction] = useState<any>(null);
   const customerInputRef = useRef<HTMLInputElement>(null);
+  const productInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    // Focus barcode scanner input on mount
+    productInputRef.current?.focus();
+  }, []);
   
   // Product Search State
   const [productQuery, setProductQuery] = useState('');
@@ -178,7 +184,9 @@ export const PosTerminal = () => {
     setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
     setCustomer(null);
     setCustomerQuery('');
-    alert('Cart parked successfully (F9).');
+    setTimeout(() => {
+        alert('Cart parked successfully (F9).');
+    }, 100);
   };
 
   const handleResumeCart = (invoice: any) => {
@@ -294,6 +302,7 @@ export const PosTerminal = () => {
           <div className="relative">
             <Search className="absolute left-3 top-2.5 text-slate-400 w-5 h-5" />
             <input 
+              ref={productInputRef}
               type="text"
               placeholder="Scan Barcode or Type Product Name (Press Enter)..."
               className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-850"

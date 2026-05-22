@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { UserPlus, Save, ShieldCheck } from 'lucide-react';
 
-export const CustomerRegistrationModal = ({ isOpen, onClose, onRegister }: any) => {
+export const CustomerRegistrationModal = ({ isOpen, onClose, onRegister, initialPhone }: any) => {
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [tamilName, setTamilName] = useState('');
@@ -9,6 +9,17 @@ export const CustomerRegistrationModal = ({ isOpen, onClose, onRegister }: any) 
   const [marketingConsent, setMarketingConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setPhone(initialPhone || '');
+      setName('');
+      setTamilName('');
+      setDob('');
+      setMarketingConsent(false);
+      setError(null);
+    }
+  }, [isOpen, initialPhone]);
 
   if (!isOpen) return null;
 

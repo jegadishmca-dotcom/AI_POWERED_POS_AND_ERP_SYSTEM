@@ -538,6 +538,7 @@ export const PosTerminal = () => {
 
       <CustomerRegistrationModal 
         isOpen={isCustomerModalOpen} 
+        initialPhone={customerQuery}
         onClose={() => setCustomerModalOpen(false)} 
         onRegister={async (newCust: any) => {
           try {

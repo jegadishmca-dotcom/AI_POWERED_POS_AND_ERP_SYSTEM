@@ -72,6 +72,10 @@ echo ""
 
 if docker compose -f $COMPOSE_FILE up -d --build $TARGET; then
   log_ok "Build and deployment successful!"
+  echo ""
+  # CRITICAL: Always restart nginx so it re-resolves the new container IPs
+  log_info "Restarting nginx to re-resolve upstream container IPs..."
+  docker restart pos_nginx > /dev/null 2>&1 && log_ok "Nginx restarted successfully." || log_warn "Nginx restart skipped (may not be running)."
 else
   log_error "Build FAILED. Checking which service(s) are down..."
   echo ""

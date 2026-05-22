@@ -482,6 +482,7 @@ export const PosTerminal = () => {
 
             // Construct invoice object to be printed
             const invoiceToPrint = {
+              id: payload.invoiceNumber,
               invoiceNumber: payload.invoiceNumber,
               businessDate: new Date().toISOString(),
               terminalId: payload.terminalId,

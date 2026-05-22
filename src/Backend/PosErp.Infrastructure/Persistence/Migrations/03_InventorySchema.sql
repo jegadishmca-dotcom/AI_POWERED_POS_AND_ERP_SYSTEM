@@ -4,7 +4,7 @@
 
 -- 1. Product Batches (FEFO Tracking)
 CREATE TABLE IF NOT EXISTS product_batches (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     product_id UUID NOT NULL REFERENCES products(id),
     batch_number VARCHAR(100) NOT NULL,
@@ -20,7 +20,7 @@ CREATE INDEX IF NOT EXISTS idx_batches_product_expiry ON product_batches(product
 
 -- 2. Immutable Stock Ledger (Audit-Proof)
 CREATE TABLE IF NOT EXISTS stock_ledger (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     warehouse_id UUID,
     terminal_id UUID,
@@ -45,7 +45,7 @@ CREATE INDEX IF NOT EXISTS idx_stock_ledger_ref ON stock_ledger(reference_docume
 
 -- 3. Goods Receipt Notes (GRN)
 CREATE TABLE IF NOT EXISTS goods_receipt_notes (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     purchase_order_id UUID,
     supplier_id UUID NOT NULL,
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS goods_receipt_notes (
 );
 
 CREATE TABLE IF NOT EXISTS goods_receipt_note_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     goods_receipt_note_id UUID NOT NULL REFERENCES goods_receipt_notes(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(id),
     batch_id UUID REFERENCES product_batches(id),
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS goods_receipt_note_items (
 
 -- 4. Stock Adjustments (Shrinkage/Damage)
 CREATE TABLE IF NOT EXISTS stock_adjustments (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     adjustment_number VARCHAR(100) UNIQUE NOT NULL,
     reason VARCHAR(100) NOT NULL,
@@ -82,7 +82,7 @@ CREATE TABLE IF NOT EXISTS stock_adjustments (
 );
 
 CREATE TABLE IF NOT EXISTS stock_adjustment_items (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     stock_adjustment_id UUID NOT NULL REFERENCES stock_adjustments(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(id),
     batch_id UUID REFERENCES product_batches(id),

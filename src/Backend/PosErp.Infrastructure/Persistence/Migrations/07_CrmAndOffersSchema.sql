@@ -3,7 +3,7 @@
 -- ==============================================================================
 
 CREATE TABLE IF NOT EXISTS customer_tiers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(50) NOT NULL UNIQUE,
     level INT NOT NULL,
     minimum_spend DECIMAL(18,4) NOT NULL DEFAULT 0,
@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS customer_tiers (
 );
 
 CREATE TABLE IF NOT EXISTS customers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     phone VARCHAR(20) UNIQUE NOT NULL,
     name VARCHAR(200) NOT NULL,
     tamil_name VARCHAR(200),
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS customers (
 CREATE INDEX IF NOT EXISTS idx_customers_phone ON customers(phone);
 
 CREATE TABLE IF NOT EXISTS wallet_ledger (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     store_id UUID,
     transaction_type VARCHAR(50) NOT NULL, -- TOPUP, SPEND, REFUND
@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS wallet_ledger (
 CREATE INDEX IF NOT EXISTS idx_wallet_ledger_customer ON wallet_ledger(customer_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS loyalty_ledger (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
     store_id UUID,
     transaction_type VARCHAR(50) NOT NULL, -- EARN, BURN, EXPIRED
@@ -59,7 +59,7 @@ CREATE TABLE IF NOT EXISTS loyalty_ledger (
 CREATE INDEX IF NOT EXISTS idx_loyalty_ledger_customer ON loyalty_ledger(customer_id, created_at DESC);
 
 CREATE TABLE IF NOT EXISTS offers (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(200) NOT NULL,
     description TEXT,
     offer_type VARCHAR(50) NOT NULL,

@@ -3,7 +3,7 @@
 -- ==============================================================================
 
 CREATE TABLE IF NOT EXISTS audit_logs (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID, -- Can be null for system actions
     action VARCHAR(100) NOT NULL, -- e.g., 'PRICE_OVERRIDE', 'STOCK_ADJUSTMENT'
     entity_name VARCHAR(100),

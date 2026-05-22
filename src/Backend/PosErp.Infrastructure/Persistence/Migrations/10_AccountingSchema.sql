@@ -3,7 +3,7 @@
 -- ==============================================================================
 
 CREATE TABLE IF NOT EXISTS accounts (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     account_code VARCHAR(20) UNIQUE NOT NULL,
     name VARCHAR(200) NOT NULL,
     account_type VARCHAR(50) NOT NULL,
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 );
 
 CREATE TABLE IF NOT EXISTS journal_entries (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     entry_number VARCHAR(100) UNIQUE NOT NULL,
     entry_date DATE NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS journal_entries (
 );
 
 CREATE TABLE IF NOT EXISTS journal_entry_lines (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     journal_entry_id UUID NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
     account_id UUID NOT NULL REFERENCES accounts(id),
     description TEXT,
@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS journal_entry_lines (
 );
 
 CREATE TABLE IF NOT EXISTS tax_transactions (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     store_id UUID,
     transaction_type VARCHAR(50) NOT NULL,
     document_number VARCHAR(100) NOT NULL,

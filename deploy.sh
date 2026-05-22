@@ -21,12 +21,25 @@ echo ""
 echo -e "${CYAN}============================================${NC}"
 echo -e "${CYAN}   POS ERP - Deployment Script v1.0        ${NC}"
 echo -e "${CYAN}============================================${NC}"
-echo ""
+NO_PULL=false
+for arg in "$@"; do
+  [[ "$arg" == "--no-pull" ]] && NO_PULL=true
+  [[ "$arg" == "--backend" ]] && MODE="--backend"
+  [[ "$arg" == "--frontend" ]] && MODE="--frontend"
+done
 
-# --- Step 1: Git Pull ---
-log_info "Pulling latest code from GitHub..."
-git pull origin main || { log_error "Git pull failed! Check your network and try again."; exit 1; }
-log_ok "Code is up to date."
+# --- Step 1: Git Pull (optional) ---
+if [ "$NO_PULL" = true ]; then
+  log_warn "Skipping git pull (--no-pull flag set). Using existing local code."
+else
+  log_info "Pulling latest code from GitHub..."
+  if git pull origin main; then
+    log_ok "Code is up to date."
+  else
+    log_warn "Git pull failed (network issue?). Continuing with existing local code..."
+    log_warn "Run 'sudo bash deploy.sh --no-pull' to skip git pull next time."
+  fi
+fi
 echo ""
 
 # --- Step 2: Check Docker daemon ---

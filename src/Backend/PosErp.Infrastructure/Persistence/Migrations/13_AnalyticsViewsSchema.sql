@@ -3,7 +3,7 @@
 -- ==============================================================================
 
 -- Daily Sales Summary (Fast line charts)
-CREATE MATERIALIZED VIEW mv_daily_sales_summary AS
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_daily_sales_summary AS
 SELECT 
     terminal_id,
     business_date,
@@ -19,7 +19,7 @@ GROUP BY terminal_id, business_date;
 CREATE UNIQUE INDEX idx_mv_daily_sales_summary ON mv_daily_sales_summary(terminal_id, business_date);
 
 -- Top Products Stats (Fast tables)
-CREATE MATERIALIZED VIEW mv_product_sales_stats AS
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_product_sales_stats AS
 SELECT 
     i.business_date,
     ii.product_id,

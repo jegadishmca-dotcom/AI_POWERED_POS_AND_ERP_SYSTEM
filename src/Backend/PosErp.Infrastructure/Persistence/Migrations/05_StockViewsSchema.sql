@@ -6,7 +6,7 @@
 -- We use a MATERIALIZED VIEW for near-instant reporting on massive catalogs.
 -- A Hangfire job should be scheduled to run REFRESH MATERIALIZED VIEW CONCURRENTLY mv_current_stock every 5-10 minutes.
 
-CREATE MATERIALIZED VIEW mv_current_stock AS
+CREATE MATERIALIZED VIEW IF NOT EXISTS mv_current_stock AS
 SELECT DISTINCT ON (store_id, product_id)
     id as latest_ledger_id,
     store_id,

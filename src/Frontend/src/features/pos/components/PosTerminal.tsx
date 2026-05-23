@@ -5,7 +5,7 @@ import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
 import { searchCustomers, registerCustomer } from '../../crm/api/crm.api';
 import { createInvoice } from '../api/pos.api';
-import { ThermalReceipt } from './ThermalReceipt';
+import { printReceipt } from '../utils/printReceipt';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { usePosKeyboardShortcuts } from '../hooks/usePosKeyboardShortcuts';
 import { HoldResumeModal } from './modals/HoldResumeModal';
@@ -610,12 +610,7 @@ export const PosTerminal = () => {
 
             setCompletedInvoice(invoiceToPrint);
             setPaymentModalOpen(false);
-
-            // Give React a frame to render the printable receipt component, then trigger print
-            setTimeout(() => {
-              window.print();
-              setCompletedInvoice(null);
-            }, 250);
+            printReceipt(invoiceToPrint);
 
             setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
             setCustomer(null);
@@ -675,11 +670,7 @@ export const PosTerminal = () => {
         isOpen={isReprintModalOpen}
         onClose={() => setReprintModalOpen(false)}
         onReprint={(inv: any) => {
-          setCompletedInvoice(inv);
-          setTimeout(() => {
-            window.print();
-            setCompletedInvoice(null);
-          }, 250);
+          printReceipt(inv);
         }}
       />
 
@@ -699,8 +690,6 @@ export const PosTerminal = () => {
         onOpenShift={handleOpenShift}
       />
 
-      {/* Hidden print container for thermal receipt printer */}
-      <ThermalReceipt invoice={completedInvoice} />
     </div>
   );
 };

@@ -86,7 +86,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             if (totalTender < cartEvaluation.FinalTotal)
                 throw new Exception("Total tender is less than the final invoice amount.");
 
-            var today = DateTime.UtcNow.Date;
+            var today = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Unspecified);
             var lastSeq = await _context.Invoices
                 .Where(i => i.TerminalId == request.TerminalId && i.BusinessDate == today)
                 .Select(i => (int?)i.TerminalSequence)
@@ -162,11 +162,11 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
             // Post Journal Entry
             await _financialPostingService.PostJournalEntryAsync(
-                null, DateTime.UtcNow.Date, $"POS Invoice {invoice.InvoiceNumber}", $"INV-{invoice.Id}", journalLines, cancellationToken);
+                null, today, $"POS Invoice {invoice.InvoiceNumber}", $"INV-{invoice.Id}", journalLines, cancellationToken);
 
             // Post Dedicated Tax Transaction for GSTR Returns
             await _financialPostingService.RecordGstTransactionAsync(
-                null, "SALE", invoice.InvoiceNumber, DateTime.UtcNow.Date, taxableValue, cgst, sgst, null, cancellationToken);
+                null, "SALE", invoice.InvoiceNumber, today, taxableValue, cgst, sgst, null, cancellationToken);
 
             // Flush ALL pending EF changes (loyalty ledger, wallet, financial lines) before committing the transaction
             await _context.SaveChangesAsync(cancellationToken);

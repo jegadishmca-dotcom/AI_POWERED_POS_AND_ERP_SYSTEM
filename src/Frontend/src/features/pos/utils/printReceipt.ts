@@ -104,14 +104,32 @@ export function printReceipt(invoice: any): void {
     });
   }
 
-  // Loyalty
+  // Loyalty points section — matches reference format:
+  // OLD POINTS : 96.00    RCVD : 1000.0
+  // TODAY PTS  :  8.19    RFND :  181.00
+  // TOTAL PTS  : 104.3
   let loyaltyHtml = '';
-  if (invoice.customerName && (safe(invoice.loyaltyPointsEarned) > 0 || safe(invoice.loyaltyPointsBalance) > 0)) {
-    loyaltyHtml = hr();
-    if (safe(invoice.loyaltyPointsEarned) > 0)
-      loyaltyHtml += row('Points Earned Today', `+${fmt(invoice.loyaltyPointsEarned)}`);
-    if (safe(invoice.loyaltyPointsBalance) > 0)
-      loyaltyHtml += row('Total Points Balance', fmt(invoice.loyaltyPointsBalance));
+  if (invoice.customerName) {
+    const earned  = safe(invoice.loyaltyPointsEarned);
+    const balance = safe(invoice.loyaltyPointsBalance);
+    const oldPts  = Math.max(0, balance - earned);
+    const rcvd    = tendered;   // total cash/UPI/card received
+    const rfnd    = change;     // change returned to customer
+
+    if (earned > 0 || balance > 0) {
+      loyaltyHtml = hr() + `
+        <div style="font-size:10px;">
+          <div style="display:flex;justify-content:space-between;">
+            <span>OLD POINTS : ${oldPts.toFixed(2)}</span>
+            <span>RCVD : ${fmt(rcvd)}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;">
+            <span>TODAY PTS  : ${earned.toFixed(2)}</span>
+            <span>RFND : ${fmt(rfnd)}</span>
+          </div>
+          <div><span>TOTAL PTS  : ${balance.toFixed(2)}</span></div>
+        </div>`;
+    }
   }
 
   // Full receipt HTML
@@ -153,8 +171,8 @@ export function printReceipt(invoice: any): void {
   </div>
   ${hr()}
   ${paymentHtml}
-  ${loyaltyHtml}
   ${gstHtml}
+  ${loyaltyHtml}
   <div style="text-align:center;margin-top:8px;padding-top:6px;border-top:1px dashed #000;padding-bottom:4px;">
     <div>Tax Invoice | GSTIN: ${STORE.gstin}</div>
     <div style="margin-top:4px;">${STORE.nameTamil}</div>

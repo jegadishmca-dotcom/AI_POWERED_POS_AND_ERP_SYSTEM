@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
+using PosErp.Infrastructure.Persistence;
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -22,7 +23,7 @@ public static class GstMasterSeeder
     public const string SLAB_28   = "10000000-0000-0000-0000-000000000005";
     public const string SLAB_28C  = "10000000-0000-0000-0000-000000000006"; // 28% + 12% Cess
 
-    public static async Task SeedAsync(IApplicationDbContext context)
+    public static async Task SeedAsync(ApplicationDbContext context)
     {
         // ── STEP 1: Create GstHsnMasterIndia table ───────────────────────────
         await context.Database.ExecuteSqlRawAsync(@"

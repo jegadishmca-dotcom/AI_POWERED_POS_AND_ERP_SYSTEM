@@ -74,10 +74,17 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
 
     return (
       <>
-        {/* Critical: use <style> tag to handle print visibility reliably without Tailwind */}
+        {/* 
+          PRINT CSS: visibility:hidden on body lets children override with visibility:visible.
+          display:none on parent would block all children — that was causing the blank receipt.
+        */}
         <style>{`
           @media screen { .pos-receipt { display: none !important; } }
-          @media print   { .pos-receipt { display: block !important; } body > *:not(.pos-receipt-root) { display: none !important; } }
+          @media print  {
+            body * { visibility: hidden; }
+            .pos-receipt { visibility: visible !important; position: fixed; top: 0; left: 0; width: 80mm; }
+            .pos-receipt * { visibility: visible !important; }
+          }
         `}</style>
 
         <div ref={ref} className="pos-receipt" style={S.wrap}>

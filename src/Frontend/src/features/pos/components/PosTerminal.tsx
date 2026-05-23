@@ -560,12 +560,27 @@ export const PosTerminal = () => {
               }))
             };
 
+            // Track loyalty points before/after
+            const oldLoyaltyPoints = customer ? (customer.points || 0) : 0;
+            let newLoyaltyBalance  = oldLoyaltyPoints;
+            let loyaltyEarned      = 0;
+
             try {
               await createInvoice(payload);
-              alert(`Invoice ${payload.invoiceNumber} Created Successfully in Database!\nFinancial journals, tax lines & loyalty ledger recorded!`);
+              // Re-fetch customer to get updated loyalty balance from backend
+              if (customer?.phone) {
+                try {
+                  const freshCustomers = await searchCustomers(customer.phone);
+                  if (freshCustomers.length > 0) {
+                    newLoyaltyBalance = freshCustomers[0].loyaltyPoints || 0;
+                    loyaltyEarned     = Math.max(0, newLoyaltyBalance - oldLoyaltyPoints);
+                    // Update customer state so next transaction shows correct balance
+                    setCustomer((prev: any) => prev ? { ...prev, points: newLoyaltyBalance } : prev);
+                  }
+                } catch { /* non-critical — skip */ }
+              }
             } catch (err: any) {
               console.warn('Network issue during checkout, saving offline...', err);
-              // Save to offline db
               await posDb.invoices.put({ ...payload, id: payload.invoiceNumber, businessDate: new Date().toISOString(), status: 'COMPLETED' } as any);
               await posDb.sync_queue.put({ ...payload, id: payload.invoiceNumber, businessDate: new Date().toISOString() } as any);
               alert(`Saved Offline: Invoice ${payload.invoiceNumber} queued for sync.`);
@@ -581,6 +596,8 @@ export const PosTerminal = () => {
               cashierName: user?.fullName || user?.username || 'Cashier',
               customerName: customer?.name || undefined,
               customerPhone: customer?.phone || undefined,
+              loyaltyPointsEarned: loyaltyEarned,
+              loyaltyPointsBalance: newLoyaltyBalance,
               subTotal: cart.subtotal,
               discountAmount: cart.totalDiscount,
               taxAmount: cart.taxTotal,

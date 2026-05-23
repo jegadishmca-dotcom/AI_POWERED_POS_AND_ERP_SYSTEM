@@ -24,6 +24,9 @@ public record CreateInvoiceCommand(
     decimal CashAmount,
     decimal UpiAmount,
     decimal CardAmount,
+    decimal RoundOff,
+    decimal NetPayable,
+    string PaymentMode,
     List<InvoiceItemDto> Items
 ) : IRequest<Guid>;
 
@@ -99,9 +102,16 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 CustomerId = customer?.Id,
                 BusinessDate = today,
                 SubTotal = cartEvaluation.Subtotal,
-                TotalDiscount = cartEvaluation.TotalDiscount,
-                TaxTotal = cartEvaluation.TaxTotal,
+                DiscountAmount = cartEvaluation.TotalDiscount,
+                TaxAmount = cartEvaluation.TaxTotal,
                 TotalAmount = cartEvaluation.FinalTotal,
+                RoundOff = request.RoundOff,
+                NetPayable = request.NetPayable,
+                PaymentMode = request.PaymentMode,
+                CashAmount = request.CashAmount,
+                UpiAmount = request.UpiAmount,
+                CardAmount = request.CardAmount,
+                WalletAmount = request.WalletAmountUsed,
                 Status = "COMPLETED"
             };
 

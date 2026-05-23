@@ -543,6 +543,13 @@ export const PosTerminal = () => {
           try {
             setIsProcessing(true);
             // Generate dynamic invoice payload matching CreateInvoiceCommand
+            const roundOffVal = +(Math.round(cart.finalTotal) - cart.finalTotal).toFixed(2);
+            const netPayableVal = Math.round(cart.finalTotal);
+            const paymentModeVal = tenders.cash > 0 && (tenders.upi > 0 || tenders.card > 0) ? 'SPLIT'
+                                 : tenders.cash > 0 ? 'CASH'
+                                 : tenders.upi > 0  ? 'UPI'
+                                 : tenders.card > 0 ? 'CARD'
+                                 : 'WALLET';
             const payload = {
               invoiceNumber: `INV-${localStorage.getItem('pos_terminal_code') || 'POS-01'}-${Date.now().toString().slice(-6)}`,
               terminalId: terminalId,
@@ -553,6 +560,9 @@ export const PosTerminal = () => {
               cashAmount: tenders.cash || 0,
               upiAmount: tenders.upi || 0,
               cardAmount: tenders.card || 0,
+              roundOff: roundOffVal,
+              netPayable: netPayableVal,
+              paymentMode: paymentModeVal,
               items: cart.items.map((item: any) => ({
                 productId: item.productId,
                 quantity: item.qty,

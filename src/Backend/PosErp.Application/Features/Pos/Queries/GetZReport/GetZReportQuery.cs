@@ -50,9 +50,9 @@ public class GetZReportQueryHandler : IRequestHandler<GetZReportQuery, ZReportDt
             invoices.Sum(i => i.TotalAmount),
             invoices.Sum(i => i.TaxAmount),
             invoices.Sum(i => i.DiscountAmount),
-            invoices.Where(i => i.PaymentMode == "CASH").Sum(i => i.NetPayable),
-            invoices.Where(i => i.PaymentMode == "CARD").Sum(i => i.NetPayable),
-            invoices.Where(i => i.PaymentMode == "UPI").Sum(i => i.NetPayable)
+            invoices.Sum(i => i.CashAmount),
+            invoices.Sum(i => i.CardAmount),
+            invoices.Sum(i => i.UpiAmount)
         );
     }
 }

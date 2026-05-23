@@ -34,7 +34,13 @@ public class Invoice
     public string? QrCode { get; set; }
     
     public string Status { get; set; } = "COMPLETED"; // COMPLETED, CANCELLED, HOLD
-    public string PaymentMode { get; set; } = "CASH"; // CASH, CARD, UPI
+    public string PaymentMode { get; set; } = "CASH"; // CASH, CARD, UPI, SPLIT
+    
+    // Individual tender amounts (supports split-tender)
+    public decimal CashAmount { get; set; }
+    public decimal UpiAmount { get; set; }
+    public decimal CardAmount { get; set; }
+    public decimal WalletAmount { get; set; }
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public Guid? CreatedBy { get; set; }

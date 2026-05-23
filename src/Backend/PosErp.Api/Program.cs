@@ -180,6 +180,14 @@ using (var scope = app.Services.CreateScope())
             );
         ");
 
+        // DDL patch: add individual tender amount columns to invoices (idempotent)
+        await context.Database.ExecuteSqlRawAsync(@"
+            ALTER TABLE ""Invoices"" ADD COLUMN IF NOT EXISTS ""CashAmount""   NUMERIC(18,2) NOT NULL DEFAULT 0;
+            ALTER TABLE ""Invoices"" ADD COLUMN IF NOT EXISTS ""UpiAmount""    NUMERIC(18,2) NOT NULL DEFAULT 0;
+            ALTER TABLE ""Invoices"" ADD COLUMN IF NOT EXISTS ""CardAmount""   NUMERIC(18,2) NOT NULL DEFAULT 0;
+            ALTER TABLE ""Invoices"" ADD COLUMN IF NOT EXISTS ""WalletAmount"" NUMERIC(18,2) NOT NULL DEFAULT 0;
+        ");
+
         // Retrieve or insert 'Owner' and 'Cashier' roles dynamically using EF Core
         var ownerRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Owner");
         if (ownerRole == null)

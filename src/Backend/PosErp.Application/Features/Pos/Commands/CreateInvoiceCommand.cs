@@ -17,6 +17,7 @@ namespace PosErp.Application.Features.Pos.Commands.SyncInvoices;
 public record CreateInvoiceCommand(
     string InvoiceNumber,
     Guid TerminalId,
+    Guid CashierId,
     Guid? CustomerId,
     string? PromoCode,
     decimal WalletAmountUsed,
@@ -93,6 +94,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             {
                 InvoiceNumber = request.InvoiceNumber,
                 TerminalId = request.TerminalId,
+                CashierId = request.CashierId,
                 TerminalSequence = nextSeq,
                 CustomerId = customer?.Id,
                 BusinessDate = today,

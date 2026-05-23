@@ -542,6 +542,7 @@ export const PosTerminal = () => {
             const payload = {
               invoiceNumber: `INV-${localStorage.getItem('pos_terminal_code') || 'POS-01'}-${Date.now().toString().slice(-6)}`,
               terminalId: terminalId,
+              cashierId: cashierId,
               customerId: customer?.id || undefined,
               promoCode: promoCode || undefined,
               walletAmountUsed: tenders.wallet || 0,

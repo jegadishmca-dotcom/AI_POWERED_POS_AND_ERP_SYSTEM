@@ -228,12 +228,24 @@ using (var scope = app.Services.CreateScope())
             {
                 Username = "admin@supermarket.local",
                 PasswordHash = passwordHasher.HashPassword("Admin@123!"),
+                PinHash = passwordHasher.HashPassword("1234"), // Default override PIN — CHANGE AFTER FIRST LOGIN
                 FullName = "System Administrator",
                 RoleId = ownerRole.Id,
                 IsActive = true
             };
             context.Users.Add(adminUser);
             usersChanged = true;
+        }
+        else
+        {
+            // Ensure existing admin has a PinHash set (for upgrades from older versions)
+            var existingAdmin = await context.Users.FirstOrDefaultAsync(u => u.Username == "admin@supermarket.local");
+            if (existingAdmin != null && existingAdmin.PinHash == null)
+            {
+                existingAdmin.PinHash = passwordHasher.HashPassword("1234");
+                usersChanged = true;
+                Console.WriteLine("[PIN] Default override PIN set for admin user. Please change it via Settings.");
+            }
         }
         
         // Seed Cashier 01 User

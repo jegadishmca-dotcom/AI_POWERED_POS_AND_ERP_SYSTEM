@@ -12,7 +12,8 @@ import {
   MapPin, 
   LogOut, 
   User as UserIcon, 
-  Terminal 
+  Terminal,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { useAuthStore } from './features/auth/store/auth.store';
 import { Login } from './features/auth/routes/Login';
@@ -28,6 +29,7 @@ import { StockPositionReport } from './features/inventory/components/StockPositi
 import { WarehouseLocationsList } from './features/inventory/components/WarehouseLocationsList';
 import { ShiftReport } from './features/pos/components/ShiftReport';
 import { Suppliers } from './features/purchasing/routes/Suppliers';
+import { Settings } from './pages/Settings';
 
 const AppLayout: React.FC = () => {
   const { user, clearAuth } = useAuthStore();
@@ -51,6 +53,7 @@ const AppLayout: React.FC = () => {
     { path: '/stock-ledger', name: 'Stock Ledger', icon: History, roles: ['Owner', 'Manager'] },
     { path: '/stock-position', name: 'Stock Position', icon: Layers, roles: ['Owner', 'Manager'] },
     { path: '/warehouses', name: 'Warehouses & Bins', icon: MapPin, roles: ['Owner', 'Manager'] },
+    { path: '/settings', name: 'Settings', icon: SettingsIcon, roles: ['Owner', 'Manager'] },
   ];
 
   const filteredNavItems = navItems.filter(item => 
@@ -168,6 +171,9 @@ const AppLayout: React.FC = () => {
             } />
             <Route path="/warehouses" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <WarehouseLocationsList />
+            } />
+            <Route path="/settings" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <Settings />
             } />
             <Route path="/" element={<Navigate to={user?.role === 'Cashier' ? "/pos" : "/dashboard"} replace />} />
             <Route path="*" element={<Navigate to={user?.role === 'Cashier' ? "/pos" : "/dashboard"} replace />} />

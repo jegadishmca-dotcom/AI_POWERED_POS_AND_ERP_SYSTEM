@@ -1,10 +1,13 @@
-﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Mvc;
 using MediatR;
 using System.Threading.Tasks;
 using PosErp.Application.Features.Auth.Commands.Login;
 using PosErp.Application.Features.Auth.Commands.Refresh;
+using PosErp.Application.Features.Auth.Commands.OverridePin;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using System;
+using System.Security.Claims;
 
 namespace PosErp.Api.Controllers;
 
@@ -55,4 +58,34 @@ public class AuthController : ControllerBase
         };
         Response.Cookies.Append("refreshToken", token, cookieOptions);
     }
+
+    /// <summary>
+    /// Verifies a manager override PIN — called from the POS Manager Override modal.
+    /// Returns { authorized: true/false }. Does NOT reveal which user matched.
+    /// </summary>
+    [HttpPost("verify-override-pin")]
+    [Authorize]
+    public async Task<IActionResult> VerifyOverridePin([FromBody] VerifyOverridePinRequest req)
+    {
+        var authorized = await _mediator.Send(new VerifyOverridePinCommand(req.Pin));
+        return Ok(new { authorized });
+    }
+
+    /// <summary>
+    /// Sets/changes the override PIN for the currently logged-in user (or a specified userId for Owner).
+    /// </summary>
+    [HttpPost("set-override-pin")]
+    [Authorize]
+    public async Task<IActionResult> SetOverridePin([FromBody] SetOverridePinRequest req)
+    {
+        var callerId = Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier) ?? Guid.Empty.ToString());
+        var targetId = req.UserId.HasValue ? req.UserId.Value : callerId;
+
+        await _mediator.Send(new SetOverridePinCommand(targetId, req.NewPin, req.ConfirmPin));
+        return Ok(new { message = "Override PIN updated successfully." });
+    }
 }
+
+// Request body records
+public record VerifyOverridePinRequest(string Pin);
+public record SetOverridePinRequest(string NewPin, string ConfirmPin, Guid? UserId = null);

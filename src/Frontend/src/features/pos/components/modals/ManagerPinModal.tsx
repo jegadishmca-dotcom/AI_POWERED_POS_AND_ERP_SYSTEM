@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, ShieldAlert, Loader2 } from 'lucide-react';
-import { api } from '../../../../services/api';
+import { api } from '@/utils/api';
 
 export const ManagerPinModal = ({ isOpen, onClose, onSuccess, actionName }: any) => {
   const [pin, setPin]         = useState('');
@@ -17,7 +17,7 @@ export const ManagerPinModal = ({ isOpen, onClose, onSuccess, actionName }: any)
     setError('');
     setLoading(true);
     try {
-      const res = await api.post('/auth/verify-override-pin', { pin });
+      const res = await api.post('/api/auth/verify-override-pin', { pin });
       if (res.data?.authorized) {
         setPin('');
         onSuccess();

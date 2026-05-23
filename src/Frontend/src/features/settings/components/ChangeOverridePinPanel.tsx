@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ShieldCheck, KeyRound, Eye, EyeOff, CheckCircle2, AlertCircle } from 'lucide-react';
-import { api } from '../../../services/api';
+import { api } from '@/utils/api';
 
 /**
  * ChangeOverridePinPanel
@@ -32,7 +32,7 @@ export const ChangeOverridePinPanel = () => {
 
     setLoading(true);
     try {
-      await api.post('/auth/set-override-pin', { newPin, confirmPin });
+      await api.post('/api/auth/set-override-pin', { newPin, confirmPin });
       setResult({ ok: true, msg: 'Override PIN changed successfully!' });
       setNewPin('');
       setConfirmPin('');

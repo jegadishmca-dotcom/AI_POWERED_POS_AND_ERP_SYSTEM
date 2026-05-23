@@ -382,6 +382,23 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine("Database seeded successfully with default customer tiers.");
         }
 
+        // Seed default Chart of Accounts (COA)
+        if (!await context.Accounts.AnyAsync())
+        {
+            var accounts = new List<PosErp.Domain.Entities.Finance.Account>
+            {
+                new() { AccountCode = "1000", Name = "Cash Tender", AccountType = "ASSET" },
+                new() { AccountCode = "1100", Name = "Digital Tender", AccountType = "ASSET" },
+                new() { AccountCode = "2100", Name = "Wallet Redemption", AccountType = "LIABILITY" },
+                new() { AccountCode = "2200", Name = "Output CGST", AccountType = "LIABILITY" },
+                new() { AccountCode = "2201", Name = "Output SGST", AccountType = "LIABILITY" },
+                new() { AccountCode = "4000", Name = "Sales Revenue", AccountType = "REVENUE" }
+            };
+            context.Accounts.AddRange(accounts);
+            await context.SaveChangesAsync();
+            Console.WriteLine("Database seeded successfully with default Chart of Accounts.");
+        }
+
         // Seed initial products if empty
         if (!await context.Products.AnyAsync())
         {

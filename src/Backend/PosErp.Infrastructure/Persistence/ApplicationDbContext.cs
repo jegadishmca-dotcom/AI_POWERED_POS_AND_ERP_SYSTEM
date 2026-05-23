@@ -30,6 +30,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Brand> Brands => Set<Brand>();
     public DbSet<TaxSlab> TaxSlabs => Set<TaxSlab>();
+    public DbSet<GstHsnMasterIndia> GstHsnMaster => Set<GstHsnMasterIndia>();
 
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();

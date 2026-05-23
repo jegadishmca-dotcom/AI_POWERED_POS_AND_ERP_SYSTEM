@@ -188,6 +188,9 @@ using (var scope = app.Services.CreateScope())
             ALTER TABLE ""Invoices"" ADD COLUMN IF NOT EXISTS ""WalletAmount"" NUMERIC(18,2) NOT NULL DEFAULT 0;
         ");
 
+        // GST Slab master + HsnMasterIndia2026 seeding
+        await PosErp.Api.Infrastructure.GstMasterSeeder.SeedAsync(context);
+
         // Retrieve or insert 'Owner' and 'Cashier' roles dynamically using EF Core
         var ownerRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Owner");
         if (ownerRole == null)

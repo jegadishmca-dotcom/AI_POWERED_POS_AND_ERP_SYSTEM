@@ -158,7 +158,7 @@ export function printReceipt(invoice: any): void {
   <div style="text-align:center;margin-top:8px;padding-top:6px;border-top:1px dashed #000;padding-bottom:4px;">
     <div>Tax Invoice | GSTIN: ${STORE.gstin}</div>
     <div style="margin-top:4px;">${STORE.nameTamil}</div>
-    <div>அனைத்தும் வாங்க நன்றிபிளுக்கு வாங்க</div>
+    <div>அனைத்தும் வாங்க ஆப்பிளுக்கு வாங்க</div>
     <div>Thank you for shopping with us!</div>
     <div>Visit Again!</div>
   </div>

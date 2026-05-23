@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { CreditCard, Wallet, Banknote, QrCode, CheckCircle } from 'lucide-react';
 
-export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompletePayment }: any) => {
+export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompletePayment, isProcessing = false }: any) => {
   const [tenders, setTenders] = useState({ cash: '', upi: '', card: '', wallet: '' });
   const [useWalletMax, setUseWalletMax] = useState(false);
 
@@ -110,10 +110,16 @@ export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompleteP
         <div className="p-4 bg-gray-50 border-t flex justify-end">
           <button 
             onClick={handleComplete}
-            disabled={balanceDue > 0}
-            className={`px-8 py-3 rounded text-white font-black text-xl flex items-center shadow ${balanceDue > 0 ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+            disabled={balanceDue > 0 || isProcessing}
+            className={`px-8 py-3 rounded text-white font-black text-xl flex items-center shadow ${
+              balanceDue > 0 || isProcessing ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'
+            }`}
           >
-            <CheckCircle className="w-6 h-6 mr-2" /> COMPLETE INVOICE
+            {isProcessing ? (
+              <><span className="animate-spin mr-2 border-2 border-white border-t-transparent rounded-full w-5 h-5 inline-block"></span> PROCESSING...</>
+            ) : (
+              <><CheckCircle className="w-6 h-6 mr-2" /> COMPLETE INVOICE</>
+            )}
           </button>
         </div>
       </div>

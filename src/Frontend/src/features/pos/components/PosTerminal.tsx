@@ -23,6 +23,8 @@ export const PosTerminal = () => {
   const [isPaymentModalOpen, setPaymentModalOpen] = useState(false);
   const [completedInvoice, setCompletedInvoice] = useState<any>(null);
   
+  const [isProcessing, setIsProcessing] = useState(false);
+  
   // Modals & Hooks State
   const [isHoldModalOpen, setHoldModalOpen] = useState(false);
   const [isReprintModalOpen, setReprintModalOpen] = useState(false);
@@ -494,7 +496,7 @@ export const PosTerminal = () => {
               value={promoCode}
               onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
             />
-            <button className="bg-slate-800 text-white px-4 rounded-r font-bold hover:bg-slate-700">Apply</button>
+            <button className="bg-slate-800 text-white px-4 rounded-r font-bold hover:bg-slate-700" onClick={() => recalculateCart(cart.items)}>Apply</button>
           </div>
 
           <div className="flex justify-between text-lg mb-2"><span>Subtotal</span><span className="font-bold text-slate-700">₹{cart.subtotal.toFixed(2)}</span></div>
@@ -533,11 +535,13 @@ export const PosTerminal = () => {
         </div>
       <PaymentModal 
         isOpen={isPaymentModalOpen} 
-        onClose={() => setPaymentModalOpen(false)} 
+        onClose={() => !isProcessing && setPaymentModalOpen(false)} 
         cartTotal={cart.finalTotal}
+        isProcessing={isProcessing}
         customer={customer}
         onCompletePayment={async (tenders: any) => {
           try {
+            setIsProcessing(true);
             // Generate dynamic invoice payload matching CreateInvoiceCommand
             const payload = {
               invoiceNumber: `INV-${localStorage.getItem('pos_terminal_code') || 'POS-01'}-${Date.now().toString().slice(-6)}`,
@@ -567,7 +571,6 @@ export const PosTerminal = () => {
               alert(`Saved Offline: Invoice ${payload.invoiceNumber} queued for sync.`);
             }
 
-            // Construct invoice object to be printed
             const invoiceToPrint = {
               id: payload.invoiceNumber,
               invoiceNumber: payload.invoiceNumber,
@@ -575,12 +578,19 @@ export const PosTerminal = () => {
               terminalId: payload.terminalId,
               terminalSequence: 1,
               cashierId: cashierId,
+              cashierName: user?.fullName || user?.username || 'Cashier',
+              customerName: customer?.name || undefined,
+              customerPhone: customer?.phone || undefined,
               subTotal: cart.subtotal,
               discountAmount: cart.totalDiscount,
               taxAmount: cart.taxTotal,
               totalAmount: cart.finalTotal,
-              roundOff: 0,
-              netPayable: cart.finalTotal,
+              cashAmount: tenders.cash,
+              upiAmount: tenders.upi,
+              cardAmount: tenders.card,
+              walletAmountUsed: tenders.wallet,
+              roundOff: Math.round(cart.finalTotal) - cart.finalTotal,
+              netPayable: Math.round(cart.finalTotal),
               paymentMode: tenders.cash > 0 ? 'CASH' : tenders.upi > 0 ? 'UPI' : tenders.card > 0 ? 'CARD' : 'WALLET',
               status: 'COMPLETED',
               items: cart.items.map((item: any) => ({
@@ -589,6 +599,8 @@ export const PosTerminal = () => {
                 name: item.name,
                 quantity: item.qty,
                 unitPrice: item.unitPrice,
+                cgstRate: item.cgstRate || 0,
+                sgstRate: item.sgstRate || 0,
                 discountAmount: item.discountAmount || 0,
                 totalAmount: item.finalLineTotal || item.lineTotal
               }))
@@ -612,6 +624,8 @@ export const PosTerminal = () => {
           } catch (err: any) {
             console.error('Checkout error:', err);
             alert('Failed to process checkout: ' + (err.message));
+          } finally {
+            setIsProcessing(false);
           }
         }} 
       />

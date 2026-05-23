@@ -27,26 +27,26 @@ public static class GstMasterSeeder
     {
         // ── STEP 1: Create GstHsnMasterIndia table ───────────────────────────
         await context.Database.ExecuteSqlRawAsync(@"
-            CREATE TABLE IF NOT EXISTS ""GstHsnMasterIndia"" (
-                ""Id""              UUID         PRIMARY KEY,
-                ""HsnCode""         VARCHAR(12)  NOT NULL,
-                ""Description""     TEXT         NOT NULL,
-                ""Category""        VARCHAR(60)  NOT NULL DEFAULT '',
-                ""ExampleProducts"" TEXT         NOT NULL DEFAULT '',
-                ""GstRatePercent""  NUMERIC(5,2) NOT NULL DEFAULT 0,
-                ""CgstRate""        NUMERIC(5,2) NOT NULL DEFAULT 0,
-                ""SgstRate""        NUMERIC(5,2) NOT NULL DEFAULT 0,
-                ""IgstRate""        NUMERIC(5,2) NOT NULL DEFAULT 0,
-                ""CessRate""        NUMERIC(5,2) NOT NULL DEFAULT 0,
-                ""IsExempt""        BOOLEAN      NOT NULL DEFAULT FALSE,
-                ""Notes""           TEXT,
-                ""NotificationRef"" VARCHAR(120),
-                ""TaxSlabId""       UUID,
-                ""CreatedAt""       TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-                ""IsDeleted""       BOOLEAN NOT NULL DEFAULT FALSE
+            CREATE TABLE IF NOT EXISTS gst_hsn_master_india (
+                id              UUID         PRIMARY KEY,
+                hsn_code         VARCHAR(12)  NOT NULL,
+                description     TEXT         NOT NULL,
+                category        VARCHAR(60)  NOT NULL DEFAULT '',
+                example_products TEXT         NOT NULL DEFAULT '',
+                gst_rate_percent  NUMERIC(5,2) NOT NULL DEFAULT 0,
+                cgst_rate        NUMERIC(5,2) NOT NULL DEFAULT 0,
+                sgst_rate        NUMERIC(5,2) NOT NULL DEFAULT 0,
+                igst_rate        NUMERIC(5,2) NOT NULL DEFAULT 0,
+                cess_rate        NUMERIC(5,2) NOT NULL DEFAULT 0,
+                is_exempt        BOOLEAN      NOT NULL DEFAULT FALSE,
+                notes           TEXT,
+                notification_ref VARCHAR(120),
+                tax_slab_id       UUID,
+                created_at       TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                is_deleted       BOOLEAN NOT NULL DEFAULT FALSE
             );
-            CREATE INDEX IF NOT EXISTS idx_gsthsn_hsncode ON ""GstHsnMasterIndia""(""HsnCode"");
-            CREATE INDEX IF NOT EXISTS idx_gsthsn_category ON ""GstHsnMasterIndia""(""Category"");
+            CREATE INDEX IF NOT EXISTS idx_gsthsn_hsncode ON gst_hsn_master_india(hsn_code);
+            CREATE INDEX IF NOT EXISTS idx_gsthsn_category ON gst_hsn_master_india(category);
         ");
 
         // ── STEP 2: Upsert the 6 standard Indian GST TaxSlab records ─────────
@@ -63,14 +63,14 @@ public static class GstMasterSeeder
         foreach (var (id, name, cgst, sgst, igst, cess) in slabs)
         {
             await context.Database.ExecuteSqlRawAsync($@"
-                INSERT INTO ""TaxSlabs"" (""Id"",""Name"",""CgstRate"",""SgstRate"",""IgstRate"",""CessRate"",""CreatedAt"",""IsDeleted"")
+                INSERT INTO tax_slabs (id, name, cgst_rate, sgst_rate, igst_rate, cess_rate, created_at, is_deleted)
                 VALUES ('{id}','{name}',{cgst},{sgst},{igst},{cess},NOW(),false)
-                ON CONFLICT (""Id"") DO UPDATE
-                    SET ""Name""=EXCLUDED.""Name"",
-                        ""CgstRate""=EXCLUDED.""CgstRate"",
-                        ""SgstRate""=EXCLUDED.""SgstRate"",
-                        ""IgstRate""=EXCLUDED.""IgstRate"",
-                        ""CessRate""=EXCLUDED.""CessRate"";
+                ON CONFLICT (id) DO UPDATE
+                    SET name=EXCLUDED.name,
+                        cgst_rate=EXCLUDED.cgst_rate,
+                        sgst_rate=EXCLUDED.sgst_rate,
+                        igst_rate=EXCLUDED.igst_rate,
+                        cess_rate=EXCLUDED.cess_rate;
             ");
         }
         Console.WriteLine("[GST] TaxSlab master: 0%, 5%, 12%, 18%, 28%, 28%+Cess seeded.");
@@ -560,11 +560,11 @@ public static class GstMasterSeeder
             var notif   = e.notif.Replace("'", "''");
 
             await context.Database.ExecuteSqlRawAsync($@"
-                INSERT INTO ""GstHsnMasterIndia"" (
-                    ""Id"",""HsnCode"",""Description"",""Category"",""ExampleProducts"",
-                    ""GstRatePercent"",""CgstRate"",""SgstRate"",""IgstRate"",""CessRate"",
-                    ""IsExempt"",""Notes"",""NotificationRef"",""TaxSlabId"",
-                    ""CreatedAt"",""IsDeleted"")
+                INSERT INTO gst_hsn_master_india (
+                    id, hsn_code, description, category, example_products,
+                    gst_rate_percent, cgst_rate, sgst_rate, igst_rate, cess_rate,
+                    is_exempt, notes, notification_ref, tax_slab_id,
+                    created_at, is_deleted)
                 VALUES (
                     '{id}','{e.hsn}','{desc}','{e.cat}','{ex}',
                     {e.rate},{cgst},{sgst},{igst},{cess},

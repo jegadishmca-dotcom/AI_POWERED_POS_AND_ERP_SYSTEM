@@ -206,22 +206,22 @@ using (var scope = app.Services.CreateScope())
         // Surf Excel Easy Wash → GST 18% (Detergent, Notif 1/2017-CT(R) Sch-III Sl.167)
         await context.Database.ExecuteSqlRawAsync(@"
             -- Tata Salt 1kg: 0% GST (fully exempt under Indian GST law)
-            UPDATE ""Products""
-            SET    ""TaxSlabId"" = '10000000-0000-0000-0000-000000000001'
-            WHERE  ""ProductCode"" = 'PROD-003'
-              AND  ""TaxSlabId"" != '10000000-0000-0000-0000-000000000001';
+            UPDATE products
+            SET    tax_slab_id = '10000000-0000-0000-0000-000000000001'
+            WHERE  product_code = 'PROD-003'
+              AND  tax_slab_id != '10000000-0000-0000-0000-000000000001';
 
             -- Aashirvaad Shudh Chakki Atta 5kg: 5% GST (branded pre-packed atta)
-            UPDATE ""Products""
-            SET    ""TaxSlabId"" = '10000000-0000-0000-0000-000000000002'
-            WHERE  ""ProductCode"" = 'PROD-002'
-              AND  ""TaxSlabId"" != '10000000-0000-0000-0000-000000000002';
+            UPDATE products
+            SET    tax_slab_id = '10000000-0000-0000-0000-000000000002'
+            WHERE  product_code = 'PROD-002'
+              AND  tax_slab_id != '10000000-0000-0000-0000-000000000002';
 
             -- Britannia Bourbon, Cadbury Dairy Milk, Surf Excel: already 18% — ensure correct
-            UPDATE ""Products""
-            SET    ""TaxSlabId"" = '10000000-0000-0000-0000-000000000004'
-            WHERE  ""ProductCode"" IN ('PROD-001', 'PROD-004', 'PROD-005')
-              AND  ""TaxSlabId"" != '10000000-0000-0000-0000-000000000004';
+            UPDATE products
+            SET    tax_slab_id = '10000000-0000-0000-0000-000000000004'
+            WHERE  product_code IN ('PROD-001', 'PROD-004', 'PROD-005')
+              AND  tax_slab_id != '10000000-0000-0000-0000-000000000004';
         ");
         Console.WriteLine("[TAX] Product GST slabs corrected: Salt=0%, Atta=5%, Biscuit/Choc/Detergent=18%");
 

@@ -168,6 +168,9 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             await _financialPostingService.RecordGstTransactionAsync(
                 null, "SALE", invoice.InvoiceNumber, DateTime.UtcNow.Date, taxableValue, cgst, sgst, null, cancellationToken);
 
+            // Flush ALL pending EF changes (loyalty ledger, wallet, financial lines) before committing the transaction
+            await _context.SaveChangesAsync(cancellationToken);
+
             await transaction.CommitAsync(cancellationToken);
             return invoice.Id;
         }

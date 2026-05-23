@@ -191,6 +191,40 @@ using (var scope = app.Services.CreateScope())
         // GST Slab master + HsnMasterIndia2026 seeding
         await PosErp.Api.Infrastructure.GstMasterSeeder.SeedAsync(context);
 
+        // ── PRODUCT TAX SLAB CORRECTION (idempotent) ─────────────────────────
+        // Seeded products were created when only the old 18% slab existed.
+        // Now we correct each product to its legally correct Indian GST slab.
+        //
+        // SLAB_0   = 10000000-0000-0000-0000-000000000001 → 0%  (Exempt)
+        // SLAB_5   = 10000000-0000-0000-0000-000000000002 → 5%
+        // SLAB_18  = 10000000-0000-0000-0000-000000000004 → 18%
+        //
+        // Tata Salt 1kg        → GST 0%  (Salt is FULLY EXEMPT, Notif 2/2017-CT(R) Sl.102)
+        // Aashirvaad Atta 5kg  → GST 5%  (Branded pre-packed atta, w.e.f. 18-Jul-2022)
+        // Britannia Bourbon    → GST 18% (Biscuits, Notif 1/2017-CT(R) Sch-III Sl.77)
+        // Cadbury Dairy Milk   → GST 18% (Chocolate, Notif 1/2017-CT(R) Sch-III Sl.68)
+        // Surf Excel Easy Wash → GST 18% (Detergent, Notif 1/2017-CT(R) Sch-III Sl.167)
+        await context.Database.ExecuteSqlRawAsync(@"
+            -- Tata Salt 1kg: 0% GST (fully exempt under Indian GST law)
+            UPDATE ""Products""
+            SET    ""TaxSlabId"" = '10000000-0000-0000-0000-000000000001'
+            WHERE  ""ProductCode"" = 'PROD-003'
+              AND  ""TaxSlabId"" != '10000000-0000-0000-0000-000000000001';
+
+            -- Aashirvaad Shudh Chakki Atta 5kg: 5% GST (branded pre-packed atta)
+            UPDATE ""Products""
+            SET    ""TaxSlabId"" = '10000000-0000-0000-0000-000000000002'
+            WHERE  ""ProductCode"" = 'PROD-002'
+              AND  ""TaxSlabId"" != '10000000-0000-0000-0000-000000000002';
+
+            -- Britannia Bourbon, Cadbury Dairy Milk, Surf Excel: already 18% — ensure correct
+            UPDATE ""Products""
+            SET    ""TaxSlabId"" = '10000000-0000-0000-0000-000000000004'
+            WHERE  ""ProductCode"" IN ('PROD-001', 'PROD-004', 'PROD-005')
+              AND  ""TaxSlabId"" != '10000000-0000-0000-0000-000000000004';
+        ");
+        Console.WriteLine("[TAX] Product GST slabs corrected: Salt=0%, Atta=5%, Biscuit/Choc/Detergent=18%");
+
         // Retrieve or insert 'Owner' and 'Cashier' roles dynamically using EF Core
         var ownerRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Owner");
         if (ownerRole == null)

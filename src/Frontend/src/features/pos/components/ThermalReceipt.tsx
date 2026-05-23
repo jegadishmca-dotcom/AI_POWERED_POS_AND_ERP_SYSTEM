@@ -2,8 +2,8 @@ import React from 'react';
 
 // Store constants extracted from actual invoice header
 const STORE = {
-  name: 'அட்ஸோக்கடம் மார்க்கெட்',
-  nameEn: 'Atsokkadm Supermarket',
+  name: 'ஆப்பிள் சூப்பர் மார்க்கெட்',
+  nameEn: 'Apple Super Market',
   gstin: '33ABTFA7190F1Z7',
   fssai: '12421019000047',
   address: '1E-16, Matha Kovil Street,',

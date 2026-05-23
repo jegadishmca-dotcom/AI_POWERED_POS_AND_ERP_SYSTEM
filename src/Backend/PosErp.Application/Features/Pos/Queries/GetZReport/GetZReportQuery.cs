@@ -33,8 +33,10 @@ public class GetZReportQueryHandler : IRequestHandler<GetZReportQuery, ZReportDt
 
     public async Task<ZReportDto> Handle(GetZReportQuery request, CancellationToken cancellationToken)
     {
+        var targetDate = DateTime.SpecifyKind(request.BusinessDate.Date, DateTimeKind.Utc);
+
         var query = _context.Invoices
-            .Where(i => i.TerminalId == request.TerminalId && i.BusinessDate.Date == request.BusinessDate.Date && i.Status == "COMPLETED");
+            .Where(i => i.TerminalId == request.TerminalId && i.BusinessDate == targetDate && i.Status == "COMPLETED");
 
         if (request.CashierId.HasValue)
         {

@@ -20,3 +20,15 @@ export const createInvoice = async (payload: CreateInvoicePayload): Promise<stri
   const { data } = await api.post('/api/pos/create', payload);
   return data;
 };
+
+export const closeShift = async (payload: { terminalId: string; cashierId: string; closingFloatCash: number; status: string }) => {
+  const { data } = await api.post('/api/pos/session/close', payload);
+  return data;
+};
+
+export const getZReport = async (terminalId: string, businessDate: string, cashierId: string) => {
+  const { data } = await api.get('/api/pos/z-report', {
+    params: { terminalId, businessDate, cashierId }
+  });
+  return data;
+};

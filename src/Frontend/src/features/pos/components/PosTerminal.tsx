@@ -4,14 +4,16 @@ import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistra
 import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
 import { searchCustomers, registerCustomer } from '../../crm/api/crm.api';
-import { createInvoice } from '../api/pos.api';
+import { createInvoice, closeShift, getZReport } from '../api/pos.api';
 import { printReceipt } from '../utils/printReceipt';
+import { printZReport } from '../utils/printZReport';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { usePosKeyboardShortcuts } from '../hooks/usePosKeyboardShortcuts';
 import { HoldResumeModal } from './modals/HoldResumeModal';
 import { ManagerPinModal } from './modals/ManagerPinModal';
 import { ReprintModal } from './modals/ReprintModal';
 import { OpenShiftModal } from './modals/OpenShiftModal';
+import { CloseShiftModal } from './modals/CloseShiftModal';
 import { posDb } from '../db/pos.db';
 import { useAuthStore } from '../../auth/store/auth.store';
 
@@ -36,6 +38,7 @@ export const PosTerminal = () => {
   // Shift Management State
   const [activeSession, setActiveSession] = useState<any>(null);
   const [isOpenShiftModalOpen, setOpenShiftModalOpen] = useState(false);
+  const [isCloseShiftModalOpen, setCloseShiftModalOpen] = useState(false);
   const { user } = useAuthStore();
   const terminalId = localStorage.getItem('pos_terminal_id') || '00000000-0000-0000-0000-000000000001';
   const cashierId = user?.id || '00000000-0000-0000-0000-000000000001';
@@ -88,6 +91,27 @@ export const PosTerminal = () => {
     } catch (err) {
       console.error('Error opening shift', err);
       alert('Error opening shift');
+    }
+  };
+
+  const handleCloseShift = async (closingCash: number) => {
+    try {
+      await closeShift({
+        terminalId,
+        cashierId,
+        closingFloatCash: closingCash,
+        status: 'CLOSED'
+      });
+      
+      const report = await getZReport(terminalId, new Date().toISOString(), cashierId);
+      printZReport(report, activeSession?.openingFloatCash || 0, closingCash, user?.fullName || 'Cashier');
+      
+      setActiveSession(null);
+      setCloseShiftModalOpen(false);
+      setOpenShiftModalOpen(true);
+    } catch (err) {
+      console.error('Error closing shift:', err);
+      alert('Failed to close shift. Please check network.');
     }
   };
 
@@ -484,7 +508,17 @@ export const PosTerminal = () => {
 
       {/* Right: Payment Panel */}
       <div className="w-1/3 flex flex-col bg-slate-50 p-6">
-        <h2 className="text-2xl font-black text-slate-800 mb-6 border-b pb-2">Payment</h2>
+        <div className="flex justify-between items-center mb-6 border-b pb-2">
+          <h2 className="text-2xl font-black text-slate-800">Payment</h2>
+          {activeSession && (
+            <button 
+              onClick={() => setCloseShiftModalOpen(true)}
+              className="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-200 transition-colors shadow-sm"
+            >
+              Close Shift
+            </button>
+          )}
+        </div>
         
         <div className="flex-1">
           {/* Promo Code Input */}
@@ -715,6 +749,12 @@ export const PosTerminal = () => {
       <OpenShiftModal
         isOpen={isOpenShiftModalOpen}
         onOpenShift={handleOpenShift}
+      />
+
+      <CloseShiftModal
+        isOpen={isCloseShiftModalOpen}
+        onClose={() => setCloseShiftModalOpen(false)}
+        onCloseShift={handleCloseShift}
       />
 
     </div>

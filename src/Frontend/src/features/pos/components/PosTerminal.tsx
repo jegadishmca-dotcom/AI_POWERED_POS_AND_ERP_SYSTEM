@@ -235,6 +235,16 @@ export const PosTerminal = () => {
     recalculateCart(updatedItems);
   };
 
+  const updateItemQtyExact = (productId: string, newQty: number) => {
+    const updatedItems = cart.items.map((item: any) => {
+      if (item.productId === productId) {
+        return { ...item, qty: newQty, lineTotal: newQty * item.unitPrice };
+      }
+      return item;
+    });
+    recalculateCart(updatedItems);
+  };
+
   const updateItemQty = (productId: string, delta: number) => {
     const updatedItems = cart.items.map((item: any) => {
       if (item.productId === productId) {
@@ -266,15 +276,17 @@ export const PosTerminal = () => {
     }
   });
 
-  // Keyboard Shortcuts Integration
+  // Keyboard Shortcuts
   usePosKeyboardShortcuts({
     onF1Search: () => customerInputRef.current?.focus(),
+    onF2Product: () => productInputRef.current?.focus(),
     onF4Payment: () => {
-        if (cart.items.length > 0) setPaymentModalOpen(true);
+      if (cart.items.length > 0) setPaymentModalOpen(true);
     },
     onF9Park: () => {
-        if (cart.items.length > 0) handleHoldCart();
-    }
+      if (cart.items.length > 0) setHoldModalOpen(true);
+    },
+    onF10Reprint: () => setReprintModalOpen(true)
   });
 
   const handleHoldCart = async () => {
@@ -410,7 +422,7 @@ export const PosTerminal = () => {
             <input 
               ref={productInputRef}
               type="text"
-              placeholder="Scan Barcode or Type Product Name (Press Enter)..."
+              placeholder="F2: Scan Barcode or Type Product Name (Press Enter)..."
               className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-850"
               value={productQuery}
               onChange={(e) => setProductQuery(e.target.value)}
@@ -482,7 +494,18 @@ export const PosTerminal = () => {
                         <button onClick={() => updateItemQty(item.productId, -1)} className="text-slate-400 hover:text-indigo-600 transition">
                           <MinusCircle className="w-6 h-6" />
                         </button>
-                        <span className="font-black text-xl w-8 text-center">{item.qty}</span>
+                        <input 
+                          type="number"
+                          min="1"
+                          className="font-black text-lg w-16 text-center border border-slate-200 rounded focus:outline-none focus:border-indigo-500 bg-white"
+                          value={item.qty}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value, 10);
+                            if (!isNaN(val) && val > 0) {
+                              updateItemQtyExact(item.productId, val);
+                            }
+                          }}
+                        />
                         <button onClick={() => updateItemQty(item.productId, 1)} className="text-slate-400 hover:text-indigo-600 transition">
                           <PlusCircle className="w-6 h-6" />
                         </button>
@@ -558,11 +581,13 @@ export const PosTerminal = () => {
               <CreditCard className="w-8 h-8 mr-3" /> PAYMENT (F4)
             </button>
             <div className="flex gap-2">
-               <button onClick={() => setHoldModalOpen(true)} className="flex-1 bg-orange-600 text-white p-3 rounded-lg shadow-md flex items-center justify-center text-sm font-bold hover:bg-orange-700 transition-colors">
-                  <Hand className="w-4 h-4 mr-2" /> F9: Hold/Resume
+               <button onClick={() => setHoldModalOpen(true)} className="flex-1 bg-orange-600 text-white p-3 rounded-lg shadow-md flex flex-col items-center justify-center text-sm font-bold hover:bg-orange-700 transition-colors">
+                  <span className="text-xs opacity-80 mb-1">F9:</span>
+                  <span className="font-bold">Hold/Resume</span>
                </button>
-               <button onClick={() => setReprintModalOpen(true)} className="flex-1 bg-slate-700 text-white p-3 rounded-lg shadow-md flex items-center justify-center text-sm font-bold hover:bg-slate-800 transition-colors">
-                  <Printer className="w-4 h-4 mr-2" /> Reprint Invoice
+               <button onClick={() => setReprintModalOpen(true)} className="flex-1 bg-slate-700 text-white p-3 rounded-lg shadow-md flex flex-col items-center justify-center text-sm font-bold hover:bg-slate-800 transition-colors">
+                  <Printer className="w-5 h-5 mb-1" />
+                  <span className="font-bold">F10: Reprint</span>
                </button>
             </div>
           </div>

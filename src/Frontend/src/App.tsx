@@ -123,7 +123,7 @@ const AppLayout: React.FC = () => {
         <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-8 shadow-sm transition-colors duration-200">
           <h1 className="text-xl font-extrabold text-slate-800 dark:text-white flex items-center">
             {navItems.find(item => item.path === location.pathname)?.name || 'ERP System'}
-            <span className="ml-3 text-xs font-bold text-slate-500 bg-slate-200 dark:bg-slate-700 dark:text-slate-300 px-2 py-1 rounded">v1.1</span>
+            <span className="ml-3 text-xs font-bold text-slate-500 bg-slate-200 dark:bg-slate-700 dark:text-slate-300 px-2 py-1 rounded">v1.2</span>
           </h1>
           <div className="flex items-center space-x-4">
             <div className="text-right hidden sm:block">

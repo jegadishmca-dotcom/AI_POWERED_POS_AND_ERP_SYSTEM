@@ -136,6 +136,16 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .Property(gi => gi.ExpiryDate)
             .HasColumnType("date");
 
+        // Explicit column name overrides for GRN-prefixed FK columns that the
+        // generic ToSnakeCase algorithm mishandles (GRNHeaderId → grnheader_id vs grn_header_id)
+        modelBuilder.Entity<GRNItem>()
+            .Property(gi => gi.GRNHeaderId)
+            .HasColumnName("grn_header_id");
+
+        modelBuilder.Entity<PurchaseBillHeader>()
+            .Property(pb => pb.GRNHeaderId)
+            .HasColumnName("grn_header_id");
+
         modelBuilder.Entity<PosErp.Domain.Entities.Catalog.Barcode>()
             .Property(b => b.BarcodeValue)
             .HasColumnName("barcode");

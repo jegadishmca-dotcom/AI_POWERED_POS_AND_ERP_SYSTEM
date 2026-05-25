@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Crm;
 using System;
@@ -49,7 +49,7 @@ public class LoyaltyService : ILoyaltyService
             TransactionType = transactionType, // EARN (+), BURN (-), EXPIRED (-)
             Points = points,
             ReferenceDocument = referenceDocument,
-            ExpiryDate = transactionType == "EARN" ? DateTime.UtcNow.AddDays(365) : null,
+            ExpiryDate = transactionType == "EARN" ? DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(365), DateTimeKind.Unspecified) : null,
             RunningPoints = newPoints,
             CreatedBy = userId
         };

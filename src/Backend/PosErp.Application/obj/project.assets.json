@@ -9596,11 +9596,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj",
+      "projectUniqueName": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj",
       "projectName": "PosErp.Application",
-      "projectPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj",
+      "projectPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj",
       "packagesPath": "C:\\Users\\User\\.nuget\\packages\\",
-      "outputPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\obj\\",
+      "outputPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -9622,8 +9622,8 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "projectReferences": {
-            "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj": {
-              "projectPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj"
+            "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj": {
+              "projectPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj"
             }
           }
         }

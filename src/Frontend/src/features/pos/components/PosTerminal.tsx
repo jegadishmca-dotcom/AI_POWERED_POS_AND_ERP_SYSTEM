@@ -284,27 +284,31 @@ export const PosTerminal = () => {
       if (cart.items.length > 0) setPaymentModalOpen(true);
     },
     onF9Park: () => {
-      if (cart.items.length > 0) setHoldModalOpen(true);
+      handleHoldCart();
     },
     onF10Reprint: () => setReprintModalOpen(true)
   });
 
   const handleHoldCart = async () => {
-    if (cart.items.length === 0) return;
-    const holdInvoice = {
-        id: Math.random().toString(),
-        invoiceNumber: `HOLD-${Date.now()}`,
-        businessDate: new Date().toISOString(),
-        items: cart.items,
-        totalAmount: cart.finalTotal
+    if (cart.items.length === 0) {
+      setHoldModalOpen(true);
+      return;
+    }
+    
+    const invoiceToHold = {
+      id: crypto.randomUUID(),
+      invoiceNumber: `HOLD-${Date.now()}`,
+      businessDate: new Date().toISOString(),
+      items: cart.items,
+      totalAmount: cart.finalTotal,
+      status: 'HELD',
     };
-    await posDb.held_invoices.put(holdInvoice as any);
+    
+    await posDb.held_invoices.put(invoiceToHold as any);
     setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
     setCustomer(null);
     setCustomerQuery('');
-    setTimeout(() => {
-        alert('Cart parked successfully (F9).');
-    }, 100);
+    alert('Cart put on hold successfully.');
   };
 
   const handleResumeCart = (invoice: any) => {
@@ -581,7 +585,7 @@ export const PosTerminal = () => {
               <CreditCard className="w-8 h-8 mr-3" /> PAYMENT (F11)
             </button>
             <div className="flex gap-2">
-               <button onClick={() => setHoldModalOpen(true)} className="flex-1 bg-orange-600 text-white p-3 rounded-lg shadow-md flex flex-col items-center justify-center text-sm font-bold hover:bg-orange-700 transition-colors">
+               <button onClick={handleHoldCart} className="flex-1 bg-orange-600 text-white p-3 rounded-lg shadow-md flex flex-col items-center justify-center text-sm font-bold hover:bg-orange-700 transition-colors">
                   <span className="text-xs opacity-80 mb-1">F9:</span>
                   <span className="font-bold">Hold/Resume</span>
                </button>

@@ -25,6 +25,55 @@ public static class GstMasterSeeder
 
     public static async Task SeedAsync(ApplicationDbContext context)
     {
+        // Execute raw DDL to guarantee finance tables exist (EnsureCreated skips if other tables are present)
+        await context.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS accounts (
+                id UUID PRIMARY KEY,
+                account_code VARCHAR(50) NOT NULL,
+                name VARCHAR(255) NOT NULL,
+                account_type VARCHAR(50) NOT NULL,
+                parent_account_id UUID,
+                is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL
+            );
+
+            CREATE TABLE IF NOT EXISTS journal_entries (
+                id UUID PRIMARY KEY,
+                store_id UUID,
+                entry_number VARCHAR(100) NOT NULL,
+                entry_date TIMESTAMP WITH TIME ZONE NOT NULL,
+                description TEXT NOT NULL,
+                reference_document VARCHAR(100) NOT NULL,
+                is_posted BOOLEAN NOT NULL DEFAULT FALSE,
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                created_by UUID
+            );
+
+            CREATE TABLE IF NOT EXISTS journal_entry_lines (
+                id UUID PRIMARY KEY,
+                journal_entry_id UUID NOT NULL REFERENCES journal_entries(id) ON DELETE CASCADE,
+                account_id UUID NOT NULL REFERENCES accounts(id),
+                description TEXT NOT NULL,
+                debit_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+                credit_amount DECIMAL(18,2) NOT NULL DEFAULT 0
+            );
+
+            CREATE TABLE IF NOT EXISTS tax_transactions (
+                id UUID PRIMARY KEY,
+                store_id UUID,
+                transaction_type VARCHAR(50) NOT NULL,
+                document_number VARCHAR(100) NOT NULL,
+                transaction_date TIMESTAMP WITH TIME ZONE NOT NULL,
+                taxable_amount DECIMAL(18,2) NOT NULL,
+                cgst_amount DECIMAL(18,2) NOT NULL,
+                sgst_amount DECIMAL(18,2) NOT NULL,
+                igst_amount DECIMAL(18,2) NOT NULL,
+                cess_amount DECIMAL(18,2) NOT NULL,
+                gstin VARCHAR(50),
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL
+            );
+        ");
+
         if (!await context.Accounts.AnyAsync())
         {
             var accounts = new List<PosErp.Domain.Entities.Finance.Account>

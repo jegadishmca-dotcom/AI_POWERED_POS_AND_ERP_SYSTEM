@@ -179,6 +179,7 @@ export const GrnForm = () => {
                       className="w-full p-2 border border-blue-200 rounded text-center" 
                       value={item.accepted} 
                       onChange={(e) => handleQuantityChange(idx, 'accepted', parseFloat(e.target.value) || 0)}
+                      onFocus={(e) => e.target.select()}
                     />
                   </td>
                   <td className="p-3 bg-red-50/30">
@@ -187,6 +188,7 @@ export const GrnForm = () => {
                       className="w-full p-2 border border-red-200 rounded text-center mb-1" 
                       value={item.rejected} 
                       onChange={(e) => handleQuantityChange(idx, 'rejected', parseFloat(e.target.value) || 0)}
+                      onFocus={(e) => e.target.select()}
                     />
                     {item.rejected > 0 && (
                       <input 

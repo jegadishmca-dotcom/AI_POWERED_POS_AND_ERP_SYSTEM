@@ -156,8 +156,8 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 string snakeTableName = ToSnakeCase(tableName);
                 if (snakeTableName == "purchase_orders") snakeTableName = "purchase_order_headers";
                 else if (snakeTableName == "purchase_bills") snakeTableName = "purchase_bill_headers";
-                else if (snakeTableName == "g_r_n_headers") snakeTableName = "grn_headers";
-                else if (snakeTableName == "g_r_n_items") snakeTableName = "grn_items";
+                else if (tableName == "GRNHeaders" || snakeTableName == "g_r_n_headers" || snakeTableName == "grnheaders") snakeTableName = "grn_headers";
+                else if (tableName == "GRNItems" || snakeTableName == "g_r_n_items" || snakeTableName == "grnitems") snakeTableName = "grn_items";
                 else if (snakeTableName == "refresh_tokens") snakeTableName = "refresh_tokens";
                 else if (snakeTableName == "stock_ledger_entrys" || snakeTableName == "stock_ledger_entries") snakeTableName = "stock_ledger";
                 else if (snakeTableName == "wallet_ledger_entrys" || snakeTableName == "wallet_ledger_entries") snakeTableName = "wallet_ledger";

@@ -652,7 +652,8 @@ export const PosTerminal = () => {
               console.warn('Network issue during checkout, saving offline...', err);
               await posDb.invoices.put({ ...payload, id: payload.invoiceNumber, businessDate: new Date().toISOString(), status: 'COMPLETED' } as any);
               await posDb.sync_queue.put({ ...payload, id: payload.invoiceNumber, businessDate: new Date().toISOString() } as any);
-              alert(`Saved Offline: Invoice ${payload.invoiceNumber} queued for sync.`);
+              const errorDetail = err?.response?.data?.Detailed || err?.response?.data?.Message || err?.message || JSON.stringify(err);
+              alert(`Saved Offline: Invoice ${payload.invoiceNumber} queued for sync.\n\nERROR DETAIL:\n${errorDetail}`);
             }
 
             const invoiceToPrint = {

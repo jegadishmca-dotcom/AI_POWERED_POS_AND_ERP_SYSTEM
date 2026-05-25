@@ -5,6 +5,7 @@ using PosErp.Application.Features.Purchasing.Commands.CreatePurchaseOrder;
 using PosErp.Application.Features.Purchasing.Queries.GetPurchaseOrders;
 using PosErp.Application.Features.Purchasing.Queries.GetPurchaseOrderById;
 using PosErp.Application.Features.Purchasing.Commands.ApprovePurchaseOrder;
+using PosErp.Application.Features.Purchasing.Commands.UpdatePurchaseOrder;
 using System;
 using System.Threading.Tasks;
 
@@ -53,6 +54,17 @@ public class PurchasingController : ControllerBase
     public async Task<IActionResult> ApprovePurchaseOrder(Guid id)
     {
         var result = await _mediator.Send(new ApprovePurchaseOrderCommand(id, null));
+        return Ok(result);
+    }
+
+    [HttpPut("purchase-orders/{id}")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
+    public async Task<IActionResult> UpdatePurchaseOrder(Guid id, [FromBody] UpdatePurchaseOrderCommand command)
+    {
+        if (id != command.PurchaseOrderId)
+            return BadRequest("Id in URL does not match PurchaseOrderId in body.");
+
+        var result = await _mediator.Send(command);
         return Ok(result);
     }
 }

@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Save, Search, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { Save, Search, Trash2, ArrowLeft } from 'lucide-react';
 import { Supplier } from './SupplierList';
 import { api } from '../../../utils/api';
 
 interface PurchaseOrderFormProps {
+  purchaseOrderId?: string | null;
   onClose: () => void;
   onSaved: () => void;
 }
@@ -24,7 +25,7 @@ interface ProductSearchResult {
   primaryBarcode: string;
 }
 
-export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ onClose, onSaved }) => {
+export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOrderId, onClose, onSaved }) => {
   const [items, setItems] = useState<POItem[]>([]);
   const [supplierId, setSupplierId] = useState('');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -37,12 +38,36 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ onClose, o
   const [searchResults, setSearchResults] = useState<ProductSearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [loadingDetails, setLoadingDetails] = useState(false);
 
+  // Load suppliers list
   useEffect(() => {
     api.get('/api/suppliers')
       .then(res => setSuppliers(res.data.filter((s: Supplier) => s.isActive)))
       .catch(err => console.error('Failed to load suppliers', err));
   }, []);
+
+  // Load existing PO details if in edit mode
+  useEffect(() => {
+    if (purchaseOrderId) {
+      setLoadingDetails(true);
+      api.get(`/api/purchasing/purchase-orders/${purchaseOrderId}`)
+        .then(res => {
+          const po = res.data;
+          setSupplierId(po.supplierId);
+          setExpectedDeliveryDate(new Date(po.expectedDeliveryDate).toISOString().slice(0, 10));
+          setItems(po.items.map((i: any) => ({
+            productId: i.productId,
+            name: i.productName,
+            productCode: '', // can be blank or resolved later
+            orderedQty: i.orderedQuantity,
+            unitCost: i.unitCost
+          })));
+        })
+        .catch(err => console.error('Failed to load purchase order details', err))
+        .finally(() => setLoadingDetails(false));
+    }
+  }, [purchaseOrderId]);
 
   // Search products handler
   useEffect(() => {
@@ -66,7 +91,6 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ onClose, o
   }, [productQuery]);
 
   const handleSelectProduct = (product: ProductSearchResult) => {
-    // Check if product already exists in items
     const existing = items.find(item => item.productId === product.id);
     if (existing) {
       alert(`${product.name} is already in the list.`);
@@ -75,7 +99,6 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ onClose, o
       return;
     }
 
-    // Default cost to 80% of selling price as estimated cost
     const defaultCost = Number((product.sellingPrice * 0.8).toFixed(2)) || 0;
 
     setItems([...items, {
@@ -125,20 +148,37 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ onClose, o
 
     try {
       setSubmitting(true);
-      const payload = {
-        storeId: null,
-        supplierId: supplierId,
-        expectedDeliveryDate: new Date(expectedDeliveryDate).toISOString(),
-        items: items.map(item => ({
-          productId: item.productId,
-          orderedQuantity: item.orderedQty,
-          unitCost: item.unitCost
-        })),
-        userId: null
-      };
-
-      await api.post('/api/purchasing/purchase-orders', payload);
-      alert("Purchase Order created successfully as DRAFT!");
+      
+      if (purchaseOrderId) {
+        // Edit flow (PUT)
+        const payload = {
+          purchaseOrderId: purchaseOrderId,
+          supplierId: supplierId,
+          expectedDeliveryDate: new Date(expectedDeliveryDate).toISOString(),
+          items: items.map(item => ({
+            productId: item.productId,
+            orderedQuantity: item.orderedQty,
+            unitCost: item.unitCost
+          }))
+        };
+        await api.put(`/api/purchasing/purchase-orders/${purchaseOrderId}`, payload);
+        alert("Purchase Order updated successfully!");
+      } else {
+        // Create flow (POST)
+        const payload = {
+          storeId: null,
+          supplierId: supplierId,
+          expectedDeliveryDate: new Date(expectedDeliveryDate).toISOString(),
+          items: items.map(item => ({
+            productId: item.productId,
+            orderedQuantity: item.orderedQty,
+            unitCost: item.unitCost
+          })),
+          userId: null
+        };
+        await api.post('/api/purchasing/purchase-orders', payload);
+        alert("Purchase Order created successfully as DRAFT!");
+      }
       onSaved();
     } catch (err: any) {
       console.error(err);
@@ -158,147 +198,156 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ onClose, o
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <h2 className="text-2xl font-bold text-slate-800">Create Purchase Order</h2>
+          <h2 className="text-2xl font-bold text-slate-800">
+            {purchaseOrderId ? 'Edit Purchase Order' : 'Create Purchase Order'}
+          </h2>
         </div>
         <button 
           onClick={handleSaveDraft} 
-          disabled={submitting}
+          disabled={submitting || loadingDetails}
           className="px-6 py-2 bg-blue-600 text-white rounded shadow flex items-center font-bold hover:bg-blue-700 disabled:opacity-50 transition-colors"
         >
-          <Save className="w-5 h-5 mr-2" /> Save PO (Draft)
+          <Save className="w-5 h-5 mr-2" /> 
+          {purchaseOrderId ? 'Update PO' : 'Save PO (Draft)'}
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-6 mb-8">
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Supplier</label>
-          <select 
-            className="w-full p-2 border rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20" 
-            value={supplierId} 
-            onChange={(e) => setSupplierId(e.target.value)}
-          >
-            <option value="">-- Select Supplier --</option>
-            {suppliers.map(s => (
-              <option key={s.id} value={s.id}>{s.name} ({s.paymentTerms})</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Expected Delivery Date</label>
-          <input 
-            type="date" 
-            value={expectedDeliveryDate}
-            onChange={(e) => setExpectedDeliveryDate(e.target.value)}
-            className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500/20" 
-          />
-        </div>
-      </div>
-
-      {/* Product Search Add Component */}
-      <div className="mb-6 relative">
-        <label className="block text-sm font-bold text-gray-700 mb-2">Search & Add Product</label>
-        <div className="relative">
-          <Search className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
-          <input 
-            type="text" 
-            placeholder="Type barcode, code, or name to add product..." 
-            value={productQuery}
-            onChange={(e) => setProductQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border-2 border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
-          />
-        </div>
-        
-        {showDropdown && (
-          <div className="absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto">
-            {searchResults.map(p => (
-              <div 
-                key={p.id}
-                onClick={() => handleSelectProduct(p)}
-                className="p-3 hover:bg-blue-50 cursor-pointer flex justify-between items-center border-b last:border-0"
+      {loadingDetails ? (
+        <div className="text-center py-12 text-slate-500 font-medium">Loading PO details...</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-6 mb-8">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Supplier</label>
+              <select 
+                className="w-full p-2 border rounded bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20" 
+                value={supplierId} 
+                onChange={(e) => setSupplierId(e.target.value)}
               >
-                <div>
-                  <div className="font-bold text-slate-800">{p.name}</div>
-                  <div className="text-xs text-slate-500">Code: {p.productCode} • Barcode: {p.primaryBarcode}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-slate-700">MRP: ₹{p.sellingPrice.toFixed(2)}</div>
-                </div>
-              </div>
-            ))}
+                <option value="">-- Select Supplier --</option>
+                {suppliers.map(s => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.paymentTerms})</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-2">Expected Delivery Date</label>
+              <input 
+                type="date" 
+                value={expectedDeliveryDate}
+                onChange={(e) => setExpectedDeliveryDate(e.target.value)}
+                className="w-full p-2 border rounded focus:outline-none focus:ring-2 focus:ring-blue-500/20" 
+              />
+            </div>
           </div>
-        )}
-      </div>
 
-      <div className="mb-4">
-        <h3 className="text-lg font-bold text-slate-800 border-b pb-2">PO Line Items</h3>
-      </div>
+          {/* Product Search Add Component */}
+          <div className="mb-6 relative">
+            <label className="block text-sm font-bold text-gray-700 mb-2">Search & Add Product</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-3 text-gray-400 w-5 h-5" />
+              <input 
+                type="text" 
+                placeholder="Type barcode, code, or name to add product..." 
+                value={productQuery}
+                onChange={(e) => setProductQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border-2 border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
+              />
+            </div>
+            
+            {showDropdown && (
+              <div className="absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto">
+                {searchResults.map(p => (
+                  <div 
+                    key={p.id}
+                    onClick={() => handleSelectProduct(p)}
+                    className="p-3 hover:bg-blue-50 cursor-pointer flex justify-between items-center border-b last:border-0"
+                  >
+                    <div>
+                      <div className="font-bold text-slate-800">{p.name}</div>
+                      <div className="text-xs text-slate-500">Code: {p.productCode} • Barcode: {p.primaryBarcode}</div>
+                    </div>
+                    <div className="text-right">
+                      <div className="font-bold text-slate-700">MRP: ₹{p.sellingPrice.toFixed(2)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
-      <table className="w-full text-left border-collapse mb-6">
-        <thead className="bg-slate-100 text-sm">
-          <tr>
-            <th className="p-3 border">Product Details</th>
-            <th className="p-3 border text-right w-36">Ordered Quantity</th>
-            <th className="p-3 border text-right w-36">Unit Cost (₹)</th>
-            <th className="p-3 border text-right w-36">Total (₹)</th>
-            <th className="p-3 border text-center w-12"></th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item, idx) => (
-            <tr key={item.productId} className="border-b hover:bg-slate-50/50">
-              <td className="p-3">
-                <div className="font-bold text-slate-800">{item.name}</div>
-                <div className="text-xs text-slate-500">Code: {item.productCode}</div>
-              </td>
-              <td className="p-3">
-                <input 
-                  type="number" 
-                  min="1"
-                  step="any"
-                  className="w-full p-1.5 border rounded text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20" 
-                  value={item.orderedQty} 
-                  onChange={(e) => handleQtyChange(idx, parseFloat(e.target.value) || 0)}
-                />
-              </td>
-              <td className="p-3">
-                <input 
-                  type="number" 
-                  min="0.01"
-                  step="any"
-                  className="w-full p-1.5 border rounded text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20" 
-                  value={item.unitCost} 
-                  onChange={(e) => handleCostChange(idx, parseFloat(e.target.value) || 0)}
-                />
-              </td>
-              <td className="p-3 text-right font-black text-slate-700">
-                ₹{(item.orderedQty * item.unitCost).toFixed(2)}
-              </td>
-              <td className="p-3 text-center">
-                <button 
-                  onClick={() => handleRemoveItem(idx)} 
-                  className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                >
-                  <Trash2 className="w-5 h-5" />
-                </button>
-              </td>
-            </tr>
-          ))}
-          {items.length === 0 && (
-            <tr>
-              <td colSpan={5} className="p-8 text-center text-gray-500">
-                No items added yet. Search and select a product above to add it.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+          <div className="mb-4">
+            <h3 className="text-lg font-bold text-slate-800 border-b pb-2">PO Line Items</h3>
+          </div>
 
-      <div className="flex justify-end border-t pt-4">
-        <div className="text-right">
-          <p className="text-gray-500 font-bold mb-1 text-sm uppercase tracking-wider">Total PO Amount</p>
-          <p className="text-4xl font-black text-slate-800">₹{totalAmount.toFixed(2)}</p>
-        </div>
-      </div>
+          <table className="w-full text-left border-collapse mb-6">
+            <thead className="bg-slate-100 text-sm">
+              <tr>
+                <th className="p-3 border">Product Details</th>
+                <th className="p-3 border text-right w-36">Ordered Quantity</th>
+                <th className="p-3 border text-right w-36">Unit Cost (₹)</th>
+                <th className="p-3 border text-right w-36">Total (₹)</th>
+                <th className="p-3 border text-center w-12"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((item, idx) => (
+                <tr key={item.productId} className="border-b hover:bg-slate-50/50">
+                  <td className="p-3">
+                    <div className="font-bold text-slate-800">{item.name}</div>
+                    {item.productCode && <div className="text-xs text-slate-500">Code: {item.productCode}</div>}
+                  </td>
+                  <td className="p-3">
+                    <input 
+                      type="number" 
+                      min="1"
+                      step="any"
+                      className="w-full p-1.5 border rounded text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20" 
+                      value={item.orderedQty} 
+                      onChange={(e) => handleQtyChange(idx, parseFloat(e.target.value) || 0)}
+                    />
+                  </td>
+                  <td className="p-3">
+                    <input 
+                      type="number" 
+                      min="0.01"
+                      step="any"
+                      className="w-full p-1.5 border rounded text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20" 
+                      value={item.unitCost} 
+                      onChange={(e) => handleCostChange(idx, parseFloat(e.target.value) || 0)}
+                    />
+                  </td>
+                  <td className="p-3 text-right font-black text-slate-700">
+                    ₹{(item.orderedQty * item.unitCost).toFixed(2)}
+                  </td>
+                  <td className="p-3 text-center">
+                    <button 
+                      onClick={() => handleRemoveItem(idx)} 
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {items.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="p-8 text-center text-gray-500">
+                    No items added yet. Search and select a product above to add it.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          <div className="flex justify-end border-t pt-4">
+            <div className="text-right">
+              <p className="text-gray-500 font-bold mb-1 text-sm uppercase tracking-wider">Total PO Amount</p>
+              <p className="text-4xl font-black text-slate-800">₹{totalAmount.toFixed(2)}</p>
+            </div>
+          </div>
+        </>
+      )}
     </div>
   );
 };

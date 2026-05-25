@@ -15,9 +15,10 @@ export interface PurchaseOrder {
 
 interface PurchaseOrderListProps {
   onAddNew: () => void;
+  onEdit: (id: string) => void;
 }
 
-export const PurchaseOrderList: React.FC<PurchaseOrderListProps> = ({ onAddNew }) => {
+export const PurchaseOrderList: React.FC<PurchaseOrderListProps> = ({ onAddNew, onEdit }) => {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -117,7 +118,13 @@ export const PurchaseOrderList: React.FC<PurchaseOrderListProps> = ({ onAddNew }
             <tbody>
               {filteredOrders.map((po) => (
                 <tr key={po.id} className="border-b hover:bg-slate-50">
-                  <td className="p-3 font-bold text-blue-600">{po.poNumber}</td>
+                  <td 
+                    onClick={() => po.status === 'DRAFT' && onEdit(po.id)}
+                    className={`p-3 font-bold ${po.status === 'DRAFT' ? 'text-blue-600 hover:text-blue-800 cursor-pointer underline hover:bg-blue-50/50' : 'text-slate-700'}`}
+                    title={po.status === 'DRAFT' ? 'Click to Edit Draft PO' : undefined}
+                  >
+                    {po.poNumber}
+                  </td>
                   <td className="p-3 text-slate-800">{po.supplierName}</td>
                   <td className="p-3 text-gray-600">{new Date(po.poDate).toLocaleDateString('en-IN')}</td>
                   <td className="p-3 text-gray-600">{new Date(po.expectedDeliveryDate).toLocaleDateString('en-IN')}</td>

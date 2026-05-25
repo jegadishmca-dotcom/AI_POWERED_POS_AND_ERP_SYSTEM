@@ -115,6 +115,27 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .Property(l => l.ExpiryDate)
             .HasColumnType("date");
 
+        // Purchasing & GRN Date mappings to match date column types in PostgreSQL
+        modelBuilder.Entity<PurchaseOrderHeader>()
+            .Property(p => p.PoDate)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<PurchaseOrderHeader>()
+            .Property(p => p.ExpectedDeliveryDate)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<GRNHeader>()
+            .Property(g => g.ReceivedDate)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<GRNItem>()
+            .Property(gi => gi.MfgDate)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<GRNItem>()
+            .Property(gi => gi.ExpiryDate)
+            .HasColumnType("date");
+
         modelBuilder.Entity<PosErp.Domain.Entities.Catalog.Barcode>()
             .Property(b => b.BarcodeValue)
             .HasColumnName("barcode");

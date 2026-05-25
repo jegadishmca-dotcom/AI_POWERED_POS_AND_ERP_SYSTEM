@@ -14,7 +14,7 @@ export const GrnForm = () => {
     api.get('/api/purchasing/purchase-orders')
       .then(res => {
         const data = res.data;
-        setPurchaseOrders(data.filter((po: any) => po.status === 'DRAFT' || po.status === 'PARTIAL_GRN'));
+        setPurchaseOrders(data.filter((po: any) => po.status === 'APPROVED' || po.status === 'PARTIAL_GRN'));
       })
       .catch(err => console.error(err));
   };

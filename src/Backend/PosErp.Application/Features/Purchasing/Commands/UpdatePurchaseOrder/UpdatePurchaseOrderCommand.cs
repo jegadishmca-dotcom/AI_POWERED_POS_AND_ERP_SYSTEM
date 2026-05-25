@@ -81,28 +81,30 @@ public class UpdatePurchaseOrderCommandHandler : IRequestHandler<UpdatePurchaseO
             po.TotalAmount += itemTotal;
         }
 
-        var dbContext = _context as DbContext;
-        if (dbContext != null)
-        {
-            Console.WriteLine($"[DEBUG] PO Header ID: {po.Id}, State: {dbContext.Entry(po).State}");
-            foreach (var item in po.Items)
-            {
-                Console.WriteLine($"[DEBUG] PO Item ID: {item.Id}, ProductID: {item.ProductId}, State: {dbContext.Entry(item).State}");
-            }
-            foreach (var entry in dbContext.ChangeTracker.Entries())
-            {
-                Console.WriteLine($"[DEBUG] Tracked Entry: {entry.Entity.GetType().Name}, State: {entry.State}, Key: {entry.Metadata.FindPrimaryKey()?.Properties[0].GetGetter().GetClrValue(entry.Entity)}");
-            }
-        }
-
         try 
         {
             await _context.SaveChangesAsync(cancellationToken);
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"[DEBUG] SaveChangesAsync Exception: {ex}");
-            throw;
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"SaveChangesAsync Exception: {ex.Message}");
+            var dbContext = _context as DbContext;
+            if (dbContext != null)
+            {
+                sb.AppendLine($"PO Header ID: {po.Id}, State: {dbContext.Entry(po).State}");
+                foreach (var item in po.Items)
+                {
+                    sb.AppendLine($"PO Item ID: {item.Id}, ProductID: {item.ProductId}, State: {dbContext.Entry(item).State}");
+                }
+                foreach (var entry in dbContext.ChangeTracker.Entries())
+                {
+                    var entityType = entry.Entity.GetType().Name;
+                    var keyVal = entry.Metadata.FindPrimaryKey()?.Properties[0].GetGetter().GetClrValue(entry.Entity);
+                    sb.AppendLine($"Tracked Entry: {entityType}, State: {entry.State}, Key: {keyVal}");
+                }
+            }
+            throw new Exception(sb.ToString(), ex);
         }
         return true;
     }

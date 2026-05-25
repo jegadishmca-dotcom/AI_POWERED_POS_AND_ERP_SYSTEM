@@ -199,9 +199,21 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         {
             if (char.IsUpper(input[i]))
             {
-                if (i > 0 && input[i - 1] != '_' && !char.IsUpper(input[i - 1]))
+                if (i > 0 && input[i - 1] != '_')
                 {
-                    sb.Append('_');
+                    // Insert underscore when transitioning from lowercase to uppercase
+                    // e.g. "orderedQuantity" → "ordered_quantity"
+                    if (!char.IsUpper(input[i - 1]))
+                    {
+                        sb.Append('_');
+                    }
+                    // Also insert underscore at end-of-acronym boundary:
+                    // when previous is uppercase and NEXT is lowercase
+                    // e.g. "GRNHeaderId" → "grn_header_id" (underscore before 'H')
+                    else if (i + 1 < input.Length && char.IsLower(input[i + 1]))
+                    {
+                        sb.Append('_');
+                    }
                 }
                 sb.Append(char.ToLower(input[i]));
             }

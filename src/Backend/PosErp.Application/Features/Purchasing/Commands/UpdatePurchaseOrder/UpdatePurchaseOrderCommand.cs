@@ -69,43 +69,22 @@ public class UpdatePurchaseOrderCommandHandler : IRequestHandler<UpdatePurchaseO
             else
             {
                 // Add new item
-                po.Items.Add(new PurchaseOrderItem
+                var newItem = new PurchaseOrderItem
                 {
+                    PurchaseOrderHeaderId = po.Id,
                     ProductId = itemDto.ProductId,
                     OrderedQuantity = itemDto.OrderedQuantity,
                     ReceivedQuantity = 0,
                     UnitCost = itemDto.UnitCost,
                     TotalCost = itemTotal
-                });
+                };
+                po.Items.Add(newItem);
+                _context.PurchaseOrderItems.Add(newItem);
             }
             po.TotalAmount += itemTotal;
         }
 
-        try 
-        {
-            await _context.SaveChangesAsync(cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"SaveChangesAsync Exception: {ex.Message}");
-            var dbContext = _context as DbContext;
-            if (dbContext != null)
-            {
-                sb.AppendLine($"PO Header ID: {po.Id}, State: {dbContext.Entry(po).State}");
-                foreach (var item in po.Items)
-                {
-                    sb.AppendLine($"PO Item ID: {item.Id}, ProductID: {item.ProductId}, State: {dbContext.Entry(item).State}");
-                }
-                foreach (var entry in dbContext.ChangeTracker.Entries())
-                {
-                    var entityType = entry.Entity.GetType().Name;
-                    var keyVal = entry.Metadata.FindPrimaryKey()?.Properties[0].GetGetter().GetClrValue(entry.Entity);
-                    sb.AppendLine($"Tracked Entry: {entityType}, State: {entry.State}, Key: {keyVal}");
-                }
-            }
-            throw new Exception(sb.ToString(), ex);
-        }
+        await _context.SaveChangesAsync(cancellationToken);
         return true;
     }
 }

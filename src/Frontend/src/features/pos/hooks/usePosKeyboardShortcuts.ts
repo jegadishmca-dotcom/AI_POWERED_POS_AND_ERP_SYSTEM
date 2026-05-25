@@ -3,12 +3,12 @@ import { useEffect } from 'react';
 type PosShortcuts = {
   onF1Search?: () => void;
   onF2Product?: () => void;
-  onF4Payment?: () => void;
+    onF11Payment?: () => void;
   onF9Park?: () => void;
   onF10Reprint?: () => void;
 };
 
-export const usePosKeyboardShortcuts = ({ onF1Search, onF2Product, onF4Payment, onF9Park, onF10Reprint }: PosShortcuts) => {
+export const usePosKeyboardShortcuts = ({ onF1Search, onF2Product, onF11Payment, onF9Park, onF10Reprint }: PosShortcuts) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
@@ -20,9 +20,9 @@ export const usePosKeyboardShortcuts = ({ onF1Search, onF2Product, onF4Payment, 
           e.preventDefault();
           onF2Product?.();
           break;
-        case 'F4':
+        case 'F11':
           e.preventDefault();
-          onF4Payment?.();
+          onF11Payment?.();
           break;
         case 'F9':
           e.preventDefault();

@@ -280,7 +280,7 @@ export const PosTerminal = () => {
   usePosKeyboardShortcuts({
     onF1Search: () => customerInputRef.current?.focus(),
     onF2Product: () => productInputRef.current?.focus(),
-    onF4Payment: () => {
+    onF11Payment: () => {
       if (cart.items.length > 0) setPaymentModalOpen(true);
     },
     onF9Park: () => {
@@ -578,7 +578,7 @@ export const PosTerminal = () => {
               className="w-full bg-emerald-600 text-white p-4 rounded-lg font-black text-2xl shadow-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors mb-4" 
               onClick={() => setPaymentModalOpen(true)}
             >
-              <CreditCard className="w-8 h-8 mr-3" /> PAYMENT (F4)
+              <CreditCard className="w-8 h-8 mr-3" /> PAYMENT (F11)
             </button>
             <div className="flex gap-2">
                <button onClick={() => setHoldModalOpen(true)} className="flex-1 bg-orange-600 text-white p-3 rounded-lg shadow-md flex flex-col items-center justify-center text-sm font-bold hover:bg-orange-700 transition-colors">

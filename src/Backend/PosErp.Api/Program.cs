@@ -182,10 +182,10 @@ using (var scope = app.Services.CreateScope())
 
         // DDL patch: add individual tender amount columns to invoices (idempotent)
         await context.Database.ExecuteSqlRawAsync(@"
-            ALTER TABLE ""Invoices"" ADD COLUMN IF NOT EXISTS ""CashAmount""   NUMERIC(18,2) NOT NULL DEFAULT 0;
-            ALTER TABLE ""Invoices"" ADD COLUMN IF NOT EXISTS ""UpiAmount""    NUMERIC(18,2) NOT NULL DEFAULT 0;
-            ALTER TABLE ""Invoices"" ADD COLUMN IF NOT EXISTS ""CardAmount""   NUMERIC(18,2) NOT NULL DEFAULT 0;
-            ALTER TABLE ""Invoices"" ADD COLUMN IF NOT EXISTS ""WalletAmount"" NUMERIC(18,2) NOT NULL DEFAULT 0;
+            ALTER TABLE invoices ADD COLUMN IF NOT EXISTS cash_amount   NUMERIC(18,2) NOT NULL DEFAULT 0;
+            ALTER TABLE invoices ADD COLUMN IF NOT EXISTS upi_amount    NUMERIC(18,2) NOT NULL DEFAULT 0;
+            ALTER TABLE invoices ADD COLUMN IF NOT EXISTS card_amount   NUMERIC(18,2) NOT NULL DEFAULT 0;
+            ALTER TABLE invoices ADD COLUMN IF NOT EXISTS wallet_amount NUMERIC(18,2) NOT NULL DEFAULT 0;
         ");
 
         // GST Slab master + HsnMasterIndia2026 seeding

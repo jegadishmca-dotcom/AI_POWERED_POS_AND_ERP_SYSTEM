@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Save, Search, Plus, Trash2 } from 'lucide-react';
 import { Supplier } from './SupplierList';
+import { api } from '../../../utils/api';
 
 export const PurchaseOrderForm = () => {
   const [items, setItems] = useState([{ productId: '', name: '', orderedQty: 1, unitCost: 0 }]);
@@ -8,9 +9,8 @@ export const PurchaseOrderForm = () => {
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
 
   useEffect(() => {
-    fetch('/api/suppliers')
-      .then(res => res.json())
-      .then(data => setSuppliers(data))
+    api.get('/api/suppliers')
+      .then(res => setSuppliers(res.data))
       .catch(err => console.error('Failed to load suppliers', err));
   }, []);
 

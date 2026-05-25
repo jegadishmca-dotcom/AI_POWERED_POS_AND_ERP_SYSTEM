@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PlusCircle, Search, Edit2 } from 'lucide-react';
+import { api } from '../../../utils/api';
 
 export interface Supplier {
   id: string;
@@ -26,12 +27,8 @@ export const SupplierList: React.FC<SupplierListProps> = ({ onEdit, onAddNew }) 
 
   const fetchSuppliers = async () => {
     try {
-      // In a real scenario, attach JWT token
-      const response = await fetch('/api/suppliers');
-      if (response.ok) {
-        const data = await response.json();
-        setSuppliers(data);
-      }
+      const response = await api.get('/api/suppliers');
+      setSuppliers(response.data);
     } catch (error) {
       console.error('Failed to fetch suppliers:', error);
     } finally {

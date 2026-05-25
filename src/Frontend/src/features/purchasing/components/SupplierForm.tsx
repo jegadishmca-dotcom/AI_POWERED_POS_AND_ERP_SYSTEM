@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Supplier } from './SupplierList';
+import { api } from '../../../utils/api';
 
 interface SupplierFormProps {
   supplier?: Supplier;
@@ -29,13 +30,13 @@ export const SupplierForm: React.FC<SupplierFormProps> = ({ supplier, onClose, o
     const method = isEditing ? 'PUT' : 'POST';
 
     try {
-      const response = await fetch(url, {
+      const response = await api({
+        url,
         method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
+        data: formData
       });
 
-      if (response.ok) {
+      if (response.status === 200 || response.status === 201 || response.status === 204) {
         onSaved();
       } else {
         console.error('Failed to save supplier');

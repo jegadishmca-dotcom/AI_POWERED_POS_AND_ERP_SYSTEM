@@ -25,7 +25,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPost("grn")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> CreateGRN([FromBody] CreateGRNCommand command)
     {
         var id = await _mediator.Send(command);
@@ -33,7 +33,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPost("grn/{id}/confirm")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> ConfirmGRN(Guid id)
     {
         // For UserId, usually we extract from Claims, here passing null for simplicity as backend supports it
@@ -56,7 +56,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPost("stock-adjustment")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> CreateStockAdjustment([FromBody] CreateStockAdjustmentCommand command)
     {
         var id = await _mediator.Send(command);
@@ -64,7 +64,7 @@ public class InventoryController : ControllerBase
     }
 
     [HttpPost("stock-adjustment/{id}/approve")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> ApproveStockAdjustment(Guid id)
     {
         var result = await _mediator.Send(new ApproveStockAdjustmentCommand(id, null));

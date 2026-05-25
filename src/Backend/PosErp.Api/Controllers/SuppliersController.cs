@@ -41,7 +41,7 @@ public class SuppliersController : ControllerBase
     }
 
     [HttpPost]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> Create([FromBody] CreateSupplierCommand command)
     {
         var id = await _mediator.Send(command);
@@ -49,7 +49,7 @@ public class SuppliersController : ControllerBase
     }
 
     [HttpPut("{id}")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateSupplierCommand command)
     {
         if (id != command.Id)

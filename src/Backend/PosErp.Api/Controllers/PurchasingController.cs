@@ -40,7 +40,7 @@ public class PurchasingController : ControllerBase
     }
 
     [HttpPost("purchase-orders")]
-    [Authorize(Roles = "Admin,Manager")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> CreatePurchaseOrder([FromBody] CreatePurchaseOrderCommand command)
     {
         var id = await _mediator.Send(command);

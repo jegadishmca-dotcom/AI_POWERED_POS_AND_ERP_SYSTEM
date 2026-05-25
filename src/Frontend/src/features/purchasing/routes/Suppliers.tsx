@@ -5,6 +5,7 @@ import { SupplierForm } from '../components/SupplierForm';
 export const Suppliers: React.FC = () => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<Supplier | undefined>();
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleEdit = (supplier: Supplier) => {
     setSelectedSupplier(supplier);
@@ -18,14 +19,13 @@ export const Suppliers: React.FC = () => {
 
   const handleSaved = () => {
     setIsFormOpen(false);
-    // Reload the page or trigger a re-fetch in SupplierList
-    // For simplicity here, we'll let SupplierList fetch on mount
-    window.location.reload();
+    setRefreshKey(prev => prev + 1);
   };
 
   return (
     <div className="h-full bg-slate-50 dark:bg-slate-900">
       <SupplierList 
+        key={refreshKey}
         onEdit={handleEdit} 
         onAddNew={handleAddNew} 
       />

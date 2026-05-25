@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { PackageCheck, Save, AlertCircle } from 'lucide-react';
+import { api } from '../../../utils/api';
 
 export const GrnForm = () => {
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
@@ -9,15 +10,27 @@ export const GrnForm = () => {
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [receivedDate, setReceivedDate] = useState(new Date().toISOString().slice(0,10));
 
-  useEffect(() => {
-    fetch('/api/purchasing/purchase-orders')
-      .then(res => res.json())
-      .then(data => {
-        // Only show POs that are not fully received
+  const fetchPurchaseOrders = () => {
+    api.get('/api/purchasing/purchase-orders')
+      .then(res => {
+        const data = res.data;
         setPurchaseOrders(data.filter((po: any) => po.status === 'DRAFT' || po.status === 'PARTIAL_GRN'));
       })
       .catch(err => console.error(err));
+  };
+
+  useEffect(() => {
+    fetchPurchaseOrders();
   }, []);
+
+  const handleReset = () => {
+    setSelectedPoId('');
+    setSelectedPo(null);
+    setGrnItems([]);
+    setInvoiceNumber('');
+    setReceivedDate(new Date().toISOString().slice(0,10));
+    fetchPurchaseOrders();
+  };
 
   const fetchPoLines = async (poId: string) => {
     if (!poId) {
@@ -26,27 +39,25 @@ export const GrnForm = () => {
       return;
     }
     try {
-      const res = await fetch(`/api/purchasing/purchase-orders/${poId}`);
-      if (res.ok) {
-        const data = await res.json();
-        setSelectedPo(data);
-        setGrnItems(data.items.map((item: any) => ({
-          id: item.id,
-          purchaseOrderItemId: item.id,
-          productId: item.productId,
-          name: item.productName,
-          ordered: item.orderedQuantity,
-          received: item.receivedQuantity,
-          pending: item.orderedQuantity - item.receivedQuantity,
-          accepted: 0,
-          rejected: 0,
-          rejectionReason: '',
-          batch: '',
-          expiry: '',
-          hasExpiry: true, // simplified for now
-          unitCost: item.unitCost
-        })));
-      }
+      const res = await api.get(`/api/purchasing/purchase-orders/${poId}`);
+      const data = res.data;
+      setSelectedPo(data);
+      setGrnItems(data.items.map((item: any) => ({
+        id: item.id,
+        purchaseOrderItemId: item.id,
+        productId: item.productId,
+        name: item.productName,
+        ordered: item.orderedQuantity,
+        received: item.receivedQuantity,
+        pending: item.orderedQuantity - item.receivedQuantity,
+        accepted: 0,
+        rejected: 0,
+        rejectionReason: '',
+        batch: '',
+        expiry: '',
+        hasExpiry: true, // simplified for now
+        unitCost: item.unitCost
+      })));
     } catch (err) {
       console.error(err);
     }
@@ -87,28 +98,17 @@ export const GrnForm = () => {
         }))
       };
 
-      const res = await fetch('/api/inventory/grn', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(grnPayload)
-      });
+      const res = await api.post('/api/inventory/grn', grnPayload);
+      const { id } = res.data;
       
-      if (res.ok) {
-        const { id } = await res.json();
-        // 2. Confirm GRN
-        const confirmRes = await fetch(`/api/inventory/grn/${id}/confirm`, { method: 'POST' });
-        if (confirmRes.ok) {
-          alert('GRN Confirmed and Stock Ledger updated successfully!');
-          window.location.reload();
-        } else {
-          alert('Failed to confirm GRN.');
-        }
-      } else {
-        alert('Failed to create GRN draft.');
-      }
-    } catch (e) {
+      // 2. Confirm GRN
+      await api.post(`/api/inventory/grn/${id}/confirm`);
+      
+      alert('GRN Confirmed and Stock Ledger updated successfully!');
+      handleReset();
+    } catch (e: any) {
       console.error(e);
-      alert('Error saving GRN');
+      alert(e.response?.data?.message || 'Error saving GRN');
     }
   };
 

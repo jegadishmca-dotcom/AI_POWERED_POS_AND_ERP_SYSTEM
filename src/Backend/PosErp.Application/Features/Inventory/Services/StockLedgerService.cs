@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Inventory;
 using System;
@@ -52,9 +52,17 @@ public class StockLedgerService : IStockLedgerService
         Guid? userId,
         CancellationToken cancellationToken)
     {
-        // Enforce transaction for atomic ledger update
-        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
-        
+        var db = (DbContext)_context;
+        var hasExistingTransaction = db.Database.CurrentTransaction != null;
+
+        // Only start a new transaction if there isn't one already active
+        // (e.g. when called from ConfirmGRNCommandHandler which manages its own transaction)
+        Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction? transaction = null;
+        if (!hasExistingTransaction)
+        {
+            transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+        }
+
         try 
         {
             // 1. Get the latest running balance directly instead of summing (Optimized)
@@ -87,19 +95,27 @@ public class StockLedgerService : IStockLedgerService
 
             _context.StockLedger.Add(entry);
             
-            await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+            if (!hasExistingTransaction)
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+                await transaction!.CommitAsync(cancellationToken);
+            }
+            // When inside an existing transaction, the caller handles SaveChanges and Commit
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            await transaction.RollbackAsync(cancellationToken);
+            if (transaction != null) await transaction.RollbackAsync(cancellationToken);
             // Handle Postgres xmin concurrency failures
             throw new Exception("Stock movement concurrency conflict. Please retry.", ex);
         }
         catch (Exception)
         {
-            await transaction.RollbackAsync(cancellationToken);
+            if (transaction != null) await transaction.RollbackAsync(cancellationToken);
             throw;
+        }
+        finally
+        {
+            transaction?.Dispose();
         }
     }
 }

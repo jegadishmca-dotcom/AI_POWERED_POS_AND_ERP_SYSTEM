@@ -37,5 +37,5 @@ export const usePosKeyboardShortcuts = ({ onF1Search, onF2Product, onF11Payment,
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onF1Search, onF2Product, onF4Payment, onF9Park, onF10Reprint]);
+  }, [onF1Search, onF2Product, onF11Payment, onF9Park, onF10Reprint]);
 };

@@ -576,6 +576,25 @@ public static class GstMasterSeeder
         }
 
         Console.WriteLine($"[GST] GstHsnMasterIndia seeded: {count} official HSN code entries.");
+
+        if (!await context.Accounts.AnyAsync())
+        {
+            var accounts = new List<PosErp.Domain.Entities.Finance.Account>
+            {
+                new() { AccountCode = "1000", Name = "Cash", AccountType = "ASSET" },
+                new() { AccountCode = "1100", Name = "Digital/UPI/Card", AccountType = "ASSET" },
+                new() { AccountCode = "2100", Name = "Wallet Liability", AccountType = "LIABILITY" },
+                new() { AccountCode = "2200", Name = "Output CGST", AccountType = "LIABILITY" },
+                new() { AccountCode = "2201", Name = "Output SGST", AccountType = "LIABILITY" },
+                new() { AccountCode = "2202", Name = "Output IGST", AccountType = "LIABILITY" },
+                new() { AccountCode = "4000", Name = "Sales Revenue", AccountType = "REVENUE" },
+                new() { AccountCode = "5000", Name = "Cost of Goods Sold", AccountType = "EXPENSE" }
+            };
+            context.Accounts.AddRange(accounts);
+            await context.SaveChangesAsync();
+            Console.WriteLine("[FINANCE] Chart of Accounts seeded.");
+        }
+
         Console.WriteLine("[GST] ═══════════════════════════════════════════════════");
         Console.WriteLine("[GST] GST Slab Reference (India 2024-26):");
         Console.WriteLine("[GST]  0%       — Salt, fresh veg/fruit, unbranded grains, fresh milk, eggs");

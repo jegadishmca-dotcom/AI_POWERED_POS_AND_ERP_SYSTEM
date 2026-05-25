@@ -217,6 +217,11 @@ using (var scope = app.Services.CreateScope())
             ALTER TABLE invoices ADD COLUMN IF NOT EXISTS wallet_amount NUMERIC(18,2) NOT NULL DEFAULT 0;
         ");
 
+        // DDL patch: add rejection_reason column to grn_items (idempotent)
+        await context.Database.ExecuteSqlRawAsync(@"
+            ALTER TABLE grn_items ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR(500);
+        ");
+
         // GST Slab master + HsnMasterIndia2026 seeding
         await PosErp.Api.Infrastructure.GstMasterSeeder.SeedAsync(context);
 

@@ -37,6 +37,7 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
   const [productQuery, setProductQuery] = useState('');
   const [searchResults, setSearchResults] = useState<ProductSearchResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [focusedIndex, setFocusedIndex] = useState(-1);
   const [submitting, setSubmitting] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(false);
 
@@ -74,6 +75,7 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
     if (productQuery.trim().length < 2) {
       setSearchResults([]);
       setShowDropdown(false);
+      setFocusedIndex(-1);
       return;
     }
 
@@ -82,6 +84,7 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
         const res = await api.get(`/api/catalog/search?q=${productQuery}`);
         setSearchResults(res.data);
         setShowDropdown(res.data.length > 0);
+        setFocusedIndex(res.data.length > 0 ? 0 : -1);
       } catch (err) {
         console.error('Failed to search products', err);
       }
@@ -96,6 +99,7 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
       alert(`${product.name} is already in the list.`);
       setProductQuery('');
       setShowDropdown(false);
+      setFocusedIndex(-1);
       return;
     }
 
@@ -111,6 +115,27 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
 
     setProductQuery('');
     setShowDropdown(false);
+    setFocusedIndex(-1);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showDropdown || searchResults.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setFocusedIndex(prev => (prev < searchResults.length - 1 ? prev + 1 : prev));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setFocusedIndex(prev => (prev > 0 ? prev - 1 : -1));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      if (focusedIndex >= 0 && focusedIndex < searchResults.length) {
+        handleSelectProduct(searchResults[focusedIndex]);
+      }
+    } else if (e.key === 'Escape') {
+      setShowDropdown(false);
+      setFocusedIndex(-1);
+    }
   };
 
   const handleRemoveItem = (index: number) => {
@@ -251,20 +276,25 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
                 placeholder="Type barcode, code, or name to add product..." 
                 value={productQuery}
                 onChange={(e) => setProductQuery(e.target.value)}
+                onKeyDown={handleKeyDown}
                 className="w-full pl-10 pr-4 py-2 border-2 border-slate-200 rounded-lg focus:outline-none focus:border-blue-500"
               />
             </div>
             
             {showDropdown && (
               <div className="absolute z-10 w-full bg-white border border-slate-200 rounded-lg shadow-lg mt-1 max-h-60 overflow-y-auto">
-                {searchResults.map(p => (
+                {searchResults.map((p, idx) => (
                   <div 
                     key={p.id}
                     onClick={() => handleSelectProduct(p)}
-                    className="p-3 hover:bg-blue-50 cursor-pointer flex justify-between items-center border-b last:border-0"
+                    className={`p-3 cursor-pointer flex justify-between items-center border-b last:border-0 transition-colors ${
+                      focusedIndex === idx 
+                        ? 'bg-blue-50 text-blue-900 border-l-4 border-l-blue-600' 
+                        : 'hover:bg-slate-50 text-slate-800'
+                    }`}
                   >
                     <div>
-                      <div className="font-bold text-slate-800">{p.name}</div>
+                      <div className="font-bold">{p.name}</div>
                       <div className="text-xs text-slate-500">Code: {p.productCode} • Barcode: {p.primaryBarcode}</div>
                     </div>
                     <div className="text-right">

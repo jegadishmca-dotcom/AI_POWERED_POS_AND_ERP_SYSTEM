@@ -196,9 +196,11 @@ export const PosTerminal = () => {
     }
   };
 
-  // Evaluate whenever promo code or customer changes
+  // Evaluate whenever promo code or customer changes, only if cart is not empty
   useEffect(() => {
-    recalculateCart(cart.items);
+    if (cart.items.length > 0) {
+      recalculateCart(cart.items);
+    }
   }, [promoCode, customer]);
 
   const addProductToCart = (product: any, overrideQty?: number) => {
@@ -696,8 +698,6 @@ export const PosTerminal = () => {
                     fullInvoice.loyaltyPointsEarned = actualLoyaltyEarned;
                     fullInvoice.loyaltyPointsBalance = actualLoyaltyBalance;
 
-                    // Update customer state so next transaction shows correct balance
-                    setCustomer((prev: any) => prev ? { ...prev, points: actualLoyaltyBalance } : prev);
                   }
                 } catch { /* non-critical — skip */ }
               }

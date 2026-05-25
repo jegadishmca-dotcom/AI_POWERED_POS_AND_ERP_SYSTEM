@@ -1,14 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { CreditCard, Wallet, Banknote, QrCode, CheckCircle } from 'lucide-react';
 
 export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompletePayment, isProcessing = false }: any) => {
   const [tenders, setTenders] = useState({ cash: '', upi: '', card: '', wallet: '' });
   const [useWalletMax, setUseWalletMax] = useState(false);
+  const cashInputRef = useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
     if (isOpen) {
       setTenders({ cash: '', upi: '', card: '', wallet: '' });
       setUseWalletMax(false);
+      setTimeout(() => {
+        cashInputRef.current?.focus();
+        cashInputRef.current?.select();
+      }, 50);
     }
   }, [isOpen]);
 
@@ -22,6 +27,14 @@ export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompleteP
   const totalTendered = cashNum + upiNum + cardNum + walletNum;
   const balanceDue = Math.max(0, cartTotal - totalTendered);
   const changeDue = Math.max(0, totalTendered - cartTotal);
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      if (balanceDue === 0 && !isProcessing) {
+        handleComplete();
+      }
+    }
+  };
 
   const handleWalletToggle = () => {
     if (!customer) return;
@@ -49,7 +62,7 @@ export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompleteP
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4" onKeyDown={handleKeyDown}>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col">
         <div className="bg-slate-800 p-4 flex justify-between items-center text-white">
           <h2 className="text-xl font-bold">Complete Payment</h2>
@@ -61,7 +74,7 @@ export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompleteP
           <div className="w-1/2 pr-6 border-r space-y-4">
              <div>
               <label className="flex items-center text-sm font-bold text-gray-700 mb-1"><Banknote className="w-4 h-4 mr-1 text-emerald-600"/> Cash Amount</label>
-              <input type="text" inputMode="decimal" className="w-full p-2 border rounded focus:ring-2 outline-none text-lg font-bold" 
+              <input ref={cashInputRef} type="text" inputMode="decimal" className="w-full p-2 border rounded focus:ring-2 outline-none text-lg font-bold" 
                      value={tenders.cash} onChange={e => setTenders({...tenders, cash: e.target.value})} />
             </div>
             <div>

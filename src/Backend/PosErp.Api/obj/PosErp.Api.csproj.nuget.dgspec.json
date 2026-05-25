@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Api\\PosErp.Api.csproj": {}
+    "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Api\\PosErp.Api.csproj": {}
   },
   "projects": {
-    "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Api\\PosErp.Api.csproj": {
+    "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Api\\PosErp.Api.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Api\\PosErp.Api.csproj",
+        "projectUniqueName": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Api\\PosErp.Api.csproj",
         "projectName": "PosErp.Api",
-        "projectPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Api\\PosErp.Api.csproj",
+        "projectPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Api\\PosErp.Api.csproj",
         "packagesPath": "C:\\Users\\User\\.nuget\\packages\\",
-        "outputPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Api\\obj\\",
+        "outputPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Api\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -33,11 +33,11 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj": {
-                "projectPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj"
+              "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj": {
+                "projectPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj"
               },
-              "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Infrastructure\\PosErp.Infrastructure.csproj": {
-                "projectPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Infrastructure\\PosErp.Infrastructure.csproj"
+              "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Infrastructure\\PosErp.Infrastructure.csproj": {
+                "projectPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Infrastructure\\PosErp.Infrastructure.csproj"
               }
             }
           }
@@ -116,14 +116,14 @@
         }
       }
     },
-    "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj": {
+    "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj",
+        "projectUniqueName": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj",
         "projectName": "PosErp.Application",
-        "projectPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj",
+        "projectPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj",
         "packagesPath": "C:\\Users\\User\\.nuget\\packages\\",
-        "outputPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\obj\\",
+        "outputPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -145,8 +145,8 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj": {
-                "projectPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj"
+              "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj": {
+                "projectPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj"
               }
             }
           }
@@ -250,14 +250,14 @@
         }
       }
     },
-    "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj": {
+    "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj",
+        "projectUniqueName": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj",
         "projectName": "PosErp.Domain",
-        "projectPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj",
+        "projectPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\PosErp.Domain.csproj",
         "packagesPath": "C:\\Users\\User\\.nuget\\packages\\",
-        "outputPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\obj\\",
+        "outputPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Domain\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -330,14 +330,14 @@
         }
       }
     },
-    "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Infrastructure\\PosErp.Infrastructure.csproj": {
+    "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Infrastructure\\PosErp.Infrastructure.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Infrastructure\\PosErp.Infrastructure.csproj",
+        "projectUniqueName": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Infrastructure\\PosErp.Infrastructure.csproj",
         "projectName": "PosErp.Infrastructure",
-        "projectPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Infrastructure\\PosErp.Infrastructure.csproj",
+        "projectPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Infrastructure\\PosErp.Infrastructure.csproj",
         "packagesPath": "C:\\Users\\User\\.nuget\\packages\\",
-        "outputPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Infrastructure\\obj\\",
+        "outputPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Infrastructure\\obj\\",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -359,8 +359,8 @@
           "net8.0": {
             "targetAlias": "net8.0",
             "projectReferences": {
-              "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj": {
-                "projectPath": "d:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj"
+              "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj": {
+                "projectPath": "D:\\JEGADISH\\APPLE_SUPERMARKET_POS_PROJECT\\AI_POWERED_POS_AND_ERP_SYSTEM\\src\\Backend\\PosErp.Application\\PosErp.Application.csproj"
               }
             }
           }

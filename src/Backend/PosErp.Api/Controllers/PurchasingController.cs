@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using PosErp.Application.Features.Purchasing.Commands.CreatePurchaseOrder;
 using PosErp.Application.Features.Purchasing.Queries.GetPurchaseOrders;
 using PosErp.Application.Features.Purchasing.Queries.GetPurchaseOrderById;
+using PosErp.Application.Features.Purchasing.Commands.ApprovePurchaseOrder;
 using System;
 using System.Threading.Tasks;
 
@@ -45,5 +46,13 @@ public class PurchasingController : ControllerBase
     {
         var id = await _mediator.Send(command);
         return CreatedAtAction(nameof(GetPurchaseOrderById), new { id }, new { id });
+    }
+
+    [HttpPost("purchase-orders/{id}/approve")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
+    public async Task<IActionResult> ApprovePurchaseOrder(Guid id)
+    {
+        var result = await _mediator.Send(new ApprovePurchaseOrderCommand(id, null));
+        return Ok(result);
     }
 }

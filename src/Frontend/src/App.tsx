@@ -29,6 +29,7 @@ import { StockPositionReport } from './features/inventory/components/StockPositi
 import { WarehouseLocationsList } from './features/inventory/components/WarehouseLocationsList';
 import { ShiftReport } from './features/pos/components/ShiftReport';
 import { Suppliers } from './features/purchasing/routes/Suppliers';
+import { PurchaseOrders } from './features/purchasing/routes/PurchaseOrders';
 import { Settings } from './pages/Settings';
 
 const AppLayout: React.FC = () => {
@@ -48,6 +49,7 @@ const AppLayout: React.FC = () => {
     { path: '/products', name: 'Product Catalog', icon: Package, roles: ['Owner', 'Manager'] },
     { path: '/grn', name: 'Goods Receipt (GRN)', icon: ClipboardCheck, roles: ['Owner', 'Manager'] },
     { path: '/suppliers', name: 'Supplier Master', icon: UserIcon, roles: ['Owner', 'Manager'] },
+    { path: '/purchase-orders', name: 'Purchase Orders', icon: ClipboardCheck, roles: ['Owner', 'Manager'] },
     { path: '/stock-adjustment', name: 'Stock Adjustment', icon: ArrowUpDown, roles: ['Owner', 'Manager'] },
     { path: '/stock-take', name: 'Stock Take', icon: ClipboardCheck, roles: ['Owner', 'Manager'] },
     { path: '/stock-ledger', name: 'Stock Ledger', icon: History, roles: ['Owner', 'Manager'] },
@@ -156,6 +158,9 @@ const AppLayout: React.FC = () => {
             } />
             <Route path="/suppliers" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <Suppliers />
+            } />
+            <Route path="/purchase-orders" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <PurchaseOrders />
             } />
             <Route path="/stock-adjustment" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <StockAdjustmentForm />

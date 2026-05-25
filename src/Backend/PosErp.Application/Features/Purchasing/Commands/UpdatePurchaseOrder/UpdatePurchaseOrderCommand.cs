@@ -43,22 +43,41 @@ public class UpdatePurchaseOrderCommandHandler : IRequestHandler<UpdatePurchaseO
 
         po.SupplierId = request.SupplierId;
         po.ExpectedDeliveryDate = request.ExpectedDeliveryDate;
+
+        // 1. Determine items to delete (those in DB but NOT in the request)
+        var incomingProductIds = request.Items.Select(i => i.ProductId).ToList();
+        var itemsToRemove = po.Items.Where(i => !incomingProductIds.Contains(i.ProductId)).ToList();
+        foreach (var item in itemsToRemove)
+        {
+            _context.PurchaseOrderItems.Remove(item);
+        }
+
+        // 2. Add or Update items
         po.TotalAmount = 0m;
-
-        // Clear existing items and re-add
-        po.Items.Clear();
-
         foreach (var itemDto in request.Items)
         {
+            var existingItem = po.Items.FirstOrDefault(i => i.ProductId == itemDto.ProductId);
             var itemTotal = itemDto.OrderedQuantity * itemDto.UnitCost;
-            po.Items.Add(new PurchaseOrderItem
+
+            if (existingItem != null)
             {
-                ProductId = itemDto.ProductId,
-                OrderedQuantity = itemDto.OrderedQuantity,
-                ReceivedQuantity = 0,
-                UnitCost = itemDto.UnitCost,
-                TotalCost = itemTotal
-            });
+                // Update existing item in place
+                existingItem.OrderedQuantity = itemDto.OrderedQuantity;
+                existingItem.UnitCost = itemDto.UnitCost;
+                existingItem.TotalCost = itemTotal;
+            }
+            else
+            {
+                // Add new item
+                po.Items.Add(new PurchaseOrderItem
+                {
+                    ProductId = itemDto.ProductId,
+                    OrderedQuantity = itemDto.OrderedQuantity,
+                    ReceivedQuantity = 0,
+                    UnitCost = itemDto.UnitCost,
+                    TotalCost = itemTotal
+                });
+            }
             po.TotalAmount += itemTotal;
         }
 

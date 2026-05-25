@@ -90,7 +90,7 @@ export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompleteP
                   <input type="checkbox" checked={useWalletMax} onChange={() => {}} className="w-4 h-4" />
                 </div>
                 <p className="text-sm text-indigo-700 font-bold">Balance: ₹{customer.walletBalance.toFixed(2)}</p>
-                {useWalletMax && <p className="text-xs font-bold text-emerald-600 mt-1">Applying ₹{tenders.wallet.toFixed(2)}</p>}
+                {useWalletMax && <p className="text-xs font-bold text-emerald-600 mt-1">Applying ₹{walletNum.toFixed(2)}</p>}
               </div>
             )}
 

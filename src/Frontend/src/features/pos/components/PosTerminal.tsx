@@ -196,10 +196,10 @@ export const PosTerminal = () => {
     }
   };
 
-  // Evaluate whenever promo code changes
+  // Evaluate whenever promo code or customer changes
   useEffect(() => {
     recalculateCart(cart.items);
-  }, [promoCode]);
+  }, [promoCode, customer]);
 
   const addProductToCart = (product: any, overrideQty?: number) => {
     const existing = cart.items.find((item: any) => item.productId === product.id);
@@ -633,34 +633,13 @@ export const PosTerminal = () => {
               }))
             };
 
-            // Track loyalty points before/after
+            // 1. Calculate offline loyalty estimation
             const oldLoyaltyPoints = customer ? (customer.points || 0) : 0;
-            let newLoyaltyBalance  = oldLoyaltyPoints;
-            let loyaltyEarned      = 0;
+            let offlineLoyaltyEarned = customer ? Math.floor(cart.finalTotal / 100) : 0;
+            let offlineLoyaltyBalance = oldLoyaltyPoints + offlineLoyaltyEarned;
 
-            try {
-              await createInvoice(payload);
-              // Re-fetch customer to get updated loyalty balance from backend
-              if (customer?.phone) {
-                try {
-                  const freshCustomers = await searchCustomers(customer.phone);
-                  if (freshCustomers.length > 0) {
-                    newLoyaltyBalance = freshCustomers[0].loyaltyPoints || 0;
-                    loyaltyEarned     = Math.max(0, newLoyaltyBalance - oldLoyaltyPoints);
-                    // Update customer state so next transaction shows correct balance
-                    setCustomer((prev: any) => prev ? { ...prev, points: newLoyaltyBalance } : prev);
-                  }
-                } catch { /* non-critical — skip */ }
-              }
-            } catch (err: any) {
-              console.warn('Network issue during checkout, saving offline...', err);
-              await posDb.invoices.put({ ...payload, id: payload.invoiceNumber, businessDate: new Date().toISOString(), status: 'COMPLETED' } as any);
-              await posDb.sync_queue.put({ ...payload, id: payload.invoiceNumber, businessDate: new Date().toISOString() } as any);
-              const errorDetail = err?.response?.data?.Detailed || err?.response?.data?.Message || err?.message || JSON.stringify(err);
-              alert(`Saved Offline: Invoice ${payload.invoiceNumber} queued for sync.\n\nERROR DETAIL:\n${errorDetail}`);
-            }
-
-            const invoiceToPrint = {
+            // 2. Construct the FULL invoice object for local storage and printing
+            const fullInvoice = {
               id: payload.invoiceNumber,
               invoiceNumber: payload.invoiceNumber,
               businessDate: new Date().toISOString(),
@@ -670,19 +649,19 @@ export const PosTerminal = () => {
               cashierName: user?.fullName || user?.username || 'Cashier',
               customerName: customer?.name || undefined,
               customerPhone: customer?.phone || undefined,
-              loyaltyPointsEarned: loyaltyEarned,
-              loyaltyPointsBalance: newLoyaltyBalance,
+              loyaltyPointsEarned: offlineLoyaltyEarned,
+              loyaltyPointsBalance: offlineLoyaltyBalance,
               subTotal: cart.subtotal,
               discountAmount: cart.totalDiscount,
               taxAmount: cart.taxTotal,
               totalAmount: cart.finalTotal,
-              cashAmount: tenders.cash,
-              upiAmount: tenders.upi,
-              cardAmount: tenders.card,
-              walletAmountUsed: tenders.wallet,
-              roundOff: Math.round(cart.finalTotal) - cart.finalTotal,
-              netPayable: Math.round(cart.finalTotal),
-              paymentMode: tenders.cash > 0 ? 'CASH' : tenders.upi > 0 ? 'UPI' : tenders.card > 0 ? 'CARD' : 'WALLET',
+              cashAmount: tenders.cash || 0,
+              upiAmount: tenders.upi || 0,
+              cardAmount: tenders.card || 0,
+              walletAmountUsed: tenders.wallet || 0,
+              roundOff: roundOffVal,
+              netPayable: netPayableVal,
+              paymentMode: paymentModeVal,
               status: 'COMPLETED',
               items: cart.items.map((item: any) => ({
                 id: item.id || '',
@@ -693,15 +672,48 @@ export const PosTerminal = () => {
                 cgstRate: item.cgstRate || 0,
                 sgstRate: item.sgstRate || 0,
                 discountAmount: item.discountAmount || 0,
-                totalAmount: item.finalLineTotal || item.lineTotal
+                totalAmount: item.finalLineTotal || item.lineTotal,
+                // Add mapping for Sync API expected fields
+                barcode: item.barcode || item.primaryBarcode || undefined,
+                productName: item.name,
+                cgstAmount: ((item.finalLineTotal || item.lineTotal) * (item.cgstRate || 0)) / 100,
+                sgstAmount: ((item.finalLineTotal || item.lineTotal) * (item.sgstRate || 0)) / 100,
+                cessRate: 0,
+                cessAmount: 0
               }))
             };
 
-            await posDb.invoices.put(invoiceToPrint as any);
+            try {
+              await createInvoice(payload);
+              // Re-fetch customer to get updated loyalty balance from backend
+              if (customer?.phone) {
+                try {
+                  const freshCustomers = await searchCustomers(customer.phone);
+                  if (freshCustomers.length > 0) {
+                    const actualLoyaltyBalance = freshCustomers[0].loyaltyPoints || 0;
+                    const actualLoyaltyEarned = Math.max(0, actualLoyaltyBalance - oldLoyaltyPoints);
+                    
+                    fullInvoice.loyaltyPointsEarned = actualLoyaltyEarned;
+                    fullInvoice.loyaltyPointsBalance = actualLoyaltyBalance;
 
-            setCompletedInvoice(invoiceToPrint);
+                    // Update customer state so next transaction shows correct balance
+                    setCustomer((prev: any) => prev ? { ...prev, points: actualLoyaltyBalance } : prev);
+                  }
+                } catch { /* non-critical — skip */ }
+              }
+            } catch (err: any) {
+              console.warn('Network issue during checkout, saving offline...', err);
+              await posDb.invoices.put(fullInvoice as any);
+              await posDb.sync_queue.put(fullInvoice as any);
+              const errorDetail = err?.response?.data?.Detailed || err?.response?.data?.Message || err?.message || JSON.stringify(err);
+              alert(`Saved Offline: Invoice ${payload.invoiceNumber} queued for sync.\n\nERROR DETAIL:\n${errorDetail}`);
+            }
+
+            await posDb.invoices.put(fullInvoice as any);
+
+            setCompletedInvoice(fullInvoice);
             setPaymentModalOpen(false);
-            printReceipt(invoiceToPrint);
+            printReceipt(fullInvoice);
 
             setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
             setCustomer(null);

@@ -169,11 +169,11 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
           {changeDue > 0 && <div style={{ ...S.row, ...S.bold }}><span>Change Due</span><span>{fmt(changeDue)}</span></div>}
 
           {/* ── LOYALTY ── */}
-          {invoice.customerName && (safe(invoice.loyaltyPointsEarned) > 0 || safe(invoice.loyaltyPointsBalance) > 0) && (
+          {invoice.customerName && (
             <>
               <div style={S.hr}/>
-              {safe(invoice.loyaltyPointsEarned) > 0 && <div style={S.row}><span>Points Earned Today</span><span>+{fmt(invoice.loyaltyPointsEarned)}</span></div>}
-              {safe(invoice.loyaltyPointsBalance) > 0 && <div style={S.row}><span>Total Points Balance</span><span>{fmt(invoice.loyaltyPointsBalance)}</span></div>}
+              <div style={S.row}><span>Points Earned Today</span><span>+{fmt(safe(invoice.loyaltyPointsEarned))}</span></div>
+              <div style={S.row}><span>Total Points Balance</span><span>{fmt(safe(invoice.loyaltyPointsBalance))}</span></div>
             </>
           )}
 

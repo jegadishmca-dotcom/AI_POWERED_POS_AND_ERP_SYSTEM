@@ -121,8 +121,24 @@ public class OfferEngine : IOfferEngine
             }
         }
 
-        // Always re-calculate final total and flat 5% GST tax total based on the final discount applied
-        bestCart.TaxTotal = Math.Round((bestCart.Subtotal - bestCart.TotalDiscount) * 0.05m, 2);
+        // Calculate actual GST based on each product's tax slab
+        decimal actualTax = 0;
+        var itemProductIds = bestCart.Items.Select(i => i.ProductId).Distinct().ToList();
+        var itemsProducts = await _context.Products
+            .Include(p => p.TaxSlab)
+            .Where(p => itemProductIds.Contains(p.Id))
+            .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+        foreach (var item in bestCart.Items)
+        {
+            if (itemsProducts.TryGetValue(item.ProductId, out var prod))
+            {
+                decimal cgstRate = prod.TaxSlab?.CgstRate ?? 0;
+                decimal sgstRate = prod.TaxSlab?.SgstRate ?? 0;
+                actualTax += Math.Round(item.FinalLineTotal * ((cgstRate + sgstRate) / 100m), 2);
+            }
+        }
+        bestCart.TaxTotal = actualTax;
         bestCart.FinalTotal = bestCart.Subtotal - bestCart.TotalDiscount + bestCart.TaxTotal;
 
         return bestCart;

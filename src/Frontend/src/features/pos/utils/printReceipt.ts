@@ -116,20 +116,18 @@ export function printReceipt(invoice: any): void {
     const rcvd    = tendered;   // total cash/UPI/card received
     const rfnd    = change;     // change returned to customer
 
-    if (earned > 0 || balance > 0) {
-      loyaltyHtml = hr() + `
-        <div style="font-size:10px;">
-          <div style="display:flex;justify-content:space-between;">
-            <span>OLD POINTS : ${oldPts.toFixed(2)}</span>
-            <span>RCVD : ${fmt(rcvd)}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;">
-            <span>TODAY PTS  : ${earned.toFixed(2)}</span>
-            <span>RFND : ${fmt(rfnd)}</span>
-          </div>
-          <div><span>TOTAL PTS  : ${balance.toFixed(2)}</span></div>
-        </div>`;
-    }
+    loyaltyHtml = hr() + `
+      <div style="font-size:10px;">
+        <div style="display:flex;justify-content:space-between;">
+          <span>OLD POINTS : ${oldPts.toFixed(2)}</span>
+          <span>RCVD : ${fmt(rcvd)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;">
+          <span>TODAY PTS  : ${earned.toFixed(2)}</span>
+          <span>RFND : ${fmt(rfnd)}</span>
+        </div>
+        <div><span>TOTAL PTS  : ${balance.toFixed(2)}</span></div>
+      </div>`;
   }
 
   // Full receipt HTML

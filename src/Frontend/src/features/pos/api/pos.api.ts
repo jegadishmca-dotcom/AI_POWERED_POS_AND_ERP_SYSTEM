@@ -13,11 +13,19 @@ export interface CreateInvoicePayload {
     productId: string;
     quantity: number;
     unitPrice: number;
+    batchId?: string;
   }>;
 }
 
 export const createInvoice = async (payload: CreateInvoicePayload): Promise<string> => {
   const { data } = await api.post('/api/pos/create', payload);
+  return data;
+};
+
+export const getProductBatches = async (productId: string): Promise<any[]> => {
+  const { data } = await api.get('/api/inventory/batches', {
+    params: { productId }
+  });
   return data;
 };
 

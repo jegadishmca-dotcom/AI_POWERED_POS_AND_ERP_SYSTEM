@@ -30,7 +30,7 @@ public record CreateInvoiceCommand(
     List<InvoiceItemDto> Items
 ) : IRequest<Guid>;
 
-public record InvoiceItemDto(Guid ProductId, decimal Quantity, decimal UnitPrice);
+public record InvoiceItemDto(Guid ProductId, decimal Quantity, decimal UnitPrice, Guid? BatchId);
 
 public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand, Guid>
 {
@@ -67,17 +67,17 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 : null;
 
             var productIds = request.Items.Select(i => i.ProductId).ToList();
-            var productCategories = await _context.Products
+            var productsInfo = await _context.Products
                 .Where(p => productIds.Contains(p.Id))
-                .Select(p => new { p.Id, p.CategoryId })
-                .ToDictionaryAsync(p => p.Id, p => p.CategoryId, cancellationToken);
+                .Select(p => new { p.Id, p.CategoryId, p.HasExpiry })
+                .ToDictionaryAsync(p => p.Id, p => p, cancellationToken);
 
             var cartEvaluation = new CartEvaluationDto
             {
                 Items = request.Items.Select(i => new CartItemEvaluationDto
                 {
                     ProductId = i.ProductId,
-                    CategoryId = productCategories.TryGetValue(i.ProductId, out var catId) ? catId : null,
+                    CategoryId = productsInfo.TryGetValue(i.ProductId, out var pInfo) ? pInfo.CategoryId : null,
                     Quantity = i.Quantity,
                     UnitPrice = i.UnitPrice
                 }).ToList()
@@ -139,17 +139,65 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
             foreach (var item in cartEvaluation.Items)
             {
+                var originalItem = request.Items.FirstOrDefault(x => x.ProductId == item.ProductId);
+                Guid? selectedBatchId = originalItem?.BatchId;
+                var hasExpiry = productsInfo.TryGetValue(item.ProductId, out var pInfo) && pInfo.HasExpiry;
+                DateTime? expiryDate = null;
+
+                if (selectedBatchId == null && hasExpiry)
+                {
+                    var activeBatches = await _context.ProductBatches
+                        .Where(b => b.ProductId == item.ProductId && b.IsActive)
+                        .ToListAsync(cancellationToken);
+
+                    if (activeBatches.Any())
+                    {
+                        var batchStocks = new List<(Guid Id, DateTime? ExpiryDate, decimal Stock)>();
+                        foreach (var b in activeBatches)
+                        {
+                            var stock = await _context.StockLedger
+                                .Where(sl => sl.ProductId == item.ProductId && sl.BatchId == b.Id)
+                                .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+                            batchStocks.Add((b.Id, b.ExpiryDate, stock));
+                        }
+
+                        var bestBatchId = batchStocks
+                            .Where(x => x.Stock > 0)
+                            .OrderBy(x => x.ExpiryDate.HasValue ? 0 : 1)
+                            .ThenBy(x => x.ExpiryDate)
+                            .Select(x => (Guid?)x.Id)
+                            .FirstOrDefault();
+
+                        if (bestBatchId == null)
+                        {
+                            bestBatchId = batchStocks
+                                .OrderBy(x => x.ExpiryDate.HasValue ? 0 : 1)
+                                .ThenBy(x => x.ExpiryDate)
+                                .Select(x => (Guid?)x.Id)
+                                .FirstOrDefault();
+                        }
+
+                        selectedBatchId = bestBatchId;
+                    }
+                }
+
+                if (selectedBatchId.HasValue)
+                {
+                    var selectedBatch = await _context.ProductBatches.FindAsync(new object[] { selectedBatchId.Value }, cancellationToken);
+                    expiryDate = selectedBatch?.ExpiryDate;
+                }
+
                 await _stockLedgerService.RecordMovementAsync(
                     storeId: storeId,
                     warehouseId: null,
                     terminalId: request.TerminalId,
                     businessDate: today,
                     productId: item.ProductId,
-                    batchId: null, // Ideally picked during checkout or FIFO
+                    batchId: selectedBatchId,
                     movementType: "SALE",
                     quantity: -item.Quantity, // Negative quantity for stock deduction
                     unitCost: item.UnitPrice, // In a real system, this would be the actual cost price, not selling price.
-                    expiryDate: null,
+                    expiryDate: expiryDate,
                     referenceDocId: invoice.Id,
                     referenceNumber: $"INV-{invoice.InvoiceNumber}",
                     userId: request.CashierId,

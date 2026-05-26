@@ -4,7 +4,7 @@ import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistra
 import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
 import { searchCustomers, registerCustomer } from '../../crm/api/crm.api';
-import { createInvoice, closeShift, getZReport } from '../api/pos.api';
+import { createInvoice, closeShift, getZReport, getProductBatches } from '../api/pos.api';
 import { printReceipt } from '../utils/printReceipt';
 import { printZReport } from '../utils/printZReport';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -204,7 +204,20 @@ export const PosTerminal = () => {
     }
   }, [promoCode, customer]);
 
-  const addProductToCart = (product: any, overrideQty?: number) => {
+  const updateItemBatch = (productId: string, batchId: string) => {
+    const updatedItems = cart.items.map((item: any) => {
+      if (item.productId === productId) {
+        return { ...item, batchId: batchId };
+      }
+      return item;
+    });
+    setCart((prev: any) => ({
+      ...prev,
+      items: updatedItems
+    }));
+  };
+
+  const addProductToCart = async (product: any, overrideQty?: number) => {
     const existing = cart.items.find((item: any) => item.productId === product.id);
     let updatedItems = [];
     const qtyToAdd = overrideQty !== undefined ? overrideQty : 1;
@@ -215,7 +228,21 @@ export const PosTerminal = () => {
           ? { ...item, qty: item.qty + qtyToAdd, lineTotal: (item.qty + qtyToAdd) * item.unitPrice } 
           : item
       );
+      recalculateCart(updatedItems);
     } else {
+      let batches: any[] = [];
+      let defaultBatchId: string | undefined = undefined;
+
+      try {
+        const fetchedBatches = await getProductBatches(product.id);
+        if (fetchedBatches && fetchedBatches.length > 0) {
+          batches = fetchedBatches;
+          defaultBatchId = fetchedBatches[0].id;
+        }
+      } catch (err) {
+        console.warn('Failed to fetch batches for product', err);
+      }
+
       updatedItems = [
         ...cart.items,
         {
@@ -230,12 +257,13 @@ export const PosTerminal = () => {
           appliedOfferName: null,
           cgstRate: product.cgstRate || 0,
           sgstRate: product.sgstRate || 0,
-          isWeighable: product.isWeighable || false
+          isWeighable: product.isWeighable || false,
+          batches: batches,
+          batchId: defaultBatchId
         }
       ];
+      recalculateCart(updatedItems);
     }
-
-    recalculateCart(updatedItems);
   };
 
   const updateItemQtyExact = (productId: string, newQty: number) => {
@@ -526,6 +554,22 @@ export const PosTerminal = () => {
                           <Tag className="w-3 h-3 mr-1" /> {item.appliedOfferName}
                         </p>
                       )}
+                      {item.batches && item.batches.length > 0 && (
+                        <div className="mt-2 flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">Batch</span>
+                          <select
+                            className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded p-1 outline-none focus:ring-1 focus:ring-indigo-500 max-w-[200px]"
+                            value={item.batchId || ''}
+                            onChange={(e) => updateItemBatch(item.productId, e.target.value)}
+                          >
+                            {item.batches.map((b: any) => (
+                              <option key={b.id} value={b.id}>
+                                {b.batchNumber} {b.expiryDate ? `(Exp: ${b.expiryDate.substring(0, 10)})` : '(No Exp)'} [Qty: {b.currentStock}]
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
                     </td>
                     <td className="p-3">
                       <div className="flex items-center justify-center gap-2">
@@ -663,7 +707,8 @@ export const PosTerminal = () => {
               items: cart.items.map((item: any) => ({
                 productId: item.productId,
                 quantity: item.qty,
-                unitPrice: item.unitPrice
+                unitPrice: item.unitPrice,
+                batchId: item.batchId || undefined
               }))
             };
 

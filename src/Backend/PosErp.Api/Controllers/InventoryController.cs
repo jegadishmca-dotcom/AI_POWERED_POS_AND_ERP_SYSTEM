@@ -7,6 +7,7 @@ using PosErp.Application.Features.Inventory.Commands.CreateStockAdjustment;
 using PosErp.Application.Features.Inventory.Commands.ApproveStockAdjustment;
 using PosErp.Application.Features.Inventory.Queries.GetStockPosition;
 using PosErp.Application.Features.Inventory.Queries.GetNearExpiryAlerts;
+using PosErp.Application.Features.Inventory.Queries.GetProductBatches;
 using System;
 using System.Threading.Tasks;
 
@@ -66,6 +67,13 @@ public class InventoryController : ControllerBase
     public async Task<IActionResult> GetStockLedger([FromQuery] Guid? storeId, [FromQuery] string? searchToken, [FromQuery] string? movementType)
     {
         var result = await _mediator.Send(new PosErp.Application.Features.Inventory.Queries.GetStockLedger.GetStockLedgerQuery(storeId, searchToken, movementType));
+        return Ok(result);
+    }
+
+    [HttpGet("batches")]
+    public async Task<IActionResult> GetProductBatches([FromQuery] Guid productId)
+    {
+        var result = await _mediator.Send(new GetProductBatchesQuery(productId));
         return Ok(result);
     }
 

@@ -222,6 +222,12 @@ using (var scope = app.Services.CreateScope())
             ALTER TABLE grn_items ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR(500);
         ");
 
+        // DDL patch: add has_expiry column to products (idempotent)
+        // Required by ProductBatchService to know if expiry date is mandatory
+        await context.Database.ExecuteSqlRawAsync(@"
+            ALTER TABLE products ADD COLUMN IF NOT EXISTS has_expiry BOOLEAN DEFAULT TRUE;
+        ");
+
         // GST Slab master + HsnMasterIndia2026 seeding
         await PosErp.Api.Infrastructure.GstMasterSeeder.SeedAsync(context);
 

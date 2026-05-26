@@ -152,10 +152,14 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
         modelBuilder.Entity<PosErp.Domain.Entities.Catalog.Product>()
             .Ignore(p => p.UnitOfMeasureId)
-            .Ignore(p => p.HasExpiry)
             .Ignore(p => p.MinStockLevel)
             .Ignore(p => p.ReorderPoint)
             .Ignore(p => p.SearchVector);
+
+        // StockLedgerEntry.Version (uint) is a C#-side optimistic concurrency field
+        // but the stock_ledger table has no such column — ignore it to prevent EF mapping error
+        modelBuilder.Entity<PosErp.Domain.Entities.Inventory.StockLedgerEntry>()
+            .Ignore(s => s.Version);
         // Map every entity and property to lowercase snake_case to match SQL Schema exactly
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {

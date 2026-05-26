@@ -41,6 +41,14 @@ public class CreateGRNCommandHandler : IRequestHandler<CreateGRNCommand, Guid>
 
     public async Task<Guid> Handle(CreateGRNCommand request, CancellationToken cancellationToken)
     {
+        // Backend guard: reject empty GRN submissions
+        if (request.Items == null || request.Items.Count == 0)
+            throw new Exception("Cannot create a GRN with no items. Please enter at least one item with accepted quantity.");
+
+        var hasAccepted = request.Items.Any(i => i.AcceptedQuantity > 0);
+        if (!hasAccepted)
+            throw new Exception("Cannot create a GRN with zero accepted quantities. Please enter accepted quantity for at least one item.");
+
         var grn = new GRNHeader
         {
             PurchaseOrderHeaderId = request.PurchaseOrderHeaderId,

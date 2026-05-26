@@ -28,17 +28,31 @@ public class InventoryController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> CreateGRN([FromBody] CreateGRNCommand command)
     {
-        var id = await _mediator.Send(command);
-        return Ok(new { id });
+        try
+        {
+            var id = await _mediator.Send(command);
+            return Ok(new { id });
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPost("grn/{id}/confirm")]
     [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> ConfirmGRN(Guid id)
     {
-        // For UserId, usually we extract from Claims, here passing null for simplicity as backend supports it
-        var result = await _mediator.Send(new ConfirmGRNCommand(id, null));
-        return Ok(result);
+        try
+        {
+            // For UserId, usually we extract from Claims, here passing null for simplicity as backend supports it
+            var result = await _mediator.Send(new ConfirmGRNCommand(id, null));
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpGet("stock-position")]

@@ -70,12 +70,43 @@ export const GrnForm = () => {
   };
 
   const handleConfirmGrn = async () => {
-    // Validate Expiry for hasExpiry items
-    const invalidItem = grnItems.find(i => i.hasExpiry && i.accepted > 0 && !i.expiry);
-    if (invalidItem) {
-      alert(`Expiry Date is mandatory for ${invalidItem.name}`);
+    // 1. Validate PO is selected
+    if (!selectedPo) {
+      alert('Please select a Purchase Order first.');
       return;
     }
+
+    // 2. Validate at least one item has accepted quantity > 0
+    const itemsWithAccepted = grnItems.filter(i => i.accepted > 0);
+    if (itemsWithAccepted.length === 0) {
+      alert('Please enter Accepted Quantity for at least one item before confirming GRN.');
+      return;
+    }
+
+    // 3. Validate accepted quantity does not exceed pending quantity
+    const overReceivedItem = grnItems.find(i => (i.accepted + i.rejected) > i.pending);
+    if (overReceivedItem) {
+      alert(`Total received (Accepted + Rejected) for "${overReceivedItem.name}" exceeds Pending Qty of ${overReceivedItem.pending}.`);
+      return;
+    }
+
+    // 4. Validate Expiry for items with accepted qty > 0
+    const invalidItem = grnItems.find(i => i.hasExpiry && i.accepted > 0 && !i.expiry);
+    if (invalidItem) {
+      alert(`Expiry Date is mandatory for "${invalidItem.name}". Please enter expiry date.`);
+      return;
+    }
+
+    // 5. Confirmation dialog
+    const totalAccepted = itemsWithAccepted.reduce((sum, i) => sum + i.accepted, 0);
+    const totalRejected = grnItems.reduce((sum, i) => sum + i.rejected, 0);
+    const confirmMsg = `Confirm GRN?\n\n` +
+      `PO: ${selectedPo.poNumber}\n` +
+      `Items with accepted qty: ${itemsWithAccepted.length}\n` +
+      `Total Accepted: ${totalAccepted}\n` +
+      `Total Rejected: ${totalRejected}\n\n` +
+      `This will update the Stock Ledger. Continue?`;
+    if (!window.confirm(confirmMsg)) return;
 
     try {
       // 1. Create GRN
@@ -111,6 +142,7 @@ export const GrnForm = () => {
       alert(e.response?.data?.message || 'Error saving GRN');
     }
   };
+
 
   return (
     <div className="bg-white shadow rounded-lg p-6 max-w-7xl mx-auto">

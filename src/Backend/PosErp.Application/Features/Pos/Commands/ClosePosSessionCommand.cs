@@ -31,7 +31,7 @@ public class ClosePosSessionCommandHandler : IRequestHandler<ClosePosSessionComm
         // For simplicity right now, we can query invoices for the specific terminal and cashier between StartTime and now
         var endTime = DateTime.UtcNow;
         var invoices = await _context.Invoices
-            .Where(i => i.TerminalId == session.TerminalId && i.CashierId == session.CashierId && i.BusinessDate >= session.StartTime && i.BusinessDate <= endTime)
+            .Where(i => i.TerminalId == session.TerminalId && i.CashierId == session.CashierId && i.CreatedAt >= session.StartTime && i.CreatedAt <= endTime)
             .ToListAsync(cancellationToken);
 
         decimal totalCashSales = invoices.Where(i => i.PaymentMode == "CASH").Sum(i => i.NetPayable);
@@ -60,10 +60,33 @@ public class ClosePosSessionCommandHandler : IRequestHandler<ClosePosSessionComm
                 journalLines.Add(new JournalLineDto { AccountCode = "1000", Description = "Cash Drawer Shortage", Debit = 0, Credit = shortage });
             }
 
+            // Ensure discrepancy accounts exist in Chart of Accounts
+            await EnsureAccountExistsAsync("1000", "Cash on Hand", "ASSET", cancellationToken);
+            await EnsureAccountExistsAsync("4200", "Cash Drawer Overage (Other Income)", "REVENUE", cancellationToken);
+            await EnsureAccountExistsAsync("5200", "Cash Drawer Shortage (Expense)", "EXPENSE", cancellationToken);
+
             await _financialPostingService.PostJournalEntryAsync(null, endTime.Date, $"Cash Discrepancy Session {session.Id}", $"SES-{session.Id}", journalLines, cancellationToken);
         }
 
         await _context.SaveChangesAsync(cancellationToken);
         return true;
+    }
+
+    private async Task EnsureAccountExistsAsync(string code, string name, string type, CancellationToken cancellationToken)
+    {
+        var exists = await _context.Accounts.AnyAsync(a => a.AccountCode == code, cancellationToken);
+        if (!exists)
+        {
+            _context.Accounts.Add(new PosErp.Domain.Entities.Finance.Account
+            {
+                Id = Guid.NewGuid(),
+                AccountCode = code,
+                Name = name,
+                AccountType = type,
+                IsActive = true,
+                CreatedAt = DateTime.UtcNow
+            });
+            await _context.SaveChangesAsync(cancellationToken);
+        }
     }
 }

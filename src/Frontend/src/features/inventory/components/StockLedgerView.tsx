@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { History, FileText, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
-import api from '../../../utils/api';
+import { api } from '../../../utils/api';
 
 interface StockLedgerEntry {
   id: string;

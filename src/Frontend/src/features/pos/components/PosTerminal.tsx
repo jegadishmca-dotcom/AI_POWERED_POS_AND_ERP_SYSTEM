@@ -119,6 +119,7 @@ export const PosTerminal = () => {
   const [productQuery, setProductQuery] = useState('');
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showProductDropdown, setShowProductDropdown] = useState(false);
+  const [focusedProductIndex, setFocusedProductIndex] = useState(-1);
 
   // Dynamic Cart State initializing empty
   const [cart, setCart] = useState<any>({
@@ -332,7 +333,35 @@ export const PosTerminal = () => {
   };
 
   const handleProductSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (showProductDropdown && searchResults.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setFocusedProductIndex(prev => prev < searchResults.length - 1 ? prev + 1 : prev);
+        return;
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setFocusedProductIndex(prev => prev > 0 ? prev - 1 : -1);
+        return;
+      } else if (e.key === 'Escape') {
+        setShowProductDropdown(false);
+        setFocusedProductIndex(-1);
+        return;
+      }
+    }
+
     if (e.key === 'Enter') {
+      e.preventDefault();
+
+      // If dropdown is open and an item is focused, select it
+      if (showProductDropdown && focusedProductIndex >= 0 && focusedProductIndex < searchResults.length) {
+        addProductToCart(searchResults[focusedProductIndex]);
+        setProductQuery('');
+        setSearchResults([]);
+        setShowProductDropdown(false);
+        setFocusedProductIndex(-1);
+        return;
+      }
+
       const val = productQuery.trim();
       if (!val) return;
 
@@ -343,9 +372,11 @@ export const PosTerminal = () => {
           setProductQuery('');
           setSearchResults([]);
           setShowProductDropdown(false);
+          setFocusedProductIndex(-1);
         } else if (results.length > 1) {
           setSearchResults(results);
           setShowProductDropdown(true);
+          setFocusedProductIndex(0); // auto-focus first item
         } else {
           alert('Product not found.');
         }
@@ -443,7 +474,7 @@ export const PosTerminal = () => {
                 <span className="text-xs font-semibold text-slate-500">Multiple items found. Select one:</span>
                 <button onClick={() => setShowProductDropdown(false)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">Close</button>
               </div>
-              {searchResults.map((p) => (
+              {searchResults.map((p, idx) => (
                 <div 
                   key={p.id}
                   onClick={() => {
@@ -451,8 +482,9 @@ export const PosTerminal = () => {
                     setProductQuery('');
                     setSearchResults([]);
                     setShowProductDropdown(false);
+                    setFocusedProductIndex(-1);
                   }}
-                  className="px-4 py-2.5 hover:bg-blue-50 cursor-pointer flex justify-between items-center border-b border-slate-100 transition"
+                  className={`px-4 py-2.5 cursor-pointer flex justify-between items-center transition ${focusedProductIndex === idx ? 'bg-blue-100 border-l-4 border-blue-500' : 'hover:bg-blue-50 border-b border-slate-100'}`}
                 >
                   <div>
                     <p className="font-bold text-slate-800">{p.name}</p>

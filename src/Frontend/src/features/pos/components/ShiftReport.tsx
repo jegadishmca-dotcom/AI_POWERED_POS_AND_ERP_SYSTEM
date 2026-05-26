@@ -7,7 +7,7 @@ import { printZReport } from '../utils/printZReport';
 export const ShiftReport = () => {
   const [session, setSession] = useState<any>(null);
   const [reportData, setReportData] = useState<any>(null);
-  const [actualCash, setActualCash] = useState<string>('0');
+  const [actualCash, setActualCash] = useState<string>('');
   const [isClosing, setIsClosing] = useState(false);
   const [isClosed, setIsClosed] = useState(false);
 
@@ -42,12 +42,26 @@ export const ShiftReport = () => {
 
   const handleCloseShift = async () => {
     if (!session) return;
+
+    const expected = session.openingFloatCash + (reportData?.cashCollected || 0);
+    const declared = parseFloat(actualCash) || 0;
+    const diff = declared - expected;
+
+    if (diff !== 0) {
+      const confirmMsg = diff > 0 
+        ? `Warning: There is a cash overage of +₹${diff.toFixed(2)} in the drawer. Are you sure you want to close the shift?`
+        : `Warning: There is a cash shortage of -₹${Math.abs(diff).toFixed(2)} in the drawer. Are you sure you want to close the shift?`;
+      if (!window.confirm(confirmMsg)) {
+        return;
+      }
+    }
+
     setIsClosing(true);
 
     try {
       const payload = {
         sessionId: session.id,
-        actualClosingCash: parseFloat(actualCash) || 0
+        actualClosingCash: declared
       };
 
       const res = await fetch('/api/pos/session/close', {
@@ -59,7 +73,7 @@ export const ShiftReport = () => {
       if (res.ok) {
         setIsClosed(true);
         if (reportData) {
-          printZReport(reportData, session?.openingFloatCash || 0, parseFloat(actualCash) || 0, user?.fullName || 'Cashier');
+          printZReport(reportData, session?.openingFloatCash || 0, declared, user?.fullName || 'Cashier');
         }
         alert('Shift Closed Successfully!\nCash Discrepancy (if any) posted to financial ledger.');
       } else {
@@ -181,7 +195,7 @@ export const ShiftReport = () => {
                 </div>
                 <button
                   onClick={handleCloseShift}
-                  disabled={isClosing || parseFloat(actualCash) < 0 || isNaN(parseFloat(actualCash))}
+                  disabled={isClosing || actualCash === '' || parseFloat(actualCash) < 0 || isNaN(parseFloat(actualCash))}
                   className="bg-amber-600 text-white font-bold text-xl px-12 py-4 rounded-xl shadow-lg hover:bg-amber-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isClosing ? 'Closing...' : 'CLOSE SHIFT'}

@@ -35,7 +35,7 @@ public class InventoryController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(new { message = ex.Message });
+            return BadRequest(new { message = ex.ToString() });
         }
     }
 
@@ -51,7 +51,7 @@ public class InventoryController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(new { message = ex.Message });
+            return BadRequest(new { message = ex.ToString() });
         }
     }
 

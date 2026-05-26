@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { IndianRupee, Printer, Calculator, FileText, CheckCircle } from 'lucide-react';
 import { posDb } from '../db/pos.db';
 import { useAuthStore } from '../../auth/store/auth.store';
+import { printZReport } from '../utils/printZReport';
 
 export const ShiftReport = () => {
   const [session, setSession] = useState<any>(null);
@@ -57,8 +58,10 @@ export const ShiftReport = () => {
 
       if (res.ok) {
         setIsClosed(true);
+        if (reportData) {
+          printZReport(reportData, session?.openingFloatCash || 0, parseFloat(actualCash) || 0, user?.fullName || 'Cashier');
+        }
         alert('Shift Closed Successfully!\nCash Discrepancy (if any) posted to financial ledger.');
-        // Optionally trigger a print for Z-Report
       } else {
         alert('Failed to close shift.');
       }
@@ -73,11 +76,20 @@ export const ShiftReport = () => {
   if (isClosed) {
     return (
       <div className="flex-1 bg-slate-50 flex items-center justify-center p-8">
-        <div className="bg-white p-12 rounded-3xl shadow-xl text-center max-w-md">
+        <div className="bg-white p-12 rounded-3xl shadow-xl text-center max-w-lg">
           <CheckCircle className="w-24 h-24 text-emerald-500 mx-auto mb-6" />
           <h2 className="text-3xl font-black text-slate-800 mb-4">Shift Closed</h2>
           <p className="text-slate-600 font-medium">Your register has been closed and the Z-Report generated.</p>
-          <button onClick={() => window.location.reload()} className="mt-8 bg-indigo-600 text-white font-bold px-8 py-3 rounded-xl hover:bg-indigo-700">Return to Login</button>
+          <div className="flex gap-4 justify-center mt-8">
+            <button onClick={() => window.location.reload()} className="bg-indigo-650 text-white font-bold px-6 py-3 rounded-xl hover:bg-indigo-750">Return to Login</button>
+            <button 
+              onClick={() => { if (reportData) printZReport(reportData, session?.openingFloatCash || 0, parseFloat(actualCash) || 0, user?.fullName || 'Cashier'); }} 
+              className="bg-white border-2 border-slate-200 text-slate-750 font-bold px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-2"
+            >
+              <Printer className="w-5 h-5" />
+              Reprint Z-Report
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -101,7 +113,10 @@ export const ShiftReport = () => {
             <h1 className="text-3xl font-black text-slate-800 tracking-tight">Shift & Sales Report</h1>
             <p className="text-slate-500 font-medium mt-1">Terminal: {terminalCode} • Cashier: {user?.fullName || 'Cashier'}</p>
           </div>
-          <button className="bg-white border-2 border-slate-200 text-slate-700 font-bold px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-2">
+          <button 
+            onClick={() => { if (reportData) printZReport(reportData, session?.openingFloatCash || 0, parseFloat(actualCash) || 0, user?.fullName || 'Cashier'); }}
+            className="bg-white border-2 border-slate-200 text-slate-700 font-bold px-6 py-3 rounded-xl hover:bg-slate-50 transition-colors flex items-center gap-2"
+          >
             <Printer className="w-5 h-5" />
             Print Z-Report
           </button>

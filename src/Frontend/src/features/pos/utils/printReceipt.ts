@@ -142,16 +142,16 @@ export function printReceipt(invoice: any): void {
     const refundLine   = `${'REFUND'.padEnd(rightColWidth, ' ')} : ${rfndVal}`;
 
     loyaltyHtml = hr() + `
-      <div style="font-size:10px; font-family:monospace; white-space:pre;">
+      <div style="font-size:10px; font-family:monospace; line-height:1.2;">
         <div style="display:flex;justify-content:space-between;">
-          <span>${oldPtsLine}</span>
-          <span>${cashRcvdLine}</span>
+          <span style="white-space:pre;">${oldPtsLine}</span>
+          <span style="white-space:pre;">${cashRcvdLine}</span>
         </div>
         <div style="display:flex;justify-content:space-between;">
-          <span>${todayPtsLine}</span>
-          <span>${refundLine}</span>
+          <span style="white-space:pre;">${todayPtsLine}</span>
+          <span style="white-space:pre;">${refundLine}</span>
         </div>
-        <div><span>${totalPtsLine}</span></div>
+        <div><span style="white-space:pre;">${totalPtsLine}</span></div>
       </div>`;
   }
 

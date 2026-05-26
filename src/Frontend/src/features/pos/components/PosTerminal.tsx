@@ -131,7 +131,7 @@ export const PosTerminal = () => {
     appliedOfferNames: []
   });
 
-  const recalculateCart = async (items: any[]) => {
+  const recalculateCart = async (items: any[], overrideCustomerId?: string | null) => {
     if (items.length === 0) {
       setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
       return;
@@ -141,7 +141,7 @@ export const PosTerminal = () => {
       const payload = {
         items: items.map(i => ({ productId: i.productId, quantity: i.qty })),
         promoCode: promoCode,
-        customerId: customer?.id
+        customerId: overrideCustomerId !== undefined ? (overrideCustomerId || undefined) : customer?.id
       };
 
       const res = await fetch('/api/pos/calculate-cart', {
@@ -333,6 +333,7 @@ export const PosTerminal = () => {
       items: cart.items,
       totalAmount: cart.finalTotal,
       status: 'HELD',
+      customer: customer // Save customer details!
     };
     
     await posDb.held_invoices.put(invoiceToHold as any);
@@ -351,7 +352,15 @@ export const PosTerminal = () => {
           finalTotal: 0,
           appliedOfferNames: []
       });
-      recalculateCart(invoice.items);
+      if (invoice.customer) {
+          setCustomer(invoice.customer);
+          setCustomerQuery(invoice.customer.phone || invoice.customer.name || '');
+          recalculateCart(invoice.items, invoice.customer.id);
+      } else {
+          setCustomer(null);
+          setCustomerQuery('');
+          recalculateCart(invoice.items, null);
+      }
       setHoldModalOpen(false);
   };
 

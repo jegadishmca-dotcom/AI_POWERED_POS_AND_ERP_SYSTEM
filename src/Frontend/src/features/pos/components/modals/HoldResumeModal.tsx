@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Clock, Play } from 'lucide-react';
 import { posDb } from '../../db/pos.db';
 import { Invoice } from '../../types';
@@ -33,7 +33,14 @@ export const HoldResumeModal = ({ isOpen, onClose, onResume }: any) => {
              heldInvoices.map((inv) => (
                <div key={inv.id} className="p-4 border rounded-lg mb-4 flex justify-between items-center hover:shadow-md transition bg-orange-50">
                   <div>
-                     <p className="font-bold text-slate-800">{inv.invoiceNumber}</p>
+                     <div className="flex items-center gap-2">
+                       <p className="font-bold text-slate-800">{inv.invoiceNumber}</p>
+                       {inv.customer && (
+                         <span className="px-2 py-0.5 text-xs bg-orange-200 text-orange-900 rounded font-medium">
+                           {inv.customer.name}
+                         </span>
+                       )}
+                     </div>
                      <p className="text-sm text-gray-500">{new Date(inv.businessDate).toLocaleString()}</p>
                      <p className="text-sm text-gray-700 mt-1">{inv.items.length} items | Total: ₹{inv.totalAmount.toFixed(2)}</p>
                   </div>

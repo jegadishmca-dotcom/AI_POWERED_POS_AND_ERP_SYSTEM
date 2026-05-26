@@ -1,4 +1,4 @@
-﻿export interface CartItem {
+export interface CartItem {
   id: string; // uuid
   productId: string;
   barcode?: string;
@@ -25,4 +25,10 @@ export interface Invoice {
   paymentMode: string;
   status: 'PENDING' | 'COMPLETED' | 'HOLD';
   items: CartItem[];
+  customer?: {
+    id: string;
+    name: string;
+    phone?: string;
+    [key: string]: any;
+  } | null;
 }

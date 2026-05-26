@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert, Printer, Clock } from 'lucide-react';
+import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert, Printer, Clock, Maximize, Minimize } from 'lucide-react';
 import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistrationModal';
 import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
@@ -42,6 +42,45 @@ export const PosTerminal = () => {
   const { user } = useAuthStore();
   const terminalId = localStorage.getItem('pos_terminal_id') || '00000000-0000-0000-0000-000000000001';
   const cashierId = user?.id || '00000000-0000-0000-0000-000000000001';
+
+  // Fullscreen management & auto-fullscreen on first user interaction
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+    const autoFullscreen = () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {
+          // ignore blocked request
+        });
+      }
+      window.removeEventListener('click', autoFullscreen);
+      window.removeEventListener('keydown', autoFullscreen);
+    };
+
+    window.addEventListener('click', autoFullscreen);
+    window.addEventListener('keydown', autoFullscreen);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('click', autoFullscreen);
+      window.removeEventListener('keydown', autoFullscreen);
+    };
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
 
   useEffect(() => {
     // Focus barcode scanner input on mount
@@ -623,7 +662,16 @@ export const PosTerminal = () => {
       {/* Right: Payment Panel */}
       <div className="w-1/3 flex flex-col bg-slate-50 p-6">
         <div className="flex justify-between items-center mb-6 border-b pb-2">
-          <h2 className="text-2xl font-black text-slate-800">Payment</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-black text-slate-800">Payment</h2>
+            <button 
+              onClick={toggleFullscreen} 
+              className="text-slate-400 hover:text-slate-600 hover:bg-slate-200/50 p-1.5 rounded-lg transition-colors ml-1"
+              title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+            >
+              {isFullscreen ? <Minimize className="w-5 h-5" /> : <Maximize className="w-5 h-5" />}
+            </button>
+          </div>
           {activeSession && (
             <button 
               onClick={() => setCloseShiftModalOpen(true)}

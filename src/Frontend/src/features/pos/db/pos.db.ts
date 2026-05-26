@@ -20,7 +20,7 @@ export class PosDatabase extends Dexie {
 
   constructor() {
     super('PosDatabase');
-    this.version(2).stores({
+    this.version(3).stores({
       catalog: 'id, code, barcode, name', // Proper indexes added for <100ms lookup
       invoices: 'id, status',
       sync_queue: 'id',

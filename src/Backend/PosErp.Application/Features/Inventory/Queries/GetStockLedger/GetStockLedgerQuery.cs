@@ -17,7 +17,9 @@ public record StockLedgerDto(
     string MovementType,
     string ReferenceDocument,
     decimal DeltaQty,
-    decimal RunningBalance
+    decimal RunningBalance,
+    string? BatchNumber,
+    DateTime? ExpiryDate
 );
 
 public record GetStockLedgerQuery(
@@ -39,7 +41,9 @@ public class GetStockLedgerQueryHandler : IRequestHandler<GetStockLedgerQuery, L
     {
         var query = from sl in _context.StockLedger
                     join p in _context.Products on sl.ProductId equals p.Id
-                    select new { sl, p };
+                    join b in _context.ProductBatches on sl.BatchId equals b.Id into bj
+                    from b in bj.DefaultIfEmpty()
+                    select new { sl, p, BatchNumber = b != null ? b.BatchNumber : null };
 
         if (request.StoreId.HasValue)
         {
@@ -68,7 +72,9 @@ public class GetStockLedgerQueryHandler : IRequestHandler<GetStockLedgerQuery, L
                 x.sl.MovementType,
                 x.sl.ReferenceNumber,
                 x.sl.Quantity,
-                x.sl.RunningBalance
+                x.sl.RunningBalance,
+                x.BatchNumber,
+                x.sl.ExpiryDate
             ))
             .ToListAsync(cancellationToken);
 

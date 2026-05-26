@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert, Printer } from 'lucide-react';
+import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert, Printer, Clock } from 'lucide-react';
 import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistrationModal';
 import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
@@ -327,7 +327,7 @@ export const PosTerminal = () => {
     }
     
     const invoiceToHold = {
-      id: crypto.randomUUID(),
+      id: Math.random().toString(36).substring(2, 15) + Date.now().toString(36),
       invoiceNumber: `HOLD-${Date.now()}`,
       businessDate: new Date().toISOString(),
       items: cart.items,
@@ -662,14 +662,20 @@ export const PosTerminal = () => {
             >
               <CreditCard className="w-8 h-8 mr-3" /> PAYMENT (F11)
             </button>
-            <div className="flex gap-2">
-               <button onClick={handleHoldCart} className="flex-1 bg-orange-600 text-white p-3 rounded-lg shadow-md flex flex-col items-center justify-center text-sm font-bold hover:bg-orange-700 transition-colors">
-                  <span className="text-xs opacity-80 mb-1">F9:</span>
-                  <span className="font-bold">Hold/Resume</span>
+            <div className="flex gap-3">
+               <button 
+                 onClick={handleHoldCart} 
+                 className="flex-1 bg-amber-600 hover:bg-amber-700 text-white p-3.5 rounded-xl shadow-md flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-bold"
+               >
+                 <Clock className="w-5 h-5" />
+                 <span>F9: Hold/Resume</span>
                </button>
-               <button onClick={() => setReprintModalOpen(true)} className="flex-1 bg-slate-700 text-white p-3 rounded-lg shadow-md flex flex-col items-center justify-center text-sm font-bold hover:bg-slate-800 transition-colors">
-                  <Printer className="w-5 h-5 mb-1" />
-                  <span className="font-bold">F10: Reprint</span>
+               <button 
+                 onClick={() => setReprintModalOpen(true)} 
+                 className="flex-1 bg-slate-700 hover:bg-slate-800 text-white p-3.5 rounded-xl shadow-md flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-bold"
+               >
+                 <Printer className="w-5 h-5" />
+                 <span>F10: Reprint</span>
                </button>
             </div>
           </div>

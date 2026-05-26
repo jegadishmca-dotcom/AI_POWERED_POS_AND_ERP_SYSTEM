@@ -10,6 +10,8 @@ interface StockLedgerEntry {
   referenceDocument: string;
   deltaQty: number;
   runningBalance: number;
+  batchNumber?: string | null;
+  expiryDate?: string | null;
 }
 
 export const StockLedgerView = () => {
@@ -89,6 +91,8 @@ export const StockLedgerView = () => {
             <tr>
               <th className="p-3 border">Date & Time</th>
               <th className="p-3 border">Product</th>
+              <th className="p-3 border">Batch No</th>
+              <th className="p-3 border">Expiry Date</th>
               <th className="p-3 border text-center">Movement</th>
               <th className="p-3 border">Reference Doc</th>
               <th className="p-3 border text-right">Delta Qty</th>
@@ -98,7 +102,7 @@ export const StockLedgerView = () => {
           <tbody>
             {ledgerEntries.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-gray-500">
+                <td colSpan={8} className="p-8 text-center text-gray-500">
                   {loading ? 'Loading ledger entries...' : 'No ledger entries found.'}
                 </td>
               </tr>
@@ -106,6 +110,8 @@ export const StockLedgerView = () => {
               <tr key={entry.id} className="border-b hover:bg-slate-50">
                 <td className="p-3 text-sm text-gray-600">{new Date(entry.date).toLocaleString()}</td>
                 <td className="p-3 font-bold text-slate-800">{entry.productName}</td>
+                <td className="p-3 text-sm text-slate-600 font-semibold">{entry.batchNumber || '-'}</td>
+                <td className="p-3 text-sm text-slate-600 font-semibold">{entry.expiryDate ? entry.expiryDate.substring(0, 10) : '-'}</td>
                 <td className="p-3 text-center">
                   <span className={`px-2 py-1 rounded text-xs font-bold ${entry.movementType === 'GRN' ? 'bg-green-100 text-green-800' : entry.movementType === 'SALE' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
                     {entry.movementType}

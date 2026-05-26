@@ -29,6 +29,7 @@ public class PurchaseOrderItemDetailDto
     public decimal ReceivedQuantity { get; set; }
     public decimal UnitCost { get; set; }
     public decimal TotalCost { get; set; }
+    public bool HasExpiry { get; set; }
 }
 
 public class GetPurchaseOrderByIdQueryHandler : IRequestHandler<GetPurchaseOrderByIdQuery, PurchaseOrderDetailsDto?>
@@ -68,7 +69,8 @@ public class GetPurchaseOrderByIdQueryHandler : IRequestHandler<GetPurchaseOrder
                 OrderedQuantity = i.OrderedQuantity,
                 ReceivedQuantity = i.ReceivedQuantity,
                 UnitCost = i.UnitCost,
-                TotalCost = i.TotalCost
+                TotalCost = i.TotalCost,
+                HasExpiry = _context.Products.Where(p => p.Id == i.ProductId).Select(p => p.HasExpiry).FirstOrDefault()
             }).ToList()
         };
 

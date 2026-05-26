@@ -55,7 +55,7 @@ export const GrnForm = () => {
         rejectionReason: '',
         batch: '',
         expiry: '',
-        hasExpiry: true, // simplified for now
+        hasExpiry: item.hasExpiry,
         unitCost: item.unitCost
       })));
     } catch (err) {

@@ -1,0 +1,77 @@
+using MediatR;
+using Microsoft.EntityFrameworkCore;
+using PosErp.Application.Interfaces;
+using PosErp.Domain.Entities.Inventory;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace PosErp.Application.Features.Inventory.Queries.GetStockLedger;
+
+public record StockLedgerDto(
+    Guid Id,
+    DateTime Date,
+    string ProductName,
+    string MovementType,
+    string ReferenceDocument,
+    decimal DeltaQty,
+    decimal RunningBalance
+);
+
+public record GetStockLedgerQuery(
+    Guid? StoreId,
+    string? SearchToken,
+    string? MovementType
+) : IRequest<List<StockLedgerDto>>;
+
+public class GetStockLedgerQueryHandler : IRequestHandler<GetStockLedgerQuery, List<StockLedgerDto>>
+{
+    private readonly IApplicationDbContext _context;
+
+    public GetStockLedgerQueryHandler(IApplicationDbContext context)
+    {
+        _context = context;
+    }
+
+    public async Task<List<StockLedgerDto>> Handle(GetStockLedgerQuery request, CancellationToken cancellationToken)
+    {
+        var query = from sl in _context.StockLedger
+                    join p in _context.Products on sl.ProductId equals p.Id
+                    select new { sl, p };
+
+        if (request.StoreId.HasValue)
+        {
+            query = query.Where(x => x.sl.StoreId == request.StoreId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.MovementType))
+        {
+            query = query.Where(x => x.sl.MovementType == request.MovementType);
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.SearchToken))
+        {
+            var search = request.SearchToken.ToLower();
+            query = query.Where(x => x.p.Name.ToLower().Contains(search) 
+                                  || x.sl.ReferenceNumber.ToLower().Contains(search));
+        }
+
+        var results = await query
+            .OrderByDescending(x => x.sl.CreatedAt)
+            .Take(100)
+            .Select(x => new StockLedgerDto(
+                x.sl.Id,
+                x.sl.CreatedAt,
+                x.p.Name,
+                x.sl.MovementType,
+                x.sl.ReferenceNumber,
+                x.sl.Quantity,
+                x.sl.RunningBalance
+            ))
+            .ToListAsync(cancellationToken);
+
+        return results;
+    }
+}

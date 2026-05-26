@@ -1,13 +1,44 @@
-import React, { useState } from 'react';
-import { History, FileText, TrendingUp, TrendingDown } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { History, FileText, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
+import api from '../../../utils/api';
+
+interface StockLedgerEntry {
+  id: string;
+  date: string;
+  productName: string;
+  movementType: string;
+  referenceDocument: string;
+  deltaQty: number;
+  runningBalance: number;
+}
 
 export const StockLedgerView = () => {
-  // Mock ledger data for visual structure
-  const ledgerEntries = [
-    { id: 1, date: '2026-05-15 10:30', product: 'Aashirvaad Atta 5kg', type: 'GRN', ref: 'GRN-2026-001', qty: 100, balance: 150 },
-    { id: 2, date: '2026-05-15 11:15', product: 'Aashirvaad Atta 5kg', type: 'SALE', ref: 'T1-20260515-001', qty: -2, balance: 148 },
-    { id: 3, date: '2026-05-15 14:00', product: 'Tata Salt 1kg', type: 'ADJ', ref: 'ADJ-101', qty: -1, balance: 49 },
-  ];
+  const [ledgerEntries, setLedgerEntries] = useState<StockLedgerEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [movementType, setMovementType] = useState('');
+
+  const fetchLedger = async () => {
+    try {
+      setLoading(true);
+      let url = '/api/inventory/ledger?';
+      if (searchTerm) url += `searchToken=${encodeURIComponent(searchTerm)}&`;
+      if (movementType) url += `movementType=${encodeURIComponent(movementType)}&`;
+      
+      const response = await api.get(url);
+      setLedgerEntries(response.data);
+    } catch (error) {
+      console.error('Failed to fetch stock ledger', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLedger();
+  }, []); // Initial load
 
   return (
     <div className="bg-white shadow rounded-lg p-6 max-w-7xl mx-auto">
@@ -15,17 +46,41 @@ export const StockLedgerView = () => {
         <h2 className="text-2xl font-bold text-slate-800 flex items-center">
           <History className="mr-3 text-blue-600" /> Immutable Stock Ledger
         </h2>
+        <button 
+          onClick={fetchLedger}
+          className="text-gray-500 hover:text-blue-600"
+          title="Refresh Ledger"
+        >
+          <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin text-blue-600' : ''}`} />
+        </button>
       </div>
 
       <div className="flex gap-4 mb-6">
-        <input type="text" placeholder="Search Product..." className="p-2 border rounded w-1/3" />
-        <select className="p-2 border rounded w-1/4">
+        <input 
+          type="text" 
+          placeholder="Search Product or Ref..." 
+          className="p-2 border rounded w-1/3 outline-none focus:ring-2 focus:ring-blue-500" 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && fetchLedger()}
+        />
+        <select 
+          className="p-2 border rounded w-1/4 outline-none focus:ring-2 focus:ring-blue-500"
+          value={movementType}
+          onChange={(e) => setMovementType(e.target.value)}
+        >
           <option value="">All Movement Types</option>
           <option value="GRN">Goods Receipt (GRN)</option>
           <option value="SALE">POS Sales</option>
           <option value="ADJ">Adjustments</option>
         </select>
-        <button className="px-4 py-2 bg-blue-600 text-white rounded">Filter Ledger</button>
+        <button 
+          onClick={fetchLedger}
+          disabled={loading}
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition"
+        >
+          Filter Ledger
+        </button>
       </div>
 
       <div className="overflow-x-auto">
@@ -41,23 +96,31 @@ export const StockLedgerView = () => {
             </tr>
           </thead>
           <tbody>
-            {ledgerEntries.map((entry) => (
+            {ledgerEntries.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="p-8 text-center text-gray-500">
+                  {loading ? 'Loading ledger entries...' : 'No ledger entries found.'}
+                </td>
+              </tr>
+            ) : ledgerEntries.map((entry) => (
               <tr key={entry.id} className="border-b hover:bg-slate-50">
-                <td className="p-3 text-sm text-gray-600">{entry.date}</td>
-                <td className="p-3 font-bold text-slate-800">{entry.product}</td>
+                <td className="p-3 text-sm text-gray-600">{new Date(entry.date).toLocaleString()}</td>
+                <td className="p-3 font-bold text-slate-800">{entry.productName}</td>
                 <td className="p-3 text-center">
-                  <span className={`px-2 py-1 rounded text-xs font-bold ${entry.type === 'GRN' ? 'bg-green-100 text-green-800' : entry.type === 'SALE' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
-                    {entry.type}
+                  <span className={`px-2 py-1 rounded text-xs font-bold ${entry.movementType === 'GRN' ? 'bg-green-100 text-green-800' : entry.movementType === 'SALE' ? 'bg-blue-100 text-blue-800' : 'bg-orange-100 text-orange-800'}`}>
+                    {entry.movementType}
                   </span>
                 </td>
                 <td className="p-3 text-sm text-blue-600 flex items-center cursor-pointer hover:underline">
-                  <FileText className="w-4 h-4 mr-1" /> {entry.ref}
+                  <FileText className="w-4 h-4 mr-1" /> {entry.referenceDocument}
                 </td>
-                <td className={`p-3 text-right font-bold flex items-center justify-end ${entry.qty > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {entry.qty > 0 ? <TrendingUp className="w-4 h-4 mr-1" /> : <TrendingDown className="w-4 h-4 mr-1" />}
-                  {entry.qty > 0 ? '+' : ''}{entry.qty}
+                <td className={`p-3 text-right font-bold ${entry.deltaQty > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  <div className="flex items-center justify-end">
+                    {entry.deltaQty > 0 ? <TrendingUp className="w-4 h-4 mr-1" /> : <TrendingDown className="w-4 h-4 mr-1" />}
+                    {entry.deltaQty > 0 ? '+' : ''}{entry.deltaQty}
+                  </div>
                 </td>
-                <td className="p-3 text-right font-black text-lg text-slate-800">{entry.balance}</td>
+                <td className="p-3 text-right font-black text-lg text-slate-800">{entry.runningBalance}</td>
               </tr>
             ))}
           </tbody>

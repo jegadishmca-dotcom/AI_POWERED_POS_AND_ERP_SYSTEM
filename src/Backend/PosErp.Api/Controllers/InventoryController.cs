@@ -62,6 +62,13 @@ public class InventoryController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("ledger")]
+    public async Task<IActionResult> GetStockLedger([FromQuery] Guid? storeId, [FromQuery] string? searchToken, [FromQuery] string? movementType)
+    {
+        var result = await _mediator.Send(new PosErp.Application.Features.Inventory.Queries.GetStockLedger.GetStockLedgerQuery(storeId, searchToken, movementType));
+        return Ok(result);
+    }
+
     [HttpGet("alerts/near-expiry")]
     public async Task<IActionResult> GetNearExpiryAlerts([FromQuery] int daysThreshold = 30)
     {

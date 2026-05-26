@@ -105,9 +105,9 @@ export function printReceipt(invoice: any): void {
   }
 
   // Loyalty points section — matches reference format:
-  // OLD POINTS : 96.00    RCVD : 1000.0
-  // TODAY PTS  :  8.19    RFND :  181.00
-  // TOTAL PTS  : 104.3
+  // OLD POINTS : 24.00          CASH RECEIVED : 235.00
+  // TODAY PTS  :  2.00          REFUND        :   1.00
+  // TOTAL PTS  : 26.00
   let loyaltyHtml = '';
   if (invoice.customerName) {
     const earned  = safe(invoice.loyaltyPointsEarned);
@@ -116,17 +116,42 @@ export function printReceipt(invoice: any): void {
     const rcvd    = tendered;   // total cash/UPI/card received
     const rfnd    = change;     // change returned to customer
 
+    const earnedStr  = earned.toFixed(2);
+    const balanceStr = balance.toFixed(2);
+    const oldPtsStr  = oldPts.toFixed(2);
+    const rcvdStr    = fmt(rcvd);
+    const rfndStr    = fmt(rfnd);
+
+    const maxValLeftLen = Math.max(oldPtsStr.length, earnedStr.length, balanceStr.length);
+    const oldPtsVal  = oldPtsStr.padStart(maxValLeftLen, ' ');
+    const earnedVal  = earnedStr.padStart(maxValLeftLen, ' ');
+    const balanceVal = balanceStr.padStart(maxValLeftLen, ' ');
+
+    const maxValRightLen = Math.max(rcvdStr.length, rfndStr.length);
+    const rcvdVal    = rcvdStr.padStart(maxValRightLen, ' ');
+    const rfndVal    = rfndStr.padStart(maxValRightLen, ' ');
+
+    const leftColWidth = 10;
+    const rightColWidth = 13;
+
+    const oldPtsLine  = `${'OLD POINTS'.padEnd(leftColWidth, ' ')} : ${oldPtsVal}`;
+    const todayPtsLine = `${'TODAY PTS'.padEnd(leftColWidth, ' ')} : ${earnedVal}`;
+    const totalPtsLine = `${'TOTAL PTS'.padEnd(leftColWidth, ' ')} : ${balanceVal}`;
+
+    const cashRcvdLine = `${'CASH RECEIVED'.padEnd(rightColWidth, ' ')} : ${rcvdVal}`;
+    const refundLine   = `${'REFUND'.padEnd(rightColWidth, ' ')} : ${rfndVal}`;
+
     loyaltyHtml = hr() + `
-      <div style="font-size:10px;">
+      <div style="font-size:10px; font-family:monospace; white-space:pre;">
         <div style="display:flex;justify-content:space-between;">
-          <span>OLD POINTS : ${oldPts.toFixed(2)}</span>
-          <span>RCVD : ${fmt(rcvd)}</span>
+          <span>${oldPtsLine}</span>
+          <span>${cashRcvdLine}</span>
         </div>
         <div style="display:flex;justify-content:space-between;">
-          <span>TODAY PTS  : ${earned.toFixed(2)}</span>
-          <span>RFND : ${fmt(rfnd)}</span>
+          <span>${todayPtsLine}</span>
+          <span>${refundLine}</span>
         </div>
-        <div><span>TOTAL PTS  : ${balance.toFixed(2)}</span></div>
+        <div><span>${totalPtsLine}</span></div>
       </div>`;
   }
 

@@ -142,6 +142,22 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .Property(gi => gi.GRNHeaderId)
             .HasColumnName("grn_header_id");
 
+        modelBuilder.Entity<PosErp.Domain.Entities.Inventory.ProductBatch>()
+            .Property(pb => pb.MfgDate)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<PosErp.Domain.Entities.Inventory.ProductBatch>()
+            .Property(pb => pb.ExpiryDate)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<PosErp.Domain.Entities.Inventory.StockLedgerEntry>()
+            .Property(sl => sl.BusinessDate)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<PosErp.Domain.Entities.Inventory.StockLedgerEntry>()
+            .Property(sl => sl.ExpiryDate)
+            .HasColumnType("date");
+
         modelBuilder.Entity<PurchaseBillHeader>()
             .Property(pb => pb.GRNHeaderId)
             .HasColumnName("grn_header_id");

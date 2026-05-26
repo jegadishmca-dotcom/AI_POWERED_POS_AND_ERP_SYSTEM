@@ -228,6 +228,14 @@ using (var scope = app.Services.CreateScope())
             ALTER TABLE products ADD COLUMN IF NOT EXISTS has_expiry BOOLEAN DEFAULT TRUE;
         ");
 
+        // Correct has_expiry for seeded non-perishable items
+        await context.Database.ExecuteSqlRawAsync(@"
+            UPDATE products 
+            SET has_expiry = FALSE 
+            WHERE product_code IN ('PROD-003', 'PROD-005', 'PROD-006', 'PROD-007')
+              AND has_expiry = TRUE;
+        ");
+
         // GST Slab master + HsnMasterIndia2026 seeding
         await PosErp.Api.Infrastructure.GstMasterSeeder.SeedAsync(context);
 

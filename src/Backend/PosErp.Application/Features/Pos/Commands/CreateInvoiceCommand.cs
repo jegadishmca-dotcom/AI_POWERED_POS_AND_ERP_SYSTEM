@@ -39,19 +39,22 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
     private readonly IWalletService _walletService;
     private readonly ILoyaltyService _loyaltyService;
     private readonly IFinancialPostingService _financialPostingService;
+    private readonly PosErp.Application.Features.Inventory.Services.IStockLedgerService _stockLedgerService;
 
     public CreateInvoiceCommandHandler(
         IApplicationDbContext context, 
         IOfferEngine offerEngine, 
         IWalletService walletService, 
         ILoyaltyService loyaltyService,
-        IFinancialPostingService financialPostingService)
+        IFinancialPostingService financialPostingService,
+        PosErp.Application.Features.Inventory.Services.IStockLedgerService stockLedgerService)
     {
         _context = context;
         _offerEngine = offerEngine;
         _walletService = walletService;
         _loyaltyService = loyaltyService;
         _financialPostingService = financialPostingService;
+        _stockLedgerService = stockLedgerService;
     }
 
     public async Task<Guid> Handle(CreateInvoiceCommand request, CancellationToken cancellationToken)
@@ -130,6 +133,29 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
             _context.Invoices.Add(invoice);
             await _context.SaveChangesAsync(cancellationToken); 
+
+            // Deduct Stock
+            Guid storeId = Guid.Empty;
+
+            foreach (var item in cartEvaluation.Items)
+            {
+                await _stockLedgerService.RecordMovementAsync(
+                    storeId: storeId,
+                    warehouseId: null,
+                    terminalId: request.TerminalId,
+                    businessDate: today,
+                    productId: item.ProductId,
+                    batchId: null, // Ideally picked during checkout or FIFO
+                    movementType: "SALE",
+                    quantity: -item.Quantity, // Negative quantity for stock deduction
+                    unitCost: item.UnitPrice, // In a real system, this would be the actual cost price, not selling price.
+                    expiryDate: null,
+                    referenceDocId: invoice.Id,
+                    referenceNumber: $"INV-{invoice.InvoiceNumber}",
+                    userId: request.CashierId,
+                    cancellationToken: cancellationToken
+                );
+            }
 
             if (request.WalletAmountUsed > 0 && customer != null)
                 await _walletService.RecordTransactionAsync(customer.Id, null, "SPEND", -request.WalletAmountUsed, $"INV-{invoice.InvoiceNumber}", null, cancellationToken);

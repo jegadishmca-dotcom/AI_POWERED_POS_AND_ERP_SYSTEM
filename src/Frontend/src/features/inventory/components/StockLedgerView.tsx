@@ -111,7 +111,10 @@ export const StockLedgerView = () => {
                     {entry.movementType}
                   </span>
                 </td>
-                <td className="p-3 text-sm text-blue-600 flex items-center cursor-pointer hover:underline">
+                <td 
+                  className="p-3 text-sm text-blue-600 flex items-center cursor-pointer hover:underline"
+                  onClick={() => alert(`Document Preview for ${entry.referenceDocument} is coming in the next update!`)}
+                >
                   <FileText className="w-4 h-4 mr-1" /> {entry.referenceDocument}
                 </td>
                 <td className={`p-3 text-right font-bold ${entry.deltaQty > 0 ? 'text-green-600' : 'text-red-600'}`}>

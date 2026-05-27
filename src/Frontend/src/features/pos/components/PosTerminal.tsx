@@ -161,6 +161,42 @@ export const PosTerminal = () => {
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [focusedProductIndex, setFocusedProductIndex] = useState(-1);
 
+  // Debounced instant search trigger on text change
+  useEffect(() => {
+    const val = productQuery.trim();
+    if (!val) {
+      setSearchResults([]);
+      setShowProductDropdown(false);
+      setFocusedProductIndex(-1);
+      return;
+    }
+
+    // Skip triggering instant search if the query is a potential barcode (long digits/letters)
+    // to let the Enter key keypress/scanner handle it uniquely without popping the dropdown.
+    // If it's a normal short text query (2 or more characters), search instantly.
+    if (val.length < 2) return;
+
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const results = await searchProducts(val);
+        if (results.length > 0) {
+          setSearchResults(results);
+          setShowProductDropdown(true);
+          // If the dropdown was not open, set focus to first item
+          setFocusedProductIndex(prev => prev >= 0 && prev < results.length ? prev : 0);
+        } else {
+          setSearchResults([]);
+          setShowProductDropdown(false);
+          setFocusedProductIndex(-1);
+        }
+      } catch (err) {
+        console.error('Error searching products instantly:', err);
+      }
+    }, 200); // 200ms debounce delay for instant responsiveness without performance lag
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [productQuery]);
+
   // Helper: scroll a specific dropdown item into view.
   // Uses data-idx attribute + native scrollIntoView which is guaranteed by
   // the browser to scroll the nearest scrollable ancestor (our overflow-y-auto

@@ -557,7 +557,15 @@ export const PosTerminal = () => {
               placeholder="F2: Scan Barcode or Type Product Name (Press Enter)..."
               className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-850"
               value={productQuery}
-              onChange={(e) => setProductQuery(e.target.value)}
+              onChange={(e) => {
+                const val = e.target.value;
+                setProductQuery(val);
+                if (!val.trim()) {
+                  setSearchResults([]);
+                  setShowProductDropdown(false);
+                  setFocusedProductIndex(-1);
+                }
+              }}
               onKeyDown={handleProductSearch}
             />
           </div>

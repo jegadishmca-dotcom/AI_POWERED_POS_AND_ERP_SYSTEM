@@ -84,6 +84,13 @@ public class InventoryController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("stock-adjustment")]
+    public async Task<IActionResult> GetStockAdjustments([FromQuery] Guid? storeId)
+    {
+        var result = await _mediator.Send(new PosErp.Application.Features.Inventory.Queries.GetStockAdjustments.GetStockAdjustmentsQuery(storeId));
+        return Ok(result);
+    }
+
     [HttpPost("stock-adjustment")]
     [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> CreateStockAdjustment([FromBody] CreateStockAdjustmentCommand command)
@@ -96,7 +103,16 @@ public class InventoryController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> ApproveStockAdjustment(Guid id)
     {
+        // For security, can extract User ID from claims if present. For simplicity we support null
         var result = await _mediator.Send(new ApproveStockAdjustmentCommand(id, null));
+        return Ok(result);
+    }
+
+    [HttpPost("stock-adjustment/{id}/reject")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
+    public async Task<IActionResult> RejectStockAdjustment(Guid id)
+    {
+        var result = await _mediator.Send(new PosErp.Application.Features.Inventory.Commands.RejectStockAdjustment.RejectStockAdjustmentCommand(id, null));
         return Ok(result);
     }
 }

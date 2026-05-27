@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Save, ShieldAlert, Plus, Trash2, CheckCircle, XCircle, Clock, Eye, AlertCircle, FileSpreadsheet, PlusCircle } from 'lucide-react';
+import { Save, ShieldAlert, Plus, Trash2, CheckCircle, XCircle, Clock, Eye, AlertCircle, FileSpreadsheet, PlusCircle, Search } from 'lucide-react';
 import { getStockAdjustments, createStockAdjustment, approveStockAdjustment, rejectStockAdjustment, StockAdjustment } from '../api/stockAdjustment.api';
 import { searchProducts } from '../../catalog/api/catalog.api';
 import { getProductBatches } from '../../pos/api/pos.api';
@@ -433,7 +433,7 @@ export const StockAdjustmentForm = () => {
                     {/* Product Search Input */}
                     <td className="p-3 border relative">
                       <div className="relative">
-                        <Search className="absolute left-3 top-2.5 text-slate-400 w-4.5 h-4.5" />
+                        <Search className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
                         <input 
                           type="text" 
                           placeholder="Search product..." 

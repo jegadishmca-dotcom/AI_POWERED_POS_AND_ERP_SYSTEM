@@ -68,9 +68,9 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
             var productIds = request.Items.Select(i => i.ProductId).ToList();
             var productsInfo = await _context.Products
+                .Include(p => p.TaxSlab)
                 .Where(p => productIds.Contains(p.Id))
-                .Select(p => new { p.Id, p.CategoryId, p.HasExpiry })
-                .ToDictionaryAsync(p => p.Id, p => p, cancellationToken);
+                .ToDictionaryAsync(p => p.Id, cancellationToken);
 
             var cartEvaluation = new CartEvaluationDto
             {
@@ -120,14 +120,26 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
             foreach (var item in cartEvaluation.Items)
             {
+                var product = productsInfo.TryGetValue(item.ProductId, out var p) ? p : null;
+                decimal cgstRate = product?.TaxSlab?.CgstRate ?? 0;
+                decimal sgstRate = product?.TaxSlab?.SgstRate ?? 0;
+                decimal cgstAmount = item.FinalLineTotal * (cgstRate / 100m);
+                decimal sgstAmount = item.FinalLineTotal * (sgstRate / 100m);
+
                 invoice.Items.Add(new InvoiceItem
                 {
                     ProductId = item.ProductId,
+                    ProductName = product?.Name ?? string.Empty,
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice,
                     Total = item.LineTotal,
                     DiscountAmount = item.DiscountAmount,
-                    FinalTotal = item.FinalLineTotal
+                    FinalTotal = item.FinalLineTotal,
+                    BusinessDate = today,
+                    CgstRate = cgstRate,
+                    CgstAmount = cgstAmount,
+                    SgstRate = sgstRate,
+                    SgstAmount = sgstAmount
                 });
             }
 

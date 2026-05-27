@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert, Printer, Clock, Maximize, Minimize } from 'lucide-react';
 import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistrationModal';
 import { PaymentModal } from './PaymentModal';
@@ -34,6 +34,7 @@ export const PosTerminal = () => {
   const [managerAction, setManagerAction] = useState<any>(null);
   const customerInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   // Shift Management State
   const [activeSession, setActiveSession] = useState<any>(null);
@@ -159,6 +160,20 @@ export const PosTerminal = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [focusedProductIndex, setFocusedProductIndex] = useState(-1);
+
+  // Helper: scroll a specific dropdown item into view.
+  // Uses data-idx attribute + native scrollIntoView which is guaranteed by
+  // the browser to scroll the nearest scrollable ancestor (our overflow-y-auto
+  // container) just enough to reveal the element — no manual math needed.
+  const scrollDropdownToIndex = (index: number) => {
+    if (!dropdownRef.current) return;
+    if (index <= 0) {
+      dropdownRef.current.scrollTop = 0;
+      return;
+    }
+    const el = dropdownRef.current.querySelector(`[data-idx="${index}"]`) as HTMLElement | null;
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+  };
 
   // Dynamic Cart State initializing empty
   const [cart, setCart] = useState<any>({
@@ -412,11 +427,15 @@ export const PosTerminal = () => {
     if (showProductDropdown && searchResults.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setFocusedProductIndex(prev => prev < searchResults.length - 1 ? prev + 1 : prev);
+        const newIndex = focusedProductIndex < searchResults.length - 1 ? focusedProductIndex + 1 : focusedProductIndex;
+        scrollDropdownToIndex(newIndex);
+        setFocusedProductIndex(newIndex);
         return;
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setFocusedProductIndex(prev => prev > 0 ? prev - 1 : -1);
+        const newIndex = focusedProductIndex > 0 ? focusedProductIndex - 1 : 0;
+        scrollDropdownToIndex(newIndex);
+        setFocusedProductIndex(newIndex);
         return;
       } else if (e.key === 'Escape') {
         setShowProductDropdown(false);
@@ -545,7 +564,11 @@ export const PosTerminal = () => {
 
           {/* Search Dropdown Overlay */}
           {showProductDropdown && searchResults.length > 0 && (
-            <div className="absolute left-4 right-4 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+            <div
+              ref={dropdownRef}
+              className="absolute left-4 right-4 mt-1 bg-white border border-slate-200 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto"
+              style={{ overscrollBehavior: 'contain' }}
+            >
               <div className="p-2 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                 <span className="text-xs font-semibold text-slate-500">Multiple items found. Select one:</span>
                 <button onClick={() => setShowProductDropdown(false)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">Close</button>
@@ -553,6 +576,7 @@ export const PosTerminal = () => {
               {searchResults.map((p, idx) => (
                 <div 
                   key={p.id}
+                  data-idx={idx}
                   onClick={() => {
                     addProductToCart(p);
                     setProductQuery('');
@@ -827,19 +851,22 @@ export const PosTerminal = () => {
 
             try {
               await createInvoice(payload);
-              // Re-fetch customer to get updated loyalty balance from backend
+              // Re-fetch customer to get updated loyalty balance from backend.
+              // Only update if the backend returned a HIGHER balance than our offline
+              // estimate (guards against a race condition where the DB hasn't flushed yet).
               if (customer?.phone) {
                 try {
                   const freshCustomers = await searchCustomers(customer.phone);
                   if (freshCustomers.length > 0) {
-                    const actualLoyaltyBalance = freshCustomers[0].loyaltyPoints || 0;
-                    const actualLoyaltyEarned = Math.max(0, actualLoyaltyBalance - oldLoyaltyPoints);
-                    
-                    fullInvoice.loyaltyPointsEarned = actualLoyaltyEarned;
-                    fullInvoice.loyaltyPointsBalance = actualLoyaltyBalance;
-
+                    const backendBalance = freshCustomers[0].loyaltyPoints || 0;
+                    if (backendBalance > oldLoyaltyPoints) {
+                      // Backend has committed the new points — use the real values
+                      fullInvoice.loyaltyPointsBalance = backendBalance;
+                      fullInvoice.loyaltyPointsEarned  = Math.max(0, backendBalance - oldLoyaltyPoints);
+                    }
+                    // else: keep the offline-calculated estimate (backend hadn't flushed yet)
                   }
-                } catch { /* non-critical — skip */ }
+                } catch { /* non-critical — keep offline estimate */ }
               }
             } catch (err: any) {
               console.warn('Network issue during checkout, saving offline...', err);

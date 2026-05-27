@@ -4,8 +4,8 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 
 export const Dashboard = () => {
   const [kpis, setKpis] = useState({ sales: 0, orders: 0, avg: 0, growth: 0 });
-  const [salesTrend, setSalesTrend] = useState([]);
-  const [topProducts, setTopProducts] = useState([]);
+  const [salesTrend, setSalesTrend] = useState<{ name: string; NetSales: number; GrossSales: number }[]>([]);
+  const [topProducts, setTopProducts] = useState<{ name: string; qty: number; rev: number }[]>([]);
 
   useEffect(() => {
     // Mock Fetching from GetTodayDashboardQuery & GetSalesAnalyticsQuery

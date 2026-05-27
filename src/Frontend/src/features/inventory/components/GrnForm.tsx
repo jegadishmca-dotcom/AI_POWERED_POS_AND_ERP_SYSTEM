@@ -246,7 +246,7 @@ export const GrnForm = () => {
                         value={item.expiry}
                         onChange={(e) => handleQuantityChange(idx, 'expiry', e.target.value)}
                       />
-                      {item.hasExpiry && !item.expiry && <AlertCircle className="w-4 h-4 text-orange-500 ml-1" title="Expiry Date is mandatory" />}
+                      {item.hasExpiry && !item.expiry && <span title="Expiry Date is mandatory"><AlertCircle className="w-4 h-4 text-orange-500 ml-1" /></span>}
                     </div>
                   </td>
                 </tr>

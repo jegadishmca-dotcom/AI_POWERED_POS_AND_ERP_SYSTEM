@@ -47,6 +47,13 @@ export const ShiftReport = () => {
     const declared = parseFloat(actualCash) || 0;
     const diff = declared - expected;
 
+    if (declared === 0 && expected > 0) {
+      const zeroConfirm = `CAUTION: You have declared the closing cash as exactly ₹0.00, but the expected cash is ₹${expected.toFixed(2)}.\n\nAre you sure you want to close the shift with ZERO cash? (This will record a shortage of -₹${expected.toFixed(2)})`;
+      if (!window.confirm(zeroConfirm)) {
+        return;
+      }
+    }
+
     if (diff !== 0) {
       const confirmMsg = diff > 0 
         ? `Warning: There is a cash overage of +₹${diff.toFixed(2)} in the drawer. Are you sure you want to close the shift?`

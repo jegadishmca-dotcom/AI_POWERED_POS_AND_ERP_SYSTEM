@@ -86,14 +86,16 @@ export function printReceipt(invoice: any): void {
 
   // GST summary table
   let gstHtml = '';
-  if (Object.keys(taxSlabs).length > 0) {
-    gstHtml = hr() + `<div style="font-weight:bold;font-size:9px;margin-bottom:2px;">GST Summary</div>
-      <div style="display:flex;font-weight:bold;font-size:9px;border-bottom:1px dashed #000;padding-bottom:1px;">
-        <span style="width:42px;">Slab</span>
-        <span style="flex:1;text-align:right;">Taxable</span>
-        <span style="flex:1;text-align:right;">CGST</span>
-        <span style="flex:1;text-align:right;">SGST</span>
-      </div>`;
+  const hasAnyTax = Object.keys(taxSlabs).length > 0;
+  gstHtml = hr() + `<div style="font-weight:bold;font-size:9px;margin-bottom:2px;">GST Summary</div>`;
+  if (hasAnyTax) {
+    gstHtml += `<div style="display:flex;font-weight:bold;font-size:9px;border-bottom:1px dashed #000;padding-bottom:1px;">
+      <span style="width:42px;">Slab</span>
+      <span style="flex:1;text-align:right;">Taxable</span>
+      <span style="flex:1;text-align:right;">CGST</span>
+      <span style="flex:1;text-align:right;">SGST</span>
+    </div>`;
+    let totalCgst = 0, totalSgst = 0, totalTaxable = 0;
     Object.entries(taxSlabs).forEach(([key, s]) => {
       gstHtml += `<div style="display:flex;font-size:9px;">
         <span style="width:42px;">${key}</span>
@@ -101,8 +103,18 @@ export function printReceipt(invoice: any): void {
         <span style="flex:1;text-align:right;">${fmt(s.cgst)}</span>
         <span style="flex:1;text-align:right;">${fmt(s.sgst)}</span>
       </div>`;
+      totalCgst += s.cgst; totalSgst += s.sgst; totalTaxable += s.taxable;
     });
+    gstHtml += `<div style="display:flex;font-size:9px;font-weight:bold;border-top:1px dashed #000;padding-top:1px;">
+      <span style="width:42px;">Total</span>
+      <span style="flex:1;text-align:right;">${fmt(totalTaxable)}</span>
+      <span style="flex:1;text-align:right;">${fmt(totalCgst)}</span>
+      <span style="flex:1;text-align:right;">${fmt(totalSgst)}</span>
+    </div>`;
+  } else {
+    gstHtml += `<div style="font-size:9px;font-style:italic;">All items: Nil Rated / Exempt (GST \u20b90.00)</div>`;
   }
+
 
   // Loyalty points section — matches reference format:
   // OLD POINTS : 24.00          CASH RECEIVED : 235.00

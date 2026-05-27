@@ -192,6 +192,9 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 else if (snakeTableName == "stock_ledger_entrys" || snakeTableName == "stock_ledger_entries") snakeTableName = "stock_ledger";
                 else if (snakeTableName == "wallet_ledger_entrys" || snakeTableName == "wallet_ledger_entries") snakeTableName = "wallet_ledger";
                 else if (snakeTableName == "loyalty_ledger_entrys" || snakeTableName == "loyalty_ledger_entries") snakeTableName = "loyalty_ledger";
+                else if (snakeTableName == "stock_adjustment_item") snakeTableName = "stock_adjustment_items";
+                else if (snakeTableName == "stock_take_item") snakeTableName = "stock_take_items";
+                else if (snakeTableName == "bin") snakeTableName = "bins";
                 
                 entity.SetTableName(snakeTableName);
             }

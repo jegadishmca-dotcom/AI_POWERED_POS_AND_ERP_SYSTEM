@@ -74,6 +74,13 @@ public class StockLedgerService : IStockLedgerService
             decimal currentBalance = lastEntry?.RunningBalance ?? 0;
             decimal newBalance = currentBalance + quantity;
 
+            var finalExpiryDate = expiryDate;
+            if (!finalExpiryDate.HasValue && batchId.HasValue)
+            {
+                var batch = await _context.ProductBatches.FindAsync(new object[] { batchId.Value }, cancellationToken);
+                finalExpiryDate = batch?.ExpiryDate;
+            }
+
             // 2. Create Immutable Entry
             var entry = new StockLedgerEntry
             {
@@ -86,7 +93,7 @@ public class StockLedgerService : IStockLedgerService
                 MovementType = movementType,
                 Quantity = quantity,
                 UnitCost = unitCost,
-                ExpiryDate = expiryDate,
+                ExpiryDate = finalExpiryDate,
                 ReferenceDocumentId = referenceDocId,
                 ReferenceNumber = referenceNumber,
                 RunningBalance = newBalance,

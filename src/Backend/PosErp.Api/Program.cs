@@ -26,8 +26,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add Database Context (PostgreSQL via PgBouncer / direct connection string)
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
-           .LogTo(msg => System.IO.File.AppendAllText(System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ef_sql.log"), msg), Microsoft.Extensions.Logging.LogLevel.Information));
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 
 builder.Services.AddScoped<IApplicationDbContext>(provider => 
     provider.GetRequiredService<ApplicationDbContext>());

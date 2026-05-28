@@ -86,13 +86,19 @@ public class CreateOrUpdateStockTakeCommandHandler : IRequestHandler<CreateOrUpd
                     .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
             }
 
-            take.Items.Add(new StockTakeItem
+            var newItem = new StockTakeItem
             {
                 ProductId = item.ProductId,
                 BatchId = item.BatchId,
                 SystemQuantity = systemQty,
                 PhysicalQuantity = item.PhysicalQuantity
-            });
+            };
+            take.Items.Add(newItem);
+
+            if (request.Id.HasValue && _context is DbContext dbContext)
+            {
+                dbContext.Entry(newItem).State = EntityState.Added;
+            }
         }
 
         await _context.SaveChangesAsync(cancellationToken);

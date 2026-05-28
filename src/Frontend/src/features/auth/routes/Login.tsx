@@ -17,16 +17,18 @@ export const Login = () => {
     setIsLoading(true);
     setError(null);
     try {
-      if (loginType === 'cashier') {
-        localStorage.setItem('pos_terminal_code', data.terminalCode);
-      } else {
-        localStorage.removeItem('pos_terminal_code');
-      }
+      const registeredTerminal = localStorage.getItem('pos_terminal_code');
       
+      if (loginType === 'cashier' && !registeredTerminal) {
+        setError('This browser device is not registered. Please log in to ERP Back-Office to register this terminal.');
+        setIsLoading(false);
+        return;
+      }
+
       const response = await login({
         username: data.username,
         password: data.password,
-        terminalCode: loginType === 'cashier' ? data.terminalCode : 'BACK-OFFICE'
+        terminalCode: loginType === 'cashier' ? registeredTerminal : 'BACK-OFFICE'
       });
       
       setAuth(response.user, response.accessToken);

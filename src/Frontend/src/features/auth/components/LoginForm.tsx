@@ -88,10 +88,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, isLoading, error
             <input 
               {...register('terminalCode')}
               type="text" 
-              className="mt-1 block w-full rounded-md border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm p-2.5 border" 
-              placeholder="e.g. POS-01" 
-              onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+              readOnly
+              className="mt-1 block w-full rounded-md border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 shadow-sm sm:text-sm p-2.5 border cursor-not-allowed font-mono font-bold" 
+              placeholder="NOT_REGISTERED" 
             />
+            {localStorage.getItem('pos_terminal_code') ? (
+              <p className="mt-1 text-[11px] text-slate-400">This device is persistently registered to this terminal counter.</p>
+            ) : (
+              <p className="mt-1 text-[11px] text-rose-500 font-semibold">Device is not registered. Please sign in to ERP Back-Office to bind a terminal.</p>
+            )}
             {terminalError && <p className="mt-1 text-sm text-red-600 dark:text-red-400 font-bold">{terminalError}</p>}
           </div>
         )}

@@ -31,7 +31,7 @@ export const ServerIpConfig: React.FC = () => {
         : window.location.origin;
       
       const res = await axios.get(`${baseUrl}/health`, { timeout: 4000 });
-      if (res.status === 200 && res.data === 'Healthy') {
+      if (res.status === 200 && res.data?.toString().toLowerCase().includes('healthy')) {
         setTestResult('success');
       } else {
         setTestResult('failed');

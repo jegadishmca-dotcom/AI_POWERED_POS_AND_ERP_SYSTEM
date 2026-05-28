@@ -96,6 +96,16 @@ builder.Services.AddScoped<IEInvoiceService, EInvoiceService>();
 // Register Materialized View Periodic Refresher
 builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.StockPositionRefreshService>();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyMethod()
+              .AllowAnyHeader();
+    });
+});
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
@@ -108,7 +118,7 @@ if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<RateLimitingMiddleware>();
 
-app.UseHttpsRedirection();
+app.UseCors("AllowAll");
 
 app.UseAuthentication();
 app.UseAuthorization();

@@ -8,6 +8,9 @@ using PosErp.Application.Features.Inventory.Commands.ApproveStockAdjustment;
 using PosErp.Application.Features.Inventory.Queries.GetStockPosition;
 using PosErp.Application.Features.Inventory.Queries.GetNearExpiryAlerts;
 using PosErp.Application.Features.Inventory.Queries.GetProductBatches;
+using PosErp.Application.Features.Inventory.Commands.CreateOrUpdateStockTake;
+using PosErp.Application.Features.Inventory.Commands.ApproveStockTake;
+using PosErp.Application.Features.Inventory.Commands.RejectStockTake;
 using System;
 using System.Threading.Tasks;
 
@@ -113,6 +116,43 @@ public class InventoryController : ControllerBase
     public async Task<IActionResult> RejectStockAdjustment(Guid id)
     {
         var result = await _mediator.Send(new PosErp.Application.Features.Inventory.Commands.RejectStockAdjustment.RejectStockAdjustmentCommand(id, null));
+        return Ok(result);
+    }
+
+    [HttpGet("stock-take")]
+    public async Task<IActionResult> GetStockTakes([FromQuery] Guid? storeId)
+    {
+        var result = await _mediator.Send(new PosErp.Application.Features.Inventory.Queries.GetStockTakes.GetStockTakesQuery(storeId));
+        return Ok(result);
+    }
+
+    [HttpGet("stock-take/{id}")]
+    public async Task<IActionResult> GetStockTakeDetails(Guid id)
+    {
+        var result = await _mediator.Send(new PosErp.Application.Features.Inventory.Queries.GetStockTakeDetails.GetStockTakeDetailsQuery(id));
+        return Ok(result);
+    }
+
+    [HttpPost("stock-take")]
+    public async Task<IActionResult> CreateOrUpdateStockTake([FromBody] CreateOrUpdateStockTakeCommand command)
+    {
+        var id = await _mediator.Send(command);
+        return Ok(new { id });
+    }
+
+    [HttpPost("stock-take/{id}/approve")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
+    public async Task<IActionResult> ApproveStockTake(Guid id)
+    {
+        var result = await _mediator.Send(new ApproveStockTakeCommand(id, null));
+        return Ok(result);
+    }
+
+    [HttpPost("stock-take/{id}/reject")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
+    public async Task<IActionResult> RejectStockTake(Guid id)
+    {
+        var result = await _mediator.Send(new RejectStockTakeCommand(id, null));
         return Ok(result);
     }
 }

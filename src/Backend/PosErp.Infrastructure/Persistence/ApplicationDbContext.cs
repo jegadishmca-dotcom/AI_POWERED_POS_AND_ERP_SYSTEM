@@ -158,6 +158,10 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .Property(sl => sl.ExpiryDate)
             .HasColumnType("date");
 
+        modelBuilder.Entity<PosErp.Domain.Entities.Inventory.StockTakeHeader>()
+            .Property(s => s.ScheduledDate)
+            .HasColumnType("date");
+
         modelBuilder.Entity<PurchaseBillHeader>()
             .Property(pb => pb.GRNHeaderId)
             .HasColumnName("grn_header_id");

@@ -41,6 +41,19 @@ public class ApproveStockTakeCommandHandler : IRequestHandler<ApproveStockTakeCo
             {
                 if (item.VarianceQuantity == 0) continue;
 
+                // Fetch actual cost price for audit-compliant valuation
+                decimal cost = 0;
+                if (item.BatchId.HasValue)
+                {
+                    var batch = await _context.ProductBatches.FindAsync(new object[] { item.BatchId.Value }, cancellationToken);
+                    cost = batch?.CostPrice ?? 0;
+                }
+                if (cost == 0)
+                {
+                    var product = await _context.Products.FindAsync(new object[] { item.ProductId }, cancellationToken);
+                    cost = product?.PurchasePrice ?? (product != null ? product.SellingPrice * 0.7m : 0);
+                }
+
                 // Create Auto-Adjustment for variance
                 await _stockLedgerService.RecordMovementAsync(
                     storeId: take.StoreId ?? Guid.Empty,
@@ -51,7 +64,7 @@ public class ApproveStockTakeCommandHandler : IRequestHandler<ApproveStockTakeCo
                     batchId: item.BatchId,
                     movementType: "ADJ", // Automated variance correction
                     quantity: item.VarianceQuantity, // Will be negative if missing stock
-                    unitCost: 0, // Should be fetched from product/batch in real app
+                    unitCost: cost,
                     expiryDate: null,
                     referenceDocId: take.Id,
                     referenceNumber: $"TAKE-VAR-{take.TakeNumber}",

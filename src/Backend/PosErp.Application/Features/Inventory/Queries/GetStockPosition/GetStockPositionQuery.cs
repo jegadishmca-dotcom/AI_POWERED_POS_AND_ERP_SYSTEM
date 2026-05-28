@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using System;
@@ -11,15 +11,16 @@ namespace PosErp.Application.Features.Inventory.Queries.GetStockPosition;
 
 public record GetStockPositionQuery(Guid? StoreId, Guid? CategoryId, string? SearchTerm) : IRequest<List<StockPositionDto>>;
 
-public record StockPositionDto(
-    Guid ProductId,
-    string ProductCode,
-    string ProductName,
-    string CategoryName,
-    decimal CurrentStock,
-    decimal LastUnitCost,
-    decimal TotalValue
-);
+public class StockPositionDto
+{
+    public Guid ProductId { get; set; }
+    public string ProductCode { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
+    public string CategoryName { get; set; } = string.Empty;
+    public decimal CurrentStock { get; set; }
+    public decimal LastUnitCost { get; set; }
+    public decimal TotalValue { get; set; }
+}
 
 public class GetStockPositionQueryHandler : IRequestHandler<GetStockPositionQuery, List<StockPositionDto>>
 {
@@ -32,27 +33,26 @@ public class GetStockPositionQueryHandler : IRequestHandler<GetStockPositionQuer
 
     public async Task<List<StockPositionDto>> Handle(GetStockPositionQuery request, CancellationToken cancellationToken)
     {
-        // In a real implementation, we would query the mv_current_stock via Dapper or EF Core Raw SQL
-        // since EF Core doesn't natively map materialized views without a defined entity.
-        // For scaffold purposes, we simulate the query structure.
+        var db = (DbContext)_context;
 
-        var sql = @"
+        var searchToken = string.IsNullOrEmpty(request.SearchTerm) ? null : request.SearchTerm;
+
+        var result = await db.Database.SqlQuery<StockPositionDto>(@$"
             SELECT 
-                p.id as ProductId,
-                p.product_code as ProductCode,
-                p.name as ProductName,
-                c.name as CategoryName,
-                COALESCE(mv.current_stock, 0) as CurrentStock,
-                COALESCE(mv.last_unit_cost, 0) as LastUnitCost
+                p.id as ""ProductId"",
+                p.product_code as ""ProductCode"",
+                p.name as ""ProductName"",
+                COALESCE(c.name, 'General') as ""CategoryName"",
+                COALESCE(mv.current_stock, 0) as ""CurrentStock"",
+                COALESCE(mv.last_unit_cost, 0) as ""LastUnitCost"",
+                (COALESCE(mv.current_stock, 0) * COALESCE(mv.last_unit_cost, 0)) as ""TotalValue""
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
-            LEFT JOIN mv_current_stock mv ON p.id = mv.product_id AND (mv.store_id = @p0 OR @p0 IS NULL)
-            WHERE (@p1 IS NULL OR p.category_id = @p1)
-              AND (@p2 IS NULL OR p.name ILIKE '%' || @p2 || '%' OR p.product_code ILIKE '%' || @p2 || '%')
-            ORDER BY p.name";
+            LEFT JOIN mv_current_stock mv ON p.id = mv.product_id AND (mv.store_id = {request.StoreId} OR {request.StoreId} IS NULL)
+            WHERE ({request.CategoryId} IS NULL OR p.category_id = {request.CategoryId})
+              AND ({searchToken} IS NULL OR p.name ILIKE '%' || {searchToken} || '%' OR p.product_code ILIKE '%' || {searchToken} || '%')
+            ORDER BY p.name").ToListAsync(cancellationToken);
 
-        // Execution logic omitted for scaffold...
-        
-        return new List<StockPositionDto>();
+        return result;
     }
 }

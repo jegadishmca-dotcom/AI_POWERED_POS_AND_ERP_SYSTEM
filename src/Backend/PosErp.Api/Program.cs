@@ -93,6 +93,9 @@ builder.Services.AddScoped<IFinancialPostingService, FinancialPostingService>();
 builder.Services.AddScoped<IFinancialReportingService, FinancialReportingService>();
 builder.Services.AddScoped<IEInvoiceService, EInvoiceService>();
 
+// Register Materialized View Periodic Refresher
+builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.StockPositionRefreshService>();
+
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

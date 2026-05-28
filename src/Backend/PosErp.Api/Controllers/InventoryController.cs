@@ -160,11 +160,12 @@ public class InventoryController : ControllerBase
     [AllowAnonymous]
     public async Task<IActionResult> GetDebugLogs()
     {
-        if (!System.IO.File.Exists("ef_sql.log"))
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ef_sql.log");
+        if (!System.IO.File.Exists(path))
         {
             return Ok("No logs found.");
         }
-        var logs = await System.IO.File.ReadAllTextAsync("ef_sql.log");
+        var logs = await System.IO.File.ReadAllTextAsync(path);
         return Content(logs, "text/plain");
     }
 
@@ -172,9 +173,10 @@ public class InventoryController : ControllerBase
     [AllowAnonymous]
     public IActionResult DeleteDebugLogs()
     {
-        if (System.IO.File.Exists("ef_sql.log"))
+        var path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "ef_sql.log");
+        if (System.IO.File.Exists(path))
         {
-            System.IO.File.Delete("ef_sql.log");
+            System.IO.File.Delete(path);
             return Ok("Logs deleted.");
         }
         return Ok("No logs existed.");

@@ -164,25 +164,45 @@ export const StockTakeForm = () => {
     }
   };
 
-  const handleEditDraft = (take: StockTake) => {
-    if (!take.items) return;
-    setEditingTakeId(take.id);
-    setScheduledDate(take.scheduledDate.substring(0, 10));
-    setFormItems(
-      take.items.map((i) => ({
-        productId: i.productId,
-        productName: i.productName,
-        batchId: i.batchId || '',
-        batchNumber: i.batchNumber || 'NO BATCH',
-        systemQuantity: i.systemQuantity,
-        physicalQuantity: i.physicalQuantity,
-        searchQuery: i.productName,
-        searchResults: [],
-        batches: i.batchId ? [{ id: i.batchId, batchNumber: i.batchNumber, currentStock: i.systemQuantity }] : [],
-      }))
-    );
-    setShowNewForm(true);
+  const handleEditDraft = async (take: StockTake) => {
+    try {
+      const details = await getStockTakeDetails(take.id);
+      if (!details || !details.items) {
+        alert('Could not retrieve items for this stock take draft.');
+        return;
+      }
+      setEditingTakeId(details.id);
+      setScheduledDate(details.scheduledDate.substring(0, 10));
+      
+      const loadedItems = await Promise.all(
+        details.items.map(async (i) => {
+          let batchesList: any[] = [];
+          try {
+            batchesList = await getProductBatches(i.productId);
+          } catch (err) {
+            console.error('Failed to fetch batches for product during draft edit', err);
+          }
+          return {
+            productId: i.productId,
+            productName: i.productName,
+            batchId: i.batchId || '',
+            batchNumber: i.batchNumber || 'NO BATCH',
+            systemQuantity: i.systemQuantity,
+            physicalQuantity: i.physicalQuantity,
+            searchQuery: i.productName,
+            searchResults: [],
+            batches: batchesList,
+          };
+        })
+      );
+      setFormItems(loadedItems);
+      setShowNewForm(true);
+    } catch (err) {
+      console.error('Failed to load draft details', err);
+      alert('Failed to load draft details for editing.');
+    }
   };
+
 
   const handleApprove = async (id: string) => {
     if (!window.confirm('Are you sure you want to approve this stock take? This will post adjustment entries to the Stock Ledger.')) return;

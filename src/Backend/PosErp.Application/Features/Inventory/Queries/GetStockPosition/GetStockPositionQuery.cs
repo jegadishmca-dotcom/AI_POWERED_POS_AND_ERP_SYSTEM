@@ -44,8 +44,8 @@ public class GetStockPositionQueryHandler : IRequestHandler<GetStockPositionQuer
                 p.name as ""ProductName"",
                 COALESCE(c.name, 'General') as ""CategoryName"",
                 COALESCE(mv.current_stock, 0) as ""CurrentStock"",
-                COALESCE(mv.last_unit_cost, 0) as ""LastUnitCost"",
-                (COALESCE(mv.current_stock, 0) * COALESCE(mv.last_unit_cost, 0)) as ""TotalValue""
+                COALESCE(mv.last_unit_cost, p.purchase_price, 0) as ""LastUnitCost"",
+                (COALESCE(mv.current_stock, 0) * COALESCE(mv.last_unit_cost, p.purchase_price, 0)) as ""TotalValue""
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
             LEFT JOIN mv_current_stock mv ON p.id = mv.product_id AND (mv.store_id = {request.StoreId} OR cast({request.StoreId} as uuid) IS NULL)

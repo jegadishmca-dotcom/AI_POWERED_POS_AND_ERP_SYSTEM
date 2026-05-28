@@ -1,7 +1,8 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -28,20 +29,27 @@ public class GetTodayDashboardQueryHandler : IRequestHandler<GetTodayDashboardQu
 
     public async Task<DashboardKpiDto> Handle(GetTodayDashboardQuery request, CancellationToken cancellationToken)
     {
-        // Using PostgreSQL Materialized Views for ultra-fast dashboard rendering
-        // In EF Core, these MVs are mapped as Keyless Entity Types or queried via FromSqlRaw
-        
         var today = DateTime.UtcNow.Date;
         var yesterday = today.AddDays(-1);
 
-        // Using FromSqlRaw to directly hit the MV
-        string sql = "SELECT SUM(net_sales) as Sales, SUM(total_invoices) as Orders FROM mv_daily_sales_summary WHERE business_date = {0}";
-        // In a real implementation, we would map the result to a DTO. Here we mock the result to represent the query execution.
-        
-        decimal todaySales = 124500.50m; // Mocked result from MV
-        int todayOrders = 342;
-        
-        decimal yesterdaySales = 110000.00m; // Mocked result from MV
+        // Fetch today's sales and order count from real invoices
+        var todayStats = await _context.Invoices
+            .Where(i => i.BusinessDate == today && i.Status == "COMPLETED")
+            .GroupBy(i => 1)
+            .Select(g => new {
+                Sales = g.Sum(i => i.TotalAmount),
+                Orders = g.Count()
+            })
+            .FirstOrDefaultAsync(cancellationToken);
+
+        // Fetch yesterday's sales to calculate growth
+        var yesterdaySales = await _context.Invoices
+            .Where(i => i.BusinessDate == yesterday && i.Status == "COMPLETED")
+            .Select(i => i.TotalAmount)
+            .SumAsync(cancellationToken);
+
+        decimal todaySales = todayStats?.Sales ?? 0m;
+        int todayOrders = todayStats?.Orders ?? 0;
 
         return new DashboardKpiDto
         {

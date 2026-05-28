@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using System;
@@ -34,15 +34,14 @@ public class GetTopProductsQueryHandler : IRequestHandler<GetTopProductsQuery, L
         var fromDate = DateTime.UtcNow.Date.AddDays(-request.Days);
 
         return await _context.InvoiceItems
-            .Include(ii => ii.Product)
             .Where(ii => ii.Invoice.BusinessDate >= fromDate && ii.Invoice.Status == "COMPLETED")
-            .GroupBy(ii => new { ii.ProductId, ii.Product.Name })
+            .GroupBy(ii => new { ii.ProductId, ii.ProductName })
             .Select(g => new TopProductDto
             {
                 ProductId = g.Key.ProductId,
-                ProductName = g.Key.Name,
+                ProductName = g.Key.ProductName,
                 TotalQuantitySold = g.Sum(x => x.Quantity),
-                TotalRevenue = g.Sum(x => x.FinalTotal)
+                TotalRevenue = g.Sum(x => x.TotalAmount)
             })
             .OrderByDescending(x => x.TotalRevenue)
             .Take(10)

@@ -162,6 +162,13 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .Property(s => s.ScheduledDate)
             .HasColumnType("date");
 
+        modelBuilder.Entity<PosErp.Domain.Entities.Inventory.StockTakeHeader>()
+            .HasMany(t => t.Items)
+            .WithOne(i => i.StockTakeHeader)
+            .HasForeignKey(i => i.StockTakeHeaderId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+
         modelBuilder.Entity<PurchaseBillHeader>()
             .Property(pb => pb.GRNHeaderId)
             .HasColumnName("grn_header_id");

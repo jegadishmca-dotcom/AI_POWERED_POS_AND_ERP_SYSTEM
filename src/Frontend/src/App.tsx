@@ -13,12 +13,14 @@ import {
   LogOut, 
   User as UserIcon, 
   Terminal,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  BarChart3
 } from 'lucide-react';
 import { useAuthStore } from './features/auth/store/auth.store';
 import { Login } from './features/auth/routes/Login';
 import { ProtectedRoute } from './features/auth/components/ProtectedRoute';
 import { Dashboard } from './features/analytics/components/Dashboard';
+import { ReportsHub } from './features/analytics/components/ReportsHub';
 import { PosTerminal } from './features/pos/components/PosTerminal';
 import { Products } from './features/catalog/routes/Products';
 import { GrnForm } from './features/inventory/components/GrnForm';
@@ -44,6 +46,7 @@ const AppLayout: React.FC = () => {
 
   const navItems = [
     { path: '/dashboard', name: 'Dashboard', icon: LayoutDashboard, roles: ['Owner', 'Manager'] },
+    { path: '/reports', name: 'Reports & Insights', icon: BarChart3, roles: ['Owner', 'Manager'] },
     { path: '/pos', name: 'POS Billing', icon: ShoppingCart, roles: ['Owner', 'Manager', 'Cashier'] },
     { path: '/shift-report', name: 'Shift & Sales Report', icon: ClipboardCheck, roles: ['Cashier'] },
     { path: '/products', name: 'Product Catalog', icon: Package, roles: ['Owner', 'Manager'] },
@@ -147,6 +150,9 @@ const AppLayout: React.FC = () => {
           <Routes>
             <Route path="/dashboard" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <Dashboard />
+            } />
+            <Route path="/reports" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <ReportsHub />
             } />
             <Route path="/pos" element={<PosTerminal />} />
             <Route path="/shift-report" element={<ShiftReport />} />

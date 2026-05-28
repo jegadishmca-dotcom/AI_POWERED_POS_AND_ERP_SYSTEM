@@ -48,9 +48,9 @@ public class GetStockPositionQueryHandler : IRequestHandler<GetStockPositionQuer
                 (COALESCE(mv.current_stock, 0) * COALESCE(mv.last_unit_cost, 0)) as ""TotalValue""
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
-            LEFT JOIN mv_current_stock mv ON p.id = mv.product_id AND (mv.store_id = {request.StoreId} OR {request.StoreId} IS NULL)
-            WHERE ({request.CategoryId} IS NULL OR p.category_id = {request.CategoryId})
-              AND ({searchToken} IS NULL OR p.name ILIKE '%' || {searchToken} || '%' OR p.product_code ILIKE '%' || {searchToken} || '%')
+            LEFT JOIN mv_current_stock mv ON p.id = mv.product_id AND (mv.store_id = {request.StoreId} OR cast({request.StoreId} as uuid) IS NULL)
+            WHERE (cast({request.CategoryId} as uuid) IS NULL OR p.category_id = {request.CategoryId})
+              AND (cast({searchToken} as text) IS NULL OR p.name ILIKE '%' || {searchToken} || '%' OR p.product_code ILIKE '%' || {searchToken} || '%')
             ORDER BY p.name").ToListAsync(cancellationToken);
 
         return result;

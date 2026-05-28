@@ -106,21 +106,32 @@ public class GetInventoryInsightsQueryHandler : IRequestHandler<GetInventoryInsi
             .ToList();
 
         // Get expired and near expiry batches (expiry <= 30 days)
-        var nearExpiryBatches = await _context.ProductBatches
+        var nearExpiryBatchesDb = await _context.ProductBatches
             .Include(b => b.Product)
             .Where(b => b.ExpiryDate != null && b.ExpiryDate <= thirtyDaysFromNow && b.IsActive)
-            .Select(b => new NearExpiryBatchDto
+            .Select(b => new 
             {
                 BatchId = b.Id,
                 ProductCode = b.Product.ProductCode,
                 ProductName = b.Product.Name,
                 BatchNumber = b.BatchNumber,
-                ExpiryDate = b.ExpiryDate,
-                DaysRemaining = b.ExpiryDate.HasValue ? (b.ExpiryDate.Value.Date - today).Days : 0
+                ExpiryDate = b.ExpiryDate
             })
             .OrderBy(b => b.ExpiryDate)
             .Take(15) // Limit to top 15 expiring batches
             .ToListAsync(cancellationToken);
+
+        var nearExpiryBatches = nearExpiryBatchesDb
+            .Select(b => new NearExpiryBatchDto
+            {
+                BatchId = b.BatchId,
+                ProductCode = b.ProductCode,
+                ProductName = b.ProductName,
+                BatchNumber = b.BatchNumber,
+                ExpiryDate = b.ExpiryDate,
+                DaysRemaining = b.ExpiryDate.HasValue ? (b.ExpiryDate.Value.Date - today).Days : 0
+            })
+            .ToList();
 
         return new InventoryInsightsDto
         {

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { TrendingUp, ShoppingBag, Users, DollarSign, Download } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getDashboardKpis, getSalesTrend, getTopProducts } from '../api/analytics.api';
+import { api } from '../../../utils/api';
 
 export const Dashboard = () => {
   const [kpis, setKpis] = useState({ sales: 0, orders: 0, avg: 0, growth: 0 });
@@ -55,8 +56,24 @@ export const Dashboard = () => {
     fetchDashboardData();
   }, []);
 
-  const handleExport = (type: 'pdf' | 'excel') => {
-    alert(`Downloading ${type} report from /api/analytics/export/${type}`);
+  const handleExport = async (type: 'pdf' | 'excel') => {
+    try {
+      const response = await api.get(`/api/analytics/export/${type}`, { responseType: 'blob' });
+      const blob = new Blob([response.data], { 
+        type: type === 'pdf' 
+          ? 'application/pdf' 
+          : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.setAttribute('download', type === 'pdf' ? 'DailySalesReport.pdf' : 'SalesAnalytics.xlsx');
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error(`Failed to export ${type} report:`, err);
+      alert(`Failed to export ${type} report. Please check your permissions and try again.`);
+    }
   };
 
   if (loading) {

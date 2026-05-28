@@ -1,12 +1,21 @@
 import axios from 'axios';
 import { useAuthStore } from '../features/auth/store/auth.store';
 
+const getServerUrl = () => {
+  const savedIp = localStorage.getItem('pos_server_ip');
+  if (savedIp) {
+    return savedIp.startsWith('http') ? savedIp : `http://${savedIp}`;
+  }
+  return import.meta.env.VITE_API_URL || '';
+};
+
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '',
+  baseURL: getServerUrl(),
   withCredentials: true, // Important for HttpOnly cookies
 });
 
 api.interceptors.request.use((config) => {
+  config.baseURL = getServerUrl();
   const token = useAuthStore.getState().accessToken;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;

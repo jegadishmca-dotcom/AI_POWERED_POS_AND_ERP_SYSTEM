@@ -17,6 +17,7 @@ public interface IApplicationDbContext
     DbSet<User> Users { get; }
     DbSet<RefreshToken> RefreshTokens { get; }
     DbSet<Role> Roles { get; }
+    DbSet<Terminal> Terminals { get; }
     
     DbSet<Product> Products { get; }
     DbSet<ProductVariant> ProductVariants { get; }

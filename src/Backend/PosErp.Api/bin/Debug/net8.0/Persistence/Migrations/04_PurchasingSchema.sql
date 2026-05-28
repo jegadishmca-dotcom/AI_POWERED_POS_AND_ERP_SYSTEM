@@ -55,6 +55,7 @@ CREATE TABLE IF NOT EXISTS grn_items (
     received_quantity DECIMAL(18,4) NOT NULL,
     accepted_quantity DECIMAL(18,4) NOT NULL,
     rejected_quantity DECIMAL(18,4) NOT NULL,
+    rejection_reason VARCHAR(500),
     unit_cost DECIMAL(18,4) NOT NULL,
     total_cost DECIMAL(18,4) NOT NULL
 );

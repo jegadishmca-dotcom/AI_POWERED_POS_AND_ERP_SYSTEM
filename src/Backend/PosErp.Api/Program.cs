@@ -302,6 +302,32 @@ using (var scope = app.Services.CreateScope())
             context.Roles.Add(cashierRole);
             await context.SaveChangesAsync();
         }
+
+        var supervisorRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Supervisor");
+        if (supervisorRole == null)
+        {
+            supervisorRole = new PosErp.Domain.Entities.Auth.Role
+            {
+                Id = Guid.Parse("00000000-0000-0000-0000-000000000003"),
+                Name = "Supervisor",
+                Description = "POS Shift Supervisor / Override Manager"
+            };
+            context.Roles.Add(supervisorRole);
+            await context.SaveChangesAsync();
+        }
+
+        var managerRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Manager");
+        if (managerRole == null)
+        {
+            managerRole = new PosErp.Domain.Entities.Auth.Role
+            {
+                Id = Guid.Parse("00000000-0000-0000-0000-000000000004"),
+                Name = "Manager",
+                Description = "Store Operations Manager"
+            };
+            context.Roles.Add(managerRole);
+            await context.SaveChangesAsync();
+        }
         
         var passwordHasher = services.GetRequiredService<IPasswordHasher>();
         bool usersChanged = false;

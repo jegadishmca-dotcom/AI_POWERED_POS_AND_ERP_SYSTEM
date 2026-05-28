@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
@@ -31,7 +31,7 @@ public class EscPosPrintService : IPrintService
             await stream.WriteAsync(initCommand, 0, initCommand.Length);
 
             // Write receipt text
-            byte[] textBytes = Encoding.ASCII.GetBytes(textContent);
+            byte[] textBytes = Encoding.UTF8.GetBytes(textContent);
             await stream.WriteAsync(textBytes, 0, textBytes.Length);
 
             // Feed and cut paper: GS V 0

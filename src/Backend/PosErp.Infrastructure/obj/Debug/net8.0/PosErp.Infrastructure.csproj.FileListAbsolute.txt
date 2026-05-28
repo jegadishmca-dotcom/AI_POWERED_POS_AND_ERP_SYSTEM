@@ -51,3 +51,4 @@ D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Back
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Infrastructure\bin\Debug\net8.0\Persistence\Migrations\13_AnalyticsViewsSchema.sql
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Infrastructure\bin\Debug\net8.0\Persistence\Migrations\14_AuditLogsSchema.sql
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Infrastructure\bin\Debug\net8.0\Persistence\Migrations\15_PosSessionSchema.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Infrastructure\bin\Debug\net8.0\Persistence\Migrations\16_TerminalSchema.sql

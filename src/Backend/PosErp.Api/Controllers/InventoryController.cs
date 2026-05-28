@@ -155,4 +155,28 @@ public class InventoryController : ControllerBase
         var result = await _mediator.Send(new RejectStockTakeCommand(id, null));
         return Ok(result);
     }
+
+    [HttpGet("debug-logs")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetDebugLogs()
+    {
+        if (!System.IO.File.Exists("ef_sql.log"))
+        {
+            return Ok("No logs found.");
+        }
+        var logs = await System.IO.File.ReadAllTextAsync("ef_sql.log");
+        return Content(logs, "text/plain");
+    }
+
+    [HttpDelete("debug-logs")]
+    [AllowAnonymous]
+    public IActionResult DeleteDebugLogs()
+    {
+        if (System.IO.File.Exists("ef_sql.log"))
+        {
+            System.IO.File.Delete("ef_sql.log");
+            return Ok("Logs deleted.");
+        }
+        return Ok("No logs existed.");
+    }
 }

@@ -64,17 +64,37 @@ public class InventoryController : ControllerBase
     }
 
     [HttpGet("stock-position")]
-    public async Task<IActionResult> GetStockPosition([FromQuery] Guid? storeId, [FromQuery] Guid? categoryId, [FromQuery] string? searchToken)
+    public async Task<IActionResult> GetStockPosition(
+        [FromQuery] Guid? storeId, 
+        [FromQuery] Guid? categoryId, 
+        [FromQuery] string? searchToken,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
     {
-        var result = await _mediator.Send(new GetStockPositionQuery(storeId, categoryId, searchToken));
+        var result = await _mediator.Send(new GetStockPositionQuery(storeId, categoryId, searchToken, page, pageSize));
         return Ok(result);
     }
 
     [HttpGet("ledger")]
-    public async Task<IActionResult> GetStockLedger([FromQuery] Guid? storeId, [FromQuery] string? searchToken, [FromQuery] string? movementType)
+    public async Task<IActionResult> GetStockLedger(
+        [FromQuery] Guid? storeId, 
+        [FromQuery] string? searchToken, 
+        [FromQuery] string? movementType,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 50)
     {
-        var result = await _mediator.Send(new PosErp.Application.Features.Inventory.Queries.GetStockLedger.GetStockLedgerQuery(storeId, searchToken, movementType));
+        var result = await _mediator.Send(new PosErp.Application.Features.Inventory.Queries.GetStockLedger.GetStockLedgerQuery(storeId, searchToken, movementType, page, pageSize));
         return Ok(result);
+    }
+
+    [HttpGet("categories")]
+    public async Task<IActionResult> GetCategories([FromServices] IApplicationDbContext dbContext)
+    {
+        var categories = await dbContext.Categories
+            .OrderBy(c => c.Name)
+            .Select(c => new { c.Id, c.Name })
+            .ToListAsync();
+        return Ok(categories);
     }
 
     [HttpGet("batches")]

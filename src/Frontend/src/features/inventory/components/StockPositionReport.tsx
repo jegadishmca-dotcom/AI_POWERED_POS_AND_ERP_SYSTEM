@@ -1,22 +1,31 @@
 import React, { useState, useEffect } from 'react';
 import { Layers, Download, Search, RefreshCw } from 'lucide-react';
-import { getStockPositions, StockPosition } from '../api/stockTake.api';
+import { getStockPositions, getCategories, StockPosition } from '../api/stockTake.api';
 
 export const StockPositionReport = () => {
   const [stockData, setStockData] = useState<StockPosition[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [totalValue, setTotalValue] = useState(0);
 
-  const fetchPositions = async () => {
+  const fetchPositions = async (targetPage: number, term = searchTerm, catId = selectedCategory) => {
     try {
       setLoading(true);
-      const data = await getStockPositions({
+      const response = await getStockPositions({
         storeId: null,
-        categoryId: null,
-        searchTerm: searchTerm.trim() || null
+        categoryId: catId || null,
+        searchTerm: term.trim() || null,
+        page: targetPage,
+        pageSize: 50
       });
-      setStockData(data);
+      setStockData(response.items);
+      setTotalCount(response.totalCount);
+      setTotalValue(response.totalValue);
+      setPage(targetPage);
     } catch (error) {
       console.error('Failed to load stock positions', error);
     } finally {
@@ -25,36 +34,43 @@ export const StockPositionReport = () => {
   };
 
   useEffect(() => {
+    const loadCategories = async () => {
+      try {
+        const cats = await getCategories();
+        setCategories(cats);
+      } catch (err) {
+        console.error('Failed to load categories', err);
+      }
+    };
+    loadCategories();
+  }, []);
+
+  useEffect(() => {
     // Fetch on mount and debounce search
     const delayDebounceFn = setTimeout(() => {
-      fetchPositions();
+      fetchPositions(1, searchTerm, selectedCategory);
     }, 300);
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchTerm]);
+  }, [searchTerm, selectedCategory]);
 
-  // Extract distinct categories from the loaded stock data to populate filter dropdown dynamically
-  const categories = Array.from(new Set(stockData.map(item => item.categoryName))).filter(Boolean);
-
-  // Filter stock data by category client-side
-  const filteredData = stockData.filter(item => {
-    if (!selectedCategory) return true;
-    return item.categoryName === selectedCategory;
-  });
-
-  const totalInventoryValue = filteredData.reduce((sum, item) => sum + item.totalValue, 0);
+  const handleReset = () => {
+    setSearchTerm('');
+    setSelectedCategory('');
+    fetchPositions(1, '', '');
+  };
 
   const handleExportCSV = () => {
-    if (filteredData.length === 0) {
+    if (stockData.length === 0) {
       alert('No data to export.');
       return;
     }
 
     const headers = ['Product Code', 'Product Name', 'Category', 'Current Stock', 'Last Unit Cost (₹)', 'Total Value (₹)'];
-    const rows = filteredData.map(item => [
+    const rows = stockData.map(item => [
       item.productCode,
       `"${item.productName.replace(/"/g, '""')}"`,
-      item.categoryName,
+      item.categoryName || 'General',
       item.currentStock,
       item.lastUnitCost.toFixed(2),
       item.totalValue.toFixed(2)
@@ -85,7 +101,7 @@ export const StockPositionReport = () => {
         </div>
         <div className="flex gap-2">
           <button 
-            onClick={fetchPositions}
+            onClick={() => fetchPositions(page)}
             disabled={loading}
             className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg border flex items-center transition"
             title="Refresh positions"
@@ -119,10 +135,17 @@ export const StockPositionReport = () => {
           onChange={(e) => setSelectedCategory(e.target.value)}
         >
           <option value="">All Categories</option>
-          {categories.map((cat, idx) => (
-            <option key={idx} value={cat}>{cat}</option>
+          {categories.map((cat) => (
+            <option key={cat.id} value={cat.id}>{cat.name}</option>
           ))}
         </select>
+        <button 
+          onClick={handleReset}
+          disabled={loading}
+          className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 border rounded-lg transition font-semibold text-sm"
+        >
+          Clear / Reset
+        </button>
       </div>
 
       {/* Positions Table */}
@@ -146,14 +169,14 @@ export const StockPositionReport = () => {
                   Loading inventory position reports...
                 </td>
               </tr>
-            ) : filteredData.length === 0 ? (
+            ) : stockData.length === 0 ? (
               <tr>
                 <td colSpan={6} className="p-8 text-center text-slate-400 font-bold text-sm">
                   No stock items match the current filters.
                 </td>
               </tr>
             ) : (
-              filteredData.map((item) => (
+              stockData.map((item) => (
                 <tr key={item.productId} className="border-b hover:bg-slate-50/50 transition">
                   <td className="p-4 text-xs font-mono text-slate-500">{item.productCode}</td>
                   <td className="p-4 font-bold text-slate-800">{item.productName}</td>
@@ -174,11 +197,35 @@ export const StockPositionReport = () => {
           <tfoot className="bg-slate-50/50 font-bold text-slate-700">
             <tr>
               <td colSpan={5} className="p-4 text-right text-sm">Total Inventory Valuation:</td>
-              <td className="p-4 text-right text-indigo-700 text-lg font-black">₹{totalInventoryValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td className="p-4 text-right text-indigo-700 text-lg font-black">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             </tr>
           </tfoot>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      <div className="flex justify-between items-center mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div className="text-sm text-slate-500 font-semibold">
+          Showing {totalCount > 0 ? (page - 1) * 50 + 1 : 0} to {Math.min(page * 50, totalCount)} of {totalCount} entries
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => fetchPositions(page - 1)}
+            disabled={page <= 1 || loading}
+            className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition"
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => fetchPositions(page + 1)}
+            disabled={page * 50 >= totalCount || loading}
+            className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
     </div>
   );
 };

@@ -21,19 +21,23 @@ export const StockLedgerView = () => {
   const [loading, setLoading] = useState(false);
   const [previewDoc, setPreviewDoc] = useState<{ id: string; type: string } | null>(null);
   
-  // Filters
+  // Filters & Pagination
   const [searchTerm, setSearchTerm] = useState('');
   const [movementType, setMovementType] = useState('');
+  const [page, setPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
 
-  const fetchLedger = async () => {
+  const fetchLedger = async (targetPage: number, term = searchTerm, moveType = movementType) => {
     try {
       setLoading(true);
-      let url = '/api/inventory/ledger?';
-      if (searchTerm) url += `searchToken=${encodeURIComponent(searchTerm)}&`;
-      if (movementType) url += `movementType=${encodeURIComponent(movementType)}&`;
+      let url = `/api/inventory/ledger?page=${targetPage}&pageSize=50&`;
+      if (term) url += `searchToken=${encodeURIComponent(term)}&`;
+      if (moveType) url += `movementType=${encodeURIComponent(moveType)}&`;
       
       const response = await api.get(url);
-      setLedgerEntries(response.data);
+      setLedgerEntries(response.data.items);
+      setTotalCount(response.data.totalCount);
+      setPage(targetPage);
     } catch (error) {
       console.error('Failed to fetch stock ledger', error);
     } finally {
@@ -41,8 +45,14 @@ export const StockLedgerView = () => {
     }
   };
 
+  const handleReset = () => {
+    setSearchTerm('');
+    setMovementType('');
+    fetchLedger(1, '', '');
+  };
+
   useEffect(() => {
-    fetchLedger();
+    fetchLedger(1);
   }, []); // Initial load
 
   return (
@@ -52,7 +62,7 @@ export const StockLedgerView = () => {
           <History className="mr-3 text-blue-600" /> Immutable Stock Ledger
         </h2>
         <button 
-          onClick={fetchLedger}
+          onClick={() => fetchLedger(page)}
           className="text-gray-500 hover:text-blue-600"
           title="Refresh Ledger"
         >
@@ -64,15 +74,18 @@ export const StockLedgerView = () => {
         <input 
           type="text" 
           placeholder="Search Product or Ref..." 
-          className="p-2 border rounded w-1/3 outline-none focus:ring-2 focus:ring-blue-500" 
+          className="p-2 border rounded w-1/3 outline-none focus:ring-2 focus:ring-blue-500 font-semibold" 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && fetchLedger()}
+          onKeyDown={(e) => e.key === 'Enter' && fetchLedger(1)}
         />
         <select 
-          className="p-2 border rounded w-1/4 outline-none focus:ring-2 focus:ring-blue-500"
+          className="p-2 border rounded w-1/4 outline-none focus:ring-2 focus:ring-blue-500 font-semibold text-slate-700"
           value={movementType}
-          onChange={(e) => setMovementType(e.target.value)}
+          onChange={(e) => {
+            setMovementType(e.target.value);
+            fetchLedger(1, searchTerm, e.target.value);
+          }}
         >
           <option value="">All Movement Types</option>
           <option value="GRN">Goods Receipt (GRN)</option>
@@ -80,11 +93,18 @@ export const StockLedgerView = () => {
           <option value="ADJ">Adjustments</option>
         </select>
         <button 
-          onClick={fetchLedger}
+          onClick={() => fetchLedger(1)}
           disabled={loading}
-          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition"
+          className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 transition font-bold"
         >
           Filter Ledger
+        </button>
+        <button 
+          onClick={handleReset}
+          disabled={loading}
+          className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 border rounded transition font-bold"
+        >
+          Clear / Reset
         </button>
       </div>
 
@@ -138,6 +158,30 @@ export const StockLedgerView = () => {
           </tbody>
         </table>
       </div>
+
+      {/* Pagination Controls */}
+      <div className="flex justify-between items-center mt-6 bg-slate-50 p-4 rounded-xl border border-slate-200">
+        <div className="text-sm text-slate-500 font-semibold">
+          Showing {totalCount > 0 ? (page - 1) * 50 + 1 : 0} to {Math.min(page * 50, totalCount)} of {totalCount} entries
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => fetchLedger(page - 1)}
+            disabled={page <= 1 || loading}
+            className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition"
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => fetchLedger(page + 1)}
+            disabled={page * 50 >= totalCount || loading}
+            className="px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+
       {previewDoc && (
         <DocumentPreviewModal 
           docId={previewDoc.id} 

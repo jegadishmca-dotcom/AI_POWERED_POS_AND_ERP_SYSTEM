@@ -9,7 +9,25 @@ using System.Threading.Tasks;
 
 namespace PosErp.Application.Features.Inventory.Queries.GetStockPosition;
 
-public record GetStockPositionQuery(Guid? StoreId, Guid? CategoryId, string? SearchTerm) : IRequest<List<StockPositionDto>>;
+public class StockPositionSummaryDto
+{
+    public int TotalCount { get; set; }
+    public decimal TotalValue { get; set; }
+}
+
+public record StockPositionListDto(
+    List<StockPositionDto> Items,
+    int TotalCount,
+    decimal TotalValue
+);
+
+public record GetStockPositionQuery(
+    Guid? StoreId,
+    Guid? CategoryId,
+    string? SearchTerm,
+    int Page = 1,
+    int PageSize = 50
+) : IRequest<StockPositionListDto>;
 
 public class StockPositionDto
 {
@@ -22,7 +40,7 @@ public class StockPositionDto
     public decimal TotalValue { get; set; }
 }
 
-public class GetStockPositionQueryHandler : IRequestHandler<GetStockPositionQuery, List<StockPositionDto>>
+public class GetStockPositionQueryHandler : IRequestHandler<GetStockPositionQuery, StockPositionListDto>
 {
     private readonly IApplicationDbContext _context;
 
@@ -31,13 +49,27 @@ public class GetStockPositionQueryHandler : IRequestHandler<GetStockPositionQuer
         _context = context;
     }
 
-    public async Task<List<StockPositionDto>> Handle(GetStockPositionQuery request, CancellationToken cancellationToken)
+    public async Task<StockPositionListDto> Handle(GetStockPositionQuery request, CancellationToken cancellationToken)
     {
         var db = (DbContext)_context;
 
         var searchToken = string.IsNullOrEmpty(request.SearchTerm) ? null : request.SearchTerm;
 
-        var result = await db.Database.SqlQuery<StockPositionDto>(@$"
+        // Get summary information (total count and total valuation)
+        var summary = await db.Database.SqlQuery<StockPositionSummaryDto>(@$"
+            SELECT 
+                CAST(COUNT(*) AS integer) as ""TotalCount"",
+                COALESCE(SUM(COALESCE(mv.current_stock, 0) * COALESCE(mv.last_unit_cost, p.purchase_price, 0)), 0)::numeric as ""TotalValue""
+            FROM products p
+            LEFT JOIN mv_current_stock mv ON p.id = mv.product_id AND (mv.store_id = {request.StoreId} OR cast({request.StoreId} as uuid) IS NULL)
+            WHERE (cast({request.CategoryId} as uuid) IS NULL OR p.category_id = {request.CategoryId})
+              AND (cast({searchToken} as text) IS NULL OR p.name ILIKE '%' || {searchToken} || '%' OR p.product_code ILIKE '%' || {searchToken} || '%')
+        ").FirstOrDefaultAsync(cancellationToken);
+
+        var offset = (request.Page - 1) * request.PageSize;
+        var limit = request.PageSize;
+
+        var items = await db.Database.SqlQuery<StockPositionDto>(@$"
             SELECT 
                 p.id as ""ProductId"",
                 p.product_code as ""ProductCode"",
@@ -51,8 +83,9 @@ public class GetStockPositionQueryHandler : IRequestHandler<GetStockPositionQuer
             LEFT JOIN mv_current_stock mv ON p.id = mv.product_id AND (mv.store_id = {request.StoreId} OR cast({request.StoreId} as uuid) IS NULL)
             WHERE (cast({request.CategoryId} as uuid) IS NULL OR p.category_id = {request.CategoryId})
               AND (cast({searchToken} as text) IS NULL OR p.name ILIKE '%' || {searchToken} || '%' OR p.product_code ILIKE '%' || {searchToken} || '%')
-            ORDER BY p.name").ToListAsync(cancellationToken);
+            ORDER BY p.name
+            LIMIT {limit} OFFSET {offset}").ToListAsync(cancellationToken);
 
-        return result;
+        return new StockPositionListDto(items, summary?.TotalCount ?? 0, summary?.TotalValue ?? 0);
     }
 }

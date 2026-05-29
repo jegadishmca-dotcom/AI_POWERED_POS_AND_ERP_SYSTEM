@@ -33,13 +33,38 @@ export interface StockTake {
   items?: StockTakeItem[];
 }
 
+export interface StockPositionResponse {
+  items: StockPosition[];
+  totalCount: number;
+  totalValue: number;
+}
+
+export interface CategoryDto {
+  id: string;
+  name: string;
+}
+
 // API Endpoints for Stock Position
 export const getStockPositions = async (params: {
   storeId?: string | null;
   categoryId?: string | null;
   searchTerm?: string | null;
-}): Promise<StockPosition[]> => {
-  const response = await api.get('/api/inventory/stock-position', { params });
+  page?: number;
+  pageSize?: number;
+}): Promise<StockPositionResponse> => {
+  const apiParams = {
+    storeId: params.storeId,
+    categoryId: params.categoryId,
+    searchToken: params.searchTerm,
+    page: params.page,
+    pageSize: params.pageSize
+  };
+  const response = await api.get('/api/inventory/stock-position', { params: apiParams });
+  return response.data;
+};
+
+export const getCategories = async (): Promise<CategoryDto[]> => {
+  const response = await api.get('/api/inventory/categories');
   return response.data;
 };
 

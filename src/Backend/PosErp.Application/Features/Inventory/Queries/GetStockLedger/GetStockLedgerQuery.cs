@@ -23,13 +23,20 @@ public record StockLedgerDto(
     Guid ReferenceDocumentId
 );
 
+public record StockLedgerListDto(
+    List<StockLedgerDto> Items,
+    int TotalCount
+);
+
 public record GetStockLedgerQuery(
     Guid? StoreId,
     string? SearchToken,
-    string? MovementType
-) : IRequest<List<StockLedgerDto>>;
+    string? MovementType,
+    int Page = 1,
+    int PageSize = 50
+) : IRequest<StockLedgerListDto>;
 
-public class GetStockLedgerQueryHandler : IRequestHandler<GetStockLedgerQuery, List<StockLedgerDto>>
+public class GetStockLedgerQueryHandler : IRequestHandler<GetStockLedgerQuery, StockLedgerListDto>
 {
     private readonly IApplicationDbContext _context;
 
@@ -38,7 +45,7 @@ public class GetStockLedgerQueryHandler : IRequestHandler<GetStockLedgerQuery, L
         _context = context;
     }
 
-    public async Task<List<StockLedgerDto>> Handle(GetStockLedgerQuery request, CancellationToken cancellationToken)
+    public async Task<StockLedgerListDto> Handle(GetStockLedgerQuery request, CancellationToken cancellationToken)
     {
         var query = from sl in _context.StockLedger
                     join p in _context.Products on sl.ProductId equals p.Id
@@ -60,12 +67,15 @@ public class GetStockLedgerQueryHandler : IRequestHandler<GetStockLedgerQuery, L
         {
             var search = request.SearchToken.ToLower();
             query = query.Where(x => x.p.Name.ToLower().Contains(search) 
-                                  || x.sl.ReferenceNumber.ToLower().Contains(search));
+                                   || x.sl.ReferenceNumber.ToLower().Contains(search));
         }
+
+        var totalCount = await query.CountAsync(cancellationToken);
 
         var results = await query
             .OrderByDescending(x => x.sl.CreatedAt)
-            .Take(100)
+            .Skip((request.Page - 1) * request.PageSize)
+            .Take(request.PageSize)
             .Select(x => new StockLedgerDto(
                 x.sl.Id,
                 x.sl.CreatedAt,
@@ -80,6 +90,6 @@ public class GetStockLedgerQueryHandler : IRequestHandler<GetStockLedgerQuery, L
             ))
             .ToListAsync(cancellationToken);
 
-        return results;
+        return new StockLedgerListDto(results, totalCount);
     }
 }

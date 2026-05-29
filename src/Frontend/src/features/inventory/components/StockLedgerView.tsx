@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { History, FileText, TrendingUp, TrendingDown, RefreshCw } from 'lucide-react';
 import { api } from '../../../utils/api';
+import { DocumentPreviewModal } from './DocumentPreviewModal';
 
 interface StockLedgerEntry {
   id: string;
@@ -12,11 +13,13 @@ interface StockLedgerEntry {
   runningBalance: number;
   batchNumber?: string | null;
   expiryDate?: string | null;
+  referenceDocumentId: string;
 }
 
 export const StockLedgerView = () => {
   const [ledgerEntries, setLedgerEntries] = useState<StockLedgerEntry[]>([]);
   const [loading, setLoading] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{ id: string; type: string } | null>(null);
   
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -119,7 +122,7 @@ export const StockLedgerView = () => {
                 </td>
                 <td 
                   className="p-3 text-sm text-blue-600 flex items-center cursor-pointer hover:underline"
-                  onClick={() => alert(`Document Preview for ${entry.referenceDocument} is coming in the next update!`)}
+                  onClick={() => setPreviewDoc({ id: entry.referenceDocumentId, type: entry.movementType })}
                 >
                   <FileText className="w-4 h-4 mr-1" /> {entry.referenceDocument}
                 </td>
@@ -135,6 +138,13 @@ export const StockLedgerView = () => {
           </tbody>
         </table>
       </div>
+      {previewDoc && (
+        <DocumentPreviewModal 
+          docId={previewDoc.id} 
+          docType={previewDoc.type} 
+          onClose={() => setPreviewDoc(null)} 
+        />
+      )}
     </div>
   );
 };

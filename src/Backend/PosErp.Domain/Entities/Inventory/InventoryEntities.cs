@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using PosErp.Domain.Entities.Catalog;
 
@@ -105,3 +105,19 @@ public class StockAdjustmentItem
     public decimal UnitCost { get; set; }
     public StockAdjustment StockAdjustment { get; set; } = null!;
 }
+
+public class PendingPriceApproval
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Barcode { get; set; } = string.Empty;
+    public string ProductName { get; set; } = string.Empty;
+    public decimal ExistingCostPrice { get; set; }
+    public decimal NewCostPrice { get; set; }
+    public decimal Quantity { get; set; }
+    public string InvoiceReference { get; set; } = string.Empty;
+    public string Status { get; set; } = "PENDING"; // PENDING, APPROVED, REJECTED
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? ActionedAt { get; set; }
+    public Guid? ActionedBy { get; set; }
+}
+

@@ -11,8 +11,7 @@ using System.IO;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
-using OfficeOpenXml;
-using OfficeOpenXml.Style;
+using ClosedXML.Excel;
 
 namespace PosErp.Api.Controllers;
 
@@ -98,104 +97,102 @@ public class AnalyticsController : ControllerBase
 
     private byte[] GenerateExcelReport(DashboardKpiDto kpi, List<SalesTrendDto> trends, List<TopProductDto> products)
     {
-        using (var package = new ExcelPackage())
+        using (var workbook = new XLWorkbook())
         {
             // 1. KPI & Overview sheet
-            var wsOverview = package.Workbook.Worksheets.Add("Overview");
+            var wsOverview = workbook.Worksheets.Add("Overview");
             
-            wsOverview.Cells["A1"].Value = "Apple Super Market - Daily Sales Report";
-            wsOverview.Cells["A1:D1"].Merge = true;
-            wsOverview.Cells["A1"].Style.Font.Size = 16;
-            wsOverview.Cells["A1"].Style.Font.Bold = true;
-            wsOverview.Cells["A1"].Style.HorizontalAlignment = ExcelHorizontalAlignment.Center;
+            wsOverview.Cell("A1").Value = "Apple Super Market - Daily Sales Report";
+            wsOverview.Range("A1:D1").Merge();
+            wsOverview.Cell("A1").Style.Font.FontSize = 16;
+            wsOverview.Cell("A1").Style.Font.Bold = true;
+            wsOverview.Cell("A1").Style.Alignment.Horizontal = XLAlignmentHorizontalValues.Center;
             
-            wsOverview.Cells["A3"].Value = "Report Date:";
-            wsOverview.Cells["B3"].Value = DateTime.Now.ToString("dd/MM/yyyy hh:mm tt");
-            wsOverview.Cells["A3"].Style.Font.Bold = true;
+            wsOverview.Cell("A3").Value = "Report Date:";
+            wsOverview.Cell("B3").Value = DateTime.Now.ToString("dd/MM/yyyy hh:mm tt");
+            wsOverview.Cell("A3").Style.Font.Bold = true;
 
             // KPI block
-            wsOverview.Cells["A5"].Value = "Metric";
-            wsOverview.Cells["B5"].Value = "Value";
-            wsOverview.Cells["A5:B5"].Style.Font.Bold = true;
-            wsOverview.Cells["A5:B5"].Style.Border.Bottom.Style = ExcelBorderStyle.Medium;
+            wsOverview.Cell("A5").Value = "Metric";
+            wsOverview.Cell("B5").Value = "Value";
+            wsOverview.Range("A5:B5").Style.Font.Bold = true;
+            wsOverview.Range("A5:B5").Style.Border.BottomBorder = XLBorderStyleValues.Medium;
             
-            wsOverview.Cells["A6"].Value = "Today's Net Sales";
-            wsOverview.Cells["B6"].Value = kpi.TodaySales;
-            wsOverview.Cells["B6"].Style.Numberformat.Format = "₹#,##0.00";
+            wsOverview.Cell("A6").Value = "Today's Net Sales";
+            wsOverview.Cell("B6").Value = kpi.TodaySales;
+            wsOverview.Cell("B6").Style.NumberFormat.Format = "₹#,##0.00";
             
-            wsOverview.Cells["A7"].Value = "Total Invoices";
-            wsOverview.Cells["B7"].Value = kpi.TodayOrders;
-            wsOverview.Cells["B7"].Style.Numberformat.Format = "#,##0";
+            wsOverview.Cell("A7").Value = "Total Invoices";
+            wsOverview.Cell("B7").Value = kpi.TodayOrders;
+            wsOverview.Cell("B7").Style.NumberFormat.Format = "#,##0";
             
-            wsOverview.Cells["A8"].Value = "Average Basket Value";
-            wsOverview.Cells["B8"].Value = kpi.AvgOrderValue;
-            wsOverview.Cells["B8"].Style.Numberformat.Format = "₹#,##0.00";
+            wsOverview.Cell("A8").Value = "Average Basket Value";
+            wsOverview.Cell("B8").Value = kpi.AvgOrderValue;
+            wsOverview.Cell("B8").Style.NumberFormat.Format = "₹#,##0.00";
 
-            wsOverview.Cells["A6:A8"].Style.Font.Bold = true;
-            wsOverview.Column(1).AutoFit();
-            wsOverview.Column(2).AutoFit();
+            wsOverview.Range("A6:A8").Style.Font.Bold = true;
+            wsOverview.Columns().AdjustToContents();
 
             // 2. Sales Trend sheet
-            var wsTrend = package.Workbook.Worksheets.Add("Sales Trend");
-            wsTrend.Cells["A1"].Value = "Date";
-            wsTrend.Cells["B1"].Value = "Gross Sales";
-            wsTrend.Cells["C1"].Value = "Net Sales";
-            wsTrend.Cells["D1"].Value = "Total Invoices";
-            wsTrend.Cells["A1:D1"].Style.Font.Bold = true;
-            wsTrend.Cells["A1:D1"].Style.Border.Bottom.Style = ExcelBorderStyle.Medium;
+            var wsTrend = workbook.Worksheets.Add("Sales Trend");
+            wsTrend.Cell("A1").Value = "Date";
+            wsTrend.Cell("B1").Value = "Gross Sales";
+            wsTrend.Cell("C1").Value = "Net Sales";
+            wsTrend.Cell("D1").Value = "Total Invoices";
+            wsTrend.Range("A1:D1").Style.Font.Bold = true;
+            wsTrend.Range("A1:D1").Style.Border.BottomBorder = XLBorderStyleValues.Medium;
 
             int rowIdx = 2;
             foreach (var trend in trends)
             {
-                wsTrend.Cells[rowIdx, 1].Value = trend.Date;
-                wsTrend.Cells[rowIdx, 2].Value = trend.GrossSales;
-                wsTrend.Cells[rowIdx, 3].Value = trend.NetSales;
-                wsTrend.Cells[rowIdx, 4].Value = trend.TotalInvoices;
+                wsTrend.Cell(rowIdx, 1).Value = trend.Date;
+                wsTrend.Cell(rowIdx, 2).Value = trend.GrossSales;
+                wsTrend.Cell(rowIdx, 3).Value = trend.NetSales;
+                wsTrend.Cell(rowIdx, 4).Value = trend.TotalInvoices;
                 
-                wsTrend.Cells[rowIdx, 2].Style.Numberformat.Format = "₹#,##0.00";
-                wsTrend.Cells[rowIdx, 3].Style.Numberformat.Format = "₹#,##0.00";
-                wsTrend.Cells[rowIdx, 4].Style.Numberformat.Format = "#,##0";
+                wsTrend.Cell(rowIdx, 2).Style.NumberFormat.Format = "₹#,##0.00";
+                wsTrend.Cell(rowIdx, 3).Style.NumberFormat.Format = "₹#,##0.00";
+                wsTrend.Cell(rowIdx, 4).Style.NumberFormat.Format = "#,##0";
                 rowIdx++;
             }
-            wsTrend.Cells[rowIdx, 1].Value = "Total";
-            wsTrend.Cells[rowIdx, 1].Style.Font.Bold = true;
-            wsTrend.Cells[rowIdx, 2].Formula = $"SUM(B2:B{rowIdx-1})";
-            wsTrend.Cells[rowIdx, 3].Formula = $"SUM(C2:C{rowIdx-1})";
-            wsTrend.Cells[rowIdx, 4].Formula = $"SUM(D2:D{rowIdx-1})";
-            wsTrend.Cells[rowIdx, 2, rowIdx, 4].Style.Font.Bold = true;
-            wsTrend.Cells[rowIdx, 2].Style.Numberformat.Format = "₹#,##0.00";
-            wsTrend.Cells[rowIdx, 3].Style.Numberformat.Format = "₹#,##0.00";
-            wsTrend.Cells[rowIdx, 4].Style.Numberformat.Format = "#,##0";
+            wsTrend.Cell(rowIdx, 1).Value = "Total";
+            wsTrend.Cell(rowIdx, 1).Style.Font.Bold = true;
+            wsTrend.Cell(rowIdx, 2).FormulaA1 = $"SUM(B2:B{rowIdx-1})";
+            wsTrend.Cell(rowIdx, 3).FormulaA1 = $"SUM(C2:C{rowIdx-1})";
+            wsTrend.Cell(rowIdx, 4).FormulaA1 = $"SUM(D2:D{rowIdx-1})";
+            wsTrend.Range(rowIdx, 2, rowIdx, 4).Style.Font.Bold = true;
+            wsTrend.Cell(rowIdx, 2).Style.NumberFormat.Format = "₹#,##0.00";
+            wsTrend.Cell(rowIdx, 3).Style.NumberFormat.Format = "₹#,##0.00";
+            wsTrend.Cell(rowIdx, 4).Style.NumberFormat.Format = "#,##0";
 
-            wsTrend.Column(1).AutoFit();
-            wsTrend.Column(2).AutoFit();
-            wsTrend.Column(3).AutoFit();
-            wsTrend.Column(4).AutoFit();
+            wsTrend.Columns().AdjustToContents();
 
             // 3. Top Products sheet
-            var wsProducts = package.Workbook.Worksheets.Add("Top Products");
-            wsProducts.Cells["A1"].Value = "Product Name";
-            wsProducts.Cells["B1"].Value = "Quantity Sold";
-            wsProducts.Cells["C1"].Value = "Total Revenue";
-            wsProducts.Cells["A1:C1"].Style.Font.Bold = true;
-            wsProducts.Cells["A1:C1"].Style.Border.Bottom.Style = ExcelBorderStyle.Medium;
+            var wsProducts = workbook.Worksheets.Add("Top Products");
+            wsProducts.Cell("A1").Value = "Product Name";
+            wsProducts.Cell("B1").Value = "Quantity Sold";
+            wsProducts.Cell("C1").Value = "Total Revenue";
+            wsProducts.Cell("A1:C1").Style.Font.Bold = true;
+            wsProducts.Cell("A1:C1").Style.Border.BottomBorder = XLBorderStyleValues.Medium;
 
             rowIdx = 2;
             foreach (var prod in products)
             {
-                wsProducts.Cells[rowIdx, 1].Value = prod.ProductName;
-                wsProducts.Cells[rowIdx, 2].Value = prod.TotalQuantitySold;
-                wsProducts.Cells[rowIdx, 3].Value = prod.TotalRevenue;
+                wsProducts.Cell(rowIdx, 1).Value = prod.ProductName;
+                wsProducts.Cell(rowIdx, 2).Value = prod.TotalQuantitySold;
+                wsProducts.Cell(rowIdx, 3).Value = prod.TotalRevenue;
                 
-                wsProducts.Cells[rowIdx, 2].Style.Numberformat.Format = "#,##0.00";
-                wsProducts.Cells[rowIdx, 3].Style.Numberformat.Format = "₹#,##0.00";
+                wsProducts.Cell(rowIdx, 2).Style.NumberFormat.Format = "#,##0.00";
+                wsProducts.Cell(rowIdx, 3).Style.NumberFormat.Format = "₹#,##0.00";
                 rowIdx++;
             }
-            wsProducts.Column(1).AutoFit();
-            wsProducts.Column(2).AutoFit();
-            wsProducts.Column(3).AutoFit();
+            wsProducts.Columns().AdjustToContents();
 
-            return package.GetAsByteArray();
+            using (var stream = new MemoryStream())
+            {
+                workbook.SaveAs(stream);
+                return stream.ToArray();
+            }
         }
     }
 }

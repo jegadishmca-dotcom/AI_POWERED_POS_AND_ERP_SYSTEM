@@ -25,6 +25,86 @@ public class PosController : ControllerBase
         _context = context;
     }
 
+    [HttpGet("invoice/{id}")]
+    public async Task<IActionResult> GetInvoice(Guid id)
+    {
+        var invoice = await _context.Invoices
+            .Include(i => i.Items)
+            .FirstOrDefaultAsync(i => i.Id == id);
+
+        if (invoice == null)
+        {
+            return NotFound("Invoice not found.");
+        }
+
+        var cashier = await _context.Users.FindAsync(invoice.CashierId);
+        string cashierName = cashier?.FullName ?? "Cashier";
+
+        string customerName = "";
+        string customerPhone = "";
+        if (invoice.CustomerId.HasValue)
+        {
+            var customer = await _context.Customers.FindAsync(invoice.CustomerId.Value);
+            if (customer != null)
+            {
+                customerName = customer.Name;
+                customerPhone = customer.Phone;
+            }
+        }
+
+        var terminal = await _context.Terminals.FindAsync(invoice.TerminalId);
+        string terminalCode = terminal?.TerminalCode ?? "POS-01";
+
+        return Ok(new
+        {
+            invoice.Id,
+            invoice.StoreId,
+            invoice.BusinessDate,
+            invoice.InvoiceNumber,
+            invoice.TerminalId,
+            TerminalCode = terminalCode,
+            invoice.CashierId,
+            CashierName = cashierName,
+            invoice.CustomerId,
+            CustomerName = customerName,
+            CustomerPhone = customerPhone,
+            invoice.SubTotal,
+            invoice.DiscountAmount,
+            invoice.TaxAmount,
+            invoice.TotalAmount,
+            invoice.RoundOff,
+            invoice.NetPayable,
+            invoice.Status,
+            invoice.PaymentMode,
+            invoice.CashAmount,
+            invoice.UpiAmount,
+            invoice.CardAmount,
+            invoice.WalletAmount,
+            invoice.CreatedAt,
+            invoice.Irn,
+            invoice.AckNo,
+            invoice.AckDate,
+            invoice.QrCode,
+            Items = invoice.Items.Select(item => new
+            {
+                item.Id,
+                item.ProductId,
+                item.Barcode,
+                item.ProductName,
+                item.Quantity,
+                item.UnitPrice,
+                item.DiscountAmount,
+                item.CgstRate,
+                item.CgstAmount,
+                item.SgstRate,
+                item.SgstAmount,
+                item.CessRate,
+                item.CessAmount,
+                item.TotalAmount
+            })
+        });
+    }
+
     [HttpGet("z-report")]
     public async Task<IActionResult> GetZReport([FromQuery] Guid terminalId, [FromQuery] DateTime businessDate, [FromQuery] Guid? cashierId = null)
     {

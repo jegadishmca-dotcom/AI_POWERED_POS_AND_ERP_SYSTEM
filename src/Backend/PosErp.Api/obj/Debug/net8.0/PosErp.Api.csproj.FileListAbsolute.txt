@@ -198,3 +198,16 @@ D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Back
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\runtimes\win\lib\netcoreapp3.0\Microsoft.Win32.SystemEvents.dll
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\runtimes\unix\lib\netcoreapp3.0\System.Drawing.Common.dll
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\runtimes\win\lib\netcoreapp3.0\System.Drawing.Common.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\ClosedXML.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\ClosedXML.Parser.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\DocumentFormat.OpenXml.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\DocumentFormat.OpenXml.Framework.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\ExcelNumberFormat.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\RBush.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\SixLabors.Fonts.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\System.IO.Packaging.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\UglyToad.PdfPig.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\UglyToad.PdfPig.Core.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\UglyToad.PdfPig.Fonts.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\UglyToad.PdfPig.Tokenization.dll
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\UglyToad.PdfPig.Tokens.dll

@@ -43,7 +43,7 @@ public class GetTopProductsQueryHandler : IRequestHandler<GetTopProductsQuery, L
                 TotalQuantitySold = g.Sum(x => x.Quantity),
                 TotalRevenue = g.Sum(x => x.TotalAmount)
             })
-            .OrderByDescending(x => x.TotalRevenue)
+            .OrderByDescending(x => x.TotalQuantitySold)
             .Take(10)
             .ToListAsync(cancellationToken);
     }

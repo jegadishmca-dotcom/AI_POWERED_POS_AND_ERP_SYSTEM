@@ -396,6 +396,7 @@ export const StockAdjustmentForm = () => {
               <option value="EXPIRED">EXPIRED (Write-off expired goods)</option>
               <option value="THEFT">THEFT (Write-off shrinkage / theft)</option>
               <option value="FOUND">FOUND (Write-in found surplus stock)</option>
+              <option value="MARKET_PURCHASE">MARKET_PURCHASE (New Purchase from market without PO)</option>
             </select>
           </div>
 

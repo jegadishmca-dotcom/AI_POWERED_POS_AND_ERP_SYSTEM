@@ -65,6 +65,15 @@ public class StockLedgerService : IStockLedgerService
 
         try 
         {
+            var rules = InventoryRulesManager.GetRules();
+            if (rules.RowLevelLocking)
+            {
+                await db.Database.ExecuteSqlRawAsync(
+                    "SELECT 1 FROM products WHERE id = {0} FOR UPDATE", 
+                    new object[] { productId }, 
+                    cancellationToken);
+            }
+
             // 1. Get the latest running balance directly instead of summing (Optimized)
             var lastEntry = await _context.StockLedger
                 .Where(x => x.ProductId == productId && x.StoreId == storeId)

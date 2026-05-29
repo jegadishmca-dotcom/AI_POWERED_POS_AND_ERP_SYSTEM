@@ -14,7 +14,8 @@ import {
   User as UserIcon, 
   Terminal,
   Settings as SettingsIcon,
-  BarChart3
+  BarChart3,
+  Sparkles
 } from 'lucide-react';
 import { useAuthStore } from './features/auth/store/auth.store';
 import { Login } from './features/auth/routes/Login';
@@ -33,6 +34,7 @@ import { ShiftReport } from './features/pos/components/ShiftReport';
 import { Suppliers } from './features/purchasing/routes/Suppliers';
 import { PurchaseOrders } from './features/purchasing/routes/PurchaseOrders';
 import { Settings } from './pages/Settings';
+import { AiInvoiceImport } from './features/inventory/components/AiInvoiceImport';
 
 const AppLayout: React.FC = () => {
   const { user, clearAuth } = useAuthStore();
@@ -57,6 +59,7 @@ const AppLayout: React.FC = () => {
     { path: '/stock-take', name: 'Stock Take', icon: ClipboardCheck, roles: ['Owner', 'Manager'] },
     { path: '/stock-ledger', name: 'Stock Ledger', icon: History, roles: ['Owner', 'Manager'] },
     { path: '/stock-position', name: 'Stock Position', icon: Layers, roles: ['Owner', 'Manager'] },
+    { path: '/ai-invoice-import', name: 'AI Invoice Extractor', icon: Sparkles, roles: ['Owner', 'Manager'] },
     { path: '/warehouses', name: 'Warehouses & Bins', icon: MapPin, roles: ['Owner', 'Manager'] },
     { path: '/settings', name: 'Settings', icon: SettingsIcon, roles: ['Owner', 'Manager'] },
   ];
@@ -179,6 +182,9 @@ const AppLayout: React.FC = () => {
             } />
             <Route path="/stock-position" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <StockPositionReport />
+            } />
+            <Route path="/ai-invoice-import" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <AiInvoiceImport />
             } />
             <Route path="/warehouses" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <WarehouseLocationsList />

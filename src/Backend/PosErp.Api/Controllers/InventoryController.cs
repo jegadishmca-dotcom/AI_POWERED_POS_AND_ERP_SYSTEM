@@ -1,6 +1,8 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using PosErp.Application.Interfaces;
 using PosErp.Application.Features.Purchasing.Commands.CreateGRN;
 using PosErp.Application.Features.Purchasing.Commands.ConfirmGRN;
 using PosErp.Application.Features.Inventory.Commands.CreateStockAdjustment;
@@ -12,6 +14,8 @@ using PosErp.Application.Features.Inventory.Commands.CreateOrUpdateStockTake;
 using PosErp.Application.Features.Inventory.Commands.ApproveStockTake;
 using PosErp.Application.Features.Inventory.Commands.RejectStockTake;
 using System;
+using System.Linq;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 
 namespace PosErp.Api.Controllers;
@@ -92,6 +96,105 @@ public class InventoryController : ControllerBase
     {
         var result = await _mediator.Send(new PosErp.Application.Features.Inventory.Queries.GetStockAdjustments.GetStockAdjustmentsQuery(storeId));
         return Ok(result);
+    }
+
+    [HttpGet("stock-adjustment/{id}")]
+    public async Task<IActionResult> GetStockAdjustment(Guid id, [FromServices] IApplicationDbContext dbContext)
+    {
+        var adjustment = await dbContext.StockAdjustments
+            .Include(sa => sa.Items)
+            .FirstOrDefaultAsync(sa => sa.Id == id);
+
+        if (adjustment == null)
+        {
+            return NotFound("Stock adjustment not found.");
+        }
+
+        var itemsWithProducts = new List<object>();
+        foreach (var item in adjustment.Items)
+        {
+            var product = await dbContext.Products.FindAsync(item.ProductId);
+            itemsWithProducts.Add(new
+            {
+                item.Id,
+                item.ProductId,
+                ProductName = product?.Name ?? "Unknown Product",
+                ProductCode = product?.ProductCode ?? string.Empty,
+                item.AdjustedQuantity,
+                item.UnitCost
+            });
+        }
+
+        var approvedByUser = adjustment.ApprovedBy.HasValue 
+            ? await dbContext.Users.FindAsync(adjustment.ApprovedBy.Value) 
+            : null;
+
+        return Ok(new
+        {
+            adjustment.Id,
+            adjustment.StoreId,
+            adjustment.AdjustmentNumber,
+            adjustment.Reason,
+            adjustment.Status,
+            adjustment.CreatedAt,
+            ApprovedBy = adjustment.ApprovedBy,
+            ApprovedByName = approvedByUser?.FullName ?? string.Empty,
+            Items = itemsWithProducts
+        });
+    }
+
+    [HttpGet("grn/{id}")]
+    public async Task<IActionResult> GetGRN(Guid id, [FromServices] IApplicationDbContext dbContext)
+    {
+        var grn = await dbContext.GRNHeaders
+            .Include(g => g.Items)
+            .FirstOrDefaultAsync(g => g.Id == id);
+
+        if (grn == null)
+        {
+            return NotFound("GRN not found.");
+        }
+
+        var supplier = await dbContext.Suppliers.FindAsync(grn.SupplierId);
+        string supplierName = supplier?.Name ?? "Unknown Supplier";
+
+        var itemsWithProducts = new List<object>();
+        foreach (var item in grn.Items)
+        {
+            var product = await dbContext.Products.FindAsync(item.ProductId);
+            itemsWithProducts.Add(new
+            {
+                item.Id,
+                item.ProductId,
+                ProductName = product?.Name ?? "Unknown Product",
+                ProductCode = product?.ProductCode ?? string.Empty,
+                item.BatchNumber,
+                item.ExpiryDate,
+                item.MfgDate,
+                item.ReceivedQuantity,
+                item.AcceptedQuantity,
+                item.RejectedQuantity,
+                item.RejectionReason,
+                item.UnitCost,
+                item.TotalCost
+            });
+        }
+
+        return Ok(new
+        {
+            grn.Id,
+            grn.StoreId,
+            grn.PurchaseOrderHeaderId,
+            grn.SupplierId,
+            SupplierName = supplierName,
+            grn.GrnNumber,
+            grn.SupplierInvoiceNumber,
+            grn.ReceivedDate,
+            grn.TotalAmount,
+            grn.Status,
+            grn.CreatedAt,
+            Items = itemsWithProducts
+        });
     }
 
     [HttpPost("stock-adjustment")]

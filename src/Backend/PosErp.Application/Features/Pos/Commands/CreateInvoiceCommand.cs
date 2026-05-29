@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using PosErp.Application.Features.Inventory.Services;
 
 namespace PosErp.Application.Features.Pos.Commands.SyncInvoices;
 
@@ -27,7 +28,8 @@ public record CreateInvoiceCommand(
     decimal RoundOff,
     decimal NetPayable,
     string PaymentMode,
-    List<InvoiceItemDto> Items
+    List<InvoiceItemDto> Items,
+    string? SupervisorOverridePin = null
 ) : IRequest<Guid>;
 
 public record InvoiceItemDto(Guid ProductId, decimal Quantity, decimal UnitPrice, Guid? BatchId);
@@ -40,6 +42,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
     private readonly ILoyaltyService _loyaltyService;
     private readonly IFinancialPostingService _financialPostingService;
     private readonly PosErp.Application.Features.Inventory.Services.IStockLedgerService _stockLedgerService;
+    private readonly IPasswordHasher _passwordHasher;
 
     public CreateInvoiceCommandHandler(
         IApplicationDbContext context, 
@@ -47,7 +50,8 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
         IWalletService walletService, 
         ILoyaltyService loyaltyService,
         IFinancialPostingService financialPostingService,
-        PosErp.Application.Features.Inventory.Services.IStockLedgerService stockLedgerService)
+        PosErp.Application.Features.Inventory.Services.IStockLedgerService stockLedgerService,
+        IPasswordHasher passwordHasher)
     {
         _context = context;
         _offerEngine = offerEngine;
@@ -55,6 +59,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
         _loyaltyService = loyaltyService;
         _financialPostingService = financialPostingService;
         _stockLedgerService = stockLedgerService;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<Guid> Handle(CreateInvoiceCommand request, CancellationToken cancellationToken)
@@ -148,6 +153,45 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
             // Deduct Stock
             Guid storeId = Guid.Empty;
+            var rules = InventoryRulesManager.GetRules();
+
+            if (rules.PreventNegativeStock)
+            {
+                foreach (var item in cartEvaluation.Items)
+                {
+                    var product = productsInfo.TryGetValue(item.ProductId, out var p) ? p : null;
+                    var productName = product?.Name ?? "Unknown Product";
+
+                    var availableStock = await _context.StockLedger
+                        .Where(sl => sl.ProductId == item.ProductId && sl.StoreId == storeId)
+                        .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+
+                    if (availableStock < item.Quantity)
+                    {
+                        bool overrideApproved = false;
+                        if (!string.IsNullOrWhiteSpace(request.SupervisorOverridePin))
+                        {
+                            var usersWithPin = await _context.Users
+                                .Where(u => u.IsActive && !u.IsDeleted && u.PinHash != null)
+                                .ToListAsync(cancellationToken);
+
+                            foreach (var user in usersWithPin)
+                            {
+                                if (_passwordHasher.VerifyPassword(request.SupervisorOverridePin, user.PinHash!))
+                                {
+                                    overrideApproved = true;
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!overrideApproved)
+                        {
+                            throw new Exception($"INSUFFICIENT_STOCK: Item '{productName}' is out of stock. Available: {availableStock}, Requested: {item.Quantity}. Scan a supervisor PIN to override.");
+                        }
+                    }
+                }
+            }
 
             foreach (var item in cartEvaluation.Items)
             {
@@ -199,6 +243,13 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                     expiryDate = selectedBatch?.ExpiryDate;
                 }
 
+                // Check if this specific item breached stock level to log override status
+                var itemStock = await _context.StockLedger
+                    .Where(sl => sl.ProductId == item.ProductId && sl.StoreId == storeId)
+                    .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+
+                string movementTypeVal = (rules.PreventNegativeStock && itemStock < item.Quantity) ? "SALE_OVERRIDE" : "SALE";
+
                 await _stockLedgerService.RecordMovementAsync(
                     storeId: storeId,
                     warehouseId: null,
@@ -206,7 +257,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                     businessDate: today,
                     productId: item.ProductId,
                     batchId: selectedBatchId,
-                    movementType: "SALE",
+                    movementType: movementTypeVal,
                     quantity: -item.Quantity, // Negative quantity for stock deduction
                     unitCost: item.UnitPrice, // In a real system, this would be the actual cost price, not selling price.
                     expiryDate: expiryDate,

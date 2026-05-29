@@ -19,7 +19,8 @@ public record StockLedgerDto(
     decimal DeltaQty,
     decimal RunningBalance,
     string? BatchNumber,
-    DateTime? ExpiryDate
+    DateTime? ExpiryDate,
+    Guid ReferenceDocumentId
 );
 
 public record GetStockLedgerQuery(
@@ -74,7 +75,8 @@ public class GetStockLedgerQueryHandler : IRequestHandler<GetStockLedgerQuery, L
                 x.sl.Quantity,
                 x.sl.RunningBalance,
                 x.BatchNumber,
-                x.sl.ExpiryDate
+                x.sl.ExpiryDate,
+                x.sl.ReferenceDocumentId
             ))
             .ToListAsync(cancellationToken);
 

@@ -241,6 +241,23 @@ using (var scope = app.Services.CreateScope())
             ALTER TABLE products ADD COLUMN IF NOT EXISTS has_expiry BOOLEAN DEFAULT TRUE;
         ");
 
+        // DDL patch: create pending_price_approvals table
+        await context.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS pending_price_approvals (
+                id UUID PRIMARY KEY,
+                barcode VARCHAR(255) NOT NULL,
+                product_name VARCHAR(512) NOT NULL,
+                existing_cost_price NUMERIC(18,2) NOT NULL DEFAULT 0,
+                new_cost_price NUMERIC(18,2) NOT NULL DEFAULT 0,
+                quantity NUMERIC(18,2) NOT NULL DEFAULT 0,
+                invoice_reference VARCHAR(255) NOT NULL DEFAULT '',
+                status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+                created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                actioned_at TIMESTAMP WITH TIME ZONE,
+                actioned_by UUID
+            );
+        ");
+
         // Correct has_expiry for seeded non-perishable items
         await context.Database.ExecuteSqlRawAsync(@"
             UPDATE products 

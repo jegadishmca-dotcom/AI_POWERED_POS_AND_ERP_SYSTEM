@@ -43,6 +43,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<StockAdjustment> StockAdjustments => Set<StockAdjustment>();
     public DbSet<StockTakeHeader> StockTakeHeaders => Set<StockTakeHeader>();
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+    public DbSet<PendingPriceApproval> PendingPriceApprovals => Set<PendingPriceApproval>();
     
     // Purchasing
     public DbSet<PurchaseOrderHeader> PurchaseOrders => Set<PurchaseOrderHeader>();

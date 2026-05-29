@@ -37,6 +37,7 @@ public interface IApplicationDbContext
     DbSet<StockAdjustment> StockAdjustments { get; }
     DbSet<StockTakeHeader> StockTakeHeaders { get; }
     DbSet<Warehouse> Warehouses { get; }
+    DbSet<PendingPriceApproval> PendingPriceApprovals { get; }
     
     // Purchasing
     DbSet<PurchaseOrderHeader> PurchaseOrders { get; }

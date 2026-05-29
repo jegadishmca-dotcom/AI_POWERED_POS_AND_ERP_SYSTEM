@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Auth;
+using PosErp.Application.Features.Inventory.Services;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -223,6 +224,24 @@ public class SettingsController : ControllerBase
         await _context.SaveChangesAsync(default);
 
         return Ok(new { message = "Terminal deleted successfully." });
+    }
+
+    [HttpGet("inventory-rules")]
+    public IActionResult GetInventoryRules()
+    {
+        var rules = InventoryRulesManager.GetRules();
+        return Ok(rules);
+    }
+
+    [HttpPost("inventory-rules")]
+    public IActionResult UpdateInventoryRules([FromBody] InventoryRules rules)
+    {
+        if (rules == null)
+        {
+            return BadRequest("Rules payload is empty.");
+        }
+        InventoryRulesManager.SaveRules(rules);
+        return Ok(rules);
     }
 }
 

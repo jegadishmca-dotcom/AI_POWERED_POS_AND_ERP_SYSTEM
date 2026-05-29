@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { PlusCircle, Search, Edit2 } from 'lucide-react';
+import { PlusCircle, Search, Edit2, Trash2 } from 'lucide-react';
 import { api } from '../../../utils/api';
 
 export interface Supplier {
@@ -36,9 +36,24 @@ export const SupplierList: React.FC<SupplierListProps> = ({ onEdit, onAddNew }) 
     }
   };
 
+  const handleDelete = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete supplier "${name}"?`)) {
+      return;
+    }
+
+    try {
+      await api.delete(`/api/suppliers/${id}`);
+      fetchSuppliers();
+    } catch (error: any) {
+      console.error('Failed to delete supplier:', error);
+      const errMsg = error.response?.data?.message || 'Failed to delete supplier.';
+      alert(errMsg);
+    }
+  };
+
   const filteredSuppliers = suppliers.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    s.gstin.toLowerCase().includes(searchTerm.toLowerCase())
+    (s.name || '').toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (s.gstin || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -105,12 +120,22 @@ export const SupplierList: React.FC<SupplierListProps> = ({ onEdit, onAddNew }) 
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button 
-                        onClick={() => onEdit(supplier)}
-                        className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                      >
-                        <Edit2 size={18} />
-                      </button>
+                      <div className="flex justify-end gap-1">
+                        <button 
+                          onClick={() => onEdit(supplier)}
+                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit Supplier"
+                        >
+                          <Edit2 size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleDelete(supplier.id, supplier.name)}
+                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          title="Delete Supplier"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

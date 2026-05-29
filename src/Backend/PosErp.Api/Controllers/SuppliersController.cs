@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using PosErp.Application.Features.Purchasing.Commands.CreateSupplier;
 using PosErp.Application.Features.Purchasing.Commands.UpdateSupplier;
+using PosErp.Application.Features.Purchasing.Commands.DeleteSupplier;
 using PosErp.Application.Features.Purchasing.Queries.GetSuppliers;
 using PosErp.Application.Features.Purchasing.Queries.GetSupplierById;
 using System;
@@ -61,5 +62,20 @@ public class SuppliersController : ControllerBase
             return NotFound();
             
         return NoContent();
+    }
+
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var result = await _mediator.Send(new DeleteSupplierCommand { Id = id });
+        
+        if (result.NotFound)
+            return NotFound(new { message = result.Message });
+            
+        if (!result.Success)
+            return BadRequest(new { message = result.Message });
+            
+        return Ok(new { message = result.Message });
     }
 }

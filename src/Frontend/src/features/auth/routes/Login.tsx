@@ -13,6 +13,46 @@ export const Login = () => {
 
   const from = location.state?.from?.pathname || '/dashboard';
 
+  // Auto-fullscreen logic
+  React.useEffect(() => {
+    const enterFS = () => {
+      // Check if already in fullscreen to avoid redundant requests
+      if (document.fullscreenElement) return;
+
+      const docEl = document.documentElement as any;
+      if (docEl.requestFullscreen) {
+        docEl.requestFullscreen().catch(() => {});
+      } else if (docEl.mozRequestFullScreen) { // Firefox
+        docEl.mozRequestFullScreen();
+      } else if (docEl.webkitRequestFullscreen) { // Chrome, Safari, Opera
+        docEl.webkitRequestFullscreen();
+      } else if (docEl.msRequestFullscreen) { // IE/Edge
+        docEl.msRequestFullscreen();
+      }
+    };
+
+    // Try immediately on component mount (may be blocked by browser security policies)
+    enterFS();
+
+    // Workaround for security policies: trigger on first user interaction anywhere on the screen
+    const handleInteraction = () => {
+      enterFS();
+      cleanup();
+    };
+
+    const cleanup = () => {
+      document.removeEventListener('click', handleInteraction);
+      document.removeEventListener('keydown', handleInteraction);
+      document.removeEventListener('touchstart', handleInteraction);
+    };
+
+    document.addEventListener('click', handleInteraction);
+    document.addEventListener('keydown', handleInteraction);
+    document.addEventListener('touchstart', handleInteraction);
+
+    return cleanup;
+  }, []);
+
   const handleLogin = async (data: any, loginType: 'cashier' | 'admin') => {
     setIsLoading(true);
     setError(null);

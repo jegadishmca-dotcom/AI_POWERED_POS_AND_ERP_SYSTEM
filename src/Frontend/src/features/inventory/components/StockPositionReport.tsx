@@ -60,14 +60,9 @@ export const StockPositionReport = () => {
     fetchPositions(1, '', '');
   };
 
-  const handleExportCSV = () => {
-    if (stockData.length === 0) {
-      alert('No data to export.');
-      return;
-    }
-
+  const downloadCSV = (items: StockPosition[], filename: string) => {
     const headers = ['Product Code', 'Product Name', 'Category', 'Current Stock', 'Last Unit Cost (₹)', 'Total Value (₹)'];
-    const rows = stockData.map(item => [
+    const rows = items.map(item => [
       item.productCode,
       `"${item.productName.replace(/"/g, '""')}"`,
       item.categoryName || 'General',
@@ -76,16 +71,67 @@ export const StockPositionReport = () => {
       item.totalValue.toFixed(2)
     ]);
 
-    const csvContent = 'data:text/csv;charset=utf-8,' 
-      + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const csvString = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
     
-    const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `Stock_Position_Report_${new Date().toISOString().substring(0, 10)}.csv`);
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleExportSearchedItems = async () => {
+    try {
+      setLoading(true);
+      const response = await getStockPositions({
+        storeId: null,
+        categoryId: selectedCategory || null,
+        searchTerm: searchTerm.trim() || null,
+        page: 1,
+        pageSize: -1
+      });
+      
+      if (!response.items || response.items.length === 0) {
+        alert('No data to export.');
+        return;
+      }
+      
+      downloadCSV(response.items, `Stock_Position_Searched_Items_${new Date().toISOString().substring(0, 10)}.csv`);
+    } catch (error) {
+      console.error('Failed to export searched stock position', error);
+      alert('Failed to export data.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleExportCompleteStock = async () => {
+    try {
+      setLoading(true);
+      const response = await getStockPositions({
+        storeId: null,
+        categoryId: null,
+        searchTerm: null,
+        page: 1,
+        pageSize: -1
+      });
+      
+      if (!response.items || response.items.length === 0) {
+        alert('No data to export.');
+        return;
+      }
+      
+      downloadCSV(response.items, `Stock_Position_Complete_Stock_${new Date().toISOString().substring(0, 10)}.csv`);
+    } catch (error) {
+      console.error('Failed to export complete stock position', error);
+      alert('Failed to export data.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -99,7 +145,7 @@ export const StockPositionReport = () => {
           </h2>
           <p className="text-xs text-slate-500 mt-1">Live snapshot of inventory quantities and asset valuations across all products.</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
           <button 
             onClick={() => fetchPositions(page)}
             disabled={loading}
@@ -109,10 +155,19 @@ export const StockPositionReport = () => {
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
           <button 
-            onClick={handleExportCSV}
-            className="px-4 py-2 bg-slate-800 text-white rounded-lg shadow-sm flex items-center hover:bg-slate-700 font-bold transition text-sm"
+            onClick={handleExportSearchedItems}
+            disabled={loading}
+            className="px-4 py-2 bg-slate-800 text-white rounded-lg shadow-sm flex items-center hover:bg-slate-700 font-bold transition text-sm disabled:opacity-50"
           >
-            <Download className="w-4 h-4 mr-2" /> Export to CSV
+            <Download className="w-4 h-4 mr-2" /> Export to csv (Searched Items Only)
+          </button>
+          <button 
+            onClick={handleExportCompleteStock}
+            disabled={loading}
+            className="px-4 py-2 rounded-lg shadow-sm flex items-center font-bold transition text-sm border border-red-200 hover:opacity-90 disabled:opacity-50"
+            style={{ backgroundColor: '#FFE4E6', color: '#DC2626' }}
+          >
+            <Download className="w-4 h-4 mr-2" style={{ color: '#DC2626' }} /> Export to csv (Complete Stock)
           </button>
         </div>
       </div>

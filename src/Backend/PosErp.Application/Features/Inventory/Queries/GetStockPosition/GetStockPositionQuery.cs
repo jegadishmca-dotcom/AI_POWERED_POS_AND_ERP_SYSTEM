@@ -66,10 +66,7 @@ public class GetStockPositionQueryHandler : IRequestHandler<GetStockPositionQuer
               AND (cast({searchToken} as text) IS NULL OR p.name ILIKE '%' || {searchToken} || '%' OR p.product_code ILIKE '%' || {searchToken} || '%')
         ").FirstOrDefaultAsync(cancellationToken);
 
-        var offset = (request.Page - 1) * request.PageSize;
-        var limit = request.PageSize;
-
-        var items = await db.Database.SqlQuery<StockPositionDto>(@$"
+        var sql = @$"
             SELECT 
                 p.id as ""ProductId"",
                 p.product_code as ""ProductCode"",
@@ -80,11 +77,19 @@ public class GetStockPositionQueryHandler : IRequestHandler<GetStockPositionQuer
                 (COALESCE(mv.current_stock, 0) * COALESCE(mv.last_unit_cost, p.purchase_price, 0)) as ""TotalValue""
             FROM products p
             LEFT JOIN categories c ON p.category_id = c.id
-            LEFT JOIN mv_current_stock mv ON p.id = mv.product_id AND (mv.store_id = {request.StoreId} OR cast({request.StoreId} as uuid) IS NULL)
-            WHERE (cast({request.CategoryId} as uuid) IS NULL OR p.category_id = {request.CategoryId})
-              AND (cast({searchToken} as text) IS NULL OR p.name ILIKE '%' || {searchToken} || '%' OR p.product_code ILIKE '%' || {searchToken} || '%')
-            ORDER BY p.name
-            LIMIT {limit} OFFSET {offset}").ToListAsync(cancellationToken);
+            LEFT JOIN mv_current_stock mv ON p.id = mv.product_id AND (mv.store_id = {{0}} OR cast({{0}} as uuid) IS NULL)
+            WHERE (cast({{1}} as uuid) IS NULL OR p.category_id = {{1}})
+              AND (cast({{2}} as text) IS NULL OR p.name ILIKE '%' || {{2}} || '%' OR p.product_code ILIKE '%' || {{2}} || '%')
+            ORDER BY p.name";
+
+        if (request.PageSize > 0)
+        {
+            var offset = (request.Page - 1) * request.PageSize;
+            sql += $" LIMIT {request.PageSize} OFFSET {offset}";
+        }
+
+        var items = await db.Database.SqlQueryRaw<StockPositionDto>(sql, request.StoreId, request.CategoryId, searchToken)
+            .ToListAsync(cancellationToken);
 
         return new StockPositionListDto(items, summary?.TotalCount ?? 0, summary?.TotalValue ?? 0);
     }

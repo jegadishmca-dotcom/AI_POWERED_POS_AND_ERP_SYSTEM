@@ -40,6 +40,7 @@ const AppLayout: React.FC = () => {
   const { user, clearAuth } = useAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
+  const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
 
   const handleLogout = () => {
     clearAuth();
@@ -71,7 +72,7 @@ const AppLayout: React.FC = () => {
   return (
     <div className="flex h-screen bg-slate-100 dark:bg-slate-900 font-sans transition-colors duration-200 overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-64 bg-slate-900 text-white flex flex-col shadow-xl z-20">
+      <aside className={`transition-all duration-350 ${sidebarCollapsed ? 'w-0 overflow-hidden opacity-0' : 'w-64 opacity-100'} bg-slate-900 text-white flex flex-col shadow-xl z-20`}>
         {/* Brand Header */}
         <div className="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800">
           <Terminal className="w-6 h-6 mr-3 text-indigo-400" />
@@ -129,10 +130,25 @@ const AppLayout: React.FC = () => {
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Top Header */}
         <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-8 shadow-sm transition-colors duration-200">
-          <h1 className="text-xl font-extrabold text-slate-800 dark:text-white flex items-center">
-            {navItems.find(item => item.path === location.pathname)?.name || 'ERP System'}
-            <span className="ml-3 text-xs font-bold text-slate-500 bg-slate-200 dark:bg-slate-700 dark:text-slate-300 px-2 py-1 rounded">v1.3</span>
-          </h1>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors flex items-center justify-center border border-slate-200 dark:border-slate-700 shadow-sm"
+              title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                {sidebarCollapsed ? (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+                ) : (
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+                )}
+              </svg>
+            </button>
+            <h1 className="text-xl font-extrabold text-slate-800 dark:text-white flex items-center">
+              {navItems.find(item => item.path === location.pathname)?.name || 'ERP System'}
+              <span className="ml-3 text-xs font-bold text-slate-500 bg-slate-200 dark:bg-slate-700 dark:text-slate-300 px-2 py-1 rounded">v1.3</span>
+            </h1>
+          </div>
           <div className="flex items-center space-x-4">
             <div className="text-right hidden sm:block">
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block">Business Date</span>

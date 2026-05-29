@@ -316,7 +316,7 @@ export const AiInvoiceImport = () => {
               <button
                 onClick={handleImport}
                 disabled={importing}
-                className="flex-1 md:flex-none px-5 py-2.5 bg-gradient-to-r from-indigo-650 to-blue-650 text-white font-bold rounded-lg text-xs flex items-center justify-center shadow hover:from-indigo-700 hover:to-blue-700 transition"
+                className="flex-1 md:flex-none px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold rounded-lg text-xs flex items-center justify-center shadow hover:from-indigo-700 hover:to-blue-700 transition"
               >
                 {importing ? (
                   <>

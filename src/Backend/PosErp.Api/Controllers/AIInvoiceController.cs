@@ -235,17 +235,13 @@ public class AIInvoiceController : ControllerBase
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
-            var adjustment = new StockAdjustment
-            {
-                Id = Guid.NewGuid(),
-                AdjustmentNumber = $"ADJ-MKT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 4).ToUpper()}",
-                Reason = "MARKET_PURCHASE",
-                Status = "APPROVED",
-                CreatedAt = DateTime.UtcNow
-            };
+            int newProductOffset = 0;
+            var baseProductCount = await _context.Products.CountAsync(cancellationToken);
 
-            _context.StockAdjustments.Add(adjustment);
+            // Keep track of the batch IDs mapped by barcode for use in Pass 2
+            var itemBatchIds = new Dictionary<string, Guid?>();
 
+            // --- PASS 1: Create/Update Products and Batches ---
             foreach (var item in request.Items)
             {
                 var product = await _context.Products
@@ -254,7 +250,8 @@ public class AIInvoiceController : ControllerBase
 
                 if (product == null)
                 {
-                    var nextProdNumber = await _context.Products.CountAsync(cancellationToken) + 1;
+                    newProductOffset++;
+                    var nextProdNumber = baseProductCount + newProductOffset;
                     product = new Product
                     {
                         Id = Guid.NewGuid(),
@@ -278,7 +275,6 @@ public class AIInvoiceController : ControllerBase
                     });
 
                     _context.Products.Add(product);
-                    await _context.SaveChangesAsync(cancellationToken);
                 }
                 else
                 {
@@ -290,7 +286,6 @@ public class AIInvoiceController : ControllerBase
 
                 // Batch Association Handling
                 Guid? selectedBatchId = null;
-                DateTime? expiryDate = item.ExpiryDate;
 
                 bool isBatchTracked = product.HasExpiry || !string.IsNullOrWhiteSpace(item.BatchNumber);
                 if (isBatchTracked)
@@ -321,10 +316,41 @@ public class AIInvoiceController : ControllerBase
                             CreatedAt = DateTime.UtcNow
                         };
                         _context.ProductBatches.Add(newBatch);
-                        await _context.SaveChangesAsync(cancellationToken);
                         selectedBatchId = newBatch.Id;
                     }
                 }
+
+                itemBatchIds[item.Barcode] = selectedBatchId;
+            }
+
+            // Save Products, Barcodes, and ProductBatches first so they exist in the DB.
+            await _context.SaveChangesAsync(cancellationToken);
+
+            // --- PASS 2: Create StockAdjustment, StockAdjustmentItems, and Record Stock Movements ---
+            var adjustment = new StockAdjustment
+            {
+                Id = Guid.NewGuid(),
+                AdjustmentNumber = $"ADJ-MKT-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 4).ToUpper()}",
+                Reason = "MARKET_PURCHASE",
+                Status = "APPROVED",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _context.StockAdjustments.Add(adjustment);
+
+            foreach (var item in request.Items)
+            {
+                var product = await _context.Products
+                    .Include(p => p.Barcodes)
+                    .FirstOrDefaultAsync(p => p.Barcodes.Any(b => b.BarcodeValue == item.Barcode), cancellationToken);
+
+                if (product == null)
+                {
+                    throw new Exception($"Product with barcode {item.Barcode} was not found after saving.");
+                }
+
+                var selectedBatchId = itemBatchIds[item.Barcode];
+                DateTime? expiryDate = item.ExpiryDate;
 
                 var adjItem = new StockAdjustmentItem
                 {
@@ -355,10 +381,25 @@ public class AIInvoiceController : ControllerBase
                 );
             }
 
+            // Save StockAdjustments, StockAdjustmentItems, and StockLedgerEntries
             await _context.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
 
             return Ok(new { success = true, adjustmentId = adjustment.Id, adjustmentNumber = adjustment.AdjustmentNumber });
+        }
+        catch (DbUpdateConcurrencyException ex)
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            var detailsList = new List<string>();
+            foreach (var entry in ex.Entries)
+            {
+                var modifiedProps = entry.Properties
+                    .Where(p => p.IsModified)
+                    .Select(p => $"{p.Metadata.Name} (Original: {p.OriginalValue}, Current: {p.CurrentValue})");
+                detailsList.Add($"{entry.Entity.GetType().Name} (State: {entry.State}) [Modified fields: {string.Join(", ", modifiedProps)}]");
+            }
+            var details = string.Join("; ", detailsList);
+            return BadRequest(new { message = $"CONCURRENCY_ERROR: {ex.Message} Details: [{details}]" });
         }
         catch (Exception ex)
         {

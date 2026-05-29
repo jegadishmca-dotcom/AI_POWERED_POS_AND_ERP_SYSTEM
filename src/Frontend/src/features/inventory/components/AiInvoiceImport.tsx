@@ -357,7 +357,9 @@ export const AiInvoiceImport = () => {
                     <th className="p-3 w-16 text-center">Status</th>
                     <th className="p-3 w-48">Product Description</th>
                     <th className="p-3 w-16 text-right">Qty</th>
-                    <th className="p-3 w-32 text-center">Cost Price</th>
+                    <th className="p-3 w-24 text-center">Invoice Cost</th>
+                    <th className="p-3 w-24 text-center">System Cost</th>
+                    <th className="p-3 w-36 text-center">Cost Status</th>
                     <th className="p-3 w-12 text-center">Expiry?</th>
                     <th className="p-3 w-28">Batch Code</th>
                     <th className="p-3 w-36">Expiry Date</th>
@@ -388,13 +390,30 @@ export const AiInvoiceImport = () => {
                         {/* Quantity */}
                         <td className="p-3 text-right font-bold text-slate-800">{item.quantity}</td>
                         
-                        {/* Cost Price */}
+                        {/* Invoice Cost */}
+                        <td className="p-3 text-center font-bold text-slate-800">
+                          ₹{item.costPrice.toFixed(2)}
+                        </td>
+
+                        {/* System Cost */}
+                        <td className="p-3 text-center text-slate-600 font-medium">
+                          {item.existingCostPrice !== null && item.existingCostPrice !== undefined ? (
+                            `₹${item.existingCostPrice.toFixed(2)}`
+                          ) : (
+                            <span className="text-slate-400 font-bold">New Product</span>
+                          )}
+                        </td>
+
+                        {/* Cost Status */}
                         <td className="p-3 text-center">
-                          <div className="font-black text-slate-800">₹{item.costPrice.toFixed(2)}</div>
-                          {item.existingCostPrice !== null && (
-                            <div className="text-[10px] text-slate-400 mt-0.5">
-                              Prev: ₹{item.existingCostPrice?.toFixed(2)}
-                            </div>
+                          {item.existingCostPrice !== null && item.existingCostPrice !== undefined && item.costPrice === item.existingCostPrice ? (
+                            <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-150">
+                              Cost is matching
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-150">
+                              Cost Diff : Action required
+                            </span>
                           )}
                         </td>
 

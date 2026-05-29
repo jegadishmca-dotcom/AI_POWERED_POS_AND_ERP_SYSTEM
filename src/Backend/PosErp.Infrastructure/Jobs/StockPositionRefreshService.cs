@@ -45,8 +45,8 @@ public class StockPositionRefreshService : BackgroundService
                 Console.WriteLine($"[StockPositionRefreshService] [ERROR] Failed to refresh materialized view: {ex.Message}");
             }
 
-            // Wait 15 seconds before refreshing again
-            await Task.Delay(TimeSpan.FromSeconds(15), stoppingToken);
+            // Wait 5 minutes before refreshing again
+            await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
         }
     }
 }

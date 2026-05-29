@@ -97,7 +97,7 @@ services:
     container_name: pos_backend
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
+      - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
       - Redis__ConnectionString=pos_redis:6379,abortConnect=false
     ports:
       - "5000:8080"
@@ -105,6 +105,8 @@ services:
       - pos_network
     depends_on:
       postgres:
+        condition: service_healthy
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy

@@ -30,7 +30,14 @@ export const ServerIpConfig: React.FC = () => {
         ? (target.startsWith('http') ? target : `http://${target}`)
         : window.location.origin;
       
-      const res = await axios.get(`${baseUrl}/health`, { timeout: 4000 });
+      // Try reverse proxy /api/health first, fall back to /health for direct server access
+      let res;
+      try {
+        res = await axios.get(`${baseUrl}/api/health`, { timeout: 3000 });
+      } catch (err) {
+        res = await axios.get(`${baseUrl}/health`, { timeout: 3000 });
+      }
+      
       if (res.status === 200 && res.data?.toString().toLowerCase().includes('healthy')) {
         setTestResult('success');
       } else {

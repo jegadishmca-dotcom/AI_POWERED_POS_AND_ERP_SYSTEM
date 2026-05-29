@@ -131,7 +131,8 @@ public class AnalyticsController : ControllerBase
             wsOverview.Cell("B8").Style.NumberFormat.Format = "₹#,##0.00";
 
             wsOverview.Range("A6:A8").Style.Font.Bold = true;
-            wsOverview.Columns().AdjustToContents();
+            wsOverview.Column(1).Width = 30;
+            wsOverview.Column(2).Width = 20;
 
             // 2. Sales Trend sheet
             var wsTrend = workbook.Worksheets.Add("Sales Trend");
@@ -165,7 +166,10 @@ public class AnalyticsController : ControllerBase
             wsTrend.Cell(rowIdx, 3).Style.NumberFormat.Format = "₹#,##0.00";
             wsTrend.Cell(rowIdx, 4).Style.NumberFormat.Format = "#,##0";
 
-            wsTrend.Columns().AdjustToContents();
+            wsTrend.Column(1).Width = 20;
+            wsTrend.Column(2).Width = 20;
+            wsTrend.Column(3).Width = 20;
+            wsTrend.Column(4).Width = 20;
 
             // 3. Top Products sheet
             var wsProducts = workbook.Worksheets.Add("Top Products");
@@ -186,7 +190,9 @@ public class AnalyticsController : ControllerBase
                 wsProducts.Cell(rowIdx, 3).Style.NumberFormat.Format = "₹#,##0.00";
                 rowIdx++;
             }
-            wsProducts.Columns().AdjustToContents();
+            wsProducts.Column(1).Width = 35;
+            wsProducts.Column(2).Width = 20;
+            wsProducts.Column(3).Width = 20;
 
             using (var stream = new MemoryStream())
             {

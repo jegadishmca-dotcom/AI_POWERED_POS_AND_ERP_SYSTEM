@@ -51,6 +51,52 @@ export const StockLedgerView = () => {
     fetchLedger(1, '', '');
   };
 
+  const handleExportExcel = async () => {
+    try {
+      setLoading(true);
+      let url = `/api/inventory/ledger?page=1&pageSize=-1&`;
+      if (searchTerm) url += `searchToken=${encodeURIComponent(searchTerm)}&`;
+      if (movementType) url += `movementType=${encodeURIComponent(movementType)}&`;
+      
+      const response = await api.get(url);
+      const items = response.data.items || [];
+      
+      if (items.length === 0) {
+        alert('No data to export.');
+        return;
+      }
+      
+      const headers = ['Date & Time', 'Product', 'Batch No', 'Expiry Date', 'Movement', 'Reference Doc', 'Delta Qty', 'Running Balance'];
+      const rows = items.map((entry: any) => [
+        `"${new Date(entry.date).toLocaleString()}"`,
+        `"${entry.productName.replace(/"/g, '""')}"`,
+        `"${(entry.batchNumber || '').replace(/"/g, '""')}"`,
+        entry.expiryDate ? entry.expiryDate.substring(0, 10) : '-',
+        entry.movementType,
+        entry.referenceDocument,
+        entry.deltaQty,
+        entry.runningBalance
+      ]);
+
+      const csvString = [headers.join(','), ...rows.map((e: any) => e.join(','))].join('\n');
+      const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvString], { type: 'text/csv;charset=utf-8;' });
+      const downloadUrl = URL.createObjectURL(blob);
+      
+      const link = document.createElement('a');
+      link.setAttribute('href', downloadUrl);
+      link.setAttribute('download', `Stock_Ledger_Export_${new Date().toISOString().substring(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error('Failed to export stock ledger to excel', error);
+      alert('Failed to export data.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchLedger(1);
   }, []); // Initial load
@@ -105,6 +151,13 @@ export const StockLedgerView = () => {
           className="px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 border rounded transition font-bold"
         >
           Clear / Reset
+        </button>
+        <button 
+          onClick={handleExportExcel}
+          disabled={loading}
+          className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded transition font-bold flex items-center shadow-sm"
+        >
+          <FileText className="w-4 h-4 mr-2" /> Export to Excel
         </button>
       </div>
 

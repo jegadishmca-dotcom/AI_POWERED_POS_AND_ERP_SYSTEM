@@ -72,10 +72,12 @@ public class GetStockLedgerQueryHandler : IRequestHandler<GetStockLedgerQuery, S
 
         var totalCount = await query.CountAsync(cancellationToken);
 
-        var results = await query
-            .OrderByDescending(x => x.sl.CreatedAt)
-            .Skip((request.Page - 1) * request.PageSize)
-            .Take(request.PageSize)
+        var queryOrdered = query.OrderByDescending(x => x.sl.CreatedAt);
+        var queryPaginated = request.PageSize > 0
+            ? queryOrdered.Skip((request.Page - 1) * request.PageSize).Take(request.PageSize)
+            : queryOrdered;
+
+        var results = await queryPaginated
             .Select(x => new StockLedgerDto(
                 x.sl.Id,
                 x.sl.CreatedAt,

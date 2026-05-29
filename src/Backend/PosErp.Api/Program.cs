@@ -125,6 +125,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHealthChecks("/health");
+app.MapHealthChecks("/api/health");
 
 // Seed Database
 using (var scope = app.Services.CreateScope())

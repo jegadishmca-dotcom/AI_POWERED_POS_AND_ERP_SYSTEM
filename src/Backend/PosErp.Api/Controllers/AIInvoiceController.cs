@@ -54,13 +54,37 @@ public class AIInvoiceController : ControllerBase
             {
                 using (var document = PdfDocument.Open(stream))
                 {
-                    var textBuilder = new System.Text.StringBuilder();
+                    var linesList = new List<string>();
                     foreach (var page in document.GetPages())
                     {
-                        textBuilder.AppendLine(page.Text);
+                        var words = page.GetWords().ToList();
+                        if (!words.Any()) continue;
+
+                        var sortedWords = words.OrderByDescending(w => w.BoundingBox.Bottom).ToList();
+                        var currentLineWords = new List<UglyToad.PdfPig.Content.Word>();
+                        double currentY = sortedWords[0].BoundingBox.Bottom;
+                        double threshold = 5.0;
+
+                        foreach (var word in sortedWords)
+                        {
+                            if (Math.Abs(word.BoundingBox.Bottom - currentY) > threshold)
+                            {
+                                var lineText = string.Join(" ", currentLineWords.OrderBy(w => w.BoundingBox.Left).Select(w => w.Text));
+                                linesList.Add(lineText);
+                                currentLineWords.Clear();
+                                currentY = word.BoundingBox.Bottom;
+                            }
+                            currentLineWords.Add(word);
+                        }
+
+                        if (currentLineWords.Any())
+                        {
+                            var lineText = string.Join(" ", currentLineWords.OrderBy(w => w.BoundingBox.Left).Select(w => w.Text));
+                            linesList.Add(lineText);
+                        }
                     }
 
-                    string text = textBuilder.ToString();
+                    string text = string.Join("\n", linesList);
                     items = ParseInvoiceText(text);
                 }
             }

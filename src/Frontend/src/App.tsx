@@ -15,7 +15,10 @@ import {
   Terminal,
   Settings as SettingsIcon,
   BarChart3,
-  Sparkles
+  Sparkles,
+  Bot,
+  TrendingUp,
+  TrendingDown
 } from 'lucide-react';
 import { useAuthStore } from './features/auth/store/auth.store';
 import { Login } from './features/auth/routes/Login';
@@ -35,6 +38,10 @@ import { Suppliers } from './features/purchasing/routes/Suppliers';
 import { PurchaseOrders } from './features/purchasing/routes/PurchaseOrders';
 import { Settings } from './pages/Settings';
 import { AiInvoiceImport } from './features/inventory/components/AiInvoiceImport';
+import { AiChat } from './features/ai/routes/AiChat';
+import { AiForecaster } from './features/ai/routes/AiForecaster';
+import { AiMarkdowns } from './features/ai/routes/AiMarkdowns';
+
 
 const AppLayout: React.FC = () => {
   const { user, clearAuth } = useAuthStore();
@@ -48,26 +55,34 @@ const AppLayout: React.FC = () => {
   };
 
   const navItems = [
-    { path: '/dashboard', name: 'Dashboard', icon: LayoutDashboard, roles: ['Owner', 'Manager'] },
-    { path: '/reports', name: 'Reports & Insights', icon: BarChart3, roles: ['Owner', 'Manager'] },
-    { path: '/pos', name: 'POS Billing', icon: ShoppingCart, roles: ['Owner', 'Manager', 'Cashier'] },
-    { path: '/shift-report', name: 'Shift & Sales Report', icon: ClipboardCheck, roles: ['Cashier'] },
-    { path: '/products', name: 'Product Catalog', icon: Package, roles: ['Owner', 'Manager'] },
-    { path: '/grn', name: 'Goods Receipt (GRN)', icon: ClipboardCheck, roles: ['Owner', 'Manager'] },
-    { path: '/suppliers', name: 'Supplier Master', icon: UserIcon, roles: ['Owner', 'Manager'] },
-    { path: '/purchase-orders', name: 'Purchase Orders', icon: ClipboardCheck, roles: ['Owner', 'Manager'] },
-    { path: '/stock-adjustment', name: 'Stock Adjustment', icon: ArrowUpDown, roles: ['Owner', 'Manager'] },
-    { path: '/stock-take', name: 'Stock Take', icon: ClipboardCheck, roles: ['Owner', 'Manager'] },
-    { path: '/stock-ledger', name: 'Stock Ledger', icon: History, roles: ['Owner', 'Manager'] },
-    { path: '/stock-position', name: 'Stock Position', icon: Layers, roles: ['Owner', 'Manager'] },
-    { path: '/ai-invoice-import', name: 'AI Invoice Extractor', icon: Sparkles, roles: ['Owner', 'Manager'] },
-    { path: '/warehouses', name: 'Warehouses & Bins', icon: MapPin, roles: ['Owner', 'Manager'] },
-    { path: '/settings', name: 'Settings', icon: SettingsIcon, roles: ['Owner', 'Manager'] },
+    { path: '/dashboard', name: 'Dashboard', icon: LayoutDashboard, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/reports', name: 'Reports & Insights', icon: BarChart3, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/pos', name: 'POS Billing', icon: ShoppingCart, roles: ['Owner', 'Manager', 'Cashier'], category: 'general' },
+    { path: '/shift-report', name: 'Shift & Sales Report', icon: ClipboardCheck, roles: ['Cashier'], category: 'general' },
+    { path: '/products', name: 'Product Catalog', icon: Package, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/grn', name: 'Goods Receipt (GRN)', icon: ClipboardCheck, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/suppliers', name: 'Supplier Master', icon: UserIcon, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/purchase-orders', name: 'Purchase Orders', icon: ClipboardCheck, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/stock-adjustment', name: 'Stock Adjustment', icon: ArrowUpDown, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/stock-take', name: 'Stock Take', icon: ClipboardCheck, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/stock-ledger', name: 'Stock Ledger', icon: History, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/stock-position', name: 'Stock Position', icon: Layers, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/warehouses', name: 'Warehouses & Bins', icon: MapPin, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/settings', name: 'Settings', icon: SettingsIcon, roles: ['Owner', 'Manager'], category: 'general' },
+
+    // AI Co-Pilot Hub
+    { path: '/ai/chat', name: 'AI Co-pilot Chat', icon: Bot, roles: ['Owner', 'Manager'], category: 'ai' },
+    { path: '/ai/forecaster', name: 'Demand Forecaster', icon: TrendingUp, roles: ['Owner', 'Manager'], category: 'ai' },
+    { path: '/ai/markdowns', name: 'Smart Markdowns', icon: TrendingDown, roles: ['Owner', 'Manager'], category: 'ai' },
+    { path: '/ai/invoice-extractor', name: 'AI Invoice Extractor', icon: Sparkles, roles: ['Owner', 'Manager'], category: 'ai' },
   ];
 
   const filteredNavItems = navItems.filter(item => 
     !user?.role || item.roles.includes(user.role)
   );
+
+  const generalItems = filteredNavItems.filter(item => item.category === 'general');
+  const aiItems = filteredNavItems.filter(item => item.category === 'ai');
 
   return (
     <div className="flex h-screen bg-slate-100 dark:bg-slate-900 font-sans transition-colors duration-200 overflow-hidden">
@@ -82,26 +97,61 @@ const AppLayout: React.FC = () => {
         </div>
 
         {/* Sidebar Nav */}
-        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-          {filteredNavItems.map(item => {
-            const Icon = item.icon;
-            const isActive = location.pathname === item.path;
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`flex items-center px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                  isActive 
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' 
-                    : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                }`}
-              >
-                <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                {item.name}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 px-4 py-4 space-y-6 overflow-y-auto">
+          {/* General Section */}
+          <div className="space-y-1">
+            <span className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
+              ERP Core Modules
+            </span>
+            {generalItems.map(item => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    isActive 
+                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' 
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                  {item.name}
+                </Link>
+              );
+            })}
+          </div>
+
+          {/* AI Co-Pilot Section */}
+          <div className="space-y-1">
+            <div className="px-4 flex items-center gap-1.5 mb-2">
+              <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+              <span className="text-[10px] font-extrabold text-indigo-400 uppercase tracking-wider block">
+                AI Co-Pilot Hub
+              </span>
+            </div>
+            {aiItems.map(item => {
+              const Icon = item.icon;
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    isActive 
+                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/30' 
+                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                  }`}
+                >
+                  <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                  {item.name}
+                </Link>
+              );
+            })}
+          </div>
         </nav>
+
 
         {/* User Card */}
         <div className="p-4 border-t border-slate-800 bg-slate-950">
@@ -200,7 +250,19 @@ const AppLayout: React.FC = () => {
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <StockPositionReport />
             } />
             <Route path="/ai-invoice-import" element={
+              <Navigate to="/ai/invoice-extractor" replace />
+            } />
+            <Route path="/ai/invoice-extractor" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <AiInvoiceImport />
+            } />
+            <Route path="/ai/chat" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <AiChat />
+            } />
+            <Route path="/ai/forecaster" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <AiForecaster />
+            } />
+            <Route path="/ai/markdowns" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <AiMarkdowns />
             } />
             <Route path="/warehouses" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <WarehouseLocationsList />

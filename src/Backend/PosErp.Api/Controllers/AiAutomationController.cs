@@ -72,28 +72,45 @@ public class AiAutomationController : ControllerBase
     {
         var cutoffDate = DateTime.UtcNow.AddDays(-30);
         
-        // Fetch sales quantity per product in last 30 days (sales are stored as negative quantities in ledger)
+        // SMART LOGIC: Only fetch products that have actual sales history in the last 30 days.
+        // This prevents the 0.15 fallback from flooding the report with every product in the catalog.
         var salesData = await _context.StockLedger
             .Where(sl => sl.MovementType == "SALE" && sl.BusinessDate >= cutoffDate)
             .GroupBy(sl => sl.ProductId)
             .Select(g => new { ProductId = g.Key, TotalSold = g.Sum(sl => -sl.Quantity) })
             .ToDictionaryAsync(x => x.ProductId, x => x.TotalSold, cancellationToken);
 
-        // Fetch current active stock for all products
+        // Also identify products that were ever received via GRN (they are stocked products, not phantom catalog entries)
+        var grnProductIds = await _context.GRNItems
+            .Select(gi => gi.ProductId)
+            .Distinct()
+            .ToListAsync(cancellationToken);
+
+        // Only consider products that have EITHER: recent sales data OR a GRN history (ever received)
+        // This eliminates 35,000+ unused catalog entries from polluting the report
+        var eligibleProductIds = salesData.Keys.Union(grnProductIds).ToHashSet();
+
+        if (!eligibleProductIds.Any())
+        {
+            return Ok(new List<object>());
+        }
+
+        // Fetch current stock only for eligible products
         var currentStocks = await _context.StockLedger
+            .Where(sl => eligibleProductIds.Contains(sl.ProductId))
             .GroupBy(sl => sl.ProductId)
             .Select(g => new { ProductId = g.Key, Stock = g.Sum(sl => sl.Quantity) })
             .ToDictionaryAsync(x => x.ProductId, x => x.Stock, cancellationToken);
 
         var products = await _context.Products
-            .Where(p => !p.IsDeleted && p.IsActive)
+            .Where(p => !p.IsDeleted && p.IsActive && eligibleProductIds.Contains(p.Id))
             .ToListAsync(cancellationToken);
 
         var suppliers = await _context.Suppliers.Where(s => s.IsActive).ToListAsync(cancellationToken);
         var defaultSupplier = suppliers.FirstOrDefault() ?? new Supplier { Id = Guid.NewGuid(), Name = "Default Local Supplier" };
         var supplierLookup = suppliers.ToDictionary(s => s.Id);
 
-        // Optimized: Fetch the latest GRN items per product to determine the preferred supplier, all in one query.
+        // Fetch supplier preference per product from GRN history (one query, in-memory lookup)
         var grnItemsData = await _context.GRNItems
             .Select(gi => new { gi.ProductId, gi.GRNHeader.SupplierId, gi.GRNHeader.CreatedAt })
             .ToListAsync(cancellationToken);
@@ -113,10 +130,19 @@ public class AiAutomationController : ControllerBase
             currentStocks.TryGetValue(product.Id, out decimal currentStock);
 
             decimal avgDailySales = totalSoldIn30Days / 30.0m;
-            // Fallback for new products or low-sales items
-            if (avgDailySales == 0)
+
+            // SMART LOGIC: Skip products with zero sales AND sufficient stock.
+            // Only include products that have REAL sales velocity OR genuinely zero stock (ran out).
+            if (avgDailySales == 0 && currentStock > 0)
             {
-                avgDailySales = 0.15m; 
+                continue; // No sales, still has stock — no action needed
+            }
+
+            // For out-of-stock products with no recent sales, use a conservative minimum
+            // (they were stocked at some point since they have GRN history)
+            if (avgDailySales == 0 && currentStock <= 0)
+            {
+                avgDailySales = 0.1m; // Very conservative - just enough to suggest a minimal reorder
             }
 
             decimal forecasted15DayDemand = avgDailySales * 15m;
@@ -126,8 +152,14 @@ public class AiAutomationController : ControllerBase
             if (requiredQuantity > 0)
             {
                 int recommendedOrder = (int)Math.Ceiling(requiredQuantity);
+
+                // Calculate urgency score: 0 = mildly low, higher = more critical
+                // Products with 0 stock and high sales rate get highest urgency
+                decimal urgencyScore = avgDailySales > 0 && currentStock <= 0
+                    ? avgDailySales * 100m
+                    : requiredQuantity;
                 
-                // Find supplier from last GRN of this product
+                // Find supplier from GRN history
                 Guid supplierId = defaultSupplier.Id;
                 string supplierName = defaultSupplier.Name;
 
@@ -150,12 +182,21 @@ public class AiAutomationController : ControllerBase
                     supplierId = supplierId,
                     supplierName = supplierName,
                     unitCost = product.PurchasePrice,
-                    totalCost = recommendedOrder * product.PurchasePrice
+                    totalCost = recommendedOrder * product.PurchasePrice,
+                    urgencyScore = urgencyScore
                 });
             }
         }
 
-        return Ok(recommendations);
+        // Sort by urgency (most critical first) and cap at 150 results to prevent UI overload
+        var sortedRecommendations = recommendations
+            .Cast<dynamic>()
+            .OrderByDescending(r => r.urgencyScore)
+            .Take(150)
+            .Select(r => (object)r)
+            .ToList();
+
+        return Ok(sortedRecommendations);
     }
 
 
@@ -309,6 +350,70 @@ public class AiAutomationController : ControllerBase
         string promptLower = request.Prompt.ToLower().Trim();
         
         // A. Hybrid NLP Rule-based router for live DB analytics
+
+        // ── Yesterday's Sales ─────────────────────────────────────────
+        if (promptLower.Contains("yesterday"))
+        {
+            var yesterday = DateTime.UtcNow.Date.AddDays(-1);
+            var yesterdayEnd = yesterday.AddDays(1);
+            var yesterdayInvoices = await _context.Invoices
+                .Where(i => i.BusinessDate >= yesterday && i.BusinessDate < yesterdayEnd)
+                .ToListAsync(cancellationToken);
+
+            int count = yesterdayInvoices.Count;
+            decimal total = yesterdayInvoices.Sum(i => i.TotalAmount);
+            decimal cash = yesterdayInvoices.Sum(i => i.CashAmount);
+            decimal upi = yesterdayInvoices.Sum(i => i.UpiAmount);
+
+            return Ok(new
+            {
+                text = $"Yesterday's Summary ({yesterday:dd MMM yyyy}):\n" +
+                       $"- Total Invoices: {count}\n" +
+                       $"- Total Sales: ₹{total:N2}\n" +
+                       $"- Cash Collections: ₹{cash:N2}\n" +
+                       $"- UPI Collections: ₹{upi:N2}"
+            });
+        }
+
+        // ── Today's Sales ─────────────────────────────────────────────
+        if (promptLower.Contains("today") || promptLower.Contains("today's"))
+        {
+            var today = DateTime.UtcNow.Date;
+            var todayInvoices = await _context.Invoices
+                .Where(i => i.BusinessDate >= today)
+                .ToListAsync(cancellationToken);
+
+            int count = todayInvoices.Count;
+            decimal total = todayInvoices.Sum(i => i.TotalAmount);
+            decimal cash = todayInvoices.Sum(i => i.CashAmount);
+            decimal upi = todayInvoices.Sum(i => i.UpiAmount);
+
+            return Ok(new
+            {
+                text = $"Today's Summary ({today:dd MMM yyyy}):\n" +
+                       $"- Total Invoices: {count}\n" +
+                       $"- Total Sales: ₹{total:N2}\n" +
+                       $"- Cash Collections: ₹{cash:N2}\n" +
+                       $"- UPI Collections: ₹{upi:N2}"
+            });
+        }
+
+        // ── Total Sales ───────────────────────────────────────────────
+        if (promptLower.Contains("total sales") || promptLower.Contains("total invoice") || promptLower.Contains("total revenue") || promptLower.Contains("sales figure"))
+        {
+            var allInvoices = await _context.Invoices.ToListAsync(cancellationToken);
+            decimal total = allInvoices.Sum(i => i.TotalAmount);
+            int count = allInvoices.Count;
+
+            return Ok(new
+            {
+                text = $"Overall Sales Summary (All Time):\n" +
+                       $"- Total Invoices Raised: {count}\n" +
+                       $"- Total Revenue: ₹{total:N2}"
+            });
+        }
+
+        // ── Top Sellers ────────────────────────────────────────────────
         if (promptLower.Contains("top sales") || promptLower.Contains("top selling") || promptLower.Contains("best seller") || promptLower.Contains("top 5"))
         {
             var topSales = await _context.StockLedger
@@ -480,14 +585,16 @@ public class AiAutomationController : ControllerBase
             Console.WriteLine($"Ollama error: {ex.Message}");
         }
 
-        // C. Fallback response when Ollama is offline
+        // C. Fallback response when Ollama is offline and query doesn't match rules
         return Ok(new
         {
-            text = "I am your AI Assistant. I couldn't reach the Ollama LLM service, but I can query the POS database for you! Try asking me: \n" +
-                   "- *'Show top selling products'* to view sales volume graphs.\n" +
-                   "- *'Sales split'* or *'cash vs upi'* to view payment statistics.\n" +
-                   "- *'Show expiry alerts'* to review soon-to-expire batch stocks.\n" +
-                   "- *'Low stock'* to see items running low in the warehouse."
+            text = "I'm your AI Co-pilot. I can query the POS database for these questions:\n" +
+                   "- *'Yesterday's sales'* or *'Today's sales'* for daily summaries\n" +
+                   "- *'Total revenue'* for overall sales figures\n" +
+                   "- *'Show top selling products'* for sales volume charts\n" +
+                   "- *'Sales split'* or *'Cash vs UPI'* for payment breakdown\n" +
+                   "- *'Show expiry alerts'* for soon-to-expire batch stocks\n" +
+                   "- *'Low stock'* for items running low in the warehouse"
         });
     }
 }

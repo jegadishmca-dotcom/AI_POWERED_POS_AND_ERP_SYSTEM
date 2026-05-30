@@ -9,6 +9,23 @@ import { api } from '../../../utils/api';
 export const StockAdjustmentForm = () => {
   const { user } = useAuthStore();
   const isManager = user?.role === 'Manager' || user?.role === 'Owner' || user?.role === 'Admin';
+
+  const downloadTemplate = () => {
+    const headers = ['ProductCode', 'Barcode', 'BatchNo', 'AdjustedQty', 'UnitCost'];
+    const rows = [
+      ['PROD-001', '8901030678918', 'B01', '-5', '75.00'],
+      ['PROD-002', '2900000000002', 'B02', '10', '42.50']
+    ];
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'Stock_Adjustment_Import_Template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
   
   // List/History state
   const [adjustments, setAdjustments] = useState<StockAdjustment[]>([]);
@@ -449,6 +466,13 @@ export const StockAdjustmentForm = () => {
           <div className="mb-4 flex justify-between items-center border-t pt-4">
             <h4 className="text-md font-bold text-slate-800">Adjustment Lines</h4>
             <div className="flex items-center space-x-4">
+              <button 
+                onClick={downloadTemplate}
+                className="text-slate-500 hover:text-slate-700 font-bold text-sm flex items-center"
+                title="Download CSV template"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Template
+              </button>
               <label className="cursor-pointer text-emerald-600 font-bold text-sm flex items-center hover:text-emerald-800">
                 <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Import CSV
                 <input 

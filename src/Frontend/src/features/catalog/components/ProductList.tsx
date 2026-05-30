@@ -15,6 +15,23 @@ export const ProductList = ({
 }) => {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
+
+  const downloadTemplate = () => {
+    const headers = ['ProductCode', 'Name', 'TamilName', 'Description', 'Mrp', 'SellingPrice', 'PurchasePrice', 'Barcode', 'TaxSlabName', 'IsWeighable', 'HasExpiry'];
+    const rows = [
+      ['PROD-001', 'Sample Item 1', 'மாதிரி பொருள் 1', 'Sample description', '100.00', '80.00', '60.00', '2900000000001', 'GST 18%', 'FALSE', 'FALSE'],
+      ['PROD-002', 'Sample Item 2', '', 'Another description', '50.00', '45.00', '35.00', '2900000000002', 'GST 5%', 'FALSE', 'FALSE']
+    ];
+    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'Product_Import_Template.csv');
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
   
   // Custom quick debounce implementation for this snippet
   const [debouncedTerm, setDebouncedTerm] = useState(searchTerm);
@@ -155,6 +172,13 @@ export const ProductList = ({
         </h2>
         <div className="flex space-x-2">
           <button 
+            onClick={downloadTemplate}
+            className="px-3 py-2 border border-slate-350 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 rounded-md text-xs font-semibold transition"
+            title="Download CSV Import Template"
+          >
+            Template CSV
+          </button>
+          <button 
             onClick={onImportClick}
             className="px-4 py-2 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700 transition"
           >
@@ -189,15 +213,16 @@ export const ProductList = ({
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Product</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Barcode</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tamil Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tax Slab</th>
               <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Price (₹)</th>
               <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
             {isLoading ? (
-              <tr><td colSpan={5} className="text-center py-4 text-slate-500">Loading...</td></tr>
+              <tr><td colSpan={6} className="text-center py-4 text-slate-500">Loading...</td></tr>
             ) : !Array.isArray(products) || products.length === 0 ? (
-              <tr><td colSpan={5} className="text-center py-4 text-slate-500">No products found.</td></tr>
+              <tr><td colSpan={6} className="text-center py-4 text-slate-500">No products found.</td></tr>
             ) : (
               products.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
@@ -207,6 +232,9 @@ export const ProductList = ({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">{p.primaryBarcode || '-'}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 font-tamil">{p.tamilName || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-550 dark:text-slate-400">
+                    <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded text-xs font-semibold text-slate-700 dark:text-slate-350">{p.taxSlabName || 'GST 0%'}</span>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-white text-right font-semibold">
                     {(p.sellingPrice ?? 0).toFixed(2)}
                   </td>

@@ -23,7 +23,8 @@ public record ProductSearchResultDto(
     bool IsWeighable,
     decimal Mrp,
     decimal PurchasePrice,
-    string? Description
+    string? Description,
+    string TaxSlabName
 );
 
 public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, List<ProductSearchResultDto>>
@@ -67,7 +68,8 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, L
                 p.IsWeighable,
                 p.Mrp,
                 p.PurchasePrice,
-                p.Description
+                p.Description,
+                p.TaxSlab != null ? p.TaxSlab.Name : "GST 0%"
             ))
             .ToListAsync(cancellationToken);
 

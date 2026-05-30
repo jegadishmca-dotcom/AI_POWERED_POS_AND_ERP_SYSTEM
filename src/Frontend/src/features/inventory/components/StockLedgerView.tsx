@@ -19,7 +19,7 @@ interface StockLedgerEntry {
 export const StockLedgerView = () => {
   const [ledgerEntries, setLedgerEntries] = useState<StockLedgerEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [previewDoc, setPreviewDoc] = useState<{ id: string; type: string } | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<{ id: string; type: string; referenceNumber?: string } | null>(null);
   
   // Filters & Pagination
   const [searchTerm, setSearchTerm] = useState('');
@@ -195,7 +195,7 @@ export const StockLedgerView = () => {
                 </td>
                 <td 
                   className="p-3 text-sm text-blue-600 flex items-center cursor-pointer hover:underline"
-                  onClick={() => setPreviewDoc({ id: entry.referenceDocumentId, type: entry.movementType })}
+                  onClick={() => setPreviewDoc({ id: entry.referenceDocumentId, type: entry.movementType, referenceNumber: entry.referenceDocument })}
                 >
                   <FileText className="w-4 h-4 mr-1" /> {entry.referenceDocument}
                 </td>
@@ -239,6 +239,7 @@ export const StockLedgerView = () => {
         <DocumentPreviewModal 
           docId={previewDoc.id} 
           docType={previewDoc.type} 
+          referenceNumber={previewDoc.referenceNumber}
           onClose={() => setPreviewDoc(null)} 
         />
       )}

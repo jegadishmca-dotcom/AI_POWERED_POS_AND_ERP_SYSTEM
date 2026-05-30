@@ -1,19 +1,23 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Calendar, User, Tag, ShoppingBag, Receipt, Truck, ArrowRightLeft, ShieldAlert } from 'lucide-react';
+import { X, FileText, Calendar, User, Tag, ShoppingBag, Receipt, Truck, ArrowRightLeft, ShieldAlert, ClipboardCheck } from 'lucide-react';
 import { api } from '../../../utils/api';
 
 interface DocumentPreviewModalProps {
   docId: string;
   docType: string;
+  referenceNumber?: string;
   onClose: () => void;
 }
 
-export const DocumentPreviewModal = ({ docId, docType, onClose }: DocumentPreviewModalProps) => {
+export const DocumentPreviewModal = ({ docId, docType, referenceNumber, onClose }: DocumentPreviewModalProps) => {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const normalizedType = docType.toUpperCase() === 'SALE_OVERRIDE' ? 'SALE' : docType.toUpperCase();
+  let normalizedType = docType.toUpperCase() === 'SALE_OVERRIDE' ? 'SALE' : docType.toUpperCase();
+  if (normalizedType === 'ADJ' && referenceNumber && referenceNumber.startsWith('TAKE-')) {
+    normalizedType = 'STOCK_TAKE';
+  }
 
   useEffect(() => {
     const fetchDoc = async () => {
@@ -26,6 +30,8 @@ export const DocumentPreviewModal = ({ docId, docType, onClose }: DocumentPrevie
           endpoint = `/api/pos/invoice/${docId}`;
         } else if (normalizedType === 'ADJ' || normalizedType === 'ADJUSTMENT') {
           endpoint = `/api/inventory/stock-adjustment/${docId}`;
+        } else if (normalizedType === 'STOCK_TAKE') {
+          endpoint = `/api/inventory/stock-take/${docId}`;
         } else if (normalizedType === 'GRN') {
           endpoint = `/api/inventory/grn/${docId}`;
         } else {
@@ -48,7 +54,7 @@ export const DocumentPreviewModal = ({ docId, docType, onClose }: DocumentPrevie
       setLoading(false);
       setError('Invalid reference document key. This is a system-generated adjustment or seed balance.');
     }
-  }, [docId, docType]);
+  }, [docId, docType, referenceNumber]);
 
   const renderSalesInvoice = () => {
     if (!data) return null;
@@ -336,15 +342,82 @@ export const DocumentPreviewModal = ({ docId, docType, onClose }: DocumentPrevie
     );
   };
 
+  const renderStockTake = () => {
+    if (!data) return null;
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+          <div>
+            <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Stock Take Info</div>
+            <div className="text-sm font-bold text-slate-800 mt-1">{data.takeNumber}</div>
+            <div className="text-xs text-slate-500 mt-1">Date: {new Date(data.createdAt).toLocaleDateString()} {new Date(data.createdAt).toLocaleTimeString()}</div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Details</div>
+            <div className="text-sm font-semibold text-slate-800 mt-1">
+              Type: <span className="px-2 py-0.5 rounded-full text-xs bg-indigo-50 text-indigo-800 font-black">Stock Take Variance</span>
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              Status: <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${data.status === 'APPROVED' ? 'bg-green-100 text-green-800' : 'bg-amber-100 text-amber-800'}`}>{data.status}</span>
+            </div>
+          </div>
+          {data.approvedByName && (
+            <div className="col-span-2 border-t pt-2 mt-2">
+              <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Approved By</div>
+              <div className="text-sm font-medium text-slate-800 mt-0.5">{data.approvedByName}</div>
+            </div>
+          )}
+        </div>
+
+        <div>
+          <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center">
+            <ArrowRightLeft className="w-4 h-4 mr-1.5 text-indigo-500" /> Count Variances
+          </h4>
+          <div className="border rounded-lg overflow-hidden">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead className="bg-slate-50 font-semibold text-slate-600">
+                <tr className="border-b">
+                  <th className="p-3">Product Name</th>
+                  <th className="p-3 text-right">System Qty</th>
+                  <th className="p-3 text-right">Physical Qty</th>
+                  <th className="p-3 text-right">Variance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.items?.map((item: any, idx: number) => (
+                  <tr key={idx} className="border-b hover:bg-slate-50">
+                    <td className="p-3">
+                      <div className="font-semibold text-slate-800">{item.productName}</div>
+                      <div className="text-[10px] text-slate-500 mt-0.5">Batch: {item.batchNumber || 'NO BATCH'}</div>
+                    </td>
+                    <td className="p-3 text-right text-slate-600">{item.systemQuantity}</td>
+                    <td className="p-3 text-right text-slate-800 font-medium">{item.physicalQuantity}</td>
+                    <td className="p-3 text-right">
+                      <span className={`font-black ${item.varianceQuantity > 0 ? 'text-green-600' : item.varianceQuantity < 0 ? 'text-red-600' : 'text-slate-500'}`}>
+                        {item.varianceQuantity > 0 ? `+${item.varianceQuantity}` : item.varianceQuantity}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const getIcon = () => {
     if (normalizedType === 'SALE') return <Receipt className="w-6 h-6 text-blue-500 mr-2" />;
     if (normalizedType === 'ADJ' || normalizedType === 'ADJUSTMENT') return <ArrowRightLeft className="w-6 h-6 text-orange-500 mr-2" />;
+    if (normalizedType === 'STOCK_TAKE') return <ClipboardCheck className="w-6 h-6 text-indigo-500 mr-2" />;
     return <Truck className="w-6 h-6 text-green-500 mr-2" />;
   };
 
   const getDocTitle = () => {
     if (normalizedType === 'SALE') return 'Sales Tax Invoice';
     if (normalizedType === 'ADJ' || normalizedType === 'ADJUSTMENT') return 'Stock Adjustment Note';
+    if (normalizedType === 'STOCK_TAKE') return 'Stock Take Note';
     return 'Goods Receipt Note (GRN)';
   };
 
@@ -391,6 +464,7 @@ export const DocumentPreviewModal = ({ docId, docType, onClose }: DocumentPrevie
             <>
               {normalizedType === 'SALE' && renderSalesInvoice()}
               {(normalizedType === 'ADJ' || normalizedType === 'ADJUSTMENT') && renderStockAdjustment()}
+              {normalizedType === 'STOCK_TAKE' && renderStockTake()}
               {normalizedType === 'GRN' && renderGRN()}
             </>
           )}

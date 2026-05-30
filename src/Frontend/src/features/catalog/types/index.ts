@@ -11,6 +11,7 @@ export interface ProductSearchResult {
   mrp: number;
   purchasePrice: number;
   description?: string;
+  taxSlabName: string;
 }
 
 export interface ImportResult {

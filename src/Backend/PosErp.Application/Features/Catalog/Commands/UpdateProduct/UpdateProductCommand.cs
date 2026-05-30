@@ -41,11 +41,11 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
             throw new Exception("Product not found.");
         }
 
-        // Verify product code uniqueness if changed
-        if (product.ProductCode != request.ProductCode)
+        // Verify product code uniqueness if changed (case-insensitive)
+        if (!string.Equals(product.ProductCode, request.ProductCode, StringComparison.OrdinalIgnoreCase))
         {
             var codeExists = await _context.Products
-                .AnyAsync(p => p.ProductCode == request.ProductCode && p.Id != product.Id && !p.IsDeleted, cancellationToken);
+                .AnyAsync(p => p.ProductCode.ToLower() == request.ProductCode.ToLower() && p.Id != product.Id && !p.IsDeleted, cancellationToken);
             if (codeExists)
             {
                 throw new Exception("Product code already exists on another product.");
@@ -62,31 +62,25 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         product.UpdatedAt = DateTime.UtcNow;
 
         // Handle Barcode Update
-        var primaryBarcode = product.Barcodes.FirstOrDefault(b => b.IsPrimary && !b.IsDeleted);
         if (!string.IsNullOrEmpty(request.BarcodeValue))
         {
-            if (primaryBarcode != null)
+            // Check if new barcode is unique among other products' active barcodes
+            var barcodeExistsOnOtherProduct = await _context.Barcodes
+                .AnyAsync(b => b.BarcodeValue == request.BarcodeValue && b.ProductId != product.Id && !b.IsDeleted, cancellationToken);
+            if (barcodeExistsOnOtherProduct)
             {
-                if (primaryBarcode.BarcodeValue != request.BarcodeValue)
-                {
-                    // Check if new barcode is unique among active barcodes
-                    var barcodeExists = await _context.Barcodes
-                        .AnyAsync(b => b.BarcodeValue == request.BarcodeValue && b.ProductId != product.Id && !b.IsDeleted, cancellationToken);
-                    if (barcodeExists)
-                    {
-                        throw new Exception("Barcode already exists on another product.");
-                    }
-                    primaryBarcode.BarcodeValue = request.BarcodeValue;
-                }
+                throw new Exception("Barcode already exists on another product.");
+            }
+
+            // Find if this product already has this barcode associated with it (active or deleted)
+            var existingBarcode = product.Barcodes.FirstOrDefault(b => b.BarcodeValue == request.BarcodeValue);
+            if (existingBarcode != null)
+            {
+                existingBarcode.IsDeleted = false;
+                existingBarcode.IsPrimary = true;
             }
             else
             {
-                var barcodeExists = await _context.Barcodes
-                    .AnyAsync(b => b.BarcodeValue == request.BarcodeValue && !b.IsDeleted, cancellationToken);
-                if (barcodeExists)
-                {
-                    throw new Exception("Barcode already exists on another product.");
-                }
                 product.Barcodes.Add(new Barcode
                 {
                     Id = Guid.NewGuid(),
@@ -96,13 +90,20 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
                     CreatedAt = DateTime.UtcNow
                 });
             }
+
+            // Set all other barcodes of this product to not primary
+            foreach (var b in product.Barcodes.Where(b => b.BarcodeValue != request.BarcodeValue))
+            {
+                b.IsPrimary = false;
+            }
         }
         else
         {
-            // If barcode was cleared, mark primary barcode as deleted
-            if (primaryBarcode != null)
+            // If barcode was cleared, mark all barcodes as not primary and deleted
+            foreach (var b in product.Barcodes)
             {
-                primaryBarcode.IsDeleted = true;
+                b.IsPrimary = false;
+                b.IsDeleted = true;
             }
         }
 

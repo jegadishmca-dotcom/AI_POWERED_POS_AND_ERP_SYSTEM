@@ -45,6 +45,8 @@ export const AiChat = () => {
   const quickPrompts = [
     { label: '🗓️ Yesterday\'s Sales', prompt: 'Yesterday\'s sales figure please' },
     { label: '📅 Today\'s Sales', prompt: 'Today\'s sales summary' },
+    { label: '📆 Last Week', prompt: 'Show me last week\'s sales' },
+    { label: '🗃️ This Month', prompt: 'This month sales summary' },
     { label: '💰 Total Revenue', prompt: 'Total revenue and sales figure' },
     { label: '📊 Top Selling Products', prompt: 'Show my top selling products' },
     { label: '💳 Cash vs UPI Sales', prompt: 'Show sales breakdown by payment type' },

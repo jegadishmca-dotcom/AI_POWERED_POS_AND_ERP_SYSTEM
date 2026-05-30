@@ -375,6 +375,85 @@ public class AiAutomationController : ControllerBase
             });
         }
 
+        // ── Last Week's Sales ─────────────────────────────────────────
+        if (promptLower.Contains("last week") || promptLower.Contains("past week") || promptLower.Contains("previous week"))
+        {
+            var weekStart = DateTime.UtcNow.Date.AddDays(-7);
+            var weekEnd = DateTime.UtcNow.Date;
+            var weekInvoices = await _context.Invoices
+                .Where(i => i.BusinessDate >= weekStart && i.BusinessDate < weekEnd)
+                .ToListAsync(cancellationToken);
+
+            int count = weekInvoices.Count;
+            decimal total = weekInvoices.Sum(i => i.TotalAmount);
+            decimal cash = weekInvoices.Sum(i => i.CashAmount);
+            decimal upi = weekInvoices.Sum(i => i.UpiAmount);
+            decimal daily = count > 0 ? total / 7m : 0;
+
+            return Ok(new
+            {
+                text = $"Last 7 Days Sales Summary ({weekStart:dd MMM} – {weekEnd:dd MMM yyyy}):\n" +
+                       $"- Total Invoices: {count}\n" +
+                       $"- Total Sales: ₹{total:N2}\n" +
+                       $"- Avg Daily Sales: ₹{daily:N2}\n" +
+                       $"- Cash Collections: ₹{cash:N2}\n" +
+                       $"- UPI Collections: ₹{upi:N2}"
+            });
+        }
+
+        // ── This Month's Sales ────────────────────────────────────────
+        if (promptLower.Contains("this month") || promptLower.Contains("current month") || promptLower.Contains("monthly sales"))
+        {
+            var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+            var monthInvoices = await _context.Invoices
+                .Where(i => i.BusinessDate >= monthStart)
+                .ToListAsync(cancellationToken);
+
+            int count = monthInvoices.Count;
+            decimal total = monthInvoices.Sum(i => i.TotalAmount);
+            decimal cash = monthInvoices.Sum(i => i.CashAmount);
+            decimal upi = monthInvoices.Sum(i => i.UpiAmount);
+            int daysElapsed = (DateTime.UtcNow.Date - monthStart).Days + 1;
+            decimal daily = daysElapsed > 0 ? total / daysElapsed : 0;
+
+            return Ok(new
+            {
+                text = $"This Month's Sales ({monthStart:MMMM yyyy}):\n" +
+                       $"- Total Invoices: {count}\n" +
+                       $"- Total Sales: ₹{total:N2}\n" +
+                       $"- Avg Daily Sales: ₹{daily:N2}\n" +
+                       $"- Cash Collections: ₹{cash:N2}\n" +
+                       $"- UPI Collections: ₹{upi:N2}"
+            });
+        }
+
+        // ── Last Month's Sales ────────────────────────────────────────
+        if (promptLower.Contains("last month") || promptLower.Contains("previous month"))
+        {
+            var lastMonthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(-1);
+            var lastMonthEnd = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+            var lastMonthInvoices = await _context.Invoices
+                .Where(i => i.BusinessDate >= lastMonthStart && i.BusinessDate < lastMonthEnd)
+                .ToListAsync(cancellationToken);
+
+            int count = lastMonthInvoices.Count;
+            decimal total = lastMonthInvoices.Sum(i => i.TotalAmount);
+            decimal cash = lastMonthInvoices.Sum(i => i.CashAmount);
+            decimal upi = lastMonthInvoices.Sum(i => i.UpiAmount);
+            int daysInMonth = (lastMonthEnd - lastMonthStart).Days;
+            decimal daily = daysInMonth > 0 ? total / daysInMonth : 0;
+
+            return Ok(new
+            {
+                text = $"Last Month's Sales ({lastMonthStart:MMMM yyyy}):\n" +
+                       $"- Total Invoices: {count}\n" +
+                       $"- Total Sales: ₹{total:N2}\n" +
+                       $"- Avg Daily Sales: ₹{daily:N2}\n" +
+                       $"- Cash Collections: ₹{cash:N2}\n" +
+                       $"- UPI Collections: ₹{upi:N2}"
+            });
+        }
+
         // ── Today's Sales ─────────────────────────────────────────────
         if (promptLower.Contains("today") || promptLower.Contains("today's"))
         {

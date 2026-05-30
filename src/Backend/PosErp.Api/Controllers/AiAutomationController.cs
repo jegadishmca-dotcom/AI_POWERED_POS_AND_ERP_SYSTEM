@@ -641,26 +641,79 @@ public class AiAutomationController : ControllerBase
         // B. Attempt connection to Ollama LLM
         try
         {
-            var ollamaUrl = "http://pos_ollama:11434/api/generate";
-            // Check if pos_ollama responds, otherwise try localhost (in case of local standalone testing)
+            var baseUrl = "http://pos_ollama:11434";
             try
             {
-                var responseTest = await _httpClient.GetAsync("http://pos_ollama:11434");
+                // Check if pos_ollama responds quickly
+                using var testCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                await _httpClient.GetAsync(baseUrl, testCts.Token);
             }
             catch
             {
-                ollamaUrl = "http://localhost:11434/api/generate";
+                baseUrl = "http://localhost:11434";
             }
 
+            // 1. Fetch available models from /api/tags
+            string activeModel = "llama2";
+            bool hasModels = false;
+            try
+            {
+                using var tagsClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+                var tagsResponse = await tagsClient.GetAsync($"{baseUrl}/api/tags", cancellationToken);
+                if (tagsResponse.IsSuccessStatusCode)
+                {
+                    var tagsJson = await tagsResponse.Content.ReadAsStringAsync(cancellationToken);
+                    using var doc = JsonDocument.Parse(tagsJson);
+                    if (doc.RootElement.TryGetProperty("models", out var modelsArr) && modelsArr.ValueKind == JsonValueKind.Array)
+                    {
+                        var modelList = new List<string>();
+                        foreach (var m in modelsArr.EnumerateArray())
+                        {
+                            if (m.TryGetProperty("name", out var nameProp))
+                            {
+                                modelList.Add(nameProp.GetString());
+                            }
+                        }
+
+                        if (modelList.Count > 0)
+                        {
+                            // Use first model (prefer Qwen or Llama if present)
+                            activeModel = modelList.FirstOrDefault(name => name.Contains("qwen") || name.Contains("llama")) ?? modelList[0];
+                            hasModels = true;
+                        }
+                    }
+                }
+            }
+            catch (Exception tagsEx)
+            {
+                Console.WriteLine($"Error fetching Ollama models: {tagsEx.Message}");
+            }
+
+            if (!hasModels)
+            {
+                // Ollama is online but has no models pulled yet
+                return Ok(new
+                {
+                    text = "🤖 **Ollama LLM Service is Online**, but no AI models have been downloaded yet.\n\n" +
+                           "Please pull a model on the host server to enable general question answering:\n" +
+                           "```bash\n" +
+                           "docker exec -it pos_ollama ollama pull qwen2.5:7b-instruct\n" +
+                           "```\n" +
+                           "*Meanwhile, you can use the quick prompt buttons below to query the database directly.*"
+                });
+            }
+
+            // 2. Query the LLM with a 90-second timeout to handle CPU-only generation safely
+            using var ollamaClient = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
             var requestBody = new
             {
-                model = "llama2", // or whatever model is pre-pulled, fallback friendly
+                model = activeModel,
                 prompt = $"You are an expert AI Co-pilot assistant for the Apple Supermarket POS & ERP. Answer this query professionally in a retail store context. Query: {request.Prompt}",
                 stream = false
             };
 
             var jsonContent = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
-            var response = await _httpClient.PostAsync(ollamaUrl, jsonContent, cancellationToken);
+            var response = await ollamaClient.PostAsync($"{baseUrl}/api/generate", jsonContent, cancellationToken);
             
             if (response.IsSuccessStatusCode)
             {
@@ -673,7 +726,7 @@ public class AiAutomationController : ControllerBase
         catch (Exception ex)
         {
             // Log or ignore to fall back
-            Console.WriteLine($"Ollama error: {ex.Message}");
+            Console.WriteLine($"Ollama generation error: {ex.Message}");
         }
 
         // C. Fallback response when Ollama is offline and query doesn't match rules

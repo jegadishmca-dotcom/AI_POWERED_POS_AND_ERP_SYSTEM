@@ -671,7 +671,11 @@ public class AiAutomationController : ControllerBase
                         {
                             if (m.TryGetProperty("name", out var nameProp))
                             {
-                                modelList.Add(nameProp.GetString());
+                                var modelName = nameProp.GetString();
+                                if (!string.IsNullOrEmpty(modelName))
+                                {
+                                    modelList.Add(modelName);
+                                }
                             }
                         }
 

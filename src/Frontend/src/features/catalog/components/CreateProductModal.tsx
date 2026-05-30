@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Loader2, Save } from 'lucide-react';
-import { createProduct } from '../api/catalog.api';
+import { createProduct, updateProduct } from '../api/catalog.api';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface CreateProductModalProps {
   isOpen: boolean;
   onClose: () => void;
+  editingProduct?: any;
 }
 
-export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, onClose }) => {
+export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, onClose, editingProduct }) => {
   const queryClient = useQueryClient();
   const [productCode, setProductCode] = useState('');
   const [name, setName] = useState('');
@@ -20,6 +21,31 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
   const [barcodeValue, setBarcodeValue] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (editingProduct) {
+        setProductCode(editingProduct.productCode || '');
+        setName(editingProduct.name || '');
+        setTamilName(editingProduct.tamilName || '');
+        setDescription(editingProduct.description || '');
+        setMrp(editingProduct.mrp?.toString() || '');
+        setSellingPrice(editingProduct.sellingPrice?.toString() || '');
+        setPurchasePrice(editingProduct.purchasePrice?.toString() || '');
+        setBarcodeValue(editingProduct.primaryBarcode || '');
+      } else {
+        setProductCode('');
+        setName('');
+        setTamilName('');
+        setDescription('');
+        setMrp('');
+        setSellingPrice('');
+        setPurchasePrice('');
+        setBarcodeValue('');
+      }
+      setError(null);
+    }
+  }, [isOpen, editingProduct]);
 
   if (!isOpen) return null;
 
@@ -33,29 +59,34 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
     setIsSubmitting(true);
     setError(null);
     try {
-      await createProduct({
-        productCode,
-        name,
-        tamilName: tamilName || undefined,
-        description: description || undefined,
-        mrp: parseFloat(mrp),
-        sellingPrice: parseFloat(sellingPrice),
-        purchasePrice: parseFloat(purchasePrice),
-        barcodeValue: barcodeValue
-      });
+      if (editingProduct) {
+        await updateProduct(editingProduct.id, {
+          id: editingProduct.id,
+          productCode,
+          name,
+          tamilName: tamilName || undefined,
+          description: description || undefined,
+          mrp: parseFloat(mrp),
+          sellingPrice: parseFloat(sellingPrice),
+          purchasePrice: parseFloat(purchasePrice),
+          barcodeValue: barcodeValue
+        });
+      } else {
+        await createProduct({
+          productCode,
+          name,
+          tamilName: tamilName || undefined,
+          description: description || undefined,
+          mrp: parseFloat(mrp),
+          sellingPrice: parseFloat(sellingPrice),
+          purchasePrice: parseFloat(purchasePrice),
+          barcodeValue: barcodeValue
+        });
+      }
       queryClient.invalidateQueries({ queryKey: ['products'] });
       onClose();
-      // Reset state
-      setProductCode('');
-      setName('');
-      setTamilName('');
-      setDescription('');
-      setMrp('');
-      setSellingPrice('');
-      setPurchasePrice('');
-      setBarcodeValue('');
     } catch (err: any) {
-      const msg = err?.response?.data?.Message || err?.response?.data?.Detailed || 'Failed to create product. Check that your product code and barcodes are unique.';
+      const msg = err?.response?.data?.Message || err?.response?.data?.Detailed || 'Failed to save product. Check that your product code and barcodes are unique.';
       setError(msg);
     } finally {
       setIsSubmitting(false);
@@ -67,7 +98,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
       <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex justify-between items-center px-6 py-4 border-b border-slate-800">
-          <h2 className="text-lg font-semibold text-white">Create New Product</h2>
+          <h2 className="text-lg font-semibold text-white">{editingProduct ? 'Edit Product' : 'Create New Product'}</h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white transition">
             <X className="w-5 h-5" />
           </button>
@@ -94,12 +125,26 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Barcode Value</label>
-              <input
-                type="text"
-                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 text-sm"
-                value={barcodeValue}
-                onChange={(e) => setBarcodeValue(e.target.value)}
-              />
+              <div className="flex space-x-2">
+                <input
+                  type="text"
+                  className="flex-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 text-sm"
+                  value={barcodeValue}
+                  onChange={(e) => setBarcodeValue(e.target.value)}
+                  placeholder="Scan or enter barcode"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    const ticks = Date.now().toString();
+                    setBarcodeValue("29" + ticks.slice(-11));
+                  }}
+                  className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold text-white rounded-lg border border-slate-750 transition"
+                  title="Auto-Generate Barcode"
+                >
+                  Gen
+                </button>
+              </div>
             </div>
           </div>
 

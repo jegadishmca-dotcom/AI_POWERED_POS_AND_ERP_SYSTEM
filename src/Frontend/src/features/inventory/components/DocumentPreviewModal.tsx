@@ -13,13 +13,14 @@ export const DocumentPreviewModal = ({ docId, docType, onClose }: DocumentPrevie
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const normalizedType = docType.toUpperCase() === 'SALE_OVERRIDE' ? 'SALE' : docType.toUpperCase();
+
   useEffect(() => {
     const fetchDoc = async () => {
       try {
         setLoading(true);
         setError(null);
         let endpoint = '';
-        const normalizedType = docType.toUpperCase();
 
         if (normalizedType === 'SALE') {
           endpoint = `/api/pos/invoice/${docId}`;
@@ -336,14 +337,12 @@ export const DocumentPreviewModal = ({ docId, docType, onClose }: DocumentPrevie
   };
 
   const getIcon = () => {
-    const normalizedType = docType.toUpperCase();
     if (normalizedType === 'SALE') return <Receipt className="w-6 h-6 text-blue-500 mr-2" />;
     if (normalizedType === 'ADJ' || normalizedType === 'ADJUSTMENT') return <ArrowRightLeft className="w-6 h-6 text-orange-500 mr-2" />;
     return <Truck className="w-6 h-6 text-green-500 mr-2" />;
   };
 
   const getDocTitle = () => {
-    const normalizedType = docType.toUpperCase();
     if (normalizedType === 'SALE') return 'Sales Tax Invoice';
     if (normalizedType === 'ADJ' || normalizedType === 'ADJUSTMENT') return 'Stock Adjustment Note';
     return 'Goods Receipt Note (GRN)';
@@ -390,9 +389,9 @@ export const DocumentPreviewModal = ({ docId, docType, onClose }: DocumentPrevie
 
           {!loading && !error && (
             <>
-              {docType.toUpperCase() === 'SALE' && renderSalesInvoice()}
-              {(docType.toUpperCase() === 'ADJ' || docType.toUpperCase() === 'ADJUSTMENT') && renderStockAdjustment()}
-              {docType.toUpperCase() === 'GRN' && renderGRN()}
+              {normalizedType === 'SALE' && renderSalesInvoice()}
+              {(normalizedType === 'ADJ' || normalizedType === 'ADJUSTMENT') && renderStockAdjustment()}
+              {normalizedType === 'GRN' && renderGRN()}
             </>
           )}
         </div>

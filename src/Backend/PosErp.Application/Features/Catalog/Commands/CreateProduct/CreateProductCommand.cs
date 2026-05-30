@@ -63,16 +63,20 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             IsActive = true
         };
 
-        // 3. Add Barcode if supplied
-        if (!string.IsNullOrEmpty(request.BarcodeValue))
+        // 3. Add Barcode (auto-generate if blank)
+        string finalBarcode = request.BarcodeValue;
+        if (string.IsNullOrEmpty(finalBarcode))
         {
-            product.Barcodes.Add(new Barcode
-            {
-                Id = Guid.NewGuid(),
-                BarcodeValue = request.BarcodeValue,
-                IsPrimary = true
-            });
+            var ticks = DateTime.UtcNow.Ticks.ToString();
+            finalBarcode = "29" + ticks.Substring(ticks.Length - 11);
         }
+
+        product.Barcodes.Add(new Barcode
+        {
+            Id = Guid.NewGuid(),
+            BarcodeValue = finalBarcode,
+            IsPrimary = true
+        });
 
         try
         {

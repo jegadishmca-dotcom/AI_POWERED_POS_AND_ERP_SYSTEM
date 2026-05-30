@@ -4,8 +4,11 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Http;
 using PosErp.Application.Features.Catalog.Commands.ImportProducts;
 using PosErp.Application.Features.Catalog.Commands.CreateProduct;
+using PosErp.Application.Features.Catalog.Commands.UpdateProduct;
+using PosErp.Application.Features.Catalog.Commands.DeleteProduct;
 using PosErp.Application.Features.Catalog.Queries.SearchProducts;
 using Microsoft.AspNetCore.Authorization;
+using System;
 
 namespace PosErp.Api.Controllers;
 
@@ -39,6 +42,24 @@ public class CatalogController : ControllerBase
     public async Task<IActionResult> Create([FromBody] CreateProductCommand command)
     {
         var result = await _mediator.Send(command);
+        return Ok(result);
+    }
+
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductCommand command)
+    {
+        if (id != command.Id)
+        {
+            return BadRequest("Mismatched Product ID.");
+        }
+        var result = await _mediator.Send(command);
+        return Ok(result);
+    }
+
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(Guid id)
+    {
+        var result = await _mediator.Send(new DeleteProductCommand(id));
         return Ok(result);
     }
 }

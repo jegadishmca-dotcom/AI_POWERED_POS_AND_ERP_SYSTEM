@@ -8,6 +8,9 @@ export interface ProductSearchResult {
   cgstRate: number;
   sgstRate: number;
   isWeighable: boolean;
+  mrp: number;
+  purchasePrice: number;
+  description?: string;
 }
 
 export interface ImportResult {

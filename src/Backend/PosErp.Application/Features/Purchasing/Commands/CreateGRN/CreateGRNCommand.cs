@@ -41,6 +41,9 @@ public class CreateGRNCommandHandler : IRequestHandler<CreateGRNCommand, Guid>
 
     public async Task<Guid> Handle(CreateGRNCommand request, CancellationToken cancellationToken)
     {
+        if (string.IsNullOrWhiteSpace(request.SupplierInvoiceNumber))
+            throw new Exception("Supplier Invoice Number is mandatory.");
+
         // Backend guard: reject empty GRN submissions
         if (request.Items == null || request.Items.Count == 0)
             throw new Exception("Cannot create a GRN with no items. Please enter at least one item with accepted quantity.");

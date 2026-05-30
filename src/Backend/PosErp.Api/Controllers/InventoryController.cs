@@ -14,9 +14,14 @@ using PosErp.Application.Features.Inventory.Commands.CreateOrUpdateStockTake;
 using PosErp.Application.Features.Inventory.Commands.ApproveStockTake;
 using PosErp.Application.Features.Inventory.Commands.RejectStockTake;
 using System;
+using System.IO;
 using System.Linq;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Http;
+using PosErp.Domain.Entities.Catalog;
+using PosErp.Domain.Entities.Inventory;
 
 namespace PosErp.Api.Controllers;
 
@@ -277,5 +282,297 @@ public class InventoryController : ControllerBase
     {
         var result = await _mediator.Send(new RejectStockTakeCommand(id, null));
         return Ok(result);
+    }
+
+    [HttpPost("stock-take/parse-csv")]
+    public async Task<IActionResult> ParseStockTakeCsv(IFormFile file, [FromServices] IApplicationDbContext dbContext, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest("No file uploaded.");
+        }
+
+        try
+        {
+            using var reader = new StreamReader(file.OpenReadStream());
+            var headerLine = await reader.ReadLineAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(headerLine))
+            {
+                return BadRequest("CSV file is empty.");
+            }
+
+            var headers = headerLine.Split(',').Select(h => h.Trim().ToLower()).ToList();
+            int codeIdx = headers.IndexOf("productcode");
+            int barcodeIdx = headers.IndexOf("barcode");
+            int batchIdx = headers.IndexOf("batchno");
+            if (batchIdx == -1) batchIdx = headers.IndexOf("batchnumber");
+            
+            int qtyIdx = headers.IndexOf("physicalcount");
+            if (qtyIdx == -1) qtyIdx = headers.IndexOf("physicalquantity");
+            if (qtyIdx == -1) qtyIdx = headers.IndexOf("quantity");
+
+            if ((codeIdx == -1 && barcodeIdx == -1) || qtyIdx == -1)
+            {
+                return BadRequest("CSV missing required headers. Required: ProductCode or Barcode, and PhysicalCount/Quantity.");
+            }
+
+            var resolvedLines = new List<object>();
+
+            while (!reader.EndOfStream)
+            {
+                var line = await reader.ReadLineAsync();
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                var values = ParseCsvLine(line);
+                if (values.Count == 0) continue;
+
+                Product? product = null;
+                if (barcodeIdx != -1 && barcodeIdx < values.Count && !string.IsNullOrWhiteSpace(values[barcodeIdx]))
+                {
+                    var barcodeVal = values[barcodeIdx];
+                    product = await dbContext.Products
+                        .Include(p => p.Barcodes)
+                        .FirstOrDefaultAsync(p => !p.IsDeleted && p.IsActive && p.Barcodes.Any(b => b.BarcodeValue == barcodeVal), cancellationToken);
+                }
+
+                if (product == null && codeIdx != -1 && codeIdx < values.Count && !string.IsNullOrWhiteSpace(values[codeIdx]))
+                {
+                    var codeVal = values[codeIdx];
+                    product = await dbContext.Products
+                        .Include(p => p.Barcodes)
+                        .FirstOrDefaultAsync(p => !p.IsDeleted && p.IsActive && p.ProductCode == codeVal, cancellationToken);
+                }
+
+                if (product == null) continue;
+
+                ProductBatch? batch = null;
+                string parsedBatchNo = "";
+                if (batchIdx != -1 && batchIdx < values.Count && !string.IsNullOrWhiteSpace(values[batchIdx]))
+                {
+                    parsedBatchNo = values[batchIdx];
+                    batch = await dbContext.ProductBatches
+                        .FirstOrDefaultAsync(b => b.ProductId == product.Id && b.BatchNumber == parsedBatchNo && b.IsActive, cancellationToken);
+                }
+
+                if (batch == null)
+                {
+                    var activeBatches = await dbContext.ProductBatches
+                        .Where(b => b.ProductId == product.Id && b.IsActive)
+                        .ToListAsync(cancellationToken);
+                    
+                    if (!string.IsNullOrEmpty(parsedBatchNo) && activeBatches.Any())
+                    {
+                        batch = activeBatches.FirstOrDefault(b => b.BatchNumber.Equals(parsedBatchNo, StringComparison.OrdinalIgnoreCase)) ?? activeBatches.FirstOrDefault();
+                    }
+                    else
+                    {
+                        batch = activeBatches.FirstOrDefault();
+                    }
+                }
+
+                decimal physicalQty = 0;
+                if (qtyIdx < values.Count)
+                {
+                    decimal.TryParse(values[qtyIdx], out physicalQty);
+                }
+
+                decimal systemQty = 0;
+                if (batch != null)
+                {
+                    systemQty = await dbContext.StockLedger
+                        .Where(sl => sl.ProductId == product.Id && sl.BatchId == batch.Id)
+                        .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+                }
+                else
+                {
+                    systemQty = await dbContext.StockLedger
+                        .Where(sl => sl.ProductId == product.Id && sl.BatchId == null)
+                        .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+                }
+
+                resolvedLines.Add(new
+                {
+                    productId = product.Id,
+                    productName = product.Name,
+                    batchId = batch?.Id ?? Guid.Empty,
+                    batchNumber = batch?.BatchNumber ?? "NO BATCH",
+                    systemQuantity = systemQty,
+                    physicalQuantity = physicalQty
+                });
+            }
+
+            return Ok(resolvedLines);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = $"CSV parse fail: {ex.Message}" });
+        }
+    }
+
+    [HttpPost("stock-adjustment/parse-csv")]
+    public async Task<IActionResult> ParseStockAdjustmentCsv(IFormFile file, [FromServices] IApplicationDbContext dbContext, CancellationToken cancellationToken)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest("No file uploaded.");
+        }
+
+        try
+        {
+            using var reader = new StreamReader(file.OpenReadStream());
+            var headerLine = await reader.ReadLineAsync(cancellationToken);
+            if (string.IsNullOrWhiteSpace(headerLine))
+            {
+                return BadRequest("CSV file is empty.");
+            }
+
+            var headers = headerLine.Split(',').Select(h => h.Trim().ToLower()).ToList();
+            int codeIdx = headers.IndexOf("productcode");
+            int barcodeIdx = headers.IndexOf("barcode");
+            int batchIdx = headers.IndexOf("batchno");
+            if (batchIdx == -1) batchIdx = headers.IndexOf("batchnumber");
+            
+            int qtyIdx = headers.IndexOf("adjustedqty");
+            if (qtyIdx == -1) qtyIdx = headers.IndexOf("adjustedquantity");
+            if (qtyIdx == -1) qtyIdx = headers.IndexOf("quantity");
+
+            int costIdx = headers.IndexOf("unitcost");
+            if (costIdx == -1) costIdx = headers.IndexOf("cost");
+
+            if ((codeIdx == -1 && barcodeIdx == -1) || qtyIdx == -1)
+            {
+                return BadRequest("CSV missing required headers. Required: ProductCode or Barcode, and AdjustedQty/Quantity.");
+            }
+
+            var resolvedLines = new List<object>();
+
+            while (!reader.EndOfStream)
+            {
+                var line = await reader.ReadLineAsync();
+                if (string.IsNullOrWhiteSpace(line)) continue;
+
+                var values = ParseCsvLine(line);
+                if (values.Count == 0) continue;
+
+                Product? product = null;
+                if (barcodeIdx != -1 && barcodeIdx < values.Count && !string.IsNullOrWhiteSpace(values[barcodeIdx]))
+                {
+                    var barcodeVal = values[barcodeIdx];
+                    product = await dbContext.Products
+                        .Include(p => p.Barcodes)
+                        .FirstOrDefaultAsync(p => !p.IsDeleted && p.IsActive && p.Barcodes.Any(b => b.BarcodeValue == barcodeVal), cancellationToken);
+                }
+
+                if (product == null && codeIdx != -1 && codeIdx < values.Count && !string.IsNullOrWhiteSpace(values[codeIdx]))
+                {
+                    var codeVal = values[codeIdx];
+                    product = await dbContext.Products
+                        .Include(p => p.Barcodes)
+                        .FirstOrDefaultAsync(p => !p.IsDeleted && p.IsActive && p.ProductCode == codeVal, cancellationToken);
+                }
+
+                if (product == null) continue;
+
+                ProductBatch? batch = null;
+                string parsedBatchNo = "";
+                if (batchIdx != -1 && batchIdx < values.Count && !string.IsNullOrWhiteSpace(values[batchIdx]))
+                {
+                    parsedBatchNo = values[batchIdx];
+                    batch = await dbContext.ProductBatches
+                        .FirstOrDefaultAsync(b => b.ProductId == product.Id && b.BatchNumber == parsedBatchNo && b.IsActive, cancellationToken);
+                }
+
+                if (batch == null)
+                {
+                    var activeBatches = await dbContext.ProductBatches
+                        .Where(b => b.ProductId == product.Id && b.IsActive)
+                        .ToListAsync(cancellationToken);
+                    
+                    if (!string.IsNullOrEmpty(parsedBatchNo) && activeBatches.Any())
+                    {
+                        batch = activeBatches.FirstOrDefault(b => b.BatchNumber.Equals(parsedBatchNo, StringComparison.OrdinalIgnoreCase)) ?? activeBatches.FirstOrDefault();
+                    }
+                    else
+                    {
+                        batch = activeBatches.FirstOrDefault();
+                    }
+                }
+
+                decimal adjustedQty = 0;
+                if (qtyIdx < values.Count)
+                {
+                    decimal.TryParse(values[qtyIdx], out adjustedQty);
+                }
+
+                decimal unitCost = 0;
+                if (costIdx != -1 && costIdx < values.Count)
+                {
+                    decimal.TryParse(values[costIdx], out unitCost);
+                }
+
+                if (unitCost == 0)
+                {
+                    unitCost = batch != null && batch.CostPrice > 0 ? batch.CostPrice : product.PurchasePrice;
+                }
+
+                decimal currentStock = 0;
+                if (batch != null)
+                {
+                    currentStock = await dbContext.StockLedger
+                        .Where(sl => sl.ProductId == product.Id && sl.BatchId == batch.Id)
+                        .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+                }
+                else
+                {
+                    currentStock = await dbContext.StockLedger
+                        .Where(sl => sl.ProductId == product.Id && sl.BatchId == null)
+                        .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+                }
+
+                resolvedLines.Add(new
+                {
+                    productId = product.Id,
+                    productName = product.Name,
+                    batchId = batch?.Id ?? Guid.Empty,
+                    batchNumber = batch?.BatchNumber ?? "NO BATCH",
+                    adjustedQuantity = adjustedQty,
+                    unitCost = unitCost,
+                    currentStock = currentStock
+                });
+            }
+
+            return Ok(resolvedLines);
+        }
+        catch (Exception ex)
+        {
+            return BadRequest(new { message = $"CSV parse fail: {ex.Message}" });
+        }
+    }
+
+    private static List<string> ParseCsvLine(string line)
+    {
+        var result = new List<string>();
+        bool inQuotes = false;
+        var currentToken = new System.Text.StringBuilder();
+
+        for (int i = 0; i < line.Length; i++)
+        {
+            char c = line[i];
+            if (c == '"')
+            {
+                inQuotes = !inQuotes;
+            }
+            else if (c == ',' && !inQuotes)
+            {
+                result.Add(currentToken.ToString().Trim(' ', '"'));
+                currentToken.Clear();
+            }
+            else
+            {
+                currentToken.Append(c);
+            }
+        }
+        result.Add(currentToken.ToString().Trim(' ', '"'));
+        return result;
     }
 }

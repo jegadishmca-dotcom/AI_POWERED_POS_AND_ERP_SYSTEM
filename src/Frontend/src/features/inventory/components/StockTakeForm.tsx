@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Save, ShieldAlert, Plus, Trash2, CheckCircle, XCircle, Clock, Eye, ClipboardCheck, PlusCircle, Search } from 'lucide-react';
+import { Save, ShieldAlert, Plus, Trash2, CheckCircle, XCircle, Clock, Eye, ClipboardCheck, PlusCircle, Search, FileSpreadsheet } from 'lucide-react';
 import { getStockTakes, getStockTakeDetails, createOrUpdateStockTake, approveStockTake, rejectStockTake, StockTake } from '../api/stockTake.api';
 import { searchProducts } from '../../catalog/api/catalog.api';
 import { getProductBatches } from '../../pos/api/pos.api';
 import { useAuthStore } from '../../auth/store/auth.store';
+import { api } from '../../../utils/api';
 
 export const StockTakeForm = () => {
   const { user } = useAuthStore();
@@ -130,6 +131,49 @@ export const StockTakeForm = () => {
 
   const handleRemoveRow = (idx: number) => {
     setFormItems(formItems.filter((_, i) => i !== idx));
+  };
+
+  const handleImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setLoading(true);
+      const response = await api.post('/api/inventory/stock-take/parse-csv', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const parsedRows = response.data;
+      if (Array.isArray(parsedRows) && parsedRows.length > 0) {
+        const mappedRows = parsedRows.map((r: any) => ({
+          productId: r.productId,
+          productName: r.productName,
+          batchId: r.batchId === '00000000-0000-0000-0000-000000000000' ? '' : r.batchId,
+          batchNumber: r.batchNumber,
+          systemQuantity: r.systemQuantity,
+          physicalQuantity: r.physicalQuantity,
+          searchQuery: r.productName,
+          searchResults: [],
+          batches: r.batchId && r.batchId !== '00000000-0000-0000-0000-000000000000' ? [{
+            id: r.batchId,
+            batchNumber: r.batchNumber,
+            currentStock: r.systemQuantity
+          }] : []
+        }));
+        setFormItems(mappedRows);
+        alert(`Successfully imported ${mappedRows.length} count lines!`);
+      } else {
+        alert("No valid product count lines found in CSV.");
+      }
+    } catch (err: any) {
+      console.error("CSV import failed", err);
+      alert("Failed to parse CSV file: " + (err.response?.data?.message || err.message));
+    } finally {
+      setLoading(false);
+      e.target.value = '';
+    }
   };
 
   const handleSaveOrSubmit = async (status: 'DRAFT' | 'REVIEW') => {
@@ -446,12 +490,23 @@ export const StockTakeForm = () => {
 
           <div className="mb-4 flex justify-between items-center border-t pt-4">
             <h4 className="text-md font-bold text-slate-800">Count Lines</h4>
-            <button 
-              onClick={handleAddRow}
-              className="text-indigo-600 font-bold text-sm flex items-center hover:text-indigo-800"
-            >
-              <PlusCircle className="w-4 h-4 mr-1.5" /> Add Product Row
-            </button>
+            <div className="flex items-center space-x-4">
+              <label className="cursor-pointer text-emerald-600 font-bold text-sm flex items-center hover:text-emerald-800">
+                <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Import CSV
+                <input 
+                  type="file" 
+                  accept=".csv" 
+                  className="hidden" 
+                  onChange={handleImportCsv}
+                />
+              </label>
+              <button 
+                onClick={handleAddRow}
+                className="text-indigo-600 font-bold text-sm flex items-center hover:text-indigo-800"
+              >
+                <PlusCircle className="w-4 h-4 mr-1.5" /> Add Product Row
+              </button>
+            </div>
           </div>
 
           <table className="w-full border-collapse text-left">

@@ -250,6 +250,10 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
                 string movementTypeVal = (rules.PreventNegativeStock && itemStock < item.Quantity) ? "SALE_OVERRIDE" : "SALE";
 
+                string invoiceRef = invoice.InvoiceNumber.StartsWith("INV-", StringComparison.OrdinalIgnoreCase)
+                    ? invoice.InvoiceNumber
+                    : $"INV-{invoice.InvoiceNumber}";
+
                 await _stockLedgerService.RecordMovementAsync(
                     storeId: storeId,
                     warehouseId: null,
@@ -258,18 +262,22 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                     productId: item.ProductId,
                     batchId: selectedBatchId,
                     movementType: movementTypeVal,
-                    quantity: -item.Quantity, // Negative quantity for stock deduction
-                    unitCost: item.UnitPrice, // In a real system, this would be the actual cost price, not selling price.
+                    quantity: -item.Quantity,
+                    unitCost: item.UnitPrice,
                     expiryDate: expiryDate,
                     referenceDocId: invoice.Id,
-                    referenceNumber: $"INV-{invoice.InvoiceNumber}",
+                    referenceNumber: invoiceRef,
                     userId: request.CashierId,
                     cancellationToken: cancellationToken
                 );
             }
 
+            string finalInvoiceRef = invoice.InvoiceNumber.StartsWith("INV-", StringComparison.OrdinalIgnoreCase)
+                ? invoice.InvoiceNumber
+                : $"INV-{invoice.InvoiceNumber}";
+
             if (request.WalletAmountUsed > 0 && customer != null)
-                await _walletService.RecordTransactionAsync(customer.Id, null, "SPEND", -request.WalletAmountUsed, $"INV-{invoice.InvoiceNumber}", null, cancellationToken);
+                await _walletService.RecordTransactionAsync(customer.Id, null, "SPEND", -request.WalletAmountUsed, finalInvoiceRef, null, cancellationToken);
 
             if (customer != null)
                 await _loyaltyService.CalculateAndAwardPointsForInvoiceAsync(invoice.Id, customer.Id, invoice.TotalAmount, cancellationToken);

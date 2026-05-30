@@ -76,6 +76,12 @@ export const GrnForm = () => {
       return;
     }
 
+    // 1.5. Validate Supplier Invoice Number is filled
+    if (!invoiceNumber.trim()) {
+      alert('Supplier Invoice No. is mandatory.');
+      return;
+    }
+
     // 2. Validate at least one item has accepted quantity > 0
     const itemsWithAccepted = grnItems.filter(i => i.accepted > 0);
     if (itemsWithAccepted.length === 0) {
@@ -176,7 +182,7 @@ export const GrnForm = () => {
           </select>
         </div>
         <div>
-          <label className="block text-sm font-bold text-gray-700 mb-2">Supplier Invoice No.</label>
+          <label className="block text-sm font-bold text-gray-700 mb-2">Supplier Invoice No. *</label>
           <input type="text" className="w-full p-2 border rounded" placeholder="Enter Invoice No." value={invoiceNumber} onChange={e => setInvoiceNumber(e.target.value)} />
         </div>
         <div>

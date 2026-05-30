@@ -31,3 +31,17 @@ export const createProduct = async (payload: CreateProductPayload): Promise<stri
   const { data } = await api.post('/api/catalog', payload);
   return data;
 };
+
+export interface UpdateProductPayload extends CreateProductPayload {
+  id: string;
+}
+
+export const updateProduct = async (id: string, payload: UpdateProductPayload): Promise<boolean> => {
+  const { data } = await api.put(`/api/catalog/${id}`, payload);
+  return data;
+};
+
+export const deleteProduct = async (id: string): Promise<boolean> => {
+  const { data } = await api.delete(`/api/catalog/${id}`);
+  return data;
+};

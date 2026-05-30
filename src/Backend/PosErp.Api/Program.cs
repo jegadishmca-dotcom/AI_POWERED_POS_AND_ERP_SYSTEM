@@ -138,6 +138,29 @@ using (var scope = app.Services.CreateScope())
         // Ensure database exists
         context.Database.EnsureCreated();
 
+        // One-time database clean-up: replace double-prefixed invoice references 'INV-INV-' with 'INV-'
+        try
+        {
+            await context.Database.ExecuteSqlRawAsync(@"
+                UPDATE stock_ledger 
+                SET reference_number = REGEXP_REPLACE(reference_number, '^INV-INV-', 'INV-') 
+                WHERE reference_number LIKE 'INV-INV-%';
+
+                UPDATE wallet_ledger 
+                SET reference_document = REGEXP_REPLACE(reference_document, '^INV-INV-', 'INV-') 
+                WHERE reference_document LIKE 'INV-INV-%';
+
+                UPDATE loyalty_ledger 
+                SET reference_document = REGEXP_REPLACE(reference_document, '^INV-INV-', 'INV-') 
+                WHERE reference_document LIKE 'INV-INV-%';
+            ");
+            Console.WriteLine("[DB Cleanup] Successfully cleaned up any existing double-prefixed invoice reference records.");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[DB Cleanup Warning] Failed to run database cleanup: {ex.Message}");
+        }
+
         // Create migration history table if not exists
         await context.Database.ExecuteSqlRawAsync(@"
             CREATE TABLE IF NOT EXISTS migration_history (

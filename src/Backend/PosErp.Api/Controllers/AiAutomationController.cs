@@ -35,6 +35,37 @@ public class AiAutomationController : ControllerBase
     public record GeneratePoItem(Guid ProductId, Guid SupplierId, decimal Quantity, decimal UnitCost);
     public record GeneratePoRequest(List<GeneratePoItem> Items);
 
+    // ── 0. OLLAMA STATUS CHECK ────────────────────────────────────────
+    [HttpGet("status")]
+    public async Task<IActionResult> GetStatus(CancellationToken cancellationToken)
+    {
+        bool ollamaOnline = false;
+        try
+        {
+            var ollamaUrl = "http://pos_ollama:11434";
+            try
+            {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                var response = await _httpClient.GetAsync(ollamaUrl, cts.Token);
+                ollamaOnline = response.IsSuccessStatusCode;
+            }
+            catch
+            {
+                ollamaUrl = "http://localhost:11434";
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                var response = await _httpClient.GetAsync(ollamaUrl, cts.Token);
+                ollamaOnline = response.IsSuccessStatusCode;
+            }
+        }
+        catch
+        {
+            ollamaOnline = false;
+        }
+
+        return Ok(new { ollamaOnline });
+    }
+
+
     // ── 1. DEMAND FORECASTING & REPLENISHMENT ─────────────────────────
     [HttpGet("forecast-replenishment")]
     public async Task<IActionResult> GetForecastReplenishment(CancellationToken cancellationToken)
@@ -60,6 +91,19 @@ public class AiAutomationController : ControllerBase
 
         var suppliers = await _context.Suppliers.Where(s => s.IsActive).ToListAsync(cancellationToken);
         var defaultSupplier = suppliers.FirstOrDefault() ?? new Supplier { Id = Guid.NewGuid(), Name = "Default Local Supplier" };
+        var supplierLookup = suppliers.ToDictionary(s => s.Id);
+
+        // Optimized: Fetch the latest GRN items per product to determine the preferred supplier, all in one query.
+        var grnItemsData = await _context.GRNItems
+            .Select(gi => new { gi.ProductId, gi.GRNHeader.SupplierId, gi.GRNHeader.CreatedAt })
+            .ToListAsync(cancellationToken);
+
+        var productPreferredSuppliers = grnItemsData
+            .GroupBy(x => x.ProductId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(x => x.CreatedAt).First().SupplierId
+            );
 
         var recommendations = new List<object>();
 
@@ -86,21 +130,12 @@ public class AiAutomationController : ControllerBase
                 // Find supplier from last GRN of this product
                 Guid supplierId = defaultSupplier.Id;
                 string supplierName = defaultSupplier.Name;
-                
-                var lastGrnItem = await _context.GRNItems
-                    .Include(gi => gi.GRNHeader)
-                    .Where(gi => gi.ProductId == product.Id)
-                    .OrderByDescending(gi => gi.GRNHeader.CreatedAt)
-                    .FirstOrDefaultAsync(cancellationToken);
 
-                if (lastGrnItem != null)
+                if (productPreferredSuppliers.TryGetValue(product.Id, out Guid preferredSupplierId) &&
+                    supplierLookup.TryGetValue(preferredSupplierId, out var supplier))
                 {
-                    var supplier = suppliers.FirstOrDefault(s => s.Id == lastGrnItem.GRNHeader.SupplierId);
-                    if (supplier != null)
-                    {
-                        supplierId = supplier.Id;
-                        supplierName = supplier.Name;
-                    }
+                    supplierId = supplier.Id;
+                    supplierName = supplier.Name;
                 }
 
                 recommendations.Add(new
@@ -122,6 +157,7 @@ public class AiAutomationController : ControllerBase
 
         return Ok(recommendations);
     }
+
 
     // ── 2. AUTO GENERATE DRAFT PURCHASE ORDERS ────────────────────────
     [HttpPost("generate-po")]
@@ -186,15 +222,20 @@ public class AiAutomationController : ControllerBase
             .Where(pb => pb.IsActive && pb.ExpiryDate.HasValue && pb.ExpiryDate.Value <= targetDate && pb.ExpiryDate.Value >= today)
             .ToListAsync(cancellationToken);
 
+        var batchIds = expiringBatches.Select(b => (Guid?)b.Id).ToList();
+
+        // Optimized: Fetch current stock for all target batches in one query
+        var batchStocks = await _context.StockLedger
+            .Where(sl => sl.BatchId.HasValue && batchIds.Contains(sl.BatchId))
+            .GroupBy(sl => sl.BatchId)
+            .Select(g => new { BatchId = g.Key.Value, Stock = g.Sum(sl => sl.Quantity) })
+            .ToDictionaryAsync(x => x.BatchId, x => x.Stock, cancellationToken);
+
         var markdowns = new List<object>();
 
         foreach (var batch in expiringBatches)
         {
-            // Calculate current stock from ledger for this batch
-            var currentStock = await _context.StockLedger
-                .Where(sl => sl.ProductId == batch.ProductId && sl.BatchId == batch.Id)
-                .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
-
+            batchStocks.TryGetValue(batch.Id, out decimal currentStock);
             if (currentStock <= 0) continue;
 
             int daysRemaining = (batch.ExpiryDate.Value - today).Days;
@@ -231,6 +272,7 @@ public class AiAutomationController : ControllerBase
 
         return Ok(markdowns);
     }
+
 
     // ── 4. APPLY DISCOUNTS TO MAIN PRODUCT CATALOG ───────────────────
     [HttpPost("apply-markdowns")]
@@ -336,14 +378,19 @@ public class AiAutomationController : ControllerBase
                 return Ok(new { text = "Good news! No active product batches are expiring within the next 30 days." });
             }
 
+            var batchIds = expiring.Select(b => (Guid?)b.Id).ToList();
+            var batchStocks = await _context.StockLedger
+                .Where(sl => sl.BatchId.HasValue && batchIds.Contains(sl.BatchId))
+                .GroupBy(sl => sl.BatchId)
+                .Select(g => new { BatchId = g.Key.Value, Stock = g.Sum(sl => sl.Quantity) })
+                .ToDictionaryAsync(x => x.BatchId, x => x.Stock, cancellationToken);
+
             var textBuilder = new StringBuilder("Here are the batches expiring soon:\n");
             var chartData = new List<object>();
 
             foreach (var batch in expiring)
             {
-                var stock = await _context.StockLedger
-                    .Where(sl => sl.ProductId == batch.ProductId && sl.BatchId == batch.Id)
-                    .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+                batchStocks.TryGetValue(batch.Id, out decimal stock);
 
                 int daysLeft = (batch.ExpiryDate.Value - today).Days;
                 textBuilder.AppendLine($"- **{batch.Product.Name}** (Batch: {batch.BatchNumber}) - Expiring in {daysLeft} days. (Stock: {stock})");
@@ -361,14 +408,18 @@ public class AiAutomationController : ControllerBase
         if (promptLower.Contains("stock") || promptLower.Contains("low stock") || promptLower.Contains("inventory levels"))
         {
             var products = await _context.Products.Where(p => !p.IsDeleted).ToListAsync(cancellationToken);
+            
+            var productStocks = await _context.StockLedger
+                .GroupBy(sl => sl.ProductId)
+                .Select(g => new { ProductId = g.Key, Stock = g.Sum(sl => sl.Quantity) })
+                .ToDictionaryAsync(x => x.ProductId, x => x.Stock, cancellationToken);
+
             var lowStockItems = new List<object>();
             var textBuilder = new StringBuilder("Items with low stock levels (< 10 units):\n");
 
             foreach (var p in products)
             {
-                var stock = await _context.StockLedger
-                    .Where(sl => sl.ProductId == p.Id)
-                    .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+                productStocks.TryGetValue(p.Id, out decimal stock);
 
                 if (stock < 10)
                 {
@@ -389,6 +440,7 @@ public class AiAutomationController : ControllerBase
                 chartData = lowStockItems.Take(8).ToList()
             });
         }
+
 
         // B. Attempt connection to Ollama LLM
         try

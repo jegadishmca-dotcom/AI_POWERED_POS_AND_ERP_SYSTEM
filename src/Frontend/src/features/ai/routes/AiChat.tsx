@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Sparkles, Send, Loader2, Bot, User, HelpCircle, BarChart3, PieChart as PieIcon, ClipboardList } from 'lucide-react';
-import { sendChatMessage, ChatMessageResponse } from '../api/ai.api';
+import { sendChatMessage, getAiStatus, ChatMessageResponse } from '../api/ai.api';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts';
 
 interface Message {
@@ -25,7 +25,22 @@ export const AiChat = () => {
   ]);
   const [inputValue, setInputValue] = useState('');
   const [loading, setLoading] = useState(false);
+  const [ollamaOnline, setOllamaOnline] = useState<boolean | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const checkOllamaStatus = async () => {
+    try {
+      const res = await getAiStatus();
+      setOllamaOnline(res.ollamaOnline);
+    } catch {
+      setOllamaOnline(false);
+    }
+  };
+
+  useEffect(() => {
+    checkOllamaStatus();
+  }, []);
+
 
   const quickPrompts = [
     { label: '📊 Top Selling Products', prompt: 'Show my top selling products' },
@@ -158,6 +173,30 @@ export const AiChat = () => {
               <Bot className="w-3 h-3 text-emerald-400" /> Live Database Integration Active
             </p>
           </div>
+        </div>
+
+        {/* Ollama Status Badge */}
+        <div className="flex items-center gap-2">
+          {ollamaOnline === null ? (
+            <span className="px-3 py-1 bg-slate-950/60 border border-slate-800 text-[10px] font-bold text-slate-400 rounded-full flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-500 animate-pulse"></span>
+              Checking LLM...
+            </span>
+          ) : ollamaOnline ? (
+            <span className="px-3 py-1 bg-emerald-950/40 border border-emerald-500/20 text-[10px] font-bold text-emerald-400 rounded-full flex items-center gap-1.5 shadow-sm shadow-emerald-500/5">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              Ollama LLM: Online
+            </span>
+          ) : (
+            <span 
+              onClick={checkOllamaStatus}
+              title="Click to check status again"
+              className="px-3 py-1 bg-amber-950/40 border border-amber-500/20 text-[10px] font-bold text-amber-450 rounded-full flex items-center gap-1.5 cursor-pointer hover:bg-amber-950/60 transition shadow-sm shadow-amber-500/5"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>
+              Ollama LLM: Offline (Database Fallback Active)
+            </span>
+          )}
         </div>
       </div>
 

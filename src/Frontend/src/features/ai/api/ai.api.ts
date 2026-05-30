@@ -58,3 +58,9 @@ export const sendChatMessage = async (prompt: string): Promise<ChatMessageRespon
   const { data } = await api.post('/api/aiautomation/chat', { prompt });
   return data;
 };
+
+export const getAiStatus = async (): Promise<{ ollamaOnline: boolean }> => {
+  const { data } = await api.get('/api/aiautomation/status');
+  return data;
+};
+

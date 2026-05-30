@@ -350,14 +350,18 @@ public class AiAutomationController : ControllerBase
         string promptLower = request.Prompt.ToLower().Trim();
         
         // A. Hybrid NLP Rule-based router for live DB analytics
+        // NOTE: BusinessDate is a PostgreSQL 'date' column. 
+        // Use equality (==) with DateTime.Date values, matching the pattern used in GetTodayDashboardQuery.
+
+        try
+        {
 
         // ── Yesterday's Sales ─────────────────────────────────────────
         if (promptLower.Contains("yesterday"))
         {
             var yesterday = DateTime.UtcNow.Date.AddDays(-1);
-            var yesterdayEnd = yesterday.AddDays(1);
             var yesterdayInvoices = await _context.Invoices
-                .Where(i => i.BusinessDate >= yesterday && i.BusinessDate < yesterdayEnd)
+                .Where(i => i.BusinessDate == yesterday)
                 .ToListAsync(cancellationToken);
 
             int count = yesterdayInvoices.Count;
@@ -379,9 +383,9 @@ public class AiAutomationController : ControllerBase
         if (promptLower.Contains("last week") || promptLower.Contains("past week") || promptLower.Contains("previous week"))
         {
             var weekStart = DateTime.UtcNow.Date.AddDays(-7);
-            var weekEnd = DateTime.UtcNow.Date;
+            var weekEnd = DateTime.UtcNow.Date.AddDays(-1);
             var weekInvoices = await _context.Invoices
-                .Where(i => i.BusinessDate >= weekStart && i.BusinessDate < weekEnd)
+                .Where(i => i.BusinessDate >= weekStart && i.BusinessDate <= weekEnd)
                 .ToListAsync(cancellationToken);
 
             int count = weekInvoices.Count;
@@ -405,15 +409,16 @@ public class AiAutomationController : ControllerBase
         if (promptLower.Contains("this month") || promptLower.Contains("current month") || promptLower.Contains("monthly sales"))
         {
             var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+            var today = DateTime.UtcNow.Date;
             var monthInvoices = await _context.Invoices
-                .Where(i => i.BusinessDate >= monthStart)
+                .Where(i => i.BusinessDate >= monthStart && i.BusinessDate <= today)
                 .ToListAsync(cancellationToken);
 
             int count = monthInvoices.Count;
             decimal total = monthInvoices.Sum(i => i.TotalAmount);
             decimal cash = monthInvoices.Sum(i => i.CashAmount);
             decimal upi = monthInvoices.Sum(i => i.UpiAmount);
-            int daysElapsed = (DateTime.UtcNow.Date - monthStart).Days + 1;
+            int daysElapsed = (today - monthStart).Days + 1;
             decimal daily = daysElapsed > 0 ? total / daysElapsed : 0;
 
             return Ok(new
@@ -431,16 +436,16 @@ public class AiAutomationController : ControllerBase
         if (promptLower.Contains("last month") || promptLower.Contains("previous month"))
         {
             var lastMonthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(-1);
-            var lastMonthEnd = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+            var lastMonthEnd = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddDays(-1);
             var lastMonthInvoices = await _context.Invoices
-                .Where(i => i.BusinessDate >= lastMonthStart && i.BusinessDate < lastMonthEnd)
+                .Where(i => i.BusinessDate >= lastMonthStart && i.BusinessDate <= lastMonthEnd)
                 .ToListAsync(cancellationToken);
 
             int count = lastMonthInvoices.Count;
             decimal total = lastMonthInvoices.Sum(i => i.TotalAmount);
             decimal cash = lastMonthInvoices.Sum(i => i.CashAmount);
             decimal upi = lastMonthInvoices.Sum(i => i.UpiAmount);
-            int daysInMonth = (lastMonthEnd - lastMonthStart).Days;
+            int daysInMonth = (lastMonthEnd - lastMonthStart).Days + 1;
             decimal daily = daysInMonth > 0 ? total / daysInMonth : 0;
 
             return Ok(new
@@ -459,7 +464,7 @@ public class AiAutomationController : ControllerBase
         {
             var today = DateTime.UtcNow.Date;
             var todayInvoices = await _context.Invoices
-                .Where(i => i.BusinessDate >= today)
+                .Where(i => i.BusinessDate == today)
                 .ToListAsync(cancellationToken);
 
             int count = todayInvoices.Count;
@@ -475,6 +480,13 @@ public class AiAutomationController : ControllerBase
                        $"- Cash Collections: ₹{cash:N2}\n" +
                        $"- UPI Collections: ₹{upi:N2}"
             });
+        }
+
+        } // end try
+        catch (Exception dateEx)
+        {
+            Console.WriteLine($"Chat date query error: {dateEx.Message}");
+            return Ok(new { text = $"I encountered an issue querying sales data: {dateEx.Message}" });
         }
 
         // ── Total Sales ───────────────────────────────────────────────

@@ -243,6 +243,93 @@ public class SettingsController : ControllerBase
         InventoryRulesManager.SaveRules(rules);
         return Ok(rules);
     }
+
+    [HttpGet("email")]
+    public IActionResult GetEmailSettings()
+    {
+        var settings = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
+        var displaySettings = new 
+        {
+            settings.SmtpServer,
+            settings.SmtpPort,
+            settings.SenderEmail,
+            SenderPassword = string.IsNullOrEmpty(settings.SenderPassword) ? "" : "••••••••",
+            settings.RecipientEmail,
+            settings.EnableSsl
+        };
+        return Ok(displaySettings);
+    }
+
+    [HttpPost("email")]
+    public IActionResult UpdateEmailSettings([FromBody] PosErp.Application.Features.Inventory.Services.EmailSettings settings)
+    {
+        if (settings == null)
+        {
+            return BadRequest("Settings payload is empty.");
+        }
+
+        if (settings.SenderPassword == "••••••••")
+        {
+            var existing = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
+            settings.SenderPassword = existing.SenderPassword;
+        }
+
+        PosErp.Application.Features.Inventory.Services.EmailSettingsManager.SaveSettings(settings);
+        return Ok(new { success = true });
+    }
+
+    [HttpPost("email/test")]
+    public async Task<IActionResult> TestEmailSettings([FromBody] PosErp.Application.Features.Inventory.Services.EmailSettings settings)
+    {
+        if (settings == null)
+        {
+            return BadRequest("Settings payload is empty.");
+        }
+
+        if (settings.SenderPassword == "••••••••")
+        {
+            var existing = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
+            settings.SenderPassword = existing.SenderPassword;
+        }
+
+        try
+        {
+            if (string.IsNullOrWhiteSpace(settings.SenderEmail) || string.IsNullOrWhiteSpace(settings.SenderPassword))
+            {
+                return BadRequest(new { success = false, message = "Sender email and password are required for the test." });
+            }
+
+            var to = !string.IsNullOrWhiteSpace(settings.RecipientEmail) ? settings.RecipientEmail : "jegadishmca@gmail.com";
+            var subject = "🍎 Apple Supermarket POS - SMTP Connection Test";
+            var htmlBody = $@"
+                <div style='font-family: sans-serif; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;'>
+                    <h2 style='color: #4f46e5;'>SMTP Setup Connection Test</h2>
+                    <p>Congratulations! Your SMTP settings configuration is correct.</p>
+                    <hr style='border: none; border-top: 1px solid #f3f4f6; margin: 20px 0;' />
+                    <p style='font-size: 12px; color: #9ca3af;'>Sent at: {DateTime.UtcNow.AddHours(5.5):dd MMM yyyy HH:mm:ss} IST</p>
+                </div>";
+
+            using var mailMessage = new System.Net.Mail.MailMessage();
+            mailMessage.From = new System.Net.Mail.MailAddress(settings.SenderEmail, "Apple Supermarket ERP");
+            mailMessage.To.Add(to);
+            mailMessage.Subject = subject;
+            mailMessage.Body = htmlBody;
+            mailMessage.IsBodyHtml = true;
+
+            using var smtpClient = new System.Net.Mail.SmtpClient(settings.SmtpServer, settings.SmtpPort);
+            smtpClient.EnableSsl = settings.EnableSsl;
+            smtpClient.UseDefaultCredentials = false;
+            smtpClient.Credentials = new System.Net.NetworkCredential(settings.SenderEmail, settings.SenderPassword);
+
+            await smtpClient.SendMailAsync(mailMessage);
+
+            return Ok(new { success = true, message = $"Test email sent successfully to {to}" });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = $"SMTP connection test failed: {ex.Message}" });
+        }
+    }
 }
 
 // ── Settings DTOs ─────────────────────────────────────────────────────────────

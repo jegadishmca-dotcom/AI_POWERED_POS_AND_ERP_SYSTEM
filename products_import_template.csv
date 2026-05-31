@@ -1,0 +1,5 @@
+ProductCode,Name,TamilName,Description,Mrp,SellingPrice,PurchasePrice,Barcode,TaxSlabName,IsWeighable,HasExpiry
+PROD-006,Clinic Plus Shampoo 340ml,கிளினிக் பிளஸ்,Strong & Long Hair,160.00,150.00,128.00,8901030756784,GST 18%,False,True
+PROD-007,Lux Creamy Perfection Soap 100g,லக்ஸ் சோப்,Creamy Perfection Soap,45.00,42.00,35.00,8901030345674,GST 18%,False,False
+PROD-008,Brooke Bond Red Label Tea 250g,ரெட் லேபல் டீ,Brooke Bond Tea,110.00,105.00,90.00,8901030678918,GST 5%,False,False
+PROD-009,Knorr Tomato Soup 50g,நார் சூப்,Tomato Soup Mix,60.00,58.00,48.00,8901030123456,GST 18%,False,True

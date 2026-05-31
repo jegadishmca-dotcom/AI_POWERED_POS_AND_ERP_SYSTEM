@@ -1,0 +1,5 @@
+{
+  "PreventNegativeStock": true,
+  "MandatoryBatchTracking": true,
+  "RowLevelLocking": true
+}

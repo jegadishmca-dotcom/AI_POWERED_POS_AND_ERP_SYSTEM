@@ -72,7 +72,10 @@ public class DailyReportEmailService : BackgroundService
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
         var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
 
-        var recipientEmail = _configuration["EmailSettings:RecipientEmail"] ?? "jegadishmca@gmail.com";
+        var savedSettings = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
+        var recipientEmail = !string.IsNullOrWhiteSpace(savedSettings.RecipientEmail)
+            ? savedSettings.RecipientEmail
+            : (_configuration["EmailSettings:RecipientEmail"] ?? "jegadishmca@gmail.com");
         var today = DateTime.UtcNow.AddHours(5.5).Date;
 
         Console.WriteLine($"[DailyReportEmailService] Generating EOD Daily Report for {today:yyyy-MM-dd}...");

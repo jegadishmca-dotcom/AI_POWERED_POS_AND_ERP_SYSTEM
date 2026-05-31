@@ -20,21 +20,42 @@ public class SmtpEmailService : IEmailService
     {
         try
         {
-            var smtpServer = _configuration["EmailSettings:SmtpServer"] ?? "smtp.gmail.com";
-            var smtpPortStr = _configuration["EmailSettings:SmtpPort"] ?? "587";
-            var senderEmail = _configuration["EmailSettings:SenderEmail"];
-            var senderPassword = _configuration["EmailSettings:SenderPassword"];
+            var savedSettings = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
+
+            var smtpServer = !string.IsNullOrWhiteSpace(savedSettings.SmtpServer)
+                ? savedSettings.SmtpServer
+                : (_configuration["EmailSettings:SmtpServer"] ?? "smtp.gmail.com");
+
+            var senderEmail = !string.IsNullOrWhiteSpace(savedSettings.SenderEmail)
+                ? savedSettings.SenderEmail
+                : _configuration["EmailSettings:SenderEmail"];
+
+            var senderPassword = !string.IsNullOrWhiteSpace(savedSettings.SenderPassword)
+                ? savedSettings.SenderPassword
+                : _configuration["EmailSettings:SenderPassword"];
+
+            int smtpPort = 587;
+            if (savedSettings.SmtpPort > 0)
+            {
+                smtpPort = savedSettings.SmtpPort;
+            }
+            else
+            {
+                var smtpPortStr = _configuration["EmailSettings:SmtpPort"] ?? "587";
+                int.TryParse(smtpPortStr, out smtpPort);
+            }
+
+            if (smtpPort <= 0)
+            {
+                smtpPort = 587;
+            }
+
+            var enableSsl = savedSettings.EnableSsl;
 
             if (string.IsNullOrWhiteSpace(senderEmail) || string.IsNullOrWhiteSpace(senderPassword))
             {
                 Console.WriteLine("[SmtpEmailService] [WARNING] SMTP credentials are not configured. Email notification skipped.");
                 return;
-            }
-
-            int.TryParse(smtpPortStr, out int smtpPort);
-            if (smtpPort <= 0)
-            {
-                smtpPort = 587;
             }
 
             using var mailMessage = new MailMessage();
@@ -45,7 +66,7 @@ public class SmtpEmailService : IEmailService
             mailMessage.IsBodyHtml = true;
 
             using var smtpClient = new SmtpClient(smtpServer, smtpPort);
-            smtpClient.EnableSsl = true;
+            smtpClient.EnableSsl = enableSsl;
             smtpClient.UseDefaultCredentials = false;
             smtpClient.Credentials = new NetworkCredential(senderEmail, senderPassword);
 

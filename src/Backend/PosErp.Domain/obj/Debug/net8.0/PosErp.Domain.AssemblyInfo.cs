@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PosErp.Domain")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a4d3840d4cfcf5bdd24f555517372b1ed89db4af")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a32115d946ceffdad0ae473d718bac54e74d4a7c")]
 [assembly: System.Reflection.AssemblyProductAttribute("PosErp.Domain")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PosErp.Domain")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

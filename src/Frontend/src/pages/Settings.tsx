@@ -4,11 +4,12 @@ import { PrinterConfig } from '../features/settings/components/PrinterConfig';
 import { TerminalConfig } from '../features/settings/components/TerminalConfig';
 import { UserManagement } from '../features/settings/components/UserManagement';
 import { ChangeOverridePinPanel } from '../features/settings/components/ChangeOverridePinPanel';
-import { Settings as SettingsIcon, Network, Printer, Monitor, Users, ShieldCheck, Database } from 'lucide-react';
+import { Settings as SettingsIcon, Network, Printer, Monitor, Users, ShieldCheck, Database, Mail } from 'lucide-react';
 import { useAuthStore } from '../features/auth/store/auth.store';
 import { InventorySafeguards } from '../features/settings/components/InventorySafeguards';
+import { EmailConfig } from '../features/settings/components/EmailConfig';
 
-type SettingsTab = 'connection' | 'printers' | 'terminals' | 'users' | 'security' | 'inventoryRules';
+type SettingsTab = 'connection' | 'printers' | 'terminals' | 'users' | 'security' | 'inventoryRules' | 'emailSetup';
 
 export const Settings: React.FC = () => {
   const { user } = useAuthStore();
@@ -22,6 +23,7 @@ export const Settings: React.FC = () => {
     { id: 'terminals', label: 'POS Terminals', icon: <Monitor className="w-4 h-4" />, roles: ['Owner', 'Manager'] },
     { id: 'users', label: 'Staff Accounts', icon: <Users className="w-4 h-4" />, roles: ['Owner', 'Manager'] },
     { id: 'inventoryRules', label: 'Inventory Rules', icon: <Database className="w-4 h-4" />, roles: ['Owner', 'Manager'] },
+    { id: 'emailSetup', label: 'Email Setup', icon: <Mail className="w-4 h-4" />, roles: ['Owner', 'Manager'] },
     { id: 'security', label: 'Security PIN', icon: <ShieldCheck className="w-4 h-4" />, roles: ['Owner', 'Manager'] },
   ];
 
@@ -68,6 +70,7 @@ export const Settings: React.FC = () => {
           {currentTab === 'terminals' && <TerminalConfig />}
           {currentTab === 'users' && <UserManagement />}
           {currentTab === 'inventoryRules' && <InventorySafeguards />}
+          {currentTab === 'emailSetup' && <EmailConfig />}
           {currentTab === 'security' && (
             <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm max-w-xl">
               <h3 className="font-bold text-slate-800 mb-2">POS Security PIN</h3>

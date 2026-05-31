@@ -343,7 +343,7 @@ export const StockTakeForm = () => {
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-800">{t.TakeNumber || t.takeNumber}</span>
+                        <span className="font-bold text-slate-800">{t.takeNumber}</span>
                         <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
                           t.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
                           t.status === 'REJECTED' ? 'bg-red-100 text-red-800' :

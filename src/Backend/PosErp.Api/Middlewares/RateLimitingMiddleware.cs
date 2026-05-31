@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using System;
@@ -29,22 +29,29 @@ public class RateLimitingMiddleware
         // Only rate limit API calls
         if (endpoint != null && endpoint.StartsWith("/api"))
         {
-            var db = _redis.GetDatabase();
-            var key = $"rate_limit:{ipAddress}";
-
-            var count = await db.StringIncrementAsync(key);
-            if (count == 1)
+            try
             {
-                await db.KeyExpireAsync(key, TimeSpan.FromMinutes(1));
+                var db = _redis.GetDatabase();
+                var key = $"rate_limit:{ipAddress}";
+
+                var count = await db.StringIncrementAsync(key);
+                if (count == 1)
+                {
+                    await db.KeyExpireAsync(key, TimeSpan.FromMinutes(1));
+                }
+
+                if (count > MaxRequestsPerMinute)
+                {
+                    _logger.LogWarning($"Rate limit exceeded for IP: {ipAddress}");
+                    context.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
+                    context.Response.ContentType = "application/json";
+                    await context.Response.WriteAsync("{\"error\": \"Too many requests. Please try again later.\"}");
+                    return;
+                }
             }
-
-            if (count > MaxRequestsPerMinute)
+            catch (Exception ex)
             {
-                _logger.LogWarning($"Rate limit exceeded for IP: {ipAddress}");
-                context.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
-                context.Response.ContentType = "application/json";
-                await context.Response.WriteAsync("{\"error\": \"Too many requests. Please try again later.\"}");
-                return;
+                _logger.LogWarning($"Redis connection failed during rate limiting check. Proceeding without rate limiting. Error: {ex.Message}");
             }
         }
 

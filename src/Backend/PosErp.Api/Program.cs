@@ -41,7 +41,13 @@ builder.Services.AddHealthChecks();
 
 // Redis Configuration
 string redisConnectionString = builder.Configuration.GetSection("Redis:ConnectionString").Value ?? "localhost:6379";
-builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(redisConnectionString));
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    var configOptions = ConfigurationOptions.Parse(redisConnectionString);
+    configOptions.AbortOnConnectFail = false;
+    configOptions.ConnectTimeout = 2000;
+    return ConnectionMultiplexer.Connect(configOptions);
+});
 builder.Services.AddStackExchangeRedisCache(options =>
 {
     options.Configuration = redisConnectionString;
@@ -124,6 +130,7 @@ app.UseCors("AllowAll");
 
 app.UseAuthentication();
 app.UseAuthorization();
+app.UseMiddleware<DemoSandboxMiddleware>();
 
 app.MapControllers();
 app.MapHealthChecks("/health");
@@ -410,6 +417,23 @@ using (var scope = app.Services.CreateScope())
                 usersChanged = true;
                 Console.WriteLine("[PIN] Default override PIN set for admin user. Please change it via Settings.");
             }
+        }
+        
+        // Seed Demo Sandbox User
+        if (!await context.Users.AnyAsync(u => u.Username == "demo@supermarket.com"))
+        {
+            var demoUser = new PosErp.Domain.Entities.Auth.User
+            {
+                Username = "demo@supermarket.com",
+                PasswordHash = passwordHasher.HashPassword("demo123456"),
+                PinHash = passwordHasher.HashPassword("1234"), // Default override PIN
+                FullName = "Demo Sandbox User",
+                RoleId = ownerRole.Id,
+                IsActive = true
+            };
+            context.Users.Add(demoUser);
+            usersChanged = true;
+            Console.WriteLine("[SEED] Seeded demo@supermarket.com sandbox user.");
         }
         
         // Seed Cashier 01 User

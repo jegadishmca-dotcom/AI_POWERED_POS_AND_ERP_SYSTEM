@@ -32,10 +32,17 @@ public class OfferEngine : IOfferEngine
 
     public async Task<List<Offer>> GetActiveOffersAsync(CancellationToken cancellationToken)
     {
-        var cachedOffers = await _cache.GetStringAsync(CacheKey, cancellationToken);
-        if (!string.IsNullOrEmpty(cachedOffers))
+        try
         {
-            return JsonSerializer.Deserialize<List<Offer>>(cachedOffers) ?? new List<Offer>();
+            var cachedOffers = await _cache.GetStringAsync(CacheKey, cancellationToken);
+            if (!string.IsNullOrEmpty(cachedOffers))
+            {
+                return JsonSerializer.Deserialize<List<Offer>>(cachedOffers) ?? new List<Offer>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Redis Cache Warning] Failed to read from Redis cache: {ex.Message}. Falling back to database query.");
         }
 
         var now = DateTime.UtcNow;
@@ -43,8 +50,15 @@ public class OfferEngine : IOfferEngine
             .Where(o => o.IsActive && o.StartDate <= now && o.EndDate >= now)
             .ToListAsync(cancellationToken);
 
-        var cacheOptions = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15) };
-        await _cache.SetStringAsync(CacheKey, JsonSerializer.Serialize(offers), cacheOptions, cancellationToken);
+        try
+        {
+            var cacheOptions = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15) };
+            await _cache.SetStringAsync(CacheKey, JsonSerializer.Serialize(offers), cacheOptions, cancellationToken);
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[Redis Cache Warning] Failed to write to Redis cache: {ex.Message}");
+        }
 
         return offers;
     }

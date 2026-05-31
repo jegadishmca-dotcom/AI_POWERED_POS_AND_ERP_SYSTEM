@@ -17,11 +17,16 @@ public class SettingsController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly PosErp.Application.Features.Audit.Services.IAuditLoggingService _auditLoggingService;
 
-    public SettingsController(IApplicationDbContext context, IPasswordHasher passwordHasher)
+    public SettingsController(
+        IApplicationDbContext context, 
+        IPasswordHasher passwordHasher,
+        PosErp.Application.Features.Audit.Services.IAuditLoggingService auditLoggingService)
     {
         _context = context;
         _passwordHasher = passwordHasher;
+        _auditLoggingService = auditLoggingService;
     }
 
     // ── User Management Endpoints ─────────────────────────────────────────────
@@ -234,13 +239,31 @@ public class SettingsController : ControllerBase
     }
 
     [HttpPost("inventory-rules")]
-    public IActionResult UpdateInventoryRules([FromBody] InventoryRules rules)
+    public async Task<IActionResult> UpdateInventoryRules([FromBody] InventoryRules rules)
     {
         if (rules == null)
         {
             return BadRequest("Rules payload is empty.");
         }
+
+        var oldRules = InventoryRulesManager.GetRules();
         InventoryRulesManager.SaveRules(rules);
+
+        // Get user details for auditing
+        var userIdClaim = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+        Guid? userId = Guid.TryParse(userIdClaim, out var guid) ? guid : null;
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        await _auditLoggingService.LogActionAsync(
+            userId,
+            "UPDATE_INVENTORY_RULES",
+            "InventoryRules",
+            "system",
+            oldRules,
+            rules,
+            ipAddress,
+            default);
+
         return Ok(rules);
     }
 
@@ -261,20 +284,40 @@ public class SettingsController : ControllerBase
     }
 
     [HttpPost("email")]
-    public IActionResult UpdateEmailSettings([FromBody] PosErp.Application.Features.Inventory.Services.EmailSettings settings)
+    public async Task<IActionResult> UpdateEmailSettings([FromBody] PosErp.Application.Features.Inventory.Services.EmailSettings settings)
     {
         if (settings == null)
         {
             return BadRequest("Settings payload is empty.");
         }
 
+        var oldSettings = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
+
         if (settings.SenderPassword == "••••••••")
         {
-            var existing = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
-            settings.SenderPassword = existing.SenderPassword;
+            settings.SenderPassword = oldSettings.SenderPassword;
         }
 
         PosErp.Application.Features.Inventory.Services.EmailSettingsManager.SaveSettings(settings);
+
+        // Get user details for auditing
+        var userIdClaim = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+        Guid? userId = Guid.TryParse(userIdClaim, out var guid) ? guid : null;
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        var oldSettingsMasked = new { oldSettings.SmtpServer, oldSettings.SmtpPort, oldSettings.SenderEmail, oldSettings.RecipientEmail, oldSettings.EnableSsl };
+        var newSettingsMasked = new { settings.SmtpServer, settings.SmtpPort, settings.SenderEmail, settings.RecipientEmail, settings.EnableSsl };
+
+        await _auditLoggingService.LogActionAsync(
+            userId,
+            "UPDATE_EMAIL_SETTINGS",
+            "EmailSettings",
+            "system",
+            oldSettingsMasked,
+            newSettingsMasked,
+            ipAddress,
+            default);
+
         return Ok(new { success = true });
     }
 

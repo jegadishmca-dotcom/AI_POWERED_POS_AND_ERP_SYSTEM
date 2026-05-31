@@ -694,6 +694,7 @@ public class AiAutomationController : ControllerBase
             });
         }
 
+        bool ollamaFailed = false;
 
         // B. Attempt connection to Ollama LLM
         try
@@ -748,6 +749,7 @@ public class AiAutomationController : ControllerBase
             catch (Exception tagsEx)
             {
                 Console.WriteLine($"Error fetching Ollama models: {tagsEx.Message}");
+                ollamaFailed = true;
             }
 
             if (!hasModels)
@@ -783,23 +785,52 @@ public class AiAutomationController : ControllerBase
                 var responseText = doc.RootElement.GetProperty("response").GetString();
                 return Ok(new { text = responseText });
             }
+            else
+            {
+                ollamaFailed = true;
+            }
         }
         catch (Exception ex)
         {
-            // Log or ignore to fall back
             Console.WriteLine($"Ollama generation error: {ex.Message}");
+            ollamaFailed = true;
         }
 
         // C. Fallback response when Ollama is offline and query doesn't match rules
-        return Ok(new
+        string fallbackText = "";
+        if (ollamaFailed)
         {
-            text = "I'm your AI Co-pilot. I can query the POS database for these questions:\n" +
-                   "- *'Yesterday's sales'* or *'Today's sales'* for daily summaries\n" +
-                   "- *'Total revenue'* for overall sales figures\n" +
-                   "- *'Show top selling products'* for sales volume charts\n" +
-                   "- *'Sales split'* or *'Cash vs UPI'* for payment breakdown\n" +
-                   "- *'Show expiry alerts'* for soon-to-expire batch stocks\n" +
-                   "- *'Low stock'* for items running low in the warehouse"
-        });
+            fallbackText += "🤖 **System Notice**: The local AI engine (Ollama) is currently offline or unreachable. Direct database search is active.\n\n";
+        }
+
+        string suggestion = "";
+        if (promptLower.Contains("sal") || promptLower.Contains("revenu") || promptLower.Contains("fig") || promptLower.Contains("invoic"))
+        {
+            suggestion = "It looks like you're asking about sales. Try asking: *'Yesterday's sales'*, *'Today's sales'*, *'Total sales'*, or *'Highest invoice'*.";
+        }
+        else if (promptLower.Contains("stock") || promptLower.Contains("expir") || promptLower.Contains("inventory") || promptLower.Contains("limit") || promptLower.Contains("warn"))
+        {
+            suggestion = "It looks like you're asking about inventory. Try asking: *'List low stock items'*, *'Show near expiry batch alerts'*, or *'Show top selling products'*.";
+        }
+        else if (promptLower.Contains("payment") || promptLower.Contains("cash") || promptLower.Contains("upi") || promptLower.Contains("split"))
+        {
+            suggestion = "It looks like you're asking about payment modes. Try asking: *'Sales split'* or *'Cash vs UPI'* to see collection breakdowns.";
+        }
+
+        if (!string.IsNullOrEmpty(suggestion))
+        {
+            fallbackText += suggestion + "\n\n";
+        }
+
+        fallbackText += "Here are the database query commands I support:\n" +
+                        "- *'Yesterday's sales'* or *'Today's sales'* for daily summaries\n" +
+                        "- *'Total revenue'* for overall sales figures\n" +
+                        "- *'Show top selling products'* for sales volume charts\n" +
+                        "- *'Sales split'* or *'Cash vs UPI'* for payment breakdown\n" +
+                        "- *'Show near expiry batch alerts'* for batches expiring within 30 days\n" +
+                        "- *'List low stock items'* for items running below 10 units\n" +
+                        "- *'Highest invoice'* to pull the top completed transaction";
+
+        return Ok(new { text = fallbackText });
     }
 }

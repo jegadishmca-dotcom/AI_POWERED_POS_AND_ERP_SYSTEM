@@ -42,16 +42,26 @@ export const AiChat = () => {
   }, []);
 
 
-  const quickPrompts = [
-    { label: '🗓️ Yesterday\'s Sales', prompt: 'Yesterday\'s sales figure please' },
-    { label: '📅 Today\'s Sales', prompt: 'Today\'s sales summary' },
-    { label: '📆 Last Week', prompt: 'Show me last week\'s sales' },
-    { label: '🗃️ This Month', prompt: 'This month sales summary' },
-    { label: '💰 Total Revenue', prompt: 'Total revenue and sales figure' },
-    { label: '📊 Top Selling Products', prompt: 'Show my top selling products' },
-    { label: '💳 Cash vs UPI Sales', prompt: 'Show sales breakdown by payment type' },
-    { label: '⚠️ Near-Expiry Alerts', prompt: 'Show near expiry batch alerts' },
-    { label: '📉 Low Stock Items', prompt: 'List low stock items' }
+  const promptCategories = [
+    {
+      title: '📈 Sales & Financials',
+      prompts: [
+        { label: 'Today\'s Sales', prompt: 'Today\'s sales summary' },
+        { label: 'Yesterday\'s Sales', prompt: 'Yesterday\'s sales figure please' },
+        { label: 'This Month', prompt: 'This month sales summary' },
+        { label: 'Last Week', prompt: 'Show me last week\'s sales' },
+        { label: 'Total Revenue', prompt: 'Total revenue and sales figure' },
+      ]
+    },
+    {
+      title: '📦 Inventory & Alerts',
+      prompts: [
+        { label: 'Top Sellers', prompt: 'Show my top selling products' },
+        { label: 'Cash vs UPI Split', prompt: 'Show sales breakdown by payment type' },
+        { label: 'Near-Expiry Alerts', prompt: 'Show near expiry batch alerts' },
+        { label: 'Low Stock Levels', prompt: 'List low stock items' }
+      ]
+    }
   ];
 
   const scrollToBottom = () => {
@@ -111,6 +121,12 @@ export const AiChat = () => {
         <div className="w-full h-64 bg-slate-950/40 p-4 rounded-xl border border-slate-800/60 mt-3">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <defs>
+                <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#6366f1" stopOpacity={1} />
+                  <stop offset="100%" stopColor="#312e81" stopOpacity={0.3} />
+                </linearGradient>
+              </defs>
               <XAxis dataKey="name" stroke="#94a3b8" fontSize={10} tickLine={false} />
               <YAxis stroke="#94a3b8" fontSize={10} tickLine={false} />
               <Tooltip 
@@ -118,7 +134,7 @@ export const AiChat = () => {
                 labelStyle={{ color: '#fff', fontWeight: 'bold' }}
                 itemStyle={{ color: '#818cf8' }}
               />
-              <Bar dataKey="value" fill="#6366f1" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="value" fill="url(#barGradient)" radius={[6, 6, 0, 0]} isAnimationActive={true} animationDuration={1200} />
             </BarChart>
           </ResponsiveContainer>
         </div>
@@ -135,9 +151,11 @@ export const AiChat = () => {
                 cx="50%"
                 cy="50%"
                 innerRadius={60}
-                outerRadius={80}
-                paddingAngle={4}
+                outerRadius={85}
+                paddingAngle={5}
                 dataKey="value"
+                isAnimationActive={true}
+                animationDuration={1000}
               >
                 {chartData.map((_, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -166,8 +184,49 @@ export const AiChat = () => {
 
   return (
     <div className="max-w-4xl mx-auto p-6 h-[calc(100vh-4rem)] flex flex-col justify-between">
+      <style>{`
+        .glass-panel {
+          background: rgba(15, 23, 42, 0.45);
+          backdrop-filter: blur(16px);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        .chat-scrollbar::-webkit-scrollbar {
+          width: 6px;
+        }
+        .chat-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .chat-scrollbar::-webkit-scrollbar-thumb {
+          background: rgba(148, 163, 184, 0.15);
+          border-radius: 9999px;
+        }
+        .chat-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: rgba(148, 163, 184, 0.3);
+        }
+        .user-bubble {
+          background: linear-gradient(135deg, #4f46e5 0%, #3b82f6 100%);
+          box-shadow: 0 4px 15px -3px rgba(79, 70, 229, 0.35);
+        }
+        .assistant-bubble {
+          background: rgba(30, 41, 59, 0.6);
+          backdrop-filter: blur(8px);
+          border: 1px solid rgba(255, 255, 255, 0.04);
+          box-shadow: 0 4px 20px -3px rgba(0, 0, 0, 0.3);
+        }
+        .quick-chip {
+          background: rgba(30, 41, 59, 0.4);
+          border: 1px solid rgba(255, 255, 255, 0.05);
+          transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .quick-chip:hover {
+          background: rgba(79, 70, 229, 0.2);
+          border-color: rgba(99, 102, 241, 0.4);
+          transform: translateY(-1px);
+        }
+      `}</style>
+
       {/* Header */}
-      <div className="bg-slate-900 border border-slate-800 p-4 rounded-t-xl flex justify-between items-center shadow-lg">
+      <div className="glass-panel p-4 rounded-t-xl flex justify-between items-center shadow-2xl relative z-10">
         <div className="flex items-center space-x-3">
           <div className="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center shadow-md">
             <Sparkles className="w-5 h-5 text-white" />
@@ -206,7 +265,7 @@ export const AiChat = () => {
       </div>
 
       {/* Message Screen */}
-      <div className="flex-1 bg-slate-950 border-x border-slate-900 p-6 overflow-y-auto space-y-6">
+      <div className="flex-1 bg-slate-950/60 backdrop-blur-sm border-x border-slate-900 p-6 overflow-y-auto space-y-6 chat-scrollbar">
         {messages.map((msg) => (
           <div
             key={msg.id}
@@ -225,8 +284,8 @@ export const AiChat = () => {
               {/* Bubble */}
               <div className={`p-4 rounded-2xl text-sm ${
                 msg.sender === 'user'
-                  ? 'bg-blue-600 text-white rounded-tr-none'
-                  : 'bg-slate-900 text-slate-100 border border-slate-800 rounded-tl-none'
+                  ? 'user-bubble text-white rounded-tr-none'
+                  : 'assistant-bubble text-slate-100 rounded-tl-none'
               }`}>
                 {/* Text */}
                 <div className="whitespace-pre-line leading-relaxed font-medium">
@@ -253,7 +312,7 @@ export const AiChat = () => {
               <div className="w-8 h-8 rounded-full bg-indigo-600/20 text-indigo-400 border border-indigo-500/20 flex items-center justify-center shrink-0">
                 <Bot className="w-4 h-4" />
               </div>
-              <div className="bg-slate-900 border border-slate-800 px-4 py-3 rounded-2xl rounded-tl-none flex items-center space-x-2 text-slate-400 text-xs font-bold">
+              <div className="assistant-bubble px-4 py-3 rounded-2xl rounded-tl-none flex items-center space-x-2 text-slate-350 text-xs font-bold">
                 <Loader2 className="w-4 h-4 animate-spin text-indigo-500" />
                 <span>AI is compiling database query...</span>
               </div>
@@ -264,17 +323,25 @@ export const AiChat = () => {
       </div>
 
       {/* Input / Control Area */}
-      <div className="bg-slate-900 border border-slate-800 p-4 rounded-b-xl space-y-4 shadow-lg">
-        {/* Quick Chips */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-thin">
-          {quickPrompts.map((chip, idx) => (
-            <button
-              key={idx}
-              onClick={() => handleSendMessage(chip.prompt)}
-              className="px-3.5 py-1.5 bg-slate-950 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white rounded-full text-xs font-bold transition flex items-center shrink-0 gap-1.5"
-            >
-              {chip.label}
-            </button>
+      <div className="glass-panel p-4 rounded-b-xl space-y-4 shadow-2xl relative z-10">
+        {/* Quick Chips Categorized */}
+        <div className="space-y-3">
+          {promptCategories.map((cat, catIdx) => (
+            <div key={catIdx} className="flex flex-col space-y-1">
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider">{cat.title}</span>
+              <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+                {cat.prompts.map((chip, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSendMessage(chip.prompt)}
+                    className="quick-chip px-3.5 py-1.5 text-slate-300 hover:text-indigo-300 rounded-full text-xs font-bold transition flex items-center shrink-0 gap-1.5"
+                  >
+                    {chip.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           ))}
         </div>
 
@@ -284,11 +351,11 @@ export const AiChat = () => {
             e.preventDefault();
             handleSendMessage(inputValue);
           }}
-          className="flex gap-2"
+          className="flex gap-2 pt-1"
         >
           <input
             type="text"
-            className="flex-1 px-4 py-3 bg-slate-950 border border-slate-850 focus:border-indigo-500 rounded-xl text-white placeholder-slate-500 focus:outline-none text-sm transition"
+            className="flex-1 px-4 py-3 bg-slate-950/70 border border-slate-800/80 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 rounded-xl text-white placeholder-slate-500 focus:outline-none text-sm transition"
             placeholder="Type a query (e.g. 'Show top selling products' or 'Payment sales breakdown')..."
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}

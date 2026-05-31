@@ -22,7 +22,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, isLoading, error
   const [loginType, setLoginType] = useState<'cashier' | 'admin'>('cashier');
   const [terminalError, setTerminalError] = useState<string | null>(null);
 
-  const { register, handleSubmit, formState: { errors } } = useForm<LoginFormData>({
+  const { register, handleSubmit, setValue, formState: { errors } } = useForm<LoginFormData>({
     resolver: zodResolver(loginSchema),
     defaultValues: {
       terminalCode: localStorage.getItem('pos_terminal_code') || '',
@@ -36,6 +36,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, isLoading, error
       return;
     }
     onSubmit(data, loginType);
+  };
+
+  const handleDemoLogin = () => {
+    setLoginType('admin');
+    setValue('username', 'demo@supermarket.com');
+    setValue('password', 'demo123456');
+    setTimeout(() => {
+      handleSubmit(handleFormSubmit)();
+    }, 50);
   };
 
   return (
@@ -101,6 +110,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, isLoading, error
           </div>
         )}
 
+        {/* Username */}
         <div>
           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Username</label>
           <input 
@@ -113,6 +123,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, isLoading, error
           {errors.username && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.username.message}</p>}
         </div>
 
+        {/* Password */}
         <div>
           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">Password</label>
           <input 
@@ -133,6 +144,18 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, isLoading, error
           {isLoading ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : `Sign In to ${loginType === 'cashier' ? 'POS Terminal' : 'ERP Back-Office'}`}
         </button>
       </form>
+
+      {/* Demo Sign In Quick Button */}
+      <div className="pt-4 border-t border-slate-200 dark:border-slate-700/60 flex flex-col items-center">
+        <span className="text-[11px] font-medium text-slate-400 dark:text-slate-500 mb-2">Want to explore a quick test-drive?</span>
+        <button
+          type="button"
+          onClick={handleDemoLogin}
+          className="w-full flex justify-center items-center py-2 px-4 border border-indigo-200 dark:border-indigo-800/80 rounded-md text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/20 hover:bg-indigo-100 dark:hover:bg-indigo-950/40 transition-colors shadow-sm"
+        >
+          🔑 Quick Login as Demo Admin
+        </button>
+      </div>
     </div>
   );
 };

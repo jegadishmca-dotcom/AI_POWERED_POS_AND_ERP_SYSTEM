@@ -57,6 +57,7 @@ builder.Services.AddMediatR(cfg => {
 builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IPrintService, EscPosPrintService>();
+builder.Services.AddScoped<IEmailService, PosErp.Infrastructure.Services.SmtpEmailService>();
 
 // JWT Authentication Configuration
 var secret = "SuperSecretKeyForDevelopmentPurposesOnlyReplaceInProdSuperSecretKeyForDevelopmentPurposesOnlyReplaceInProd";
@@ -95,6 +96,7 @@ builder.Services.AddScoped<IEInvoiceService, EInvoiceService>();
 
 // Register Materialized View Periodic Refresher
 builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.StockPositionRefreshService>();
+builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.DailyReportEmailService>();
 
 builder.Services.AddCors(options =>
 {

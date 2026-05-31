@@ -1,5 +1,7 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Catalog;
 using PosErp.Domain.Entities.Inventory;
@@ -336,6 +338,26 @@ public class AiAutomationController : ControllerBase
 
         await _context.SaveChangesAsync(cancellationToken);
         return Ok(new { success = true });
+    }
+
+    // ── 4.1 TRIGGER DAILY REPORT EMAIL MANUALLY ──────────────────────
+    [HttpPost("trigger-daily-email")]
+    public async Task<IActionResult> TriggerDailyEmail(CancellationToken cancellationToken)
+    {
+        try
+        {
+            var scopeFactory = HttpContext.RequestServices.GetRequiredService<IServiceScopeFactory>();
+            var config = HttpContext.RequestServices.GetRequiredService<IConfiguration>();
+
+            var reportService = new PosErp.Infrastructure.Jobs.DailyReportEmailService(scopeFactory, config);
+            await reportService.SendDailyReportAsync(cancellationToken);
+
+            return Ok(new { success = true, message = "Daily report email triggered successfully." });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = $"Failed to trigger email: {ex.Message}" });
+        }
     }
 
     // ── 5. CONVERSATIONAL ERP ASSISTANT (CHAT) ────────────────────────

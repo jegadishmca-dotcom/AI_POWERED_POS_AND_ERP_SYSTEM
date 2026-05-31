@@ -99,6 +99,11 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
       - Redis__ConnectionString=pos_redis:6379,abortConnect=false
+      - EmailSettings__SmtpServer=smtp.gmail.com
+      - EmailSettings__SmtpPort=587
+      - EmailSettings__SenderEmail=
+      - EmailSettings__SenderPassword=
+      - EmailSettings__RecipientEmail=jegadishmca@gmail.com
     ports:
       - "5000:8080"
     networks:

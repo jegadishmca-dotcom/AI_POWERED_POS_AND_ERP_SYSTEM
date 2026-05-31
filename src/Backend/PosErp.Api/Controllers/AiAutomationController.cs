@@ -526,6 +526,41 @@ public class AiAutomationController : ControllerBase
             });
         }
 
+        // ── Top Invoice ──────────────────────────────────────────────
+        if (promptLower.Contains("top invoice") || promptLower.Contains("highest invoice") || promptLower.Contains("best invoice") || promptLower.Contains("max invoice") || promptLower.Contains("maximum invoice"))
+        {
+            var topInvoice = await _context.Invoices
+                .Where(i => i.Status == "COMPLETED")
+                .OrderByDescending(i => i.TotalAmount)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (topInvoice == null)
+            {
+                return Ok(new { text = "No completed invoices found in the system." });
+            }
+
+            var customerName = "Walk-in Customer";
+            if (topInvoice.CustomerId.HasValue)
+            {
+                var customer = await _context.Customers.FindAsync(new object[] { topInvoice.CustomerId.Value }, cancellationToken);
+                if (customer != null)
+                {
+                    customerName = customer.Name;
+                }
+            }
+
+            return Ok(new
+            {
+                text = $"**Highest Value Completed Invoice (All Time):**\n" +
+                       $"- **Invoice #**: {topInvoice.InvoiceNumber}\n" +
+                       $"- **Customer**: {customerName}\n" +
+                       $"- **Date**: {topInvoice.BusinessDate:dd MMM yyyy}\n" +
+                       $"- **Total Amount**: ₹{topInvoice.TotalAmount:N2}\n" +
+                       $"- **Payment Mode**: {topInvoice.PaymentMode}\n" +
+                       $"- **Counter Terminal**: {topInvoice.TerminalId}"
+            });
+        }
+
         // ── Top Sellers ────────────────────────────────────────────────
         if (promptLower.Contains("top sales") || promptLower.Contains("top selling") || promptLower.Contains("best seller") || promptLower.Contains("top 5"))
         {

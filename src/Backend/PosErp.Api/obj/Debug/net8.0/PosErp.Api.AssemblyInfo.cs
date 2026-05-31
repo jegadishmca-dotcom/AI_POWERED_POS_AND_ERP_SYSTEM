@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PosErp.Api")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+eece7fb2ba7bce06af537cdc292d5d063e43c66a")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a4d3840d4cfcf5bdd24f555517372b1ed89db4af")]
 [assembly: System.Reflection.AssemblyProductAttribute("PosErp.Api")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PosErp.Api")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

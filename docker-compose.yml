@@ -101,8 +101,8 @@ services:
       - Redis__ConnectionString=pos_redis:6379,abortConnect=false
       - EmailSettings__SmtpServer=smtp.gmail.com
       - EmailSettings__SmtpPort=587
-      - EmailSettings__SenderEmail=
-      - EmailSettings__SenderPassword=
+      - EmailSettings__SenderEmail=fortabletuse999@gmail.com
+      - EmailSettings__SenderPassword=brtb rhbq voqh xhyg
       - EmailSettings__RecipientEmail=jegadishmca@gmail.com
     ports:
       - "5000:8080"

@@ -425,7 +425,7 @@ using (var scope = app.Services.CreateScope())
             var demoUser = new PosErp.Domain.Entities.Auth.User
             {
                 Username = "demo@supermarket.com",
-                PasswordHash = passwordHasher.HashPassword("demo123456"),
+                PasswordHash = passwordHasher.HashPassword("Demo@123456"),
                 PinHash = passwordHasher.HashPassword("1234"), // Default override PIN
                 FullName = "Demo Sandbox User",
                 RoleId = ownerRole.Id,
@@ -434,6 +434,17 @@ using (var scope = app.Services.CreateScope())
             context.Users.Add(demoUser);
             usersChanged = true;
             Console.WriteLine("[SEED] Seeded demo@supermarket.com sandbox user.");
+        }
+        else
+        {
+            // Ensure existing demo user has the correct password (one-time upgrade)
+            var existingDemo = await context.Users.FirstOrDefaultAsync(u => u.Username == "demo@supermarket.com");
+            if (existingDemo != null && !passwordHasher.VerifyPassword("Demo@123456", existingDemo.PasswordHash))
+            {
+                existingDemo.PasswordHash = passwordHasher.HashPassword("Demo@123456");
+                usersChanged = true;
+                Console.WriteLine("[SEED] Updated demo@supermarket.com password to meet policy requirements.");
+            }
         }
         
         // Seed Cashier 01 User

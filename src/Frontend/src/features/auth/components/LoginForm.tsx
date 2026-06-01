@@ -41,7 +41,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, isLoading, error
   const handleDemoLogin = () => {
     setLoginType('admin');
     setValue('username', 'demo@supermarket.com');
-    setValue('password', 'demo123456');
+    setValue('password', 'Demo@123456');
     setTimeout(() => {
       handleSubmit(handleFormSubmit)();
     }, 50);

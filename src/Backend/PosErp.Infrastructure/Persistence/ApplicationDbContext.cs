@@ -195,7 +195,6 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             var tableName = entity.GetTableName();
             if (tableName != null)
             {
-                // Pluralize/SnakeCase overrides for explicit table names
                 string snakeTableName = ToSnakeCase(tableName);
                 if (snakeTableName == "purchase_orders") snakeTableName = "purchase_order_headers";
                 else if (snakeTableName == "purchase_bills") snakeTableName = "purchase_bill_headers";
@@ -208,6 +207,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 else if (snakeTableName == "stock_adjustment_item") snakeTableName = "stock_adjustment_items";
                 else if (snakeTableName == "stock_take_item") snakeTableName = "stock_take_items";
                 else if (snakeTableName == "bin") snakeTableName = "bins";
+                else if (snakeTableName == "gst_hsn_master" || tableName == "GstHsnMaster") snakeTableName = "gst_hsn_master_india";
                 
                 entity.SetTableName(snakeTableName);
             }

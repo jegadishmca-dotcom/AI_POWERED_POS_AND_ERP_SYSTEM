@@ -406,7 +406,7 @@ SELECT
     i.business_date,
     ii.product_id,
     SUM(ii.quantity) as total_quantity_sold,
-    SUM(ii.final_total) as total_revenue
+    SUM(ii.total_amount) as total_revenue
 FROM invoices i
 JOIN invoice_items ii ON i.id = ii.invoice_id
 WHERE i.status = 'COMPLETED'

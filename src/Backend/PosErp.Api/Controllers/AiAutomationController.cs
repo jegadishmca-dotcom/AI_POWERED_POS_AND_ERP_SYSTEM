@@ -833,4 +833,229 @@ public class AiAutomationController : ControllerBase
 
         return Ok(new { text = fallbackText });
     }
+
+    public record MatchSupplierProductsRequest(List<string> SupplierProductNames, Guid? SupplierId);
+
+    // ── X. AI SMART PRODUCT MATCHER FOR GRN ───────────────────────────────
+    [HttpPost("match-supplier-products")]
+    public async Task<IActionResult> MatchSupplierProducts([FromBody] MatchSupplierProductsRequest request, CancellationToken cancellationToken)
+    {
+        if (request.SupplierProductNames == null || !request.SupplierProductNames.Any())
+            return BadRequest("No supplier product names provided.");
+
+        var catalog = await _context.Products
+            .Where(p => p.IsActive && !p.IsDeleted)
+            .Select(p => new { p.Id, p.ProductCode, p.Name })
+            .Take(500)
+            .ToListAsync(cancellationToken);
+
+        var catalogJson = JsonSerializer.Serialize(catalog);
+        var inputJson = JsonSerializer.Serialize(request.SupplierProductNames);
+
+        var prompt = "You are an AI Smart Product Matcher for an ERP system. " +
+                     "Your task is to match a list of raw supplier product names to the best matching internal catalog product. " +
+                     "Output strictly a JSON array of objects. Format: [{\"SupplierProductName\": \"...\", \"MatchedProductId\": \"...\", \"MatchedProductName\": \"...\", \"Confidence\": \"High/Medium/Low\"}]. " +
+                     "If there is no logical match, set MatchedProductId to null. " +
+                     "Internal Catalog: " + catalogJson + " " +
+                     "Supplier Products to Match: " + inputJson;
+
+        try
+        {
+            var baseUrl = "http://pos_ollama:11434";
+            try
+            {
+                using var testCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                await _httpClient.GetAsync(baseUrl, testCts.Token);
+            }
+            catch { baseUrl = "http://localhost:11434"; }
+
+            // Fetch active model
+            string activeModel = "llama2";
+            try
+            {
+                using var tagsClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+                var tagsResponse = await tagsClient.GetAsync($"{baseUrl}/api/tags", cancellationToken);
+                if (tagsResponse.IsSuccessStatusCode)
+                {
+                    var tagsJson = await tagsResponse.Content.ReadAsStringAsync(cancellationToken);
+                    using var doc = JsonDocument.Parse(tagsJson);
+                    if (doc.RootElement.TryGetProperty("models", out var modelsArr) && modelsArr.ValueKind == JsonValueKind.Array)
+                    {
+                        var modelList = new List<string>();
+                        foreach (var m in modelsArr.EnumerateArray())
+                        {
+                            if (m.TryGetProperty("name", out var nameProp))
+                            {
+                                var modelName = nameProp.GetString();
+                                if (!string.IsNullOrEmpty(modelName)) modelList.Add(modelName);
+                            }
+                        }
+                        if (modelList.Count > 0)
+                            activeModel = modelList.FirstOrDefault(name => name.Contains("qwen") || name.Contains("llama")) ?? modelList[0];
+                    }
+                }
+            }
+            catch { }
+
+            using var ollamaClient = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+            var requestBody = new
+            {
+                model = activeModel,
+                prompt = prompt,
+                stream = false,
+                format = "json"
+            };
+
+            var jsonContent = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+            var response = await ollamaClient.PostAsync($"{baseUrl}/api/generate", jsonContent, cancellationToken);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var resString = await response.Content.ReadAsStringAsync(cancellationToken);
+                var doc = JsonDocument.Parse(resString);
+                var responseText = doc.RootElement.GetProperty("response").GetString();
+                
+                try {
+                    var matches = JsonSerializer.Deserialize<List<object>>(responseText);
+                    return Ok(matches);
+                } catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Ollama Matcher error: {ex.Message}");
+        }
+
+        // Fallback: simple contains matching
+        var fallbackMatches = request.SupplierProductNames.Select(supplierName => {
+            var match = catalog.FirstOrDefault(c => supplierName.Contains(c.Name, StringComparison.OrdinalIgnoreCase) || c.Name.Contains(supplierName, StringComparison.OrdinalIgnoreCase));
+            return new {
+                SupplierProductName = supplierName,
+                MatchedProductId = match?.Id,
+                MatchedProductName = match?.Name,
+                Confidence = match != null ? "Low (Rule-based)" : "None"
+            };
+        }).ToList();
+
+        return Ok(fallbackMatches);
+    }
+
+    // ── Z. SMART CASHIER FRAUD & SHRINKAGE DETECTION ──────────────────
+    [HttpGet("fraud-detection")]
+    public async Task<IActionResult> GetFraudDetection(CancellationToken cancellationToken)
+    {
+        var cutoffDate = DateTime.UtcNow.AddDays(-7);
+
+        var recentInvoices = await _context.Invoices
+            .Include(i => i.Items)
+                .ThenInclude(l => l.Product)
+            .Where(i => i.Status == "COMPLETED" && i.BusinessDate >= cutoffDate)
+            .ToListAsync(cancellationToken);
+
+        if (!recentInvoices.Any())
+        {
+            return Ok(new { FlaggedCashiers = new List<object>(), Message = "No recent transactions found to analyze." });
+        }
+
+        var cashierStats = recentInvoices.GroupBy(i => i.CreatedBy)
+            .Select(g => {
+                var allLines = g.SelectMany(i => i.Items).ToList();
+                var totalLines = allLines.Count;
+                var voidLines = allLines.Count(l => l.Quantity < 0);
+                var overrideLines = allLines.Count(l => l.Product != null && l.UnitPrice < l.Product.SellingPrice);
+                
+                return new {
+                    CashierId = g.Key?.ToString() ?? "Unknown",
+                    TotalTransactions = g.Count(),
+                    TotalLines = totalLines,
+                    VoidCount = voidLines,
+                    VoidRate = totalLines > 0 ? (decimal)voidLines / totalLines : 0,
+                    OverrideCount = overrideLines,
+                    OverrideRate = totalLines > 0 ? (decimal)overrideLines / totalLines : 0
+                };
+            }).ToList();
+
+        var statsJson = JsonSerializer.Serialize(cashierStats);
+        var prompt = "You are a Loss Prevention Expert AI. Analyze the following 7-day POS statistics for our cashiers. " +
+                     "Flag any cashier with a VoidRate > 0.05 (5%) or an OverrideRate > 0.10 (10%). " +
+                     "Output strictly in JSON array format: [{\"CashierId\": \"...\", \"RiskLevel\": \"High/Medium/Low\", \"Reason\": \"...\", \"RecommendedAction\": \"...\"}]. " +
+                     "If no cashiers are flagged, return an empty array []. Data: " + statsJson;
+
+        try
+        {
+            var baseUrl = "http://pos_ollama:11434";
+            try
+            {
+                using var testCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                await _httpClient.GetAsync(baseUrl, testCts.Token);
+            }
+            catch { baseUrl = "http://localhost:11434"; }
+
+            string activeModel = "llama2";
+            try
+            {
+                using var tagsClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+                var tagsResponse = await tagsClient.GetAsync($"{baseUrl}/api/tags", cancellationToken);
+                if (tagsResponse.IsSuccessStatusCode)
+                {
+                    var tagsJson = await tagsResponse.Content.ReadAsStringAsync(cancellationToken);
+                    using var doc = JsonDocument.Parse(tagsJson);
+                    if (doc.RootElement.TryGetProperty("models", out var modelsArr) && modelsArr.ValueKind == JsonValueKind.Array)
+                    {
+                        var modelList = new List<string>();
+                        foreach (var m in modelsArr.EnumerateArray())
+                        {
+                            if (m.TryGetProperty("name", out var nameProp))
+                            {
+                                var modelName = nameProp.GetString();
+                                if (!string.IsNullOrEmpty(modelName)) modelList.Add(modelName);
+                            }
+                        }
+                        if (modelList.Count > 0)
+                            activeModel = modelList.FirstOrDefault(name => name.Contains("qwen") || name.Contains("llama")) ?? modelList[0];
+                    }
+                }
+            }
+            catch { }
+
+            using var ollamaClient = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+            var requestBody = new
+            {
+                model = activeModel,
+                prompt = prompt,
+                stream = false,
+                format = "json"
+            };
+
+            var jsonContent = new StringContent(JsonSerializer.Serialize(requestBody), Encoding.UTF8, "application/json");
+            var response = await ollamaClient.PostAsync($"{baseUrl}/api/generate", jsonContent, cancellationToken);
+            
+            if (response.IsSuccessStatusCode)
+            {
+                var resString = await response.Content.ReadAsStringAsync(cancellationToken);
+                var doc = JsonDocument.Parse(resString);
+                var responseText = doc.RootElement.GetProperty("response").GetString();
+                
+                try {
+                    var flagged = JsonSerializer.Deserialize<List<object>>(responseText);
+                    return Ok(new { FlaggedCashiers = flagged, Message = "AI Analysis Complete." });
+                } catch { }
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Ollama Fraud Detection error: {ex.Message}");
+        }
+
+        var fallbackFlagged = cashierStats
+            .Where(c => c.VoidRate > 0.05m || c.OverrideRate > 0.10m)
+            .Select(c => new {
+                CashierId = c.CashierId,
+                RiskLevel = c.VoidRate > 0.10m ? "High" : "Medium",
+                Reason = $"Rule-based flag: Void Rate is {c.VoidRate:P1}, Override Rate is {c.OverrideRate:P1}.",
+                RecommendedAction = "Review transaction logs and CCTV footage for this cashier."
+            }).ToList();
+
+        return Ok(new { FlaggedCashiers = fallbackFlagged, Message = "AI Offline. Using Rule-based detection." });
+    }
 }

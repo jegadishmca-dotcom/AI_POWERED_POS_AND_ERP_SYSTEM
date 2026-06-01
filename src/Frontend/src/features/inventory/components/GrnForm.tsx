@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { PackageCheck, Save, AlertCircle } from 'lucide-react';
+import { PackageCheck, Save, AlertCircle, Sparkles } from 'lucide-react';
 import { api } from '../../../utils/api';
+import { matchSupplierProducts, SupplierProductMatch } from '../../ai/api/ai.api';
 
 export const GrnForm = () => {
   const [purchaseOrders, setPurchaseOrders] = useState<any[]>([]);
@@ -9,6 +10,28 @@ export const GrnForm = () => {
   const [grnItems, setGrnItems] = useState<any[]>([]);
   const [invoiceNumber, setInvoiceNumber] = useState('');
   const [receivedDate, setReceivedDate] = useState(new Date().toISOString().slice(0,10));
+  
+  // AI Smart Matcher States
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiInput, setAiInput] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiMatches, setAiMatches] = useState<SupplierProductMatch[]>([]);
+
+  const handleAiMatch = async () => {
+    const lines = aiInput.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+    if (lines.length === 0) return;
+    
+    setAiLoading(true);
+    try {
+      const results = await matchSupplierProducts({ supplierProductNames: lines });
+      setAiMatches(results);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to get AI matches.');
+    } finally {
+      setAiLoading(false);
+    }
+  };
 
   const fetchPurchaseOrders = () => {
     api.get('/api/purchasing/purchase-orders')
@@ -156,12 +179,20 @@ export const GrnForm = () => {
         <h2 className="text-2xl font-bold text-slate-800 flex items-center">
           <PackageCheck className="mr-3 text-emerald-600" /> Goods Receipt Note (GRN)
         </h2>
-        <button 
-          onClick={handleConfirmGrn}
-          className="px-6 py-2 bg-emerald-600 text-white rounded shadow flex items-center font-bold hover:bg-emerald-700"
-        >
-          <Save className="w-5 h-5 mr-2" /> Confirm GRN
-        </button>
+        <div className="flex space-x-3">
+          <button 
+            onClick={() => setShowAiModal(true)}
+            className="px-4 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded shadow-sm flex items-center font-bold hover:bg-indigo-100 transition"
+          >
+            <Sparkles className="w-5 h-5 mr-2" /> AI Smart Match
+          </button>
+          <button 
+            onClick={handleConfirmGrn}
+            className="px-6 py-2 bg-emerald-600 text-white rounded shadow flex items-center font-bold hover:bg-emerald-700"
+          >
+            <Save className="w-5 h-5 mr-2" /> Confirm GRN
+          </button>
+        </div>
       </div>
 
       <div className="mb-6 grid grid-cols-3 gap-6">
@@ -259,6 +290,88 @@ export const GrnForm = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* AI Smart Match Modal */}
+      {showAiModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b flex justify-between items-center bg-indigo-50 rounded-t-xl">
+              <h3 className="font-bold text-lg flex items-center text-indigo-900">
+                <Sparkles className="w-5 h-5 mr-2 text-indigo-600" /> AI Smart Product Matcher
+              </h3>
+              <button onClick={() => setShowAiModal(false)} className="text-gray-500 hover:text-gray-800 text-xl font-bold">&times;</button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              <p className="text-sm text-gray-600 mb-4">
+                Paste supplier product names from their invoice (one per line). The AI will resolve spelling variations and match them to our catalog.
+              </p>
+              
+              <textarea 
+                className="w-full h-40 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-mono"
+                placeholder="e.g.&#10;Br. Bond Tea 250g&#10;Nestle Maggi 70g"
+                value={aiInput}
+                onChange={e => setAiInput(e.target.value)}
+              />
+
+              {aiMatches.length > 0 && (
+                <div className="mt-6 border rounded-lg overflow-hidden">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="p-2 border-b">Supplier Product</th>
+                        <th className="p-2 border-b">Matched Internal Product</th>
+                        <th className="p-2 border-b">Confidence</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {aiMatches.map((m, i) => (
+                        <tr key={i} className="border-b">
+                          <td className="p-2 font-medium">{m.supplierProductName}</td>
+                          <td className="p-2 text-indigo-700 font-bold">{m.matchedProductName || 'No match found'}</td>
+                          <td className="p-2">
+                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${
+                              m.confidence === 'High' ? 'bg-green-100 text-green-800' :
+                              m.confidence === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                              {m.confidence}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t flex justify-end gap-3 bg-gray-50 rounded-b-xl">
+              <button 
+                onClick={() => setShowAiModal(false)}
+                className="px-4 py-2 text-gray-600 font-medium hover:bg-gray-200 rounded-lg transition"
+              >
+                Close
+              </button>
+              <button 
+                onClick={handleAiMatch}
+                disabled={!aiInput.trim() || aiLoading}
+                className="px-6 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 transition flex items-center disabled:opacity-50"
+              >
+                {aiLoading ? (
+                  <span className="flex items-center">
+                    <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                    Matching...
+                  </span>
+                ) : (
+                  <>
+                    <Sparkles className="w-4 h-4 mr-2" /> Match Products
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

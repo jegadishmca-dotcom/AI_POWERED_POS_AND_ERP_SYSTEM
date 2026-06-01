@@ -18,7 +18,8 @@ import {
   Sparkles,
   Bot,
   TrendingUp,
-  TrendingDown
+  TrendingDown,
+  ShieldAlert
 } from 'lucide-react';
 import { useAuthStore } from './features/auth/store/auth.store';
 import { Login } from './features/auth/routes/Login';
@@ -41,7 +42,7 @@ import { AiInvoiceImport } from './features/inventory/components/AiInvoiceImport
 import { AiChat } from './features/ai/routes/AiChat';
 import { AiForecaster } from './features/ai/routes/AiForecaster';
 import { AiMarkdowns } from './features/ai/routes/AiMarkdowns';
-
+import { LossPreventionDashboard } from './features/analytics/components/LossPreventionDashboard';
 
 const AppLayout: React.FC = () => {
   const { user, clearAuth } = useAuthStore();
@@ -75,6 +76,7 @@ const AppLayout: React.FC = () => {
     { path: '/ai/forecaster', name: 'Demand Forecaster', icon: TrendingUp, roles: ['Owner', 'Manager'], category: 'ai' },
     { path: '/ai/markdowns', name: 'Smart Markdowns', icon: TrendingDown, roles: ['Owner', 'Manager'], category: 'ai' },
     { path: '/ai/invoice-extractor', name: 'AI Invoice Extractor', icon: Sparkles, roles: ['Owner', 'Manager'], category: 'ai' },
+    { path: '/ai/loss-prevention', name: 'AI Fraud Detection', icon: ShieldAlert, roles: ['Owner', 'Manager'], category: 'ai' },
   ];
 
   const filteredNavItems = navItems.filter(item => 
@@ -263,6 +265,9 @@ const AppLayout: React.FC = () => {
             } />
             <Route path="/ai/markdowns" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <AiMarkdowns />
+            } />
+            <Route path="/ai/loss-prevention" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <LossPreventionDashboard />
             } />
             <Route path="/warehouses" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <WarehouseLocationsList />

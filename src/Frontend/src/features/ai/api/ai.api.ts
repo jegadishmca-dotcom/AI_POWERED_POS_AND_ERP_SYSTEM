@@ -64,3 +64,35 @@ export const getAiStatus = async (): Promise<{ ollamaOnline: boolean }> => {
   return data;
 };
 
+export interface MatchSupplierProductsRequest {
+  supplierProductNames: string[];
+  supplierId?: string;
+}
+
+export interface SupplierProductMatch {
+  supplierProductName: string;
+  matchedProductId: string | null;
+  matchedProductName: string | null;
+  confidence: string;
+}
+
+export const matchSupplierProducts = async (request: MatchSupplierProductsRequest): Promise<SupplierProductMatch[]> => {
+  const { data } = await api.post('/api/aiautomation/match-supplier-products', request);
+  return data;
+};
+
+export interface FraudDetectionResult {
+  flaggedCashiers: Array<{
+    cashierId: string;
+    riskLevel: string;
+    reason: string;
+    recommendedAction: string;
+  }>;
+  message: string;
+}
+
+export const getFraudDetection = async (): Promise<FraudDetectionResult> => {
+  const { data } = await api.get('/api/aiautomation/fraud-detection');
+  return data;
+};
+

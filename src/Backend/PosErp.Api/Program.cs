@@ -98,6 +98,7 @@ builder.Services.AddScoped<IProductBatchService, ProductBatchService>();
 builder.Services.AddScoped<IOfferEngine, OfferEngine>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
+builder.Services.AddScoped<PosErp.Application.Features.Audit.Services.IAuditLoggingService, PosErp.Application.Features.Audit.Services.AuditLoggingService>();
 builder.Services.AddScoped<ICustomerTierService, CustomerTierService>();
 builder.Services.AddScoped<IFinancialPostingService, FinancialPostingService>();
 builder.Services.AddScoped<IFinancialReportingService, FinancialReportingService>();

@@ -73,8 +73,8 @@ const AppLayout: React.FC = () => {
 
     // AI Co-Pilot Hub
     { path: '/ai/chat', name: 'AI Co-pilot Chat', icon: Bot, roles: ['Owner', 'Manager'], category: 'ai' },
-    { path: '/ai/forecaster', name: 'Demand Forecaster', icon: TrendingUp, roles: ['Owner', 'Manager'], category: 'ai' },
-    { path: '/ai/markdowns', name: 'Smart Markdowns', icon: TrendingDown, roles: ['Owner', 'Manager'], category: 'ai' },
+    { path: '/ai/forecaster', name: 'AI Demand Forecaster', icon: TrendingUp, roles: ['Owner', 'Manager'], category: 'ai' },
+    { path: '/ai/markdowns', name: 'AI Smart Markdowns', icon: TrendingDown, roles: ['Owner', 'Manager'], category: 'ai' },
     { path: '/ai/invoice-extractor', name: 'AI Invoice Extractor', icon: Sparkles, roles: ['Owner', 'Manager'], category: 'ai' },
     { path: '/ai/loss-prevention', name: 'AI Fraud Detection', icon: ShieldAlert, roles: ['Owner', 'Manager'], category: 'ai' },
   ];

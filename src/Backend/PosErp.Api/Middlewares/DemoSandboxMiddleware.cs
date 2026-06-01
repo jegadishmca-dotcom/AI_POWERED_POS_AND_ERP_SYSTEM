@@ -27,7 +27,9 @@ public class DemoSandboxMiddleware
             bool isAllowedEndpoint = path.Contains("/api/auth/login") || 
                                      path.Contains("/api/auth/refresh") || 
                                      path.Contains("/api/auth/logout") ||
-                                     path.Contains("/api/settings/email/test");
+                                     path.Contains("/api/settings/email/test") ||
+                                     path.Contains("/api/pos/") ||
+                                     path.Contains("/api/aiautomation/");
 
             if (!isAllowedEndpoint)
             {

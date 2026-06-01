@@ -393,8 +393,8 @@ SELECT
     business_date,
     COUNT(id) as total_invoices,
     SUM(sub_total) as gross_sales,
-    SUM(total_discount) as total_discounts,
-    SUM(tax_total) as total_tax,
+    SUM(discount_amount) as total_discounts,
+    SUM(tax_amount) as total_tax,
     SUM(total_amount) as net_sales
 FROM invoices
 WHERE status = 'COMPLETED'

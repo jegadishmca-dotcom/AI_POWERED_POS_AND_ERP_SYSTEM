@@ -28,6 +28,7 @@ public class StockPositionRefreshService : BackgroundService
                 using var scope = _scopeFactory.CreateScope();
                 var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
                 var db = (DbContext)context;
+                db.Database.SetCommandTimeout(120);
 
                 // Try concurrent refresh (non-blocking)
                 try

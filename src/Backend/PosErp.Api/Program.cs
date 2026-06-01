@@ -45,7 +45,9 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
     var configOptions = ConfigurationOptions.Parse(redisConnectionString);
     configOptions.AbortOnConnectFail = false;
-    configOptions.ConnectTimeout = 2000;
+    configOptions.ConnectTimeout = 1000;
+    configOptions.SyncTimeout = 500;
+    configOptions.AsyncTimeout = 500;
     return ConnectionMultiplexer.Connect(configOptions);
 });
 builder.Services.AddStackExchangeRedisCache(options =>

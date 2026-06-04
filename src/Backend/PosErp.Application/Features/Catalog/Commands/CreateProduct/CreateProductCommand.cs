@@ -16,7 +16,8 @@ public record CreateProductCommand(
     decimal Mrp,
     decimal SellingPrice,
     decimal PurchasePrice,
-    string BarcodeValue
+    string BarcodeValue,
+    Guid? TaxSlabId
 ) : IRequest<Guid>;
 
 public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Guid>
@@ -30,8 +31,18 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
 
     public async Task<Guid> Handle(CreateProductCommand request, CancellationToken cancellationToken)
     {
-        // 1. Get default Tax Slab or create one if empty
-        var taxSlab = await _context.TaxSlabs.FirstOrDefaultAsync(cancellationToken);
+        // 1. Get requested Tax Slab or default to first if not provided
+        PosErp.Domain.Entities.Catalog.TaxSlab? taxSlab = null;
+        if (request.TaxSlabId.HasValue)
+        {
+            taxSlab = await _context.TaxSlabs.FirstOrDefaultAsync(t => t.Id == request.TaxSlabId.Value, cancellationToken);
+        }
+
+        if (taxSlab == null)
+        {
+            taxSlab = await _context.TaxSlabs.FirstOrDefaultAsync(cancellationToken);
+        }
+
         if (taxSlab == null)
         {
             taxSlab = new TaxSlab

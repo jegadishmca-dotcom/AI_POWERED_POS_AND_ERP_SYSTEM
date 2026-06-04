@@ -18,7 +18,8 @@ public record UpdateProductCommand(
     decimal Mrp,
     decimal SellingPrice,
     decimal PurchasePrice,
-    string BarcodeValue
+    string BarcodeValue,
+    Guid? TaxSlabId
 ) : IRequest<bool>;
 
 public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand, bool>
@@ -59,6 +60,10 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         product.Mrp = request.Mrp;
         product.SellingPrice = request.SellingPrice;
         product.PurchasePrice = request.PurchasePrice;
+        if (request.TaxSlabId.HasValue)
+        {
+            product.TaxSlabId = request.TaxSlabId.Value;
+        }
         product.UpdatedAt = DateTime.UtcNow;
 
         // Handle Barcode Update

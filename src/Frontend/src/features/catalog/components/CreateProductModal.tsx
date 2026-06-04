@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Save } from 'lucide-react';
-import { createProduct, updateProduct } from '../api/catalog.api';
+import { createProduct, updateProduct, getTaxSlabs, TaxSlab } from '../api/catalog.api';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface CreateProductModalProps {
@@ -19,8 +19,14 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
   const [sellingPrice, setSellingPrice] = useState('');
   const [purchasePrice, setPurchasePrice] = useState('');
   const [barcodeValue, setBarcodeValue] = useState('');
+  const [taxSlabId, setTaxSlabId] = useState('');
+  const [taxSlabs, setTaxSlabs] = useState<TaxSlab[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getTaxSlabs().then(setTaxSlabs).catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (isOpen) {
@@ -33,6 +39,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
         setSellingPrice(editingProduct.sellingPrice?.toString() || '');
         setPurchasePrice(editingProduct.purchasePrice?.toString() || '');
         setBarcodeValue(editingProduct.primaryBarcode || '');
+        setTaxSlabId(editingProduct.taxSlabId || '');
       } else {
         setProductCode('');
         setName('');
@@ -42,6 +49,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
         setSellingPrice('');
         setPurchasePrice('');
         setBarcodeValue('');
+        setTaxSlabId('');
       }
       setError(null);
     }
@@ -69,7 +77,8 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
           mrp: parseFloat(mrp),
           sellingPrice: parseFloat(sellingPrice),
           purchasePrice: parseFloat(purchasePrice),
-          barcodeValue: barcodeValue
+          barcodeValue: barcodeValue,
+          taxSlabId: taxSlabId || undefined
         });
       } else {
         await createProduct({
@@ -80,7 +89,8 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
           mrp: parseFloat(mrp),
           sellingPrice: parseFloat(sellingPrice),
           purchasePrice: parseFloat(purchasePrice),
-          barcodeValue: barcodeValue
+          barcodeValue: barcodeValue,
+          taxSlabId: taxSlabId || undefined
         });
       }
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -169,7 +179,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
             />
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">MRP (₹) *</label>
               <input
@@ -182,7 +192,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Selling Price (₹) *</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Selling (₹) *</label>
               <input
                 type="number"
                 step="0.01"
@@ -193,7 +203,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Purchase Price (₹) *</label>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Cost (₹) *</label>
               <input
                 type="number"
                 step="0.01"
@@ -202,6 +212,20 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
                 value={purchasePrice}
                 onChange={(e) => setPurchasePrice(e.target.value)}
               />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Tax Slab *</label>
+              <select
+                required
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm"
+                value={taxSlabId}
+                onChange={(e) => setTaxSlabId(e.target.value)}
+              >
+                <option value="">-- Select --</option>
+                {taxSlabs.map(ts => (
+                  <option key={ts.id} value={ts.id}>{ts.name}</option>
+                ))}
+              </select>
             </div>
           </div>
 

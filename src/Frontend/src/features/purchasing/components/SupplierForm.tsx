@@ -39,9 +39,11 @@ export const SupplierForm: React.FC<SupplierFormProps> = ({ supplier, onClose, o
       if (response.status === 200 || response.status === 201 || response.status === 204) {
         onSaved();
       } else {
+        alert(response.data?.message || 'Failed to save supplier');
         console.error('Failed to save supplier');
       }
-    } catch (error) {
+    } catch (error: any) {
+      alert(error?.response?.data?.message || 'Error saving supplier');
       console.error('Error saving supplier', error);
     } finally {
       setLoading(false);

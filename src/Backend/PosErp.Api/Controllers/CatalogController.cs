@@ -18,10 +18,12 @@ namespace PosErp.Api.Controllers;
 public class CatalogController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly PosErp.Application.Interfaces.IApplicationDbContext _context;
 
-    public CatalogController(IMediator mediator)
+    public CatalogController(IMediator mediator, PosErp.Application.Interfaces.IApplicationDbContext context)
     {
         _mediator = mediator;
+        _context = context;
     }
 
     [HttpGet("search")]
@@ -29,6 +31,14 @@ public class CatalogController : ControllerBase
     {
         var result = await _mediator.Send(new SearchProductsQuery(q ?? string.Empty, limit));
         return Ok(result);
+    }
+
+    [HttpGet("tax-slabs")]
+    public async Task<IActionResult> GetTaxSlabs()
+    {
+        var slabs = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+            System.Linq.Queryable.Where(_context.TaxSlabs, t => !t.IsDeleted));
+        return Ok(slabs);
     }
 
     [HttpPost("import")]

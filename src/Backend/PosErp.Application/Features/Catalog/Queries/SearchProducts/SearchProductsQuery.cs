@@ -24,7 +24,8 @@ public record ProductSearchResultDto(
     decimal Mrp,
     decimal PurchasePrice,
     string? Description,
-    string TaxSlabName
+    string TaxSlabName,
+    Guid TaxSlabId
 );
 
 public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, List<ProductSearchResultDto>>
@@ -69,7 +70,8 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, L
                 p.Mrp,
                 p.PurchasePrice,
                 p.Description,
-                p.TaxSlab != null ? p.TaxSlab.Name : "GST 0%"
+                p.TaxSlab != null ? p.TaxSlab.Name : "GST 0%",
+                p.TaxSlabId
             ))
             .ToListAsync(cancellationToken);
 

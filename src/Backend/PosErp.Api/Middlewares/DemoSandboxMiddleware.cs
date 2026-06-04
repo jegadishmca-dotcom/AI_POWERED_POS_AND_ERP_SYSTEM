@@ -31,8 +31,12 @@ public class DemoSandboxMiddleware
                                      path.Contains("/api/pos/") ||
                                      path.Contains("/api/aiautomation/");
 
-            // Allow creating and updating products (POST/PUT) for demo purposes, but block DELETE
-            if (path.StartsWith("/api/catalog") && (HttpMethods.IsPost(method) || HttpMethods.IsPut(method)))
+            // Allow creating and updating operational data (POST/PUT) for demo purposes, but block DELETE
+            if ((path.StartsWith("/api/catalog") || 
+                 path.StartsWith("/api/suppliers") || 
+                 path.StartsWith("/api/purchasing") || 
+                 path.StartsWith("/api/inventory")) && 
+                (HttpMethods.IsPost(method) || HttpMethods.IsPut(method)))
             {
                 isAllowedEndpoint = true;
             }

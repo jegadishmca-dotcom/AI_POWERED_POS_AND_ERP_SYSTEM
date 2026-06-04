@@ -16,6 +16,20 @@ export const importCsv = async (file: File): Promise<ImportResult> => {
   return data;
 };
 
+export interface TaxSlab {
+  id: string;
+  name: string;
+  cgstRate: number;
+  sgstRate: number;
+  igstRate: number;
+  cessRate: number;
+}
+
+export const getTaxSlabs = async (): Promise<TaxSlab[]> => {
+  const { data } = await api.get('/api/catalog/tax-slabs');
+  return data;
+};
+
 export interface CreateProductPayload {
   productCode: string;
   name: string;
@@ -25,6 +39,7 @@ export interface CreateProductPayload {
   sellingPrice: number;
   purchasePrice: number;
   barcodeValue: string;
+  taxSlabId?: string;
 }
 
 export const createProduct = async (payload: CreateProductPayload): Promise<string> => {

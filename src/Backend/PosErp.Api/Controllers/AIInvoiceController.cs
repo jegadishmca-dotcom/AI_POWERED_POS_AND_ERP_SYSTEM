@@ -153,7 +153,7 @@ public class AIInvoiceController : ControllerBase
                     BatchNumber = "",
                     ExpiryDate = (DateTime?)null,
                     Status = "NEW",
-                    HasExpiry = false, // defaults to false for new items until updated
+                    HasExpiry = IsPerishable(item.ProductName),
                     Remarks = "New Product - setup name & pricing details"
                 });
             }
@@ -477,5 +477,44 @@ public class AIInvoiceController : ControllerBase
             new() { Barcode = "8901030753888", ProductName = "Maggi 2-Minute Noodles 70g", CostPrice = 11.50m, Mrp = 14.00m, SellingPrice = 14.00m, Quantity = 100 },
             new() { Barcode = "8901725185550", ProductName = "Fortune Mustard Oil 1L", CostPrice = 145.00m, Mrp = 175.00m, SellingPrice = 175.00m, Quantity = 40 }
         };
+    }
+
+    private static bool IsPerishable(string productName)
+    {
+        if (string.IsNullOrWhiteSpace(productName)) return false;
+
+        var name = productName.ToLower();
+
+        // Items that are typically non-perishable in a supermarket context
+        var nonPerishableKeywords = new[]
+        {
+            "salt", "surf excel", "detergent", "soap", "shampoo", "cleaner", "lizol", "harpic", "colin", 
+            "battery", "eveready", "duracell", "clay", "pencil", "pen", "box", "notebook", "stationery",
+            "toy", "plastic", "container", "bottle", "plate", "spoon", "fork", "knife", "bulb", "led",
+            "wire", "plug", "clipper", "scissors", "comb", "brush", "hanger", "bucket", "mug"
+        };
+
+        foreach (var keyword in nonPerishableKeywords)
+        {
+            if (name.Contains(keyword)) return false;
+        }
+
+        // Perishable items that require batch tracking/expiry dates (food, beverage, medicine, cosmetics)
+        var perishableKeywords = new[]
+        {
+            "bread", "milk", "butter", "cheese", "paneer", "curd", "dahi", "yoghurt", "yogurt", "ghee",
+            "egg", "meat", "chicken", "fish", "mutton", "fruit", "vegetable", "juice", "beverage",
+            "noodle", "pasta", "maggi", "biscuit", "cookie", "rusk", "chocolate", "sweet", "candy",
+            "oil", "mustard", "refined", "dal", "pulse", "atta", "flour", "rice", "wheat", "sugar",
+            "sauce", "ketchup", "jam", "honey", "pickle", "tea", "coffee", "bourbon", "silk", "cadbury",
+            "medicine", "tablet", "syrup", "ointment", "cream", "lotion"
+        };
+
+        foreach (var keyword in perishableKeywords)
+        {
+            if (name.Contains(keyword)) return true;
+        }
+
+        return false;
     }
 }

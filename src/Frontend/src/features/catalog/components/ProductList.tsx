@@ -207,7 +207,7 @@ export const ProductList = ({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+        <table className="min-w-full divide-y-2 divide-slate-300 dark:divide-slate-650">
           <thead className="bg-slate-50 dark:bg-slate-900">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Product</th>
@@ -218,7 +218,7 @@ export const ProductList = ({
               <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
+          <tbody className="bg-white dark:bg-slate-800 divide-y-2 divide-slate-300 dark:divide-slate-700">
             {isLoading ? (
               <tr><td colSpan={6} className="text-center py-4 text-slate-500">Loading...</td></tr>
             ) : !Array.isArray(products) || products.length === 0 ? (

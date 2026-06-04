@@ -352,7 +352,7 @@ export const AiInvoiceImport = () => {
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-xs table-fixed">
-                <thead className="bg-slate-50 font-bold text-slate-700 border-b sticky top-0">
+                <thead className="bg-slate-50 font-bold text-slate-700 border-b-2 border-slate-350 sticky top-0">
                   <tr>
                     <th className="p-3 w-16 text-center">Status</th>
                     <th className="p-3 w-48">Product Description</th>
@@ -375,7 +375,7 @@ export const AiInvoiceImport = () => {
                     const hasExpiryErr = isPerishable && rules.mandatoryBatchTracking && !item.expiryDate;
 
                     return (
-                      <tr key={idx} className="border-b hover:bg-slate-50">
+                      <tr key={idx} className="border-b-2 border-slate-300 hover:bg-slate-50">
                         {/* Status Badge */}
                         <td className="p-3 text-center">{getStatusBadge(item.status)}</td>
                         

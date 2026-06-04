@@ -3,6 +3,7 @@ import { IndianRupee, Printer, Calculator, FileText, CheckCircle } from 'lucide-
 import { posDb } from '../db/pos.db';
 import { useAuthStore } from '../../auth/store/auth.store';
 import { printZReport } from '../utils/printZReport';
+import { api } from '../../../utils/api';
 
 export const ShiftReport = () => {
   const [session, setSession] = useState<any>(null);
@@ -19,17 +20,21 @@ export const ShiftReport = () => {
   useEffect(() => {
     const fetchSessionAndReport = async () => {
       try {
-        const res = await fetch(`/api/pos/session/current?terminalId=${terminalId}&cashierId=${cashierId}`);
-        if (res.ok) {
-          const sessionData = await res.json();
+        const { data: sessionData } = await api.get(`/api/pos/session/current`, {
+          params: { terminalId, cashierId }
+        });
+        
+        if (sessionData) {
           setSession(sessionData);
 
-          // If there is an active session, fetch X-Report (which uses terminalId, cashierId, and date)
-          if (sessionData && sessionData.status === 'OPEN') {
+          // If there is an active session, fetch X-Report
+          if (sessionData.status === 'OPEN') {
             const today = new Date().toISOString().split('T')[0];
-            const zRes = await fetch(`/api/pos/z-report?terminalId=${terminalId}&businessDate=${today}&cashierId=${cashierId}`);
-            if (zRes.ok) {
-              setReportData(await zRes.json());
+            const { data: zRes } = await api.get(`/api/pos/z-report`, {
+              params: { terminalId, businessDate: today, cashierId }
+            });
+            if (zRes) {
+              setReportData(zRes);
             }
           }
         }
@@ -71,13 +76,9 @@ export const ShiftReport = () => {
         actualClosingCash: declared
       };
 
-      const res = await fetch('/api/pos/session/close', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
+      const res = await api.post('/api/pos/session/close', payload);
 
-      if (res.ok) {
+      if (res.status === 200) {
         setIsClosed(true);
         if (reportData) {
           printZReport(reportData, session?.openingFloatCash || 0, declared, user?.fullName || 'Cashier');

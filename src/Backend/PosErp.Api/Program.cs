@@ -661,6 +661,30 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine("Database seeded successfully with initial products.");
         }
 
+        // Seed initial stock if empty
+        if (!await context.StockLedger.AnyAsync())
+        {
+            var storeId = Guid.Empty;
+            var allProducts = await context.Products.ToListAsync();
+            foreach (var product in allProducts)
+            {
+                context.StockLedger.Add(new PosErp.Domain.Entities.Inventory.StockLedgerEntry
+                {
+                    StoreId = storeId,
+                    ProductId = product.Id,
+                    MovementType = "INITIAL_SEED",
+                    Quantity = 1000,
+                    UnitCost = product.PurchasePrice,
+                    RunningBalance = 1000,
+                    BusinessDate = DateTime.UtcNow.Date,
+                    ReferenceNumber = "SEED-001",
+                    CreatedAt = DateTime.UtcNow
+                });
+            }
+            await context.SaveChangesAsync();
+            Console.WriteLine("Database seeded successfully with initial stock.");
+        }
+
         // Seed default Terminal if empty
         var terminalId = Guid.Parse("00000000-0000-0000-0000-000000000001");
         if (!await context.Terminals.AnyAsync(t => t.Id == terminalId))

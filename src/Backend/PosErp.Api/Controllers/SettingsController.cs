@@ -296,12 +296,18 @@ public class SettingsController : ControllerBase
     public IActionResult GetEmailSettings()
     {
         var settings = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
+        
+        var currentUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+        var isDemoUser = string.Equals(currentUsername, "demo@supermarket.com", StringComparison.OrdinalIgnoreCase);
+
         var displaySettings = new 
         {
             settings.SmtpServer,
             settings.SmtpPort,
             settings.SenderEmail,
-            SenderPassword = string.IsNullOrEmpty(settings.SenderPassword) ? "" : "••••••••",
+            SenderPassword = isDemoUser 
+                ? (string.IsNullOrEmpty(settings.SenderPassword) ? "" : "••••••••") 
+                : settings.SenderPassword,
             settings.RecipientEmail,
             settings.EnableSsl
         };
@@ -318,9 +324,17 @@ public class SettingsController : ControllerBase
 
         var oldSettings = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
 
+        var currentUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+        var isDemoUser = string.Equals(currentUsername, "demo@supermarket.com", StringComparison.OrdinalIgnoreCase);
+
         if (settings.SenderPassword == "••••••••")
         {
             settings.SenderPassword = oldSettings.SenderPassword;
+        }
+
+        if (isDemoUser)
+        {
+            settings.SenderEmail = oldSettings.SenderEmail;
         }
 
         PosErp.Application.Features.Inventory.Services.EmailSettingsManager.SaveSettings(settings);

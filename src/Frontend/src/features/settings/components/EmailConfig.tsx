@@ -173,7 +173,8 @@ export const EmailConfig: React.FC = () => {
                 placeholder="e.g. supermarket@gmail.com"
                 value={senderEmail}
                 onChange={(e) => setSenderEmail(e.target.value)}
-                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                disabled={isDemoUser}
+                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:bg-slate-50"
               />
             </div>
 
@@ -211,14 +212,14 @@ export const EmailConfig: React.FC = () => {
               Owner Recipient Email
             </label>
             <input
-              type="email"
-              placeholder="e.g. owner@gmail.com"
+              type="text"
+              placeholder="e.g. owner1@gmail.com, owner2@gmail.com"
               value={recipientEmail}
               onChange={(e) => setRecipientEmail(e.target.value)}
               className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
             <p className="text-[10px] text-slate-400 font-medium">
-              This is the target inbox where daily reports and system alerts are sent.
+              This is the target inbox where daily reports and system alerts are sent. Separate multiple emails with a comma.
             </p>
           </div>
 

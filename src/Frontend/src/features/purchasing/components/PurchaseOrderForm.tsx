@@ -22,6 +22,7 @@ interface ProductSearchResult {
   productCode: string;
   name: string;
   sellingPrice: number;
+  purchasePrice: number;
   primaryBarcode: string;
 }
 
@@ -103,7 +104,7 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
       return;
     }
 
-    const defaultCost = Number((product.sellingPrice * 0.8).toFixed(2)) || 0;
+    const defaultCost = product.purchasePrice || Number((product.sellingPrice * 0.8).toFixed(2)) || 0;
 
     setItems([...items, {
       productId: product.id,

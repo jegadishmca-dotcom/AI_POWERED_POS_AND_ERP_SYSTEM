@@ -225,6 +225,23 @@ export const PosTerminal = () => {
       return;
     }
 
+    // --- INSTANT OPTIMISTIC LOCAL CALCULATION ---
+    let localSubtotal = items.reduce((sum: number, item: any) => sum + (item.qty * item.unitPrice), 0);
+    let localTaxTotal = items.reduce((sum: number, item: any) => {
+        const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0);
+        return sum + ((item.qty * item.unitPrice) * (itemTaxRate / 100));
+    }, 0);
+
+    setCart({
+      items: items.map(i => ({ ...i, finalLineTotal: i.qty * i.unitPrice, discountAmount: i.discountAmount || 0, appliedOfferName: i.appliedOfferName || null })),
+      subtotal: localSubtotal,
+      totalDiscount: 0, 
+      taxTotal: localTaxTotal,
+      finalTotal: localSubtotal + localTaxTotal,
+      appliedOfferNames: [] 
+    });
+
+    // --- BACKGROUND SERVER CALCULATION FOR PROMOS ---
     try {
       const payload = {
         items: items.map(i => ({ productId: i.productId, quantity: i.qty })),
@@ -234,46 +251,32 @@ export const PosTerminal = () => {
 
       const data = await calculateCart(payload);
       
-      // Map API response back to UI cart format
-      const evaluatedItems = items.map((origItem: any) => {
-        const calcItem = data.items.find((i: any) => i.productId === origItem.productId);
-        if (!calcItem) return origItem;
+      setCart((prevCart: any) => {
+        const evaluatedItems = prevCart.items.map((origItem: any) => {
+          const calcItem = data.items.find((i: any) => i.productId === origItem.productId);
+          if (!calcItem) return origItem;
+          return {
+            ...origItem,
+            discountAmount: calcItem.discountAmount,
+            finalLineTotal: calcItem.finalLineTotal,
+            appliedOfferName: calcItem.appliedOfferName,
+            cgstRate: calcItem.cgstRate,
+            sgstRate: calcItem.sgstRate
+          };
+        });
+
         return {
-          ...origItem,
-          discountAmount: calcItem.discountAmount,
-          finalLineTotal: calcItem.finalLineTotal,
-          appliedOfferName: calcItem.appliedOfferName,
-          cgstRate: calcItem.cgstRate,
-          sgstRate: calcItem.sgstRate
+          items: evaluatedItems,
+          subtotal: data.subTotal,
+          totalDiscount: data.totalDiscount,
+          taxTotal: data.taxTotal,
+          finalTotal: data.finalTotal,
+          appliedOfferNames: data.appliedOfferNames
         };
       });
 
-      setCart({
-        items: evaluatedItems,
-        subtotal: data.subTotal,
-        totalDiscount: data.totalDiscount,
-        taxTotal: data.taxTotal,
-        finalTotal: data.finalTotal,
-        appliedOfferNames: data.appliedOfferNames
-      });
-
     } catch (err) {
-      console.warn('Backend calculation failed, falling back to basic offline calculation', err);
-      // Basic offline fallback (no promos, just basic tax)
-      let subtotal = items.reduce((sum: number, item: any) => sum + (item.qty * item.unitPrice), 0);
-      let taxTotal = items.reduce((sum: number, item: any) => {
-          const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0);
-          return sum + ((item.qty * item.unitPrice) * (itemTaxRate / 100));
-      }, 0);
-
-      setCart({
-        items: items.map(i => ({ ...i, finalLineTotal: i.qty * i.unitPrice, discountAmount: 0, appliedOfferName: null })),
-        subtotal,
-        totalDiscount: 0,
-        taxTotal,
-        finalTotal: subtotal + taxTotal,
-        appliedOfferNames: []
-      });
+      console.warn('Backend calculation failed, keeping basic offline calculation', err);
     }
   };
 
@@ -310,39 +313,42 @@ export const PosTerminal = () => {
       );
       recalculateCart(updatedItems);
     } else {
-      let batches: any[] = [];
-      let defaultBatchId: string | undefined = undefined;
+      const newItem = {
+        id: Math.random().toString(),
+        productId: product.id,
+        name: product.name,
+        qty: qtyToAdd,
+        unitPrice: product.sellingPrice,
+        lineTotal: product.sellingPrice * qtyToAdd,
+        discountAmount: 0,
+        finalLineTotal: product.sellingPrice * qtyToAdd,
+        appliedOfferName: null,
+        cgstRate: product.cgstRate || 0,
+        sgstRate: product.sgstRate || 0,
+        isWeighable: product.isWeighable || false,
+        batches: [],
+        batchId: undefined
+      };
 
+      updatedItems = [...cart.items, newItem];
+      recalculateCart(updatedItems);
+
+      // Fetch batches asynchronously in the background
       try {
         const fetchedBatches = await getProductBatches(product.id);
         if (fetchedBatches && fetchedBatches.length > 0) {
-          batches = fetchedBatches;
-          defaultBatchId = fetchedBatches[0].id;
+          setCart((prev: any) => ({
+            ...prev,
+            items: prev.items.map((i: any) => 
+              i.productId === product.id 
+                ? { ...i, batches: fetchedBatches, batchId: fetchedBatches[0].id } 
+                : i
+            )
+          }));
         }
       } catch (err) {
         console.warn('Failed to fetch batches for product', err);
       }
-
-      updatedItems = [
-        ...cart.items,
-        {
-          id: Math.random().toString(),
-          productId: product.id,
-          name: product.name,
-          qty: qtyToAdd,
-          unitPrice: product.sellingPrice,
-          lineTotal: product.sellingPrice * qtyToAdd,
-          discountAmount: 0,
-          finalLineTotal: product.sellingPrice * qtyToAdd,
-          appliedOfferName: null,
-          cgstRate: product.cgstRate || 0,
-          sgstRate: product.sgstRate || 0,
-          isWeighable: product.isWeighable || false,
-          batches: batches,
-          batchId: defaultBatchId
-        }
-      ];
-      recalculateCart(updatedItems);
     }
   };
 

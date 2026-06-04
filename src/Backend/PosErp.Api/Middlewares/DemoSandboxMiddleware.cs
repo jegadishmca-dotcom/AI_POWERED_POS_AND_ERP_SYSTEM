@@ -32,7 +32,7 @@ public class DemoSandboxMiddleware
                                      path.Contains("/api/aiautomation/");
 
             // Allow creating and updating products (POST/PUT) for demo purposes, but block DELETE
-            if (path.Contains("/api/catalog/products") && (HttpMethods.IsPost(method) || HttpMethods.IsPut(method)))
+            if (path.StartsWith("/api/catalog") && (HttpMethods.IsPost(method) || HttpMethods.IsPut(method)))
             {
                 isAllowedEndpoint = true;
             }

@@ -1,5 +1,5 @@
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Offers;
 using PosErp.Application.Features.Offers.Models;
@@ -21,10 +21,10 @@ public interface IOfferEngine
 public class OfferEngine : IOfferEngine
 {
     private readonly IApplicationDbContext _context;
-    private readonly IDistributedCache _cache;
+    private readonly IMemoryCache _cache;
     private const string CacheKey = "ActiveOffers";
 
-    public OfferEngine(IApplicationDbContext context, IDistributedCache cache)
+    public OfferEngine(IApplicationDbContext context, IMemoryCache cache)
     {
         _context = context;
         _cache = cache;
@@ -32,17 +32,9 @@ public class OfferEngine : IOfferEngine
 
     public async Task<List<Offer>> GetActiveOffersAsync(CancellationToken cancellationToken)
     {
-        try
+        if (_cache.TryGetValue(CacheKey, out List<Offer>? cachedOffers) && cachedOffers != null)
         {
-            var cachedOffers = await _cache.GetStringAsync(CacheKey, cancellationToken);
-            if (!string.IsNullOrEmpty(cachedOffers))
-            {
-                return JsonSerializer.Deserialize<List<Offer>>(cachedOffers) ?? new List<Offer>();
-            }
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Redis Cache Warning] Failed to read from Redis cache: {ex.Message}. Falling back to database query.");
+            return cachedOffers;
         }
 
         var now = DateTime.UtcNow;
@@ -50,15 +42,8 @@ public class OfferEngine : IOfferEngine
             .Where(o => o.IsActive && o.StartDate <= now && o.EndDate >= now)
             .ToListAsync(cancellationToken);
 
-        try
-        {
-            var cacheOptions = new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15) };
-            await _cache.SetStringAsync(CacheKey, JsonSerializer.Serialize(offers), cacheOptions, cancellationToken);
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"[Redis Cache Warning] Failed to write to Redis cache: {ex.Message}");
-        }
+        var cacheOptions = new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(15) };
+        _cache.Set(CacheKey, offers, cacheOptions);
 
         return offers;
     }

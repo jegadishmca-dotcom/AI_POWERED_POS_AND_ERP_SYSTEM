@@ -57,6 +57,9 @@ builder.Services.AddStackExchangeRedisCache(options =>
     options.InstanceName = "AppleSupermarket_";
 });
 
+// Register Memory Cache for OfferEngine
+builder.Services.AddMemoryCache();
+
 // Register MediatR
 builder.Services.AddMediatR(cfg => {
     cfg.RegisterServicesFromAssembly(typeof(IApplicationDbContext).Assembly);

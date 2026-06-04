@@ -69,7 +69,7 @@ public class StockLedgerService : IStockLedgerService
             if (rules.RowLevelLocking)
             {
                 await db.Database.ExecuteSqlRawAsync(
-                    "SELECT 1 FROM products WHERE id = {0} FOR UPDATE", 
+                    "SELECT 1 FROM \"Products\" WHERE \"Id\" = {0} FOR UPDATE", 
                     new object[] { productId }, 
                     cancellationToken);
             }

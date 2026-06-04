@@ -207,38 +207,38 @@ export const ProductList = ({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y-2 divide-slate-300 dark:divide-slate-650">
-          <thead className="bg-slate-50 dark:bg-slate-900">
+        <table className="min-w-full border-collapse">
+          <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Product</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Barcode</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tamil Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tax Slab</th>
-              <th className="px-6 py-3 text-right text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Price (₹)</th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Product</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Barcode</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tamil Name</th>
+              <th className="px-6 py-3 text-left text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Tax Slab</th>
+              <th className="px-6 py-3 text-right text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Price (₹)</th>
+              <th className="px-6 py-3 text-center text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
-          <tbody className="bg-white dark:bg-slate-800 divide-y-2 divide-slate-300 dark:divide-slate-700">
+          <tbody className="bg-white dark:bg-slate-800">
             {isLoading ? (
-              <tr><td colSpan={6} className="text-center py-4 text-slate-500">Loading...</td></tr>
+              <tr><td colSpan={6} className="text-center py-4 text-slate-500 border-b-2 border-blue-200 dark:border-blue-800/80">Loading...</td></tr>
             ) : !Array.isArray(products) || products.length === 0 ? (
-              <tr><td colSpan={6} className="text-center py-4 text-slate-500">No products found.</td></tr>
+              <tr><td colSpan={6} className="text-center py-4 text-slate-500 border-b-2 border-blue-200 dark:border-blue-800/80">No products found.</td></tr>
             ) : (
               products.map((p) => (
                 <tr key={p.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-white">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900 dark:text-white border-b-2 border-blue-200 dark:border-blue-800/80">
                     {p.name || 'Unnamed Product'}
                     <div className="text-xs text-slate-500">{p.productCode || 'N/A'}</div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">{p.primaryBarcode || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 font-tamil">{p.tamilName || '-'}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-550 dark:text-slate-400">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-550 dark:text-slate-400 border-b-2 border-blue-200 dark:border-blue-800/80">{p.primaryBarcode || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 font-tamil border-b-2 border-blue-200 dark:border-blue-800/80">{p.tamilName || '-'}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 border-b-2 border-blue-200 dark:border-blue-800/80">
                     <span className="px-2 py-0.5 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded text-xs font-semibold text-slate-700 dark:text-slate-350">{p.taxSlabName || 'GST 0%'}</span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-white text-right font-semibold">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900 dark:text-white text-right font-semibold border-b-2 border-blue-200 dark:border-blue-800/80">
                     {(p.sellingPrice ?? 0).toFixed(2)}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-center border-b-2 border-blue-200 dark:border-blue-800/80">
                     <div className="flex items-center justify-center space-x-3">
                       <button 
                         onClick={() => onEditClick(p)} 

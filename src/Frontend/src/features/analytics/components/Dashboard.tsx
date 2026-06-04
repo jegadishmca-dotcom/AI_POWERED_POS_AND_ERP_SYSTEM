@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { TrendingUp, ShoppingBag, Users, DollarSign, Download } from 'lucide-react';
+import { TrendingUp, ShoppingBag, Users, IndianRupee, Download } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { getDashboardKpis, getSalesTrend, getTopProducts } from '../api/analytics.api';
 import { api } from '../../../utils/api';
@@ -130,7 +130,7 @@ export const Dashboard = () => {
             </p>
           </div>
           <div className="w-12 h-12 rounded-full bg-emerald-100 flex items-center justify-center text-emerald-600">
-            <DollarSign className="w-6 h-6" />
+            <IndianRupee className="w-6 h-6" />
           </div>
         </div>
         

@@ -134,14 +134,14 @@ export const PosTerminal = () => {
 
   const handleCloseShift = async (closingCash: number) => {
     try {
+      if (!activeSession?.id) throw new Error("No active session found.");
       await closeShift({
-        terminalId,
-        cashierId,
-        closingFloatCash: closingCash,
-        status: 'CLOSED'
+        sessionId: activeSession.id,
+        actualClosingCash: closingCash
       });
       
-      const report = await getZReport(terminalId, new Date().toISOString(), cashierId);
+      const today = new Date().toISOString().split('T')[0];
+      const report = await getZReport(terminalId, today, cashierId);
       printZReport(report, activeSession?.openingFloatCash || 0, closingCash, user?.fullName || 'Cashier');
       
       setActiveSession(null);

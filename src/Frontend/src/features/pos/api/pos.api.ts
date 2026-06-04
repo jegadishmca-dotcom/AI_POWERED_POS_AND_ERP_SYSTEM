@@ -29,7 +29,7 @@ export const getProductBatches = async (productId: string): Promise<any[]> => {
   return data;
 };
 
-export const closeShift = async (payload: { terminalId: string; cashierId: string; closingFloatCash: number; status: string }) => {
+export const closeShift = async (payload: { sessionId: string; actualClosingCash: number }) => {
   const { data } = await api.post('/api/pos/session/close', payload);
   return data;
 };

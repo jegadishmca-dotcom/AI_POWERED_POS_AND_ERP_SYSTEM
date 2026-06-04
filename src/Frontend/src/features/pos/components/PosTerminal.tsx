@@ -911,7 +911,7 @@ export const PosTerminal = () => {
                 } catch { /* non-critical — keep offline estimate */ }
               }
             } catch (err: any) {
-              const errorText = err?.response?.data?.message || err?.response?.data?.Detailed || err?.response?.data?.Message || err?.message || "";
+              const errorText = err?.response?.data?.message || err?.response?.data?.detailed || err?.response?.data?.Detailed || err?.response?.data?.Message || err?.message || "";
               
               if (errorText.includes("INSUFFICIENT_STOCK")) {
                 const pin = prompt(`${errorText}\n\nPlease enter Supervisor PIN to override negative stock sale:`);
@@ -920,7 +920,7 @@ export const PosTerminal = () => {
                     const retryPayload = { ...payload, supervisorOverridePin: pin };
                     await createInvoice(retryPayload);
                   } catch (retryErr: any) {
-                    const retryErrorText = retryErr?.response?.data?.message || retryErr?.response?.data?.Detailed || retryErr?.response?.data?.Message || retryErr?.message || "Invalid PIN.";
+                    const retryErrorText = retryErr?.response?.data?.message || retryErr?.response?.data?.detailed || retryErr?.response?.data?.Detailed || retryErr?.response?.data?.Message || retryErr?.message || "Invalid PIN.";
                     alert("Override Failed: " + retryErrorText);
                     throw new Error(retryErrorText);
                   }
@@ -931,7 +931,7 @@ export const PosTerminal = () => {
                 console.warn('Network issue during checkout, saving offline...', err);
                 await posDb.invoices.put(fullInvoice as any);
                 await posDb.sync_queue.put(fullInvoice as any);
-                const errorDetail = err?.response?.data?.Detailed || err?.response?.data?.Message || err?.message || JSON.stringify(err);
+                const errorDetail = err?.response?.data?.detailed || err?.response?.data?.message || err?.response?.data?.Detailed || err?.response?.data?.Message || err?.message || JSON.stringify(err);
                 alert(`Saved Offline: Invoice ${payload.invoiceNumber} queued for sync.\n\nERROR DETAIL:\n${errorDetail}`);
               }
             }

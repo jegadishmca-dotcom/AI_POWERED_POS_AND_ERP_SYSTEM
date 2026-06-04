@@ -34,8 +34,17 @@ public class SettingsController : ControllerBase
     [HttpGet("users")]
     public async Task<IActionResult> GetUsers()
     {
-        var users = await _context.Users
-            .Where(u => !u.IsDeleted)
+        var currentUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+        var isDemoUser = string.Equals(currentUsername, "demo@supermarket.com", StringComparison.OrdinalIgnoreCase);
+
+        var query = _context.Users.Where(u => !u.IsDeleted);
+
+        if (isDemoUser)
+        {
+            query = query.Where(u => !u.Username.ToLower().EndsWith("@supermarket.local"));
+        }
+
+        var users = await query
             .Join(_context.Roles,
                 u => u.RoleId,
                 r => r.Id,
@@ -100,6 +109,14 @@ public class SettingsController : ControllerBase
             return NotFound(new { message = "User not found." });
         }
 
+        var currentUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+        var isDemoUser = string.Equals(currentUsername, "demo@supermarket.com", StringComparison.OrdinalIgnoreCase);
+
+        if (isDemoUser && user.Username.ToLower().EndsWith("@supermarket.local"))
+        {
+            return StatusCode(403, new { message = "Demo Sandbox User cannot modify system accounts." });
+        }
+
         var roleExists = await _context.Roles.AnyAsync(r => r.Id == request.RoleId);
         if (!roleExists)
         {
@@ -127,6 +144,14 @@ public class SettingsController : ControllerBase
         if (user == null)
         {
             return NotFound(new { message = "User not found." });
+        }
+
+        var currentUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+        var isDemoUser = string.Equals(currentUsername, "demo@supermarket.com", StringComparison.OrdinalIgnoreCase);
+
+        if (isDemoUser && user.Username.ToLower().EndsWith("@supermarket.local"))
+        {
+            return StatusCode(403, new { message = "Demo Sandbox User cannot modify system accounts." });
         }
 
         user.PasswordHash = _passwordHasher.HashPassword(request.Password);

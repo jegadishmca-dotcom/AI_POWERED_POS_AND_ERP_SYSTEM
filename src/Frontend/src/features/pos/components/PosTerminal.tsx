@@ -147,9 +147,10 @@ export const PosTerminal = () => {
       setActiveSession(null);
       setCloseShiftModalOpen(false);
       setOpenShiftModalOpen(true);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error closing shift:', err);
-      alert('Failed to close shift. Please check network.');
+      const errMsg = err.response?.data ? (typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data)) : err.message;
+      alert(`Failed to close shift. Reason: ${errMsg}`);
     }
   };
 

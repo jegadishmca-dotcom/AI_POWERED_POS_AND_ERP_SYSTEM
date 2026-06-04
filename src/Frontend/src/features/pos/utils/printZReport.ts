@@ -1,19 +1,19 @@
 const STORE = {
   nameTamil: 'ஆப்பிள் சூப்பர் மார்க்கெட்',
-  nameEn:    'Apple Super Market',
-  gstin:     '33ABTFA7190F1Z7',
-  fssai:     '12421019000047',
-  address:   '1E-16, Matha Kovil Street,',
-  city:      'Ilayankudi - 630702',
-  phone:     '7339056767 / 04564-221190',
+  nameEn: 'Apple Super Market',
+  gstin: '33ABTFA7190F1Z7',
+  fssai: '12421019000047',
+  address: '1E-1G, Matha Kovil Street,',
+  city: 'Ilayankudi - 630702',
+  phone: '7339056767 / 04564-221190',
 };
 
-const safe  = (n: any, d = 0): number => (typeof n === 'number' && !isNaN(n) ? n : d);
-const fmt   = (n: any): string => safe(n).toFixed(2);
-const row   = (l: string, r: string, bold = false) =>
-  `<div style="display:flex;justify-content:space-between;${bold ? 'font-weight:bold;font-size:13px;' : ''}">`+
+const safe = (n: any, d = 0): number => (typeof n === 'number' && !isNaN(n) ? n : d);
+const fmt = (n: any): string => safe(n).toFixed(2);
+const row = (l: string, r: string, bold = false) =>
+  `<div style="display:flex;justify-content:space-between;${bold ? 'font-weight:bold;font-size:13px;' : ''}">` +
   `<span>${l}</span><span>${r}</span></div>`;
-const hr    = () => `<hr style="border:none;border-top:1px dashed #000;margin:4px 0;"/>`;
+const hr = () => `<hr style="border:none;border-top:1px dashed #000;margin:4px 0;"/>`;
 
 export function printZReport(report: any, openingCash: number, declaredCash: number, cashierName: string): void {
   if (!report) return;
@@ -21,9 +21,9 @@ export function printZReport(report: any, openingCash: number, declaredCash: num
   const expectedCash = openingCash + safe(report.cashCollected);
   const diff = declaredCash - expectedCash;
   const terminalCode = (() => { try { return localStorage.getItem('pos_terminal_code') || 'POS-01'; } catch { return 'POS-01'; } })();
-  
-  const dateStr  = report.businessDate ? new Date(report.businessDate).toLocaleDateString('en-IN') : '-';
-  const timeStr  = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+  const dateStr = report.businessDate ? new Date(report.businessDate).toLocaleDateString('en-IN') : '-';
+  const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
   const html = `<!DOCTYPE html>
 <html lang="ta">

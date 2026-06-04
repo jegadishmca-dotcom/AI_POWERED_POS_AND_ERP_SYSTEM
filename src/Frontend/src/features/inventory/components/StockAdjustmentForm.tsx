@@ -191,9 +191,14 @@ export const StockAdjustmentForm = () => {
   };
 
   const handleSubmitAdjustment = async () => {
-    const validItems = formItems.filter((i) => i.productId !== '');
-    if (validItems.length === 0) {
+    if (formItems.length === 0) {
       alert('Please add at least one product line.');
+      return;
+    }
+
+    const validItems = formItems.filter((i) => i.productId !== '');
+    if (validItems.length < formItems.length) {
+      alert('Please select a product from the search dropdown for all lines.');
       return;
     }
 

@@ -194,9 +194,14 @@ export const StockTakeForm = () => {
   };
 
   const handleSaveOrSubmit = async (status: 'DRAFT' | 'REVIEW') => {
-    const validItems = formItems.filter((i) => i.productId !== '');
-    if (validItems.length === 0) {
+    if (formItems.length === 0) {
       alert('Please add at least one product count line.');
+      return;
+    }
+
+    const validItems = formItems.filter((i) => i.productId !== '');
+    if (validItems.length < formItems.length) {
+      alert('Please select a product from the search dropdown for all lines.');
       return;
     }
 

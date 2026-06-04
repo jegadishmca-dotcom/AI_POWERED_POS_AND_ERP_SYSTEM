@@ -86,7 +86,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
       queryClient.invalidateQueries({ queryKey: ['products'] });
       onClose();
     } catch (err: any) {
-      const msg = err?.response?.data?.Message || err?.response?.data?.Detailed || 'Failed to save product. Check that your product code and barcodes are unique.';
+      const msg = err?.response?.data?.message || err?.response?.data?.Message || err?.response?.data?.Detailed || 'Failed to save product. Check that your product code and barcodes are unique.';
       setError(msg);
     } finally {
       setIsSubmitting(false);

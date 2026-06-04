@@ -217,8 +217,6 @@ using (var scope = app.Services.CreateScope())
                     exists = result != null && (bool)result;
                 }
 
-                if (!wasOpen) await connection.CloseAsync();
-
                 if (!exists)
                 {
                     Console.WriteLine($"Applying database migration: {filename}...");
@@ -249,6 +247,7 @@ using (var scope = app.Services.CreateScope())
                     Console.WriteLine($"Migration {filename} applied successfully!");
                 }
             }
+            if (!wasOpen) await connection.CloseAsync();
         }
         
         // Execute raw DDL to guarantee refresh_tokens table exists (EnsureCreated skips if other tables are present)

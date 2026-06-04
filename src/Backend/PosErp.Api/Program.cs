@@ -163,6 +163,10 @@ using (var scope = app.Services.CreateScope())
             );
         ");
 
+        var connection = context.Database.GetDbConnection();
+        var wasOpen = connection.State == System.Data.ConnectionState.Open;
+        if (!wasOpen) await connection.OpenAsync();
+
         // Scan and execute all pending raw SQL migrations in alphabetical order
         var migrationsDir = Path.Combine(AppContext.BaseDirectory, "Persistence", "Migrations");
         if (Directory.Exists(migrationsDir))
@@ -170,6 +174,31 @@ using (var scope = app.Services.CreateScope())
             var sqlFiles = Directory.GetFiles(migrationsDir, "*.sql")
                                     .OrderBy(f => Path.GetFileName(f))
                                     .ToList();
+
+            // Prevent crash if tables were created manually without migration_history
+            using (var checkCmd = connection.CreateCommand())
+            {
+                checkCmd.CommandText = "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'roles')";
+                var rolesExist = (bool)(await checkCmd.ExecuteScalarAsync() ?? false);
+
+                checkCmd.CommandText = "SELECT COUNT(*) FROM migration_history";
+                var historyCount = Convert.ToInt32(await checkCmd.ExecuteScalarAsync() ?? 0);
+
+                if (rolesExist && historyCount == 0)
+                {
+                    // Seed migration_history for the original 16 migrations
+                    foreach (var f in sqlFiles.Where(x => !x.Contains("17_")))
+                    {
+                        var seedCmd = connection.CreateCommand();
+                        seedCmd.CommandText = "INSERT INTO migration_history (migration_name) VALUES (@p0) ON CONFLICT DO NOTHING";
+                        var p = seedCmd.CreateParameter();
+                        p.ParameterName = "@p0";
+                        p.Value = Path.GetFileName(f);
+                        seedCmd.Parameters.Add(p);
+                        await seedCmd.ExecuteNonQueryAsync();
+                    }
+                }
+            }
 
             foreach (var sqlFile in sqlFiles)
             {

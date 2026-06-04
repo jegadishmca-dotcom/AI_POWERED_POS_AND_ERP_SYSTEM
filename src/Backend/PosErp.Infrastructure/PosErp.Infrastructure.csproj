@@ -19,9 +19,9 @@
     <PackageReference Include="BCrypt.Net-Next" Version="4.0.3" />
   </ItemGroup>
   <ItemGroup>
-    <None Update="Persistence\Migrations\*.sql">
+    <Content Include="Persistence\Migrations\*.sql">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
       <CopyToPublishDirectory>Always</CopyToPublishDirectory>
-    </None>
+    </Content>
   </ItemGroup>
 </Project>

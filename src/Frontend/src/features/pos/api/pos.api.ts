@@ -40,3 +40,20 @@ export const getZReport = async (terminalId: string, businessDate: string, cashi
   });
   return data;
 };
+
+export const getCurrentSession = async (terminalId: string, cashierId: string) => {
+  const { data } = await api.get('/api/pos/session/current', {
+    params: { terminalId, cashierId }
+  });
+  return data;
+};
+
+export const openSession = async (payload: { terminalId: string; cashierId: string; openingFloatCash: number }) => {
+  const { data } = await api.post('/api/pos/session/open', payload);
+  return data;
+};
+
+export const calculateCart = async (payload: any) => {
+  const { data } = await api.post('/api/pos/calculate-cart', payload);
+  return data;
+};

@@ -4,7 +4,7 @@ import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistra
 import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
 import { searchCustomers, registerCustomer } from '../../crm/api/crm.api';
-import { createInvoice, closeShift, getZReport, getProductBatches } from '../api/pos.api';
+import { createInvoice, closeShift, getZReport, getProductBatches, getCurrentSession, openSession, calculateCart } from '../api/pos.api';
 import { printReceipt } from '../utils/printReceipt';
 import { printZReport } from '../utils/printZReport';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -90,14 +90,9 @@ export const PosTerminal = () => {
     // Check for active shift
     const fetchSession = async () => {
       try {
-        const res = await fetch(`/api/pos/session/current?terminalId=${terminalId}&cashierId=${cashierId}`);
-        if (res.ok) {
-          const sessionData = await res.json();
-          if (sessionData && sessionData.status === 'OPEN') {
-            setActiveSession(sessionData);
-          } else {
-            setOpenShiftModalOpen(true);
-          }
+        const sessionData = await getCurrentSession(terminalId, cashierId);
+        if (sessionData && sessionData.status === 'OPEN') {
+          setActiveSession(sessionData);
         } else {
           setOpenShiftModalOpen(true);
         }
@@ -116,18 +111,9 @@ export const PosTerminal = () => {
         cashierId,
         openingFloatCash: openingCash
       };
-      const res = await fetch('/api/pos/session/open', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        const sessionId = await res.json();
-        setActiveSession({ id: sessionId, terminalId, cashierId, openingFloatCash: openingCash, status: 'OPEN' });
-        setOpenShiftModalOpen(false);
-      } else {
-        alert('Failed to open shift.');
-      }
+      const sessionId = await openSession(payload);
+      setActiveSession({ id: sessionId, terminalId, cashierId, openingFloatCash: openingCash, status: 'OPEN' });
+      setOpenShiftModalOpen(false);
     } catch (err) {
       console.error('Error opening shift', err);
       alert('Error opening shift');
@@ -234,15 +220,7 @@ export const PosTerminal = () => {
         customerId: overrideCustomerId !== undefined ? (overrideCustomerId || undefined) : customer?.id
       };
 
-      const res = await fetch('/api/pos/calculate-cart', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-
-      if (!res.ok) throw new Error('API failed');
-
-      const data = await res.json();
+      const data = await calculateCart(payload);
       
       // Map API response back to UI cart format
       const evaluatedItems = items.map((origItem: any) => {

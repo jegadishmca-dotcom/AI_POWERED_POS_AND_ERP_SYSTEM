@@ -660,6 +660,22 @@ using (var scope = app.Services.CreateScope())
             await context.SaveChangesAsync();
             Console.WriteLine("Database seeded successfully with initial products.");
         }
+
+        // Seed default Terminal if empty
+        var terminalId = Guid.Parse("00000000-0000-0000-0000-000000000001");
+        if (!await context.Terminals.AnyAsync(t => t.Id == terminalId))
+        {
+            var terminal = new PosErp.Domain.Entities.Auth.Terminal
+            {
+                Id = terminalId,
+                TerminalCode = "POS-01",
+                Name = "Main Terminal",
+                IsActive = true
+            };
+            context.Terminals.Add(terminal);
+            await context.SaveChangesAsync();
+            Console.WriteLine("Database seeded successfully with default Terminal.");
+        }
     }
     catch (Exception ex)
     {

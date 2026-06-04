@@ -16,6 +16,7 @@ import { OpenShiftModal } from './modals/OpenShiftModal';
 import { CloseShiftModal } from './modals/CloseShiftModal';
 import { posDb } from '../db/pos.db';
 import { useAuthStore } from '../../auth/store/auth.store';
+import { syncInvoices } from '../api/pos.sync';
 
 export const PosTerminal = () => {
   const [customer, setCustomer] = useState<any>(null);
@@ -71,6 +72,17 @@ export const PosTerminal = () => {
       window.removeEventListener('click', autoFullscreen);
       window.removeEventListener('keydown', autoFullscreen);
     };
+  }, []);
+
+  // Background Sync for Offline Invoices
+  useEffect(() => {
+    // Sync immediately on mount
+    syncInvoices();
+    // Then sync every 15 seconds
+    const interval = setInterval(() => {
+      syncInvoices();
+    }, 15000);
+    return () => clearInterval(interval);
   }, []);
 
   const toggleFullscreen = () => {

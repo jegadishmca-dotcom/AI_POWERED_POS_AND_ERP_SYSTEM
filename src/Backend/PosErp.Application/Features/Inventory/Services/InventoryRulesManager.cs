@@ -6,7 +6,7 @@ namespace PosErp.Application.Features.Inventory.Services;
 
 public class InventoryRules
 {
-    public bool PreventNegativeStock { get; set; } = true;
+    public bool PreventNegativeStock { get; set; } = false;
     public bool MandatoryBatchTracking { get; set; } = true;
     public bool RowLevelLocking { get; set; } = true;
 }

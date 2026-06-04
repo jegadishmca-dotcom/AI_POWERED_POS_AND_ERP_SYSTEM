@@ -845,8 +845,9 @@ export const PosTerminal = () => {
             let offlineLoyaltyBalance = oldLoyaltyPoints + offlineLoyaltyEarned;
 
             // 2. Construct the FULL invoice object for local storage and printing
+            const invoiceId = crypto.randomUUID();
             const fullInvoice = {
-              id: payload.invoiceNumber,
+              id: invoiceId,
               invoiceNumber: payload.invoiceNumber,
               businessDate: new Date().toISOString(),
               terminalId: payload.terminalId,
@@ -870,7 +871,7 @@ export const PosTerminal = () => {
               paymentMode: paymentModeVal,
               status: 'COMPLETED',
               items: cart.items.map((item: any) => ({
-                id: item.id || '',
+                id: item.id || crypto.randomUUID(),
                 productId: item.productId,
                 name: item.name,
                 quantity: item.qty,

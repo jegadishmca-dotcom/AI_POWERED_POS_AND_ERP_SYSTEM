@@ -101,8 +101,10 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 .MaxAsync(cancellationToken) ?? 0;
             var nextSeq = lastSeq + 1;
 
+            var invoiceId = Guid.NewGuid();
             var invoice = new Invoice
             {
+                Id = invoiceId,
                 InvoiceNumber = request.InvoiceNumber,
                 TerminalId = request.TerminalId,
                 CashierId = request.CashierId,
@@ -133,6 +135,8 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
                 invoice.Items.Add(new InvoiceItem
                 {
+                    Id = Guid.NewGuid(),
+                    InvoiceId = invoiceId,
                     ProductId = item.ProductId,
                     ProductName = product?.Name ?? string.Empty,
                     Quantity = item.Quantity,

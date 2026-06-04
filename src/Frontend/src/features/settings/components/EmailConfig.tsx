@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Mail, Server, ShieldCheck, Key, RefreshCw, Save, Send, AlertTriangle, Eye, EyeOff } from 'lucide-react';
 import { api } from '../../../utils/api';
+import { useAuthStore } from '../../auth/store/auth.store';
 
 export const EmailConfig: React.FC = () => {
   const [smtpServer, setSmtpServer] = useState('smtp.gmail.com');
@@ -16,6 +17,9 @@ export const EmailConfig: React.FC = () => {
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+
+  const { user } = useAuthStore();
+  const isDemoUser = user?.username?.toLowerCase() === 'demo@supermarket.com';
 
   const fetchEmailSettings = async () => {
     try {
@@ -184,16 +188,20 @@ export const EmailConfig: React.FC = () => {
                   placeholder="e.g. xxxx xxxx xxxx xxxx"
                   value={senderPassword}
                   onChange={(e) => setSenderPassword(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10"
+                  disabled={isDemoUser}
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10 disabled:opacity-50 disabled:bg-slate-50"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
+                {!isDemoUser && (
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                )}
               </div>
+              {isDemoUser && <p className="text-[10px] text-red-500 font-bold">Hidden for Demo User.</p>}
             </div>
           </div>
 

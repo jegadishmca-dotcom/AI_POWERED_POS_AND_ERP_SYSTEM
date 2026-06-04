@@ -13,4 +13,4 @@ CREATE TABLE IF NOT EXISTS terminals (
 -- Seed initial terminal if not exists
 INSERT INTO terminals (id, terminal_code, name, is_active, created_at)
 VALUES ('00000000-0000-0000-0000-000000000001', 'TERMINAL 01', 'Counter 01 Main', TRUE, CURRENT_TIMESTAMP)
-ON CONFLICT (terminal_code) DO NOTHING;
+ON CONFLICT (id) DO NOTHING;

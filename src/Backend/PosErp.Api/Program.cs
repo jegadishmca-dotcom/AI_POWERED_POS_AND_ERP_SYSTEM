@@ -205,10 +205,6 @@ using (var scope = app.Services.CreateScope())
                 var filename = Path.GetFileName(sqlFile);
                 bool exists = false;
 
-                var connection = context.Database.GetDbConnection();
-                var wasOpen = connection.State == System.Data.ConnectionState.Open;
-                if (!wasOpen) await connection.OpenAsync();
-
                 using (var cmd = connection.CreateCommand())
                 {
                     cmd.CommandText = "SELECT EXISTS(SELECT 1 FROM migration_history WHERE migration_name = @p0)";

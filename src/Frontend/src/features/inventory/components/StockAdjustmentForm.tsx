@@ -497,10 +497,10 @@ export const StockAdjustmentForm = () => {
           </div>          <table className="w-full border-collapse">
             <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
               <tr>
-                <th className="p-3 text-left w-5/12">Product Search</th>
-                <th className="p-3 text-left w-3/12">Select Batch</th>
-                <th className="p-3 text-center w-1.5/12">Current Stock</th>
-                <th className="p-3 text-center w-1.5/12">Adjusted Qty (- / +)</th>
+                <th className="p-3 text-left w-5/12 border-r-2 border-blue-200 dark:border-blue-800">Product Search</th>
+                <th className="p-3 text-left w-3/12 border-r-2 border-blue-200 dark:border-blue-800">Select Batch</th>
+                <th className="p-3 text-center w-1.5/12 border-r-2 border-blue-200 dark:border-blue-800">Current Stock</th>
+                <th className="p-3 text-center w-1.5/12 border-r-2 border-blue-200 dark:border-blue-800">Adjusted Qty (- / +)</th>
                 <th className="p-3 text-center w-1/12"></th>
               </tr>
             </thead>
@@ -516,7 +516,7 @@ export const StockAdjustmentForm = () => {
                   <tr key={idx} className="hover:bg-slate-50/20 dark:hover:bg-slate-700/20 transition">
                     
                     {/* Product Search Input */}
-                    <td className="p-3 relative border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <td className="p-3 relative border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                       <div className="relative">
                         <Search className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
                         <input 
@@ -549,7 +549,7 @@ export const StockAdjustmentForm = () => {
                     </td>
  
                     {/* Batch Selector */}
-                    <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <td className="p-3 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                       {item.batches.length > 0 ? (
                         <select
                           className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-950"
@@ -568,17 +568,17 @@ export const StockAdjustmentForm = () => {
                     </td>
  
                     {/* Current Stock */}
-                    <td className="p-3 text-center font-bold text-slate-750 dark:text-slate-300 text-sm border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <td className="p-3 text-center font-bold text-slate-800 dark:text-slate-200 text-sm border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                       {item.productId ? item.currentStock : '-'}
                     </td>
  
                     {/* Delta adjustment quantity */}
-                    <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <td className="p-3 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                       <input 
                         type="number"
                         placeholder="-1"
                         className={`w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-center font-black text-sm outline-none focus:ring-2 focus:ring-indigo-500 ${
-                          item.adjustedQuantity < 0 ? 'text-red-600 bg-red-50/50 dark:bg-red-950/20 focus:border-red-500' : 'text-green-600 bg-green-50/50 dark:bg-green-950/20 focus:border-green-500'
+                          item.adjustedQuantity < 0 ? 'text-red-600 bg-red-50/50 dark:bg-red-955/20 focus:border-red-500' : 'text-green-600 bg-green-50/50 dark:bg-green-955/20 focus:border-green-500'
                         }`}
                         value={item.adjustedQuantity}
                         onChange={(e) => {

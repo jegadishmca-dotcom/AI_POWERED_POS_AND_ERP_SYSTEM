@@ -227,22 +227,22 @@ export const GrnForm = () => {
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800 text-sm">
               <tr>
-                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400">Product</th>
-                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-center">Pending Qty</th>
-                <th className="p-3 font-semibold text-blue-700 dark:text-blue-300 text-center">Accepted Qty</th>
-                <th className="p-3 font-semibold text-red-700 dark:text-red-300 text-center">Rejected Qty</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Product</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-center border-r-2 border-blue-200 dark:border-blue-800">Pending Qty</th>
+                <th className="p-3 font-semibold text-blue-700 dark:text-blue-300 text-center border-r-2 border-blue-200 dark:border-blue-800">Accepted Qty</th>
+                <th className="p-3 font-semibold text-red-700 dark:text-red-300 text-center border-r-2 border-blue-200 dark:border-blue-800">Rejected Qty</th>
                 <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 w-48">Batch / Expiry</th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-slate-800">
               {grnItems.map((item, idx) => (
                 <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
-                  <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
+                  <td className="p-3 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                     <p className="font-bold text-slate-800 dark:text-white">{item.name}</p>
                     <p className="text-xs text-gray-500 dark:text-slate-400">Cost: ₹{item.unitCost.toFixed(2)}</p>
                   </td>
-                  <td className="p-3 text-center text-lg font-bold text-gray-600 dark:text-slate-300 border-b-2 border-blue-200 dark:border-blue-800/80">{item.pending}</td>
-                  <td className="p-3 bg-blue-50/30 dark:bg-blue-950/20 border-b-2 border-blue-200 dark:border-blue-800/80">
+                  <td className="p-3 text-center text-lg font-bold text-gray-600 dark:text-slate-300 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">{item.pending}</td>
+                  <td className="p-3 bg-blue-50/30 dark:bg-blue-950/20 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                     <input 
                       type="number" 
                       className="w-full p-2 border border-blue-200 dark:border-blue-900 rounded text-center bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-semibold" 
@@ -251,7 +251,7 @@ export const GrnForm = () => {
                       onFocus={(e) => e.target.select()}
                     />
                   </td>
-                  <td className="p-3 bg-red-50/30 dark:bg-red-950/20 border-b-2 border-blue-200 dark:border-blue-800/80">
+                  <td className="p-3 bg-red-50/30 dark:bg-red-950/20 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                     <input 
                       type="number" 
                       className="w-full p-2 border border-red-200 dark:border-red-900 rounded text-center mb-1 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-semibold" 
@@ -321,16 +321,16 @@ export const GrnForm = () => {
                   <table className="w-full text-sm text-left border-collapse">
                     <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800">
                       <tr>
-                        <th className="p-2.5 font-semibold text-slate-500 dark:text-slate-400">Supplier Product</th>
-                        <th className="p-2.5 font-semibold text-slate-500 dark:text-slate-400">Matched Internal Product</th>
+                        <th className="p-2.5 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Supplier Product</th>
+                        <th className="p-2.5 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Matched Internal Product</th>
                         <th className="p-2.5 font-semibold text-slate-500 dark:text-slate-400">Confidence</th>
                       </tr>
                     </thead>
                     <tbody className="bg-white dark:bg-slate-800">
                       {aiMatches.map((m, i) => (
                         <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
-                          <td className="p-2.5 font-medium text-slate-800 dark:text-white border-b-2 border-blue-200 dark:border-blue-800/80">{m.supplierProductName}</td>
-                          <td className="p-2.5 text-indigo-700 dark:text-indigo-400 font-bold border-b-2 border-blue-200 dark:border-blue-800/80">{m.matchedProductName || 'No match found'}</td>
+                          <td className="p-2.5 font-medium text-slate-800 dark:text-white border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">{m.supplierProductName}</td>
+                          <td className="p-2.5 text-indigo-700 dark:text-indigo-400 font-bold border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">{m.matchedProductName || 'No match found'}</td>
                           <td className="p-2.5 border-b-2 border-blue-200 dark:border-blue-800/80">
                             <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                               m.confidence === 'High' ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300' :

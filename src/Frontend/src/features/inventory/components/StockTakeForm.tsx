@@ -541,10 +541,10 @@ export const StockTakeForm = () => {
           <table className="w-full border-collapse text-left">
             <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
               <tr>
-                <th className="p-3 w-5/12">Product Search</th>
-                <th className="p-3 w-3/12">Select Batch</th>
-                <th className="p-3 text-center w-1.5/12">System Stock</th>
-                <th className="p-3 text-center w-1.5/12">Physical Count</th>
+                <th className="p-3 w-5/12 border-r-2 border-blue-200 dark:border-blue-800">Product Search</th>
+                <th className="p-3 w-3/12 border-r-2 border-blue-200 dark:border-blue-800">Select Batch</th>
+                <th className="p-3 text-center w-1.5/12 border-r-2 border-blue-200 dark:border-blue-800">System Stock</th>
+                <th className="p-3 text-center w-1.5/12 border-r-2 border-blue-200 dark:border-blue-800">Physical Count</th>
                 <th className="p-3 text-center w-1/12"></th>
               </tr>
             </thead>
@@ -560,7 +560,7 @@ export const StockTakeForm = () => {
                   <tr key={idx} className="hover:bg-slate-50/20 dark:hover:bg-slate-700/20 transition">
                     
                     {/* Product Search */}
-                    <td className="p-3 relative border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <td className="p-3 relative border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                       <div className="relative">
                         <Search className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
                         <input 
@@ -591,12 +591,12 @@ export const StockTakeForm = () => {
                         </div>
                       )}
                     </td>
-
+ 
                     {/* Batch Selection */}
-                    <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <td className="p-3 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                       {item.batches.length > 0 ? (
                         <select
-                          className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-700 dark:text-slate-350 bg-white dark:bg-slate-950"
+                          className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-800 dark:text-slate-100 bg-white dark:bg-slate-950"
                           value={item.batchId}
                           onChange={(e) => handleBatchChange(idx, e.target.value)}
                         >
@@ -607,17 +607,17 @@ export const StockTakeForm = () => {
                           ))}
                         </select>
                       ) : (
-                        <span className="text-xs text-slate-400 font-bold pl-2">No active batches</span>
+                        <span className="text-xs text-slate-500 dark:text-slate-400 font-bold pl-2">No active batches</span>
                       )}
                     </td>
-
+ 
                     {/* System Stock */}
-                    <td className="p-3 text-center font-bold text-slate-750 dark:text-slate-350 text-sm bg-slate-50/50 dark:bg-slate-900/30 border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <td className="p-3 text-center font-bold text-slate-800 dark:text-slate-100 text-sm bg-slate-50/50 dark:bg-slate-900/30 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                       {item.productId ? item.systemQuantity : '-'}
                     </td>
-
+ 
                     {/* Physical Count */}
-                    <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <td className="p-3 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                       <input 
                         type="number"
                         placeholder="0"
@@ -630,7 +630,7 @@ export const StockTakeForm = () => {
                         }}
                       />
                     </td>
-
+ 
                     {/* Remove row */}
                     <td className="p-3 text-center border-b-2 border-blue-200 dark:border-blue-800/80">
                       <button 
@@ -640,7 +640,7 @@ export const StockTakeForm = () => {
                         <Trash2 className="w-5 h-5" />
                       </button>
                     </td>
-
+ 
                   </tr>
                 ))
               )}

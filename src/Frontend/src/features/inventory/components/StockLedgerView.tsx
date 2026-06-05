@@ -165,13 +165,13 @@ export const StockLedgerView = () => {
         <table className="w-full text-left border-collapse">
           <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800 text-sm">
             <tr>
-              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400">Date & Time</th>
-              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400">Product</th>
-              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400">Batch No</th>
-              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400">Expiry Date</th>
-              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-center">Movement</th>
-              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400">Reference Doc</th>
-              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right">Delta Qty</th>
+              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Date & Time</th>
+              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Product</th>
+              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Batch No</th>
+              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Expiry Date</th>
+              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-center border-r-2 border-blue-200 dark:border-blue-800">Movement</th>
+              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Reference Doc</th>
+              <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right border-r-2 border-blue-200 dark:border-blue-800">Delta Qty</th>
               <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right">Running Balance</th>
             </tr>
           </thead>
@@ -184,22 +184,24 @@ export const StockLedgerView = () => {
               </tr>
             ) : ledgerEntries.map((entry) => (
               <tr key={entry.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50">
-                <td className="p-3 text-sm text-gray-600 dark:text-slate-300 border-b-2 border-blue-200 dark:border-blue-800/80">{new Date(entry.date).toLocaleString()}</td>
-                <td className="p-3 font-bold text-slate-800 dark:text-white border-b-2 border-blue-200 dark:border-blue-800/80">{entry.productName}</td>
-                <td className="p-3 text-sm text-slate-600 dark:text-slate-300 font-semibold border-b-2 border-blue-200 dark:border-blue-800/80">{entry.batchNumber || '-'}</td>
-                <td className="p-3 text-sm text-slate-600 dark:text-slate-300 font-semibold border-b-2 border-blue-200 dark:border-blue-800/80">{entry.expiryDate ? entry.expiryDate.substring(0, 10) : '-'}</td>
-                <td className="p-3 text-center border-b-2 border-blue-200 dark:border-blue-800/80">
+                <td className="p-3 text-sm text-gray-600 dark:text-slate-300 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">{new Date(entry.date).toLocaleString()}</td>
+                <td className="p-3 font-bold text-slate-800 dark:text-white border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">{entry.productName}</td>
+                <td className="p-3 text-sm text-slate-600 dark:text-slate-300 font-semibold border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">{entry.batchNumber || '-'}</td>
+                <td className="p-3 text-sm text-slate-600 dark:text-slate-300 font-semibold border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">{entry.expiryDate ? entry.expiryDate.substring(0, 10) : '-'}</td>
+                <td className="p-3 text-center border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                   <span className={`px-2 py-1 rounded text-xs font-bold ${entry.movementType === 'GRN' ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300' : entry.movementType === 'SALE' ? 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300' : 'bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300'}`}>
                     {entry.movementType}
                   </span>
                 </td>
                 <td 
-                  className="p-3 text-sm text-blue-600 dark:text-blue-400 flex items-center cursor-pointer hover:underline border-b-2 border-blue-200 dark:border-blue-800/80"
+                  className="p-3 text-sm text-blue-600 dark:text-blue-400 cursor-pointer hover:underline border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80"
                   onClick={() => setPreviewDoc({ id: entry.referenceDocumentId, type: entry.movementType, referenceNumber: entry.referenceDocument })}
                 >
-                  <FileText className="w-4 h-4 mr-1" /> {entry.referenceDocument}
+                  <div className="flex items-center">
+                    <FileText className="w-4 h-4 mr-1" /> {entry.referenceDocument}
+                  </div>
                 </td>
-                <td className={`p-3 text-right font-bold border-b-2 border-blue-200 dark:border-blue-800/80 ${entry.deltaQty > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                <td className={`p-3 text-right font-bold border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80 ${entry.deltaQty > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
                   <div className="flex items-center justify-end">
                     {entry.deltaQty > 0 ? <TrendingUp className="w-4 h-4 mr-1" /> : <TrendingDown className="w-4 h-4 mr-1" />}
                     {entry.deltaQty > 0 ? '+' : ''}{entry.deltaQty}

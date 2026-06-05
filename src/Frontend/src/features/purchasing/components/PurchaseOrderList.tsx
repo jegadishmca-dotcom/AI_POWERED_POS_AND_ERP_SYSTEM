@@ -106,12 +106,12 @@ export const PurchaseOrderList: React.FC<PurchaseOrderListProps> = ({ onAddNew, 
           <table className="w-full text-left border-collapse">
             <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800 text-sm">
               <tr>
-                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400">PO Number</th>
-                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400">Supplier</th>
-                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400">PO Date</th>
-                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400">Expected Delivery</th>
-                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right">Total Amount</th>
-                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-center">Status</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">PO Number</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Supplier</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">PO Date</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Expected Delivery</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right border-r-2 border-blue-200 dark:border-blue-800">Total Amount</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-center border-r-2 border-blue-200 dark:border-blue-800">Status</th>
                 <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-center">Actions</th>
               </tr>
             </thead>
@@ -120,22 +120,22 @@ export const PurchaseOrderList: React.FC<PurchaseOrderListProps> = ({ onAddNew, 
                 <tr key={po.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
                   <td 
                     onClick={() => po.status === 'DRAFT' && onEdit(po.id)}
-                    className={`p-3 font-bold border-b-2 border-blue-200 dark:border-blue-800/80 ${po.status === 'DRAFT' ? 'text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 cursor-pointer underline hover:bg-blue-50/50 dark:hover:bg-blue-950/20' : 'text-slate-700 dark:text-slate-300'}`}
+                    className={`p-3 font-bold border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80 ${po.status === 'DRAFT' ? 'text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 cursor-pointer underline hover:bg-blue-50/50 dark:hover:bg-blue-950/20' : 'text-slate-700 dark:text-slate-300'}`}
                     title={po.status === 'DRAFT' ? 'Click to Edit Draft PO' : undefined}
                   >
                     {po.poNumber}
                   </td>
-                  <td className="p-3 text-slate-800 dark:text-white border-b-2 border-blue-200 dark:border-blue-800/80">{po.supplierName}</td>
-                  <td className="p-3 text-gray-600 dark:text-slate-300 border-b-2 border-blue-200 dark:border-blue-800/80">{new Date(po.poDate).toLocaleDateString('en-IN')}</td>
-                  <td className="p-3 text-gray-600 dark:text-slate-300 border-b-2 border-blue-200 dark:border-blue-800/80">{new Date(po.expectedDeliveryDate).toLocaleDateString('en-IN')}</td>
-                  <td className="p-3 text-right font-bold text-slate-800 dark:text-white border-b-2 border-blue-200 dark:border-blue-800/80">₹{po.totalAmount.toFixed(2)}</td>
-                  <td className="p-3 text-center border-b-2 border-blue-200 dark:border-blue-800/80">
+                  <td className="p-3 text-slate-800 dark:text-white border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">{po.supplierName}</td>
+                  <td className="p-3 text-gray-600 dark:text-slate-300 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">{new Date(po.poDate).toLocaleDateString('en-IN')}</td>
+                  <td className="p-3 text-gray-600 dark:text-slate-300 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">{new Date(po.expectedDeliveryDate).toLocaleDateString('en-IN')}</td>
+                  <td className="p-3 text-right font-bold text-slate-800 dark:text-white border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">₹{po.totalAmount.toFixed(2)}</td>
+                  <td className="p-3 text-center border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                     <span className={`px-2 py-1 rounded text-xs font-bold ${
                       po.status === 'APPROVED' 
                         ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300' 
                         : po.status === 'DRAFT' 
-                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' 
-                        : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-955 dark:text-amber-300' 
+                        : 'bg-blue-100 text-blue-800 dark:bg-blue-955 dark:text-blue-300'
                     }`}>
                       {po.status.replace('_', ' ')}
                     </span>

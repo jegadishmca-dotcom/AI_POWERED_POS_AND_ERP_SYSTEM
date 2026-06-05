@@ -93,24 +93,24 @@ export const SupplierList: React.FC<SupplierListProps> = ({ onEdit, onAddNew }) 
             <table className="w-full text-left border-collapse">
               <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800 text-sm">
                 <tr>
-                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">Name</th>
-                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">GSTIN</th>
-                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">Phone</th>
-                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">Payment Terms</th>
-                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">Status</th>
+                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Name</th>
+                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">GSTIN</th>
+                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Phone</th>
+                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Payment Terms</th>
+                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Status</th>
                   <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white dark:bg-slate-800">
                 {filteredSuppliers.map((supplier) => (
                   <tr key={supplier.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
-                    <td className="px-6 py-4 border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <td className="px-6 py-4 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                       <div className="font-medium text-gray-800 dark:text-white">{supplier.name}</div>
                     </td>
-                    <td className="px-6 py-4 text-gray-600 dark:text-slate-300 border-b-2 border-blue-200 dark:border-blue-800/80">{supplier.gstin || '-'}</td>
-                    <td className="px-6 py-4 text-gray-600 dark:text-slate-300 border-b-2 border-blue-200 dark:border-blue-800/80">{supplier.phone}</td>
-                    <td className="px-6 py-4 text-gray-600 dark:text-slate-300 border-b-2 border-blue-200 dark:border-blue-800/80">{supplier.paymentTerms}</td>
-                    <td className="px-6 py-4 border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <td className="px-6 py-4 text-gray-600 dark:text-slate-300 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">{supplier.gstin || '-'}</td>
+                    <td className="px-6 py-4 text-gray-600 dark:text-slate-300 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">{supplier.phone}</td>
+                    <td className="px-6 py-4 text-gray-600 dark:text-slate-300 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">{supplier.paymentTerms}</td>
+                    <td className="px-6 py-4 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                       <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
                         supplier.isActive 
                           ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300' 

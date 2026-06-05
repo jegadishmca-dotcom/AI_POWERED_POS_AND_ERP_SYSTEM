@@ -314,21 +314,21 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
           <table className="w-full text-left border-collapse mb-6">
             <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800 text-sm">
               <tr>
-                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400">Product Details</th>
-                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right w-36">Ordered Quantity</th>
-                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right w-36">Unit Cost (₹)</th>
-                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right w-36">Total (₹)</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 border-r-2 border-blue-200 dark:border-blue-800">Product Details</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right w-36 border-r-2 border-blue-200 dark:border-blue-800">Ordered Quantity</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right w-36 border-r-2 border-blue-200 dark:border-blue-800">Unit Cost (₹)</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right w-36 border-r-2 border-blue-200 dark:border-blue-800">Total (₹)</th>
                 <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-center w-12"></th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-slate-800">
               {items.map((item, idx) => (
                 <tr key={item.productId} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/50 transition">
-                  <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
+                  <td className="p-3 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                     <div className="font-bold text-slate-800 dark:text-white">{item.name}</div>
                     {item.productCode && <div className="text-xs text-slate-500 dark:text-slate-400">Code: {item.productCode}</div>}
                   </td>
-                  <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
+                  <td className="p-3 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                     <input 
                       type="number" 
                       min="1"
@@ -338,7 +338,7 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
                       onChange={(e) => handleQtyChange(idx, parseFloat(e.target.value) || 0)}
                     />
                   </td>
-                  <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
+                  <td className="p-3 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                     <input 
                       type="number" 
                       min="0.01"
@@ -348,13 +348,13 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
                       onChange={(e) => handleCostChange(idx, parseFloat(e.target.value) || 0)}
                     />
                   </td>
-                  <td className="p-3 text-right font-black text-slate-700 dark:text-slate-200 border-b-2 border-blue-200 dark:border-blue-800/80">
+                  <td className="p-3 text-right font-black text-slate-700 dark:text-slate-200 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                     ₹{(item.orderedQty * item.unitCost).toFixed(2)}
                   </td>
                   <td className="p-3 text-center border-b-2 border-blue-200 dark:border-blue-800/80">
                     <button 
                       onClick={() => handleRemoveItem(idx)} 
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors"
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-955/20 rounded-lg transition-colors"
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>

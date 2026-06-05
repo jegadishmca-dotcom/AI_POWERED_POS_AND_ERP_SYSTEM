@@ -44,6 +44,9 @@ export const BusinessDateDashboard: React.FC = () => {
     return `${yyyy}-${mm}-${dd}`;
   });
 
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [alertInfo, setAlertInfo] = useState<{ title: string; message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -81,13 +84,21 @@ export const BusinessDateDashboard: React.FC = () => {
         openedBy: user?.id
       });
       if (success) {
-        alert(`Business Date ${selectedOpenDate} opened successfully!`);
+        setAlertInfo({
+          title: 'Day Opened Successfully',
+          message: `Business Date ${selectedOpenDate} is now open and operational.`,
+          type: 'success'
+        });
         await loadData();
       }
     } catch (err: any) {
       console.error(err);
       const msg = err.response?.data ? (typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data)) : err.message;
-      alert(`Failed to open business date: ${msg}`);
+      setAlertInfo({
+        title: 'Failed to Open Day',
+        message: `Error detail: ${msg}`,
+        type: 'error'
+      });
     } finally {
       setSubmitting(false);
     }
@@ -95,27 +106,39 @@ export const BusinessDateDashboard: React.FC = () => {
 
   const handleCloseDay = async () => {
     if (hasOpenShifts) {
-      alert('CANNOT PERFORM END-OF-DAY:\nThere are still open cashier shifts. All cashiers must close their shifts before EOD can be run.');
+      setAlertInfo({
+        title: 'Cashier Shifts Still Open',
+        message: 'All cashiers must close their shifts and reconcile registers before End-of-Day can be processed.',
+        type: 'warning'
+      });
       return;
     }
+    setShowConfirmModal(true);
+  };
 
-    if (!window.confirm(`Are you sure you want to perform End-of-Day for ${activeDateInfo?.businessDate ? new Date(activeDateInfo.businessDate).toLocaleDateString('en-IN') : ''}?\n\nThis will:\n1. Lock all invoices on this date from modification.\n2. Reconcile terminal ledgers.\n3. Automatically trigger the daily sales report email to the owner.`)) {
-      return;
-    }
-
+  const handleCloseDayConfirm = async () => {
+    setShowConfirmModal(false);
     try {
       setSubmitting(true);
       const result = await closeBusinessDate({
         closedBy: user?.id
       });
       if (result.success) {
-        alert(`Business Date successfully closed!\nDaily sales email report has been queued.`);
+        setAlertInfo({
+          title: 'End-of-Day Processed',
+          message: `Business Date closed successfully!\nThe daily sales email report has been compiled and queued for dispatch to the owner list.`,
+          type: 'success'
+        });
         await loadData();
       }
     } catch (err: any) {
       console.error(err);
       const msg = err.response?.data ? (typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data)) : err.message;
-      alert(`Failed to execute End-of-Day: ${msg}`);
+      setAlertInfo({
+        title: 'End-of-Day Failed',
+        message: `Error detail: ${msg}`,
+        type: 'error'
+      });
     } finally {
       setSubmitting(false);
     }
@@ -414,6 +437,103 @@ export const BusinessDateDashboard: React.FC = () => {
         </div>
 
       </div>
+
+      {showConfirmModal && (
+        <div className="fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all border border-slate-100 dark:border-slate-700">
+            <div className="bg-gradient-to-r from-red-600 to-rose-600 p-6 text-white">
+              <div className="flex items-center gap-3">
+                <Lock className="w-6 h-6 text-white shrink-0" />
+                <h2 className="text-xl font-bold">Confirm End-of-Day (EOD)</h2>
+              </div>
+              <p className="text-red-100 text-xs mt-1">
+                Are you sure you want to close and lock the operational business date?
+              </p>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 flex items-center justify-between">
+                <span className="text-sm font-semibold text-slate-500">Target Business Date:</span>
+                <span className="text-lg font-extrabold text-slate-800 dark:text-white">
+                  {activeDateInfo?.businessDate ? new Date(activeDateInfo.businessDate).toLocaleDateString('en-IN', { dateStyle: 'long' }) : ''}
+                </span>
+              </div>
+
+              <div className="space-y-3">
+                <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Operational Impacts:</p>
+                
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2.5 text-slate-600 dark:text-slate-300 text-sm">
+                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span><strong>Lock Invoices:</strong> All transactions for this business date will be sealed and locked against modifications or new invoices.</span>
+                  </div>
+                  <div className="flex items-start gap-2.5 text-slate-600 dark:text-slate-300 text-sm">
+                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span><strong>Reconcile Ledgers:</strong> Registers and drawer counts will be reconciled and locked.</span>
+                  </div>
+                  <div className="flex items-start gap-2.5 text-slate-600 dark:text-slate-300 text-sm">
+                    <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0 mt-0.5" />
+                    <span><strong>Daily Report Email:</strong> A full sales report will be automatically compiled and emailed to the owner/manager list.</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  onClick={() => setShowConfirmModal(false)}
+                  className="py-3 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleCloseDayConfirm}
+                  disabled={submitting}
+                  className="py-3 px-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold rounded-xl transition-all shadow-md shadow-red-500/10 text-sm"
+                >
+                  {submitting ? 'Executing EOD...' : 'Confirm & Close Day'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {alertInfo && (
+        <div className="fixed inset-0 bg-slate-900/80 z-[110] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all border border-slate-100 dark:border-slate-700">
+            <div className={`p-6 flex flex-col items-center justify-center text-white text-center ${
+              alertInfo.type === 'success' ? 'bg-emerald-600' : alertInfo.type === 'error' ? 'bg-red-600' : 'bg-amber-600'
+            }`}>
+              {alertInfo.type === 'success' ? (
+                <CheckCircle className="w-12 h-12 mb-2" />
+              ) : alertInfo.type === 'error' ? (
+                <AlertTriangle className="w-12 h-12 mb-2" />
+              ) : (
+                <AlertTriangle className="w-12 h-12 mb-2" />
+              )}
+              <h2 className="text-xl font-bold">{alertInfo.title}</h2>
+            </div>
+            <div className="p-6 text-center space-y-4">
+              <p className="text-slate-600 dark:text-slate-300 text-sm whitespace-pre-line leading-relaxed">
+                {alertInfo.message}
+              </p>
+              <button
+                onClick={() => setAlertInfo(null)}
+                className={`w-full py-2.5 px-4 text-white font-bold rounded-xl shadow-md transition-colors ${
+                  alertInfo.type === 'success' 
+                    ? 'bg-emerald-600 hover:bg-emerald-700' 
+                    : alertInfo.type === 'error' 
+                      ? 'bg-red-600 hover:bg-red-700' 
+                      : 'bg-amber-600 hover:bg-amber-700'
+                }`}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

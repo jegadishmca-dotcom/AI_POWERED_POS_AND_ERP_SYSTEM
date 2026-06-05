@@ -36,6 +36,7 @@ import { StockLedgerView } from './features/inventory/components/StockLedgerView
 import { StockPositionReport } from './features/inventory/components/StockPositionReport';
 import { WarehouseLocationsList } from './features/inventory/components/WarehouseLocationsList';
 import { ShiftReport } from './features/pos/components/ShiftReport';
+import { BusinessDateDashboard } from './features/pos/components/BusinessDateDashboard';
 import { Suppliers } from './features/purchasing/routes/Suppliers';
 import { PurchaseOrders } from './features/purchasing/routes/PurchaseOrders';
 import { Settings } from './pages/Settings';
@@ -72,6 +73,7 @@ const AppLayout: React.FC = () => {
     { path: '/reports', name: 'Reports & Insights', icon: BarChart3, roles: ['Owner', 'Manager'], category: 'general' },
     { path: '/pos', name: 'POS Billing', icon: ShoppingCart, roles: ['Owner', 'Manager', 'Cashier'], category: 'general' },
     { path: '/shift-report', name: 'Shift & Sales Report', icon: ClipboardCheck, roles: ['Cashier'], category: 'general' },
+    { path: '/eod', name: 'End of Day (EOD)', icon: ClipboardCheck, roles: ['Owner', 'Manager'], category: 'general' },
     { path: '/products', name: 'Product Catalog', icon: Package, roles: ['Owner', 'Manager'], category: 'general' },
     { path: '/grn', name: 'Goods Receipt (GRN)', icon: ClipboardCheck, roles: ['Owner', 'Manager'], category: 'general' },
     { path: '/suppliers', name: 'Supplier Master', icon: UserIcon, roles: ['Owner', 'Manager'], category: 'general' },
@@ -283,6 +285,9 @@ const AppLayout: React.FC = () => {
             } />
             <Route path="/pos" element={<PosTerminal />} />
             <Route path="/shift-report" element={<ShiftReport />} />
+            <Route path="/eod" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <BusinessDateDashboard />
+            } />
             <Route path="/products" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <Products />
             } />

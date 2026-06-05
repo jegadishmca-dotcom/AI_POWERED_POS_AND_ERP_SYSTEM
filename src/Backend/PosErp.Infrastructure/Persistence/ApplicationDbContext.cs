@@ -36,6 +36,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Invoice> Invoices => Set<Invoice>();
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<PosSession> PosSessions => Set<PosSession>();
+    public DbSet<StoreBusinessDate> StoreBusinessDates => Set<StoreBusinessDate>();
     
     // Inventory
     public DbSet<ProductBatch> ProductBatches => Set<ProductBatch>();
@@ -94,6 +95,13 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
 
         modelBuilder.Entity<InvoiceItem>()
             .Property(ii => ii.BusinessDate)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<StoreBusinessDate>()
+            .HasKey(sbd => new { sbd.StoreId, sbd.BusinessDate });
+
+        modelBuilder.Entity<StoreBusinessDate>()
+            .Property(sbd => sbd.BusinessDate)
             .HasColumnType("date");
 
         modelBuilder.Entity<InvoiceItem>()
@@ -201,6 +209,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 else if (tableName == "GRNHeaders" || snakeTableName == "g_r_n_headers" || snakeTableName == "grnheaders") snakeTableName = "grn_headers";
                 else if (tableName == "GRNItems" || snakeTableName == "g_r_n_items" || snakeTableName == "grnitems") snakeTableName = "grn_items";
                 else if (snakeTableName == "refresh_tokens") snakeTableName = "refresh_tokens";
+                else if (snakeTableName == "store_business_date" || snakeTableName == "store_business_dates") snakeTableName = "store_business_dates";
                 else if (snakeTableName == "stock_ledger_entrys" || snakeTableName == "stock_ledger_entries") snakeTableName = "stock_ledger";
                 else if (snakeTableName == "wallet_ledger_entrys" || snakeTableName == "wallet_ledger_entries") snakeTableName = "wallet_ledger";
                 else if (snakeTableName == "loyalty_ledger_entrys" || snakeTableName == "loyalty_ledger_entries") snakeTableName = "loyalty_ledger";

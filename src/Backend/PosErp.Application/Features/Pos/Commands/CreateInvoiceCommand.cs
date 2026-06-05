@@ -94,7 +94,16 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             if (totalTender < cartEvaluation.FinalTotal)
                 throw new Exception("Total tender is less than the final invoice amount.");
 
-            var today = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Unspecified);
+            // Retrieve the current active business date
+            var activeDateSession = await _context.StoreBusinessDates
+                .FirstOrDefaultAsync(d => d.StoreId == Guid.Empty && d.Status == "OPEN", cancellationToken);
+
+            if (activeDateSession == null)
+            {
+                throw new Exception("No active business date is open. Please open a business date before recording transactions.");
+            }
+
+            var today = activeDateSession.BusinessDate;
             var lastSeq = await _context.Invoices
                 .Where(i => i.TerminalId == request.TerminalId && i.BusinessDate == today)
                 .Select(i => (int?)i.TerminalSequence)

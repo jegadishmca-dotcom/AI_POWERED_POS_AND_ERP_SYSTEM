@@ -88,7 +88,7 @@ public class DailyReportEmailService : BackgroundService
         }
     }
 
-    public async Task SendDailyReportAsync(CancellationToken cancellationToken)
+    public async Task SendDailyReportAsync(CancellationToken cancellationToken, DateTime? reportDate = null)
     {
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
@@ -99,7 +99,7 @@ public class DailyReportEmailService : BackgroundService
         var recipientEmail = !string.IsNullOrWhiteSpace(savedSettings.RecipientEmail)
             ? savedSettings.RecipientEmail
             : (_configuration["EmailSettings:RecipientEmail"] ?? "jegadishmca@gmail.com");
-        var today = DateTime.UtcNow.AddHours(5.5).Date;
+        var today = reportDate?.Date ?? DateTime.UtcNow.AddHours(5.5).Date;
 
         Console.WriteLine($"[DailyReportEmailService] Generating EOD Daily Report for {today:yyyy-MM-dd}...");
 

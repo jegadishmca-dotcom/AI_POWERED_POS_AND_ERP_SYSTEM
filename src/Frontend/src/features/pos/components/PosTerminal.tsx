@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert, Printer, Clock, Maximize, Minimize, Mic, MicOff } from 'lucide-react';
+import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert, Printer, Clock, Maximize, Minimize, Mic, MicOff, Unlock } from 'lucide-react';
 import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistrationModal';
 import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
 import { searchCustomers, registerCustomer } from '../../crm/api/crm.api';
-import { createInvoice, closeShift, getZReport, getProductBatches, getCurrentSession, openSession, calculateCart } from '../api/pos.api';
+import { createInvoice, closeShift, getZReport, getProductBatches, getCurrentSession, openSession, calculateCart, getActiveBusinessDate, openBusinessDate } from '../api/pos.api';
 import { printReceipt } from '../utils/printReceipt';
 import { printZReport } from '../utils/printZReport';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -46,6 +46,19 @@ export const PosTerminal = () => {
   const { user } = useAuthStore();
   const terminalId = localStorage.getItem('pos_terminal_id') || '00000000-0000-0000-0000-000000000001';
   const cashierId = user?.id || '00000000-0000-0000-0000-000000000001';
+
+  // Business Date State
+  const [isBusinessDateOpen, setBusinessDateOpen] = useState(true);
+  const [activeBusinessDate, setActiveBusinessDate] = useState<string | null>(null);
+  const [dateLoading, setDateLoading] = useState(true);
+  const [openingDateSubmitting, setOpeningDateSubmitting] = useState(false);
+  const [selectedOpenDate, setSelectedOpenDate] = useState(() => {
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = String(today.getMonth() + 1).padStart(2, '0');
+    const dd = String(today.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  });
 
   // Fullscreen management & auto-fullscreen on first user interaction
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -101,21 +114,30 @@ export const PosTerminal = () => {
     // Focus barcode scanner input on mount
     productInputRef.current?.focus();
     
-    // Check for active shift
-    const fetchSession = async () => {
+    // Check business date and active shift
+    const checkBusinessDate = async () => {
       try {
-        const sessionData = await getCurrentSession(terminalId, cashierId);
-        if (sessionData && sessionData.status === 'OPEN') {
-          setActiveSession(sessionData);
-        } else {
-          setOpenShiftModalOpen(true);
+        setDateLoading(true);
+        const activeState = await getActiveBusinessDate();
+        setBusinessDateOpen(activeState.isOpen);
+        setActiveBusinessDate(activeState.businessDate);
+        
+        if (activeState.isOpen) {
+          // Check for active shift only if business day is open
+          const sessionData = await getCurrentSession(terminalId, cashierId);
+          if (sessionData && sessionData.status === 'OPEN') {
+            setActiveSession(sessionData);
+          } else {
+            setOpenShiftModalOpen(true);
+          }
         }
       } catch (err) {
-        console.error('Failed to fetch session', err);
-        setOpenShiftModalOpen(true); // Default to forcing open shift on network error
+        console.error('Failed to fetch business date status', err);
+      } finally {
+        setDateLoading(false);
       }
     };
-    fetchSession();
+    checkBusinessDate();
   }, []);
   
   const handleOpenShift = async (openingCash: number) => {
@@ -716,6 +738,86 @@ export const PosTerminal = () => {
       }
     }
   };
+
+  if (dateLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-100 dark:bg-slate-900">
+        <div className="flex flex-col items-center space-y-4">
+          <Clock className="w-10 h-10 text-indigo-600 animate-spin" />
+          <p className="text-slate-500 dark:text-slate-400 font-semibold">Validating Business Date...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isBusinessDateOpen) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
+        <div className="bg-slate-800 rounded-2xl border border-slate-700 p-8 max-w-md w-full shadow-2xl space-y-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-red-950/40 text-red-400 flex items-center justify-center mx-auto border border-red-900/60 shadow-lg">
+            <ShieldAlert className="w-8 h-8 animate-pulse" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-white">Business Day Closed</h1>
+            <p className="text-slate-400 text-sm mt-2">
+              There is no active open business date. Supermarket registers are locked from billing until a new operational date is opened.
+            </p>
+          </div>
+
+          <div className="bg-slate-900/40 p-4 rounded-xl border border-slate-700 text-left space-y-3">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Open Day Operational Date
+            </label>
+            <input 
+              type="date"
+              value={selectedOpenDate}
+              onChange={(e) => setSelectedOpenDate(e.target.value)}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg py-2.5 px-3.5 text-white font-semibold outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
+            />
+          </div>
+
+          <button
+            onClick={async () => {
+              if (!selectedOpenDate) return;
+              try {
+                setOpeningDateSubmitting(true);
+                setDateLoading(true);
+                const success = await openBusinessDate({ businessDate: selectedOpenDate, openedBy: cashierId });
+                if (success) {
+                  alert(`Business Date ${selectedOpenDate} opened successfully!`);
+                  // Reload business date state
+                  const activeState = await getActiveBusinessDate();
+                  setBusinessDateOpen(activeState.isOpen);
+                  setActiveBusinessDate(activeState.businessDate);
+                  
+                  if (activeState.isOpen) {
+                    const sessionData = await getCurrentSession(terminalId, cashierId);
+                    if (sessionData && sessionData.status === 'OPEN') {
+                      setActiveSession(sessionData);
+                    } else {
+                      setOpenShiftModalOpen(true);
+                    }
+                  }
+                }
+              } catch (err: any) {
+                console.error(err);
+                const msg = err.response?.data ? (typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data)) : err.message;
+                alert(`Failed to open business date: ${msg}`);
+              } finally {
+                setDateLoading(false);
+                setOpeningDateSubmitting(false);
+              }
+            }}
+            disabled={openingDateSubmitting || !selectedOpenDate}
+            className="w-full py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/10 hover:scale-[1.01] transition-all duration-200 flex items-center justify-center gap-2"
+          >
+            <Unlock className="w-4 h-4" />
+            {openingDateSubmitting ? 'Opening Day...' : 'Open Business Day'}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-slate-100">

@@ -30,6 +30,7 @@ public interface IApplicationDbContext
     DbSet<Invoice> Invoices { get; }
     DbSet<InvoiceItem> InvoiceItems { get; }
     DbSet<PosSession> PosSessions { get; }
+    DbSet<StoreBusinessDate> StoreBusinessDates { get; }
     
     // Inventory
     DbSet<ProductBatch> ProductBatches { get; }

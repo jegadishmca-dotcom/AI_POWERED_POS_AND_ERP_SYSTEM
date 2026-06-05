@@ -289,4 +289,90 @@ public class PosController : ControllerBase
         await _printService.PrintReceiptAsync(printerIp, 9100, sb.ToString());
         return Ok();
     }
+
+    [HttpGet("business-date/active")]
+    public async Task<IActionResult> GetActiveBusinessDate([FromQuery] Guid? storeId)
+    {
+        var activeDate = await _mediator.Send(new PosErp.Application.Features.Pos.Queries.GetActiveBusinessDateQuery(storeId));
+        if (activeDate == null)
+        {
+            return Ok(new { isOpen = false, businessDate = (DateTime?)null });
+        }
+        return Ok(new { isOpen = true, businessDate = activeDate.BusinessDate, openedAt = activeDate.OpenedAt });
+    }
+
+    [HttpPost("business-date/open")]
+    public async Task<IActionResult> OpenBusinessDate([FromBody] PosErp.Application.Features.Pos.Commands.OpenBusinessDateCommand command)
+    {
+        var success = await _mediator.Send(command);
+        return Ok(new { success });
+    }
+
+    [HttpPost("business-date/close")]
+    public async Task<IActionResult> CloseBusinessDate([FromBody] PosErp.Application.Features.Pos.Commands.CloseBusinessDateCommand command)
+    {
+        var closedDate = await _mediator.Send(command);
+
+        // Trigger daily report email automatically
+        try
+        {
+            var scopeFactory = HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>();
+            var config = HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+            var reportService = new PosErp.Infrastructure.Jobs.DailyReportEmailService(scopeFactory, config);
+            await reportService.SendDailyReportAsync(default, closedDate);
+            Console.WriteLine($"[PosController] Automatically sent daily email report for closed Business Date: {closedDate:yyyy-MM-dd}");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[PosController] [ERROR] Failed to send daily report email on EOD: {ex.Message}");
+        }
+
+        return Ok(new { success = true, closedDate });
+    }
+
+    [HttpGet("sessions/summary")]
+    public async Task<IActionResult> GetSessionsSummary()
+    {
+        var sessions = await _context.PosSessions
+            .Select(s => new {
+                s.Id,
+                s.TerminalId,
+                s.CashierId,
+                s.StartTime,
+                s.EndTime,
+                s.OpeningFloatCash,
+                s.ExpectedClosingCash,
+                s.ActualClosingCash,
+                s.Difference,
+                s.Status,
+                CashierName = _context.Users.Where(u => u.Id == s.CashierId).Select(u => u.FullName).FirstOrDefault() ?? "Unknown Cashier",
+                TerminalCode = _context.Terminals.Where(t => t.Id == s.TerminalId).Select(t => t.TerminalCode).FirstOrDefault() ?? "Unknown Terminal"
+            })
+            .OrderByDescending(s => s.StartTime)
+            .Take(50)
+            .ToListAsync();
+        return Ok(sessions);
+    }
+
+    [HttpGet("business-date/metrics")]
+    public async Task<IActionResult> GetBusinessDateMetrics([FromQuery] DateTime businessDate)
+    {
+        var targetDate = businessDate.Date;
+        var invoices = await _context.Invoices
+            .Where(i => i.BusinessDate == targetDate && i.Status == "COMPLETED")
+            .ToListAsync();
+
+        var metrics = new {
+            TotalInvoices = invoices.Count,
+            TotalSales = invoices.Sum(i => i.TotalAmount),
+            TotalTax = invoices.Sum(i => i.TaxAmount),
+            TotalDiscount = invoices.Sum(i => i.DiscountAmount),
+            CashCollected = invoices.Sum(i => i.CashAmount),
+            CardCollected = invoices.Sum(i => i.CardAmount),
+            UpiCollected = invoices.Sum(i => i.UpiAmount),
+            WalletCollected = invoices.Sum(i => i.WalletAmount)
+        };
+
+        return Ok(metrics);
+    }
 }

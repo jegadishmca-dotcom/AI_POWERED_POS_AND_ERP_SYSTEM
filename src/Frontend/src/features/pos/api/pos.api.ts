@@ -57,3 +57,64 @@ export const calculateCart = async (payload: any) => {
   const { data } = await api.post('/api/pos/calculate-cart', payload);
   return data;
 };
+
+export interface ActiveBusinessDateResponse {
+  isOpen: boolean;
+  businessDate: string | null;
+  openedAt?: string;
+}
+
+export const getActiveBusinessDate = async (storeId?: string): Promise<ActiveBusinessDateResponse> => {
+  const { data } = await api.get('/api/pos/business-date/active', {
+    params: { storeId }
+  });
+  return data;
+};
+
+export const openBusinessDate = async (payload: { businessDate: string; storeId?: string; openedBy?: string }): Promise<boolean> => {
+  const { data } = await api.post('/api/pos/business-date/open', payload);
+  return data.success;
+};
+
+export const closeBusinessDate = async (payload: { storeId?: string; closedBy?: string }): Promise<{ success: boolean; closedDate: string }> => {
+  const { data } = await api.post('/api/pos/business-date/close', payload);
+  return data;
+};
+
+export interface SessionSummaryDto {
+  id: string;
+  terminalId: string;
+  cashierId: string;
+  startTime: string;
+  endTime: string | null;
+  openingFloatCash: number;
+  expectedClosingCash: number;
+  actualClosingCash: number;
+  difference: number;
+  status: 'OPEN' | 'CLOSED';
+  cashierName: string;
+  terminalCode: string;
+}
+
+export interface BusinessDateMetricsDto {
+  totalInvoices: number;
+  totalSales: number;
+  totalTax: number;
+  totalDiscount: number;
+  cashCollected: number;
+  cardCollected: number;
+  upiCollected: number;
+  walletCollected: number;
+}
+
+export const getSessionsSummary = async (): Promise<SessionSummaryDto[]> => {
+  const { data } = await api.get('/api/pos/sessions/summary');
+  return data;
+};
+
+export const getBusinessDateMetrics = async (businessDate: string): Promise<BusinessDateMetricsDto> => {
+  const { data } = await api.get('/api/pos/business-date/metrics', {
+    params: { businessDate }
+  });
+  return data;
+};

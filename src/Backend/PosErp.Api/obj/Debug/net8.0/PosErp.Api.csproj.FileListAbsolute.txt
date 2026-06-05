@@ -217,3 +217,4 @@ D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Back
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\19_EmailSettingsSchema.sql
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\20_EmailApiSupport.sql
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\21_AddResendSupport.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\22_BusinessDateManagement.sql

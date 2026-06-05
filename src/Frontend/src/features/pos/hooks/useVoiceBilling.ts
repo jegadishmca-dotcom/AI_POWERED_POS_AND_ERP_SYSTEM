@@ -113,11 +113,17 @@ export const useVoiceBilling = ({
 
     recognition.onerror = (event: any) => {
       console.warn('Speech recognition error:', event.error);
+      let userMsg = event.error;
       if (event.error === 'not-allowed') {
-        setError('Microphone permission denied.');
-      } else {
-        setError(event.error);
+        userMsg = 'Microphone permission denied. Enable access in browser settings.';
+      } else if (event.error === 'no-speech') {
+        userMsg = 'No speech detected. Please speak clearly into your mic.';
+      } else if (event.error === 'network') {
+        userMsg = 'Network error. Speech recognition requires internet connection.';
+      } else if (event.error === 'aborted') {
+        userMsg = 'Voice recognition was stopped.';
       }
+      setError(userMsg);
       setIsListening(false);
     };
 

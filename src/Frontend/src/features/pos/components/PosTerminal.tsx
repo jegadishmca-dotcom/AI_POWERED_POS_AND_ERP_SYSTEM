@@ -263,10 +263,17 @@ export const PosTerminal = () => {
     }
   };
 
-  const { isListening, toggleListening } = useVoiceBilling({
+  const { isListening, error: voiceError, toggleListening } = useVoiceBilling({
     onVoiceCommand: handleVoiceCommand,
     language: voiceLanguage
   });
+
+  useEffect(() => {
+    if (voiceError) {
+      setVoiceStatus(voiceError);
+      setVoiceStatusType('error');
+    }
+  }, [voiceError]);
 
   useEffect(() => {
     if (isListening) {

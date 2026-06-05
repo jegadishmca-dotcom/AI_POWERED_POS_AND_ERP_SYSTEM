@@ -165,7 +165,7 @@ export const PosTerminal = () => {
       });
       
       const today = new Date().toISOString().split('T')[0];
-      const report = await getZReport(terminalId, today, cashierId);
+      const report = await getZReport(terminalId, today, cashierId, activeSession.id);
       printZReport(report, activeSession?.openingFloatCash || 0, closingCash, user?.fullName || 'Cashier');
       
       setActiveSession(null);

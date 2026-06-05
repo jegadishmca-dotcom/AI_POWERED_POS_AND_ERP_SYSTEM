@@ -31,7 +31,7 @@ export const ShiftReport = () => {
           if (sessionData.status === 'OPEN') {
             const today = new Date().toISOString().split('T')[0];
             const { data: zRes } = await api.get(`/api/pos/z-report`, {
-              params: { terminalId, businessDate: today, cashierId }
+              params: { terminalId, businessDate: today, cashierId, sessionId: sessionData.id }
             });
             if (zRes) {
               setReportData(zRes);

@@ -34,9 +34,9 @@ export const closeShift = async (payload: { sessionId: string; actualClosingCash
   return data;
 };
 
-export const getZReport = async (terminalId: string, businessDate: string, cashierId: string) => {
+export const getZReport = async (terminalId: string, businessDate: string, cashierId: string, sessionId?: string) => {
   const { data } = await api.get('/api/pos/z-report', {
-    params: { terminalId, businessDate, cashierId }
+    params: { terminalId, businessDate, cashierId, sessionId }
   });
   return data;
 };

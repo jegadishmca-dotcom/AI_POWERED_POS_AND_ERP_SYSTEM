@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace PosErp.Application.Features.Pos.Queries.GetZReport;
 
-public record GetZReportQuery(Guid TerminalId, DateTime BusinessDate, Guid? CashierId = null) : IRequest<ZReportDto>;
+public record GetZReportQuery(Guid TerminalId, DateTime BusinessDate, Guid? CashierId = null, Guid? SessionId = null) : IRequest<ZReportDto>;
 
 public record ZReportDto(
     Guid TerminalId, 
@@ -34,13 +34,38 @@ public class GetZReportQueryHandler : IRequestHandler<GetZReportQuery, ZReportDt
     public async Task<ZReportDto> Handle(GetZReportQuery request, CancellationToken cancellationToken)
     {
         var targetDate = request.BusinessDate.Date;
+        var query = _context.Invoices.AsQueryable();
 
-        var query = _context.Invoices
-            .Where(i => i.TerminalId == request.TerminalId && i.BusinessDate == targetDate && i.Status == "COMPLETED");
-
-        if (request.CashierId.HasValue)
+        if (request.SessionId.HasValue)
         {
-            query = query.Where(i => i.CashierId == request.CashierId.Value);
+            var session = await _context.PosSessions.FindAsync(new object[] { request.SessionId.Value }, cancellationToken);
+            if (session != null)
+            {
+                var start = session.StartTime;
+                var end = session.EndTime ?? DateTime.UtcNow;
+
+                query = query.Where(i => i.TerminalId == request.TerminalId 
+                                      && i.CashierId == request.CashierId 
+                                      && i.CreatedAt >= start 
+                                      && i.CreatedAt <= end 
+                                      && i.Status == "COMPLETED");
+            }
+            else
+            {
+                query = query.Where(i => i.TerminalId == request.TerminalId && i.BusinessDate == targetDate && i.Status == "COMPLETED");
+                if (request.CashierId.HasValue)
+                {
+                    query = query.Where(i => i.CashierId == request.CashierId.Value);
+                }
+            }
+        }
+        else
+        {
+            query = query.Where(i => i.TerminalId == request.TerminalId && i.BusinessDate == targetDate && i.Status == "COMPLETED");
+            if (request.CashierId.HasValue)
+            {
+                query = query.Where(i => i.CashierId == request.CashierId.Value);
+            }
         }
 
         var invoices = await query.ToListAsync(cancellationToken);

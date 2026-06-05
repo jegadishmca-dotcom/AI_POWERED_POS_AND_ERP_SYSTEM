@@ -2,7 +2,9 @@ using System;
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json;
+using System.Data;
+using Microsoft.EntityFrameworkCore;
+using PosErp.Application.Interfaces;
 
 namespace PosErp.Application.Features.Inventory.Services;
 
@@ -14,15 +16,27 @@ public class EmailSettings
     public string SenderPassword { get; set; } = "";
     public string RecipientEmail { get; set; } = "jegadishmca@gmail.com";
     public bool EnableSsl { get; set; } = true;
+    public int TriggerIntervalMinutes { get; set; } = 0;
 }
 
-public static class EmailSettingsManager
+public interface IEmailSettingsManager
 {
-    private static readonly string FilePath = Path.Combine(AppContext.BaseDirectory, "email_settings.json");
-    private static readonly object LockObj = new();
+    EmailSettings GetSettings();
+    void SaveSettings(EmailSettings settings);
+}
 
-    private static readonly string PepperKey = "AppPosErp_SecretPepperSmtp2026_"; // 32 chars key for AES-256
+public class EmailSettingsManager : IEmailSettingsManager
+{
+    private readonly IApplicationDbContext _context;
+
+    // Pad PepperKey to 32 bytes (exactly 32 characters) for AES-256
+    private static readonly string PepperKey = "AppPosErp_SecretPepperSmtp2026_X";
     private static readonly byte[] StaticIv = new byte[16] { 0x12, 0x34, 0x56, 0x78, 0x90, 0xAB, 0xCD, 0xEF, 0x12, 0x34, 0x56, 0x78, 0x90, 0xAB, 0xCD, 0xEF };
+
+    public EmailSettingsManager(IApplicationDbContext context)
+    {
+        _context = context;
+    }
 
     private static string Encrypt(string plainText)
     {
@@ -54,7 +68,6 @@ public static class EmailSettingsManager
         if (string.IsNullOrEmpty(cipherText)) return "";
         try
         {
-            // If it is not a valid Base64 string, return it as-is (e.g. if previously saved in plain text)
             Span<byte> buffer = new Span<byte>(new byte[cipherText.Length]);
             if (!Convert.TryFromBase64String(cipherText, buffer, out int _))
             {
@@ -78,58 +91,114 @@ public static class EmailSettingsManager
         }
     }
 
-    public static EmailSettings GetSettings()
+    public EmailSettings GetSettings()
     {
-        lock (LockObj)
+        var settings = new EmailSettings();
+        try
         {
-            if (!File.Exists(FilePath))
+            var dbContext = _context as DbContext;
+            if (dbContext == null) return settings;
+
+            var conn = dbContext.Database.GetDbConnection();
+            var wasOpen = conn.State == ConnectionState.Open;
+            if (!wasOpen) conn.Open();
+
+            using (var cmd = conn.CreateCommand())
             {
-                var defaultSettings = new EmailSettings();
-                SaveSettings(defaultSettings);
-                return defaultSettings;
+                cmd.CommandText = "SELECT smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes FROM email_settings WHERE id = 'global'";
+                using (var reader = cmd.ExecuteReader())
+                {
+                    if (reader.Read())
+                    {
+                        settings.SmtpServer = reader.IsDBNull(0) ? "smtp.gmail.com" : reader.GetString(0);
+                        settings.SmtpPort = reader.IsDBNull(1) ? 587 : reader.GetInt32(1);
+                        settings.SenderEmail = reader.IsDBNull(2) ? "fortabletuse999@gmail.com" : reader.GetString(2);
+                        var encryptedPassword = reader.IsDBNull(3) ? "" : reader.GetString(3);
+                        settings.SenderPassword = Decrypt(encryptedPassword);
+                        settings.RecipientEmail = reader.IsDBNull(4) ? "jegadishmca@gmail.com" : reader.GetString(4);
+                        settings.EnableSsl = reader.IsDBNull(5) ? true : reader.GetBoolean(5);
+                        settings.TriggerIntervalMinutes = reader.IsDBNull(6) ? 0 : reader.GetInt32(6);
+                    }
+                }
             }
 
-            try
-            {
-                string json = File.ReadAllText(FilePath);
-                var settings = JsonSerializer.Deserialize<EmailSettings>(json) ?? new EmailSettings();
-                if (!string.IsNullOrEmpty(settings.SenderPassword))
-                {
-                    settings.SenderPassword = Decrypt(settings.SenderPassword);
-                }
-                return settings;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error reading email settings, using defaults: {ex.Message}");
-                return new EmailSettings();
-            }
+            if (!wasOpen) conn.Close();
         }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EmailSettingsManager] Error reading settings from DB: {ex.Message}");
+        }
+        return settings;
     }
 
-    public static void SaveSettings(EmailSettings settings)
+    public void SaveSettings(EmailSettings settings)
     {
-        lock (LockObj)
+        try
         {
-            try
-            {
-                var clone = new EmailSettings
-                {
-                    SmtpServer = settings.SmtpServer,
-                    SmtpPort = settings.SmtpPort,
-                    SenderEmail = settings.SenderEmail,
-                    SenderPassword = Encrypt(settings.SenderPassword),
-                    RecipientEmail = settings.RecipientEmail,
-                    EnableSsl = settings.EnableSsl
-                };
+            var dbContext = _context as DbContext;
+            if (dbContext == null) return;
 
-                string json = JsonSerializer.Serialize(clone, new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(FilePath, json);
-            }
-            catch (Exception ex)
+            var conn = dbContext.Database.GetDbConnection();
+            var wasOpen = conn.State == ConnectionState.Open;
+            if (!wasOpen) conn.Open();
+
+            using (var cmd = conn.CreateCommand())
             {
-                Console.WriteLine($"Failed to save email settings: {ex.Message}");
+                cmd.CommandText = @"
+                    INSERT INTO email_settings (id, smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes)
+                    VALUES ('global', @smtp_server, @smtp_port, @sender_email, @sender_password, @recipient_email, @enable_ssl, @trigger_interval_minutes)
+                    ON CONFLICT (id) DO UPDATE SET
+                        smtp_server = EXCLUDED.smtp_server,
+                        smtp_port = EXCLUDED.smtp_port,
+                        sender_email = EXCLUDED.sender_email,
+                        sender_password = EXCLUDED.sender_password,
+                        recipient_email = EXCLUDED.recipient_email,
+                        enable_ssl = EXCLUDED.enable_ssl,
+                        trigger_interval_minutes = EXCLUDED.trigger_interval_minutes;";
+
+                var pSmtpServer = cmd.CreateParameter();
+                pSmtpServer.ParameterName = "@smtp_server";
+                pSmtpServer.Value = settings.SmtpServer ?? "";
+                cmd.Parameters.Add(pSmtpServer);
+
+                var pSmtpPort = cmd.CreateParameter();
+                pSmtpPort.ParameterName = "@smtp_port";
+                pSmtpPort.Value = settings.SmtpPort;
+                cmd.Parameters.Add(pSmtpPort);
+
+                var pSenderEmail = cmd.CreateParameter();
+                pSenderEmail.ParameterName = "@sender_email";
+                pSenderEmail.Value = settings.SenderEmail ?? "";
+                cmd.Parameters.Add(pSenderEmail);
+
+                var pSenderPassword = cmd.CreateParameter();
+                pSenderPassword.ParameterName = "@sender_password";
+                pSenderPassword.Value = Encrypt(settings.SenderPassword);
+                cmd.Parameters.Add(pSenderPassword);
+
+                var pRecipientEmail = cmd.CreateParameter();
+                pRecipientEmail.ParameterName = "@recipient_email";
+                pRecipientEmail.Value = settings.RecipientEmail ?? "";
+                cmd.Parameters.Add(pRecipientEmail);
+
+                var pEnableSsl = cmd.CreateParameter();
+                pEnableSsl.ParameterName = "@enable_ssl";
+                pEnableSsl.Value = settings.EnableSsl;
+                cmd.Parameters.Add(pEnableSsl);
+
+                var pTriggerIntervalMinutes = cmd.CreateParameter();
+                pTriggerIntervalMinutes.ParameterName = "@trigger_interval_minutes";
+                pTriggerIntervalMinutes.Value = settings.TriggerIntervalMinutes;
+                cmd.Parameters.Add(pTriggerIntervalMinutes);
+
+                cmd.ExecuteNonQuery();
             }
+
+            if (!wasOpen) conn.Close();
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[EmailSettingsManager] Error saving settings to DB: {ex.Message}");
         }
     }
 }

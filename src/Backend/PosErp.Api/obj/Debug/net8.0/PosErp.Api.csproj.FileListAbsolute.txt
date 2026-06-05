@@ -214,3 +214,4 @@ D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Back
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\01_CoreSchema.sql
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\17_AddCustomerIdToInvoices.sql
 D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\18_CreateDefaultPartitions.sql
+D:\JEGADISH\APPLE_SUPERMARKET_POS_PROJECT\AI_POWERED_POS_AND_ERP_SYSTEM\src\Backend\PosErp.Api\bin\Debug\net8.0\Persistence\Migrations\19_EmailSettingsSchema.sql

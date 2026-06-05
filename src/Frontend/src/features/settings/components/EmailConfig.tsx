@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Mail, Server, ShieldCheck, Key, RefreshCw, Save, Send, AlertTriangle, Eye, EyeOff } from 'lucide-react';
+import { Mail, Server, ShieldCheck, Key, RefreshCw, Save, Send, AlertTriangle, Eye, EyeOff, Clock } from 'lucide-react';
 import { api } from '../../../utils/api';
 import { useAuthStore } from '../../auth/store/auth.store';
 
@@ -10,16 +10,18 @@ export const EmailConfig: React.FC = () => {
   const [senderPassword, setSenderPassword] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
   const [enableSsl, setEnableSsl] = useState(true);
+  const [triggerIntervalMinutes, setTriggerIntervalMinutes] = useState(0);
 
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
+  const [triggeringSales, setTriggeringSales] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
   const { user } = useAuthStore();
-  const isDemoUser = user?.username?.toLowerCase() === 'demo@supermarket.com';
+  const isSuperAdmin = user?.username?.toLowerCase() === 'admin@supermarket.local';
 
   const fetchEmailSettings = async () => {
     try {
@@ -32,6 +34,7 @@ export const EmailConfig: React.FC = () => {
       setSenderPassword(res.data.senderPassword || '');
       setRecipientEmail(res.data.recipientEmail || 'jegadishmca@gmail.com');
       setEnableSsl(res.data.enableSsl !== false);
+      setTriggerIntervalMinutes(res.data.triggerIntervalMinutes || 0);
     } catch (err: any) {
       console.error('Failed to load email configuration settings', err);
       setErrorMsg('Failed to load email settings configuration from server.');
@@ -56,7 +59,8 @@ export const EmailConfig: React.FC = () => {
         senderEmail,
         senderPassword,
         recipientEmail,
-        enableSsl
+        enableSsl,
+        triggerIntervalMinutes: Number(triggerIntervalMinutes)
       };
 
       await api.post('/api/settings/email', payload);
@@ -84,7 +88,8 @@ export const EmailConfig: React.FC = () => {
         senderEmail,
         senderPassword,
         recipientEmail,
-        enableSsl
+        enableSsl,
+        triggerIntervalMinutes: Number(triggerIntervalMinutes)
       };
 
       const res = await api.post('/api/settings/email/test', payload);
@@ -99,6 +104,27 @@ export const EmailConfig: React.FC = () => {
       setErrorMsg(msg);
     } finally {
       setTesting(false);
+    }
+  };
+
+  const handleTriggerSales = async () => {
+    try {
+      setTriggeringSales(true);
+      setSuccessMsg(null);
+      setErrorMsg(null);
+
+      const res = await api.post('/api/aiautomation/trigger-daily-email');
+      if (res.data.success) {
+        setSuccessMsg(res.data.message || "Today's sales report email triggered successfully.");
+      } else {
+        setErrorMsg("Failed to trigger sales report. Server responded with error.");
+      }
+    } catch (err: any) {
+      console.error("Failed to trigger sales email", err);
+      const msg = err.response?.data?.message || "Failed to trigger sales report email.";
+      setErrorMsg(msg);
+    } finally {
+      setTriggeringSales(false);
     }
   };
 
@@ -173,26 +199,25 @@ export const EmailConfig: React.FC = () => {
                 placeholder="e.g. supermarket@gmail.com"
                 value={senderEmail}
                 onChange={(e) => setSenderEmail(e.target.value)}
-                disabled={isDemoUser}
+                disabled={!isSuperAdmin}
                 className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:bg-slate-50"
               />
             </div>
 
             {/* Sender Password */}
-            <div className="space-y-1">
-              <label className="text-xs font-black text-slate-500 uppercase flex items-center gap-1.5">
-                <Key className="w-3.5 h-3.5" /> Sender Password / App Key
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="e.g. xxxx xxxx xxxx xxxx"
-                  value={senderPassword}
-                  onChange={(e) => setSenderPassword(e.target.value)}
-                  disabled={isDemoUser}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10 disabled:opacity-50 disabled:bg-slate-50"
-                />
-                {!isDemoUser && (
+            {isSuperAdmin && (
+              <div className="space-y-1">
+                <label className="text-xs font-black text-slate-500 uppercase flex items-center gap-1.5">
+                  <Key className="w-3.5 h-3.5" /> Sender Password / App Key
+                </label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="e.g. xxxx xxxx xxxx xxxx"
+                    value={senderPassword}
+                    onChange={(e) => setSenderPassword(e.target.value)}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10"
+                  />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
@@ -200,10 +225,9 @@ export const EmailConfig: React.FC = () => {
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
-                )}
+                </div>
               </div>
-              {isDemoUser && <p className="text-[10px] text-red-500 font-bold">Hidden for Demo User.</p>}
-            </div>
+            )}
           </div>
 
           {/* Recipient Email */}
@@ -220,6 +244,23 @@ export const EmailConfig: React.FC = () => {
             />
             <p className="text-[10px] text-slate-400 font-medium">
               This is the target inbox where daily reports and system alerts are sent. Separate multiple emails with a comma.
+            </p>
+          </div>
+
+          {/* Trigger Interval (Minutes) */}
+          <div className="space-y-1">
+            <label className="text-xs font-black text-slate-500 uppercase flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5" /> Trigger Interval (Minutes)
+            </label>
+            <input
+              type="number"
+              placeholder="e.g. 0 for EOD, 120 for every 2 hours"
+              value={triggerIntervalMinutes}
+              onChange={(e) => setTriggerIntervalMinutes(Math.max(0, Number(e.target.value)))}
+              className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+            <p className="text-[10px] text-slate-400 font-medium">
+              Set to 0 to only trigger once at End-Of-Day (11:59 PM IST). Set to a value greater than 0 (e.g., 120) to automatically trigger report emails at that interval in minutes.
             </p>
           </div>
 
@@ -242,28 +283,47 @@ export const EmailConfig: React.FC = () => {
           </div>
 
           {/* Action buttons */}
-          <div className="flex justify-between items-center pt-4 border-t border-slate-100">
-            {/* Test Email */}
-            <button
-              onClick={handleTestEmail}
-              disabled={testing || saving}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 font-bold rounded-xl text-sm flex items-center transition"
-            >
-              {testing ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" /> Sending Test...
-                </>
-              ) : (
-                <>
-                  <Send className="w-4 h-4 mr-1.5" /> Test Configuration
-                </>
-              )}
-            </button>
+          <div className="flex flex-wrap gap-3 justify-between items-center pt-4 border-t border-slate-100">
+            <div className="flex flex-wrap gap-3">
+              {/* Test Email */}
+              <button
+                onClick={handleTestEmail}
+                disabled={testing || saving || triggeringSales}
+                className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 disabled:opacity-50 text-slate-700 font-bold rounded-xl text-sm flex items-center transition"
+              >
+                {testing ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" /> Sending Test...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-1.5" /> Test Configuration
+                  </>
+                )}
+              </button>
+
+              {/* Trigger Today's Sales */}
+              <button
+                onClick={handleTriggerSales}
+                disabled={testing || saving || triggeringSales}
+                className="px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-250 disabled:opacity-50 text-emerald-700 font-bold rounded-xl text-sm flex items-center transition"
+              >
+                {triggeringSales ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-1.5 animate-spin" /> Triggering...
+                  </>
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-1.5 text-emerald-600" /> Trigger Today's Sales
+                  </>
+                )}
+              </button>
+            </div>
 
             {/* Save Settings */}
             <button
               onClick={handleSave}
-              disabled={saving || testing}
+              disabled={saving || testing || triggeringSales}
               className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-bold rounded-xl text-sm flex items-center shadow-md transition"
             >
               {saving ? (

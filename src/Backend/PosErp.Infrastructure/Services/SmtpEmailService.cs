@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using PosErp.Application.Interfaces;
+using PosErp.Application.Features.Inventory.Services;
 using System;
 using System.Net;
 using System.Net.Mail;
@@ -10,17 +11,19 @@ namespace PosErp.Infrastructure.Services;
 public class SmtpEmailService : IEmailService
 {
     private readonly IConfiguration _configuration;
+    private readonly IEmailSettingsManager _emailSettingsManager;
 
-    public SmtpEmailService(IConfiguration configuration)
+    public SmtpEmailService(IConfiguration configuration, IEmailSettingsManager emailSettingsManager)
     {
         _configuration = configuration;
+        _emailSettingsManager = emailSettingsManager;
     }
 
     public async Task SendEmailAsync(string to, string subject, string htmlBody)
     {
         try
         {
-            var savedSettings = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
+            var savedSettings = _emailSettingsManager.GetSettings();
 
             var smtpServer = !string.IsNullOrWhiteSpace(savedSettings.SmtpServer)
                 ? savedSettings.SmtpServer

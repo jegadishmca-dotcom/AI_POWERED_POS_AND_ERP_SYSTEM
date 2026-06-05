@@ -106,6 +106,7 @@ builder.Services.AddScoped<ICustomerTierService, CustomerTierService>();
 builder.Services.AddScoped<IFinancialPostingService, FinancialPostingService>();
 builder.Services.AddScoped<IFinancialReportingService, FinancialReportingService>();
 builder.Services.AddScoped<IEInvoiceService, EInvoiceService>();
+builder.Services.AddScoped<IEmailSettingsManager, EmailSettingsManager>();
 
 // Register Materialized View Periodic Refresher
 builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.StockPositionRefreshService>();

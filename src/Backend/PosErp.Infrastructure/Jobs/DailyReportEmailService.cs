@@ -23,6 +23,8 @@ public class DailyReportEmailService : BackgroundService
         _configuration = configuration;
     }
 
+    private DateTime _lastSentUtc = DateTime.MinValue;
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         Console.WriteLine("[DailyReportEmailService] Background worker started.");
@@ -31,38 +33,58 @@ public class DailyReportEmailService : BackgroundService
         {
             try
             {
-                // Calculate delay until 11:59 PM India Standard Time (UTC+5.30)
-                var nowIst = DateTime.UtcNow.AddHours(5.5);
-                var targetTimeIst = nowIst.Date.AddHours(23).AddMinutes(59).AddSeconds(0);
-
-                if (nowIst >= targetTimeIst)
+                using (var scope = _scopeFactory.CreateScope())
                 {
-                    // Target has already passed for today, schedule for tomorrow
-                    targetTimeIst = targetTimeIst.AddDays(1);
+                    var settingsManager = scope.ServiceProvider.GetRequiredService<PosErp.Application.Features.Inventory.Services.IEmailSettingsManager>();
+                    var settings = settingsManager.GetSettings();
+
+                    var nowUtc = DateTime.UtcNow;
+                    var nowIst = nowUtc.AddHours(5.5);
+
+                    bool shouldTrigger = false;
+
+                    if (settings.TriggerIntervalMinutes > 0)
+                    {
+                        var elapsed = nowUtc - _lastSentUtc;
+                        if (_lastSentUtc == DateTime.MinValue)
+                        {
+                            // Initialize on start so we don't trigger immediately
+                            _lastSentUtc = nowUtc;
+                            Console.WriteLine($"[DailyReportEmailService] Interval timer initialized. Will trigger in {settings.TriggerIntervalMinutes} minutes.");
+                        }
+                        else if (elapsed >= TimeSpan.FromMinutes(settings.TriggerIntervalMinutes))
+                        {
+                            shouldTrigger = true;
+                        }
+                    }
+                    else
+                    {
+                        var targetTimeIst = nowIst.Date.AddHours(23).AddMinutes(59).AddSeconds(0);
+                        if (nowIst >= targetTimeIst && _lastSentUtc.AddHours(5.5).Date < nowIst.Date)
+                        {
+                            shouldTrigger = true;
+                        }
+                    }
+
+                    if (shouldTrigger)
+                    {
+                        _lastSentUtc = nowUtc;
+                        Console.WriteLine($"[DailyReportEmailService] Triggering report email at {nowIst:yyyy-MM-dd HH:mm:ss} IST...");
+                        await SendDailyReportAsync(stoppingToken);
+                    }
                 }
-
-                var delay = targetTimeIst - nowIst;
-                Console.WriteLine($"[DailyReportEmailService] Next daily report email scheduled for {targetTimeIst} IST (Delay: {delay.TotalHours:F2} hours)");
-
-                await Task.Delay(delay, stoppingToken);
-
-                // Run report generation and email sending
-                await SendDailyReportAsync(stoppingToken);
-
-                // Wait 2 minutes to prevent double execution in the same minute
-                await Task.Delay(TimeSpan.FromMinutes(2), stoppingToken);
             }
             catch (TaskCanceledException)
             {
-                // Background service is stopping
                 break;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"[DailyReportEmailService] [ERROR] Background worker loop encountered exception: {ex.Message}");
-                // Wait 5 minutes before retrying to prevent hot looping on persistent errors
-                await Task.Delay(TimeSpan.FromMinutes(5), stoppingToken);
             }
+
+            // Check every 10 seconds (responsive to settings changes)
+            await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
         }
     }
 
@@ -71,8 +93,9 @@ public class DailyReportEmailService : BackgroundService
         using var scope = _scopeFactory.CreateScope();
         var context = scope.ServiceProvider.GetRequiredService<IApplicationDbContext>();
         var emailService = scope.ServiceProvider.GetRequiredService<IEmailService>();
+        var settingsManager = scope.ServiceProvider.GetRequiredService<PosErp.Application.Features.Inventory.Services.IEmailSettingsManager>();
 
-        var savedSettings = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
+        var savedSettings = settingsManager.GetSettings();
         var recipientEmail = !string.IsNullOrWhiteSpace(savedSettings.RecipientEmail)
             ? savedSettings.RecipientEmail
             : (_configuration["EmailSettings:RecipientEmail"] ?? "jegadishmca@gmail.com");

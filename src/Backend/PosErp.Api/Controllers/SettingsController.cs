@@ -18,15 +18,18 @@ public class SettingsController : ControllerBase
     private readonly IApplicationDbContext _context;
     private readonly IPasswordHasher _passwordHasher;
     private readonly PosErp.Application.Features.Audit.Services.IAuditLoggingService _auditLoggingService;
+    private readonly PosErp.Application.Features.Inventory.Services.IEmailSettingsManager _emailSettingsManager;
 
     public SettingsController(
         IApplicationDbContext context, 
         IPasswordHasher passwordHasher,
-        PosErp.Application.Features.Audit.Services.IAuditLoggingService auditLoggingService)
+        PosErp.Application.Features.Audit.Services.IAuditLoggingService auditLoggingService,
+        PosErp.Application.Features.Inventory.Services.IEmailSettingsManager emailSettingsManager)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _auditLoggingService = auditLoggingService;
+        _emailSettingsManager = emailSettingsManager;
     }
 
     // ── User Management Endpoints ─────────────────────────────────────────────
@@ -295,21 +298,22 @@ public class SettingsController : ControllerBase
     [HttpGet("email")]
     public IActionResult GetEmailSettings()
     {
-        var settings = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
+        var settings = _emailSettingsManager.GetSettings();
         
         var currentUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
-        var isDemoUser = string.Equals(currentUsername, "demo@supermarket.com", StringComparison.OrdinalIgnoreCase);
+        var isSuperAdmin = string.Equals(currentUsername, "admin@supermarket.local", StringComparison.OrdinalIgnoreCase);
 
         var displaySettings = new 
         {
             settings.SmtpServer,
             settings.SmtpPort,
             settings.SenderEmail,
-            SenderPassword = isDemoUser 
-                ? (string.IsNullOrEmpty(settings.SenderPassword) ? "" : "••••••••") 
-                : settings.SenderPassword,
+            SenderPassword = isSuperAdmin 
+                ? settings.SenderPassword 
+                : (string.IsNullOrEmpty(settings.SenderPassword) ? "" : "••••••••"),
             settings.RecipientEmail,
-            settings.EnableSsl
+            settings.EnableSsl,
+            settings.TriggerIntervalMinutes
         };
         return Ok(displaySettings);
     }
@@ -322,30 +326,34 @@ public class SettingsController : ControllerBase
             return BadRequest("Settings payload is empty.");
         }
 
-        var oldSettings = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
+        var oldSettings = _emailSettingsManager.GetSettings();
 
         var currentUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
-        var isDemoUser = string.Equals(currentUsername, "demo@supermarket.com", StringComparison.OrdinalIgnoreCase);
+        var isSuperAdmin = string.Equals(currentUsername, "admin@supermarket.local", StringComparison.OrdinalIgnoreCase);
 
-        if (settings.SenderPassword == "••••••••")
+        if (!isSuperAdmin)
         {
+            // Non-superadmins cannot modify the password or sender email
             settings.SenderPassword = oldSettings.SenderPassword;
-        }
-
-        if (isDemoUser)
-        {
             settings.SenderEmail = oldSettings.SenderEmail;
         }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(settings.SenderPassword) || settings.SenderPassword == "••••••••")
+            {
+                settings.SenderPassword = oldSettings.SenderPassword;
+            }
+        }
 
-        PosErp.Application.Features.Inventory.Services.EmailSettingsManager.SaveSettings(settings);
+        _emailSettingsManager.SaveSettings(settings);
 
         // Get user details for auditing
         var userIdClaim = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
         Guid? userId = Guid.TryParse(userIdClaim, out var guid) ? guid : null;
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
-        var oldSettingsMasked = new { oldSettings.SmtpServer, oldSettings.SmtpPort, oldSettings.SenderEmail, oldSettings.RecipientEmail, oldSettings.EnableSsl };
-        var newSettingsMasked = new { settings.SmtpServer, settings.SmtpPort, settings.SenderEmail, settings.RecipientEmail, settings.EnableSsl };
+        var oldSettingsMasked = new { oldSettings.SmtpServer, oldSettings.SmtpPort, oldSettings.SenderEmail, oldSettings.RecipientEmail, oldSettings.EnableSsl, oldSettings.TriggerIntervalMinutes };
+        var newSettingsMasked = new { settings.SmtpServer, settings.SmtpPort, settings.SenderEmail, settings.RecipientEmail, settings.EnableSsl, settings.TriggerIntervalMinutes };
 
         await _auditLoggingService.LogActionAsync(
             userId,
@@ -368,10 +376,29 @@ public class SettingsController : ControllerBase
             return BadRequest("Settings payload is empty.");
         }
 
-        if (settings.SenderPassword == "••••••••")
+        var oldSettings = _emailSettingsManager.GetSettings();
+
+        var currentUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+        var isSuperAdmin = string.Equals(currentUsername, "admin@supermarket.local", StringComparison.OrdinalIgnoreCase);
+
+        if (!isSuperAdmin)
         {
-            var existing = PosErp.Application.Features.Inventory.Services.EmailSettingsManager.GetSettings();
-            settings.SenderPassword = existing.SenderPassword;
+            // If the requester is not admin@supermarket.local, enforce original credentials
+            settings.SenderPassword = oldSettings.SenderPassword;
+            settings.SenderEmail = oldSettings.SenderEmail;
+        }
+        else
+        {
+            if (string.IsNullOrWhiteSpace(settings.SenderPassword) || settings.SenderPassword == "••••••••")
+            {
+                settings.SenderPassword = oldSettings.SenderPassword;
+            }
+        }
+
+        // Make sure we fallback to saved email if it's sent empty
+        if (string.IsNullOrWhiteSpace(settings.SenderEmail))
+        {
+            settings.SenderEmail = oldSettings.SenderEmail;
         }
 
         try

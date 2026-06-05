@@ -272,6 +272,7 @@ export const PosTerminal = () => {
       }
     } finally {
       isVoiceSearchingRef.current = false;
+      productInputRef.current?.focus();
     }
   };
 

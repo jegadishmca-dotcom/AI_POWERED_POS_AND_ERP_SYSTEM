@@ -239,7 +239,7 @@ export const StockPositionReport = () => {
                     <span className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded">{item.categoryName || 'General'}</span>
                   </td>
                   <td className="p-4 text-right font-black text-md text-slate-800 dark:text-white border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
-                    <span className={item.currentStock < 10 ? 'text-red-650 bg-red-50 dark:bg-red-955 px-2 py-0.5 rounded' : ''}>
+                    <span className={item.currentStock < 10 ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 px-2 py-0.5 rounded border border-red-200 dark:border-red-900/50' : ''}>
                       {item.currentStock}
                     </span>
                   </td>

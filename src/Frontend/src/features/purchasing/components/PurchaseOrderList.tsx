@@ -134,8 +134,8 @@ export const PurchaseOrderList: React.FC<PurchaseOrderListProps> = ({ onAddNew, 
                       po.status === 'APPROVED' 
                         ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300' 
                         : po.status === 'DRAFT' 
-                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-955 dark:text-amber-300' 
-                        : 'bg-blue-100 text-blue-800 dark:bg-blue-955 dark:text-blue-300'
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' 
+                        : 'bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300'
                     }`}>
                       {po.status.replace('_', ' ')}
                     </span>

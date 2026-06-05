@@ -577,8 +577,10 @@ export const StockAdjustmentForm = () => {
                       <input 
                         type="number"
                         placeholder="-1"
-                        className={`w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-center font-black text-sm outline-none focus:ring-2 focus:ring-indigo-500 ${
-                          item.adjustedQuantity < 0 ? 'text-red-600 bg-red-50/50 dark:bg-red-955/20 focus:border-red-500' : 'text-green-600 bg-green-50/50 dark:bg-green-955/20 focus:border-green-500'
+                        className={`w-full p-2 border rounded-lg text-center font-black text-sm outline-none focus:ring-2 focus:ring-indigo-500 ${
+                          item.adjustedQuantity < 0 
+                            ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/50 focus:border-red-500' 
+                            : 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-900/50 focus:border-green-500'
                         }`}
                         value={item.adjustedQuantity}
                         onChange={(e) => {

@@ -354,7 +354,7 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
                   <td className="p-3 text-center border-b-2 border-blue-200 dark:border-blue-800/80">
                     <button 
                       onClick={() => handleRemoveItem(idx)} 
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-955/20 rounded-lg transition-colors"
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors"
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>

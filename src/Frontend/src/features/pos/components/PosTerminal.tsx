@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert, Printer, Clock, Maximize, Minimize } from 'lucide-react';
+import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert, Printer, Clock, Maximize, Minimize, Mic, MicOff } from 'lucide-react';
 import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistrationModal';
 import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
@@ -9,6 +9,7 @@ import { printReceipt } from '../utils/printReceipt';
 import { printZReport } from '../utils/printZReport';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { usePosKeyboardShortcuts } from '../hooks/usePosKeyboardShortcuts';
+import { useVoiceBilling } from '../hooks/useVoiceBilling';
 import { HoldResumeModal } from './modals/HoldResumeModal';
 import { ManagerPinModal } from './modals/ManagerPinModal';
 import { ReprintModal } from './modals/ReprintModal';
@@ -159,6 +160,147 @@ export const PosTerminal = () => {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [showProductDropdown, setShowProductDropdown] = useState(false);
   const [focusedProductIndex, setFocusedProductIndex] = useState(-1);
+
+  // Voice Billing States
+  const [voiceLanguage, setVoiceLanguage] = useState<'en-IN' | 'ta-IN'>(() => {
+    return (localStorage.getItem('pos_voice_language') as 'en-IN' | 'ta-IN') || 'en-IN';
+  });
+  const [voiceQuantity, setVoiceQuantity] = useState<number | null>(null);
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+  const [voiceStatusType, setVoiceStatusType] = useState<'success' | 'error' | 'info' | 'listening'>('info');
+
+  const handleVoiceLanguageToggle = () => {
+    const nextLang = voiceLanguage === 'en-IN' ? 'ta-IN' : 'en-IN';
+    setVoiceLanguage(nextLang);
+    localStorage.setItem('pos_voice_language', nextLang);
+    setVoiceStatus(nextLang === 'ta-IN' ? 'மொழி மாற்றப்பட்டது: தமிழ்' : 'Language changed: English (India)');
+    setVoiceStatusType('info');
+  };
+
+  const handleVoiceCommand = async (result: any) => {
+    setProductQuery(result.rawText);
+
+    if (result.isQuantityOnly) {
+      if (cart.items.length > 0) {
+        const lastItem = cart.items[cart.items.length - 1];
+        updateItemQtyExact(lastItem.productId, result.quantity);
+        setVoiceStatus(voiceLanguage === 'ta-IN'
+          ? `அளவு மாற்றப்பட்டது: ${lastItem.name} x${result.quantity}`
+          : `Updated quantity: ${lastItem.name} to ${result.quantity}`
+        );
+        setVoiceStatusType('success');
+        setProductQuery('');
+      } else {
+        setVoiceStatus(voiceLanguage === 'ta-IN'
+          ? 'வண்டியில் பொருட்கள் இல்லை. அளவை மாற்ற முடியாது.'
+          : 'Cart is empty. Cannot change quantity.'
+        );
+        setVoiceStatusType('error');
+      }
+      return;
+    }
+
+    try {
+      setVoiceStatus(voiceLanguage === 'ta-IN' ? 'தேடுகிறது...' : 'Searching catalog...');
+      setVoiceStatusType('info');
+
+      const results = await searchProducts(result.parsedQuery);
+
+      if (results.length === 1) {
+        addProductToCart(results[0], result.quantity);
+        setVoiceStatus(voiceLanguage === 'ta-IN'
+          ? `சேர்க்கப்பட்டது: ${results[0].tamilName || results[0].name} x${result.quantity}`
+          : `Added: ${results[0].name} x${result.quantity}`
+        );
+        setVoiceStatusType('success');
+        setProductQuery('');
+      } else if (results.length > 1) {
+        setSearchResults(results);
+        setShowProductDropdown(true);
+        setFocusedProductIndex(0);
+        setVoiceQuantity(result.quantity);
+        setVoiceStatus(voiceLanguage === 'ta-IN'
+          ? `${results.length} பொருட்கள் கண்டறியப்பட்டன. ஒன்றை தேர்ந்தெடுக்கவும்.`
+          : `Found ${results.length} matches. Please select one.`
+        );
+        setVoiceStatusType('info');
+      } else {
+        if (result.parsedQuery !== result.rawText) {
+          const rawResults = await searchProducts(result.rawText);
+          if (rawResults.length === 1) {
+            addProductToCart(rawResults[0], result.quantity);
+            setVoiceStatus(voiceLanguage === 'ta-IN'
+              ? `சேர்க்கப்பட்டது: ${rawResults[0].tamilName || rawResults[0].name} x${result.quantity}`
+              : `Added: ${rawResults[0].name} x${result.quantity}`
+            );
+            setVoiceStatusType('success');
+            setProductQuery('');
+            return;
+          } else if (rawResults.length > 1) {
+            setSearchResults(rawResults);
+            setShowProductDropdown(true);
+            setFocusedProductIndex(0);
+            setVoiceQuantity(result.quantity);
+            setVoiceStatus(voiceLanguage === 'ta-IN'
+              ? `${rawResults.length} பொருட்கள் கண்டறியப்பட்டன. ஒன்றை தேர்ந்தெடுக்கவும்.`
+              : `Found ${rawResults.length} matches. Please select one.`
+            );
+            setVoiceStatusType('info');
+            return;
+          }
+        }
+
+        setVoiceStatus(voiceLanguage === 'ta-IN'
+          ? `"${result.parsedQuery}" என்ற பெயரில் பொருள் இல்லை`
+          : `No product found matching "${result.parsedQuery}"`
+        );
+        setVoiceStatusType('error');
+      }
+    } catch (err) {
+      console.error('Voice search failed:', err);
+      setVoiceStatus(voiceLanguage === 'ta-IN' ? 'தேடலில் பிழை ஏற்பட்டது.' : 'Voice search error.');
+      setVoiceStatusType('error');
+    }
+  };
+
+  const { isListening, toggleListening } = useVoiceBilling({
+    onVoiceCommand: handleVoiceCommand,
+    language: voiceLanguage
+  });
+
+  useEffect(() => {
+    if (isListening) {
+      setVoiceStatus(voiceLanguage === 'ta-IN' ? 'கேட்டுக்கொண்டிருக்கிறது... பேசவும்.' : 'Listening... Speak now.');
+      setVoiceStatusType('listening');
+    } else {
+      setVoiceStatus(prev => {
+        if (prev === 'Listening... Speak now.' || prev === 'கேட்டுக்கொண்டிருக்கிறது... பேசவும்.') {
+          return null;
+        }
+        return prev;
+      });
+    }
+  }, [isListening, voiceLanguage]);
+
+  useEffect(() => {
+    if (voiceStatus && voiceStatusType !== 'listening') {
+      const timer = setTimeout(() => {
+        setVoiceStatus(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [voiceStatus, voiceStatusType]);
+
+  useEffect(() => {
+    const handleVoiceShortcut = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        toggleListening();
+      }
+    };
+    window.addEventListener('keydown', handleVoiceShortcut);
+    return () => window.removeEventListener('keydown', handleVoiceShortcut);
+  }, [toggleListening]);
 
   // Debounced instant search trigger on text change
   useEffect(() => {
@@ -482,7 +624,8 @@ export const PosTerminal = () => {
 
       // If dropdown is open and an item is focused, select it
       if (showProductDropdown && focusedProductIndex >= 0 && focusedProductIndex < searchResults.length) {
-        addProductToCart(searchResults[focusedProductIndex]);
+        addProductToCart(searchResults[focusedProductIndex], voiceQuantity || undefined);
+        setVoiceQuantity(null);
         setProductQuery('');
         setSearchResults([]);
         setShowProductDropdown(false);
@@ -496,7 +639,8 @@ export const PosTerminal = () => {
       try {
         const results = await searchProducts(val);
         if (results.length === 1) {
-          addProductToCart(results[0]);
+          addProductToCart(results[0], voiceQuantity || undefined);
+          setVoiceQuantity(null);
           setProductQuery('');
           setSearchResults([]);
           setShowProductDropdown(false);
@@ -582,26 +726,68 @@ export const PosTerminal = () => {
 
         {/* Product Search / Barcode Input Bar */}
         <div className="p-4 bg-slate-50 border-b border-slate-200 relative">
-          <div className="relative">
-            <Search className="absolute left-3 top-2.5 text-slate-400 w-5 h-5" />
-            <input 
-              ref={productInputRef}
-              type="text"
-              placeholder="F2: Scan Barcode or Type Product Name (Press Enter)..."
-              className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-850"
-              value={productQuery}
-              onChange={(e) => {
-                const val = e.target.value;
-                setProductQuery(val);
-                if (!val.trim()) {
-                  setSearchResults([]);
-                  setShowProductDropdown(false);
-                  setFocusedProductIndex(-1);
-                }
-              }}
-              onKeyDown={handleProductSearch}
-            />
+          <div className="flex gap-2 items-center">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-2.5 text-slate-400 w-5 h-5" />
+              <input 
+                ref={productInputRef}
+                type="text"
+                placeholder="F2: Scan Barcode or Type Product Name (Press Enter)..."
+                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-850"
+                value={productQuery}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setProductQuery(val);
+                  if (!val.trim()) {
+                    setSearchResults([]);
+                    setShowProductDropdown(false);
+                    setFocusedProductIndex(-1);
+                  }
+                }}
+                onKeyDown={handleProductSearch}
+              />
+            </div>
+            
+            {/* Language Selector Capsule */}
+            <button
+              onClick={handleVoiceLanguageToggle}
+              className="px-3 py-2 border border-slate-300 rounded-lg bg-white text-xs font-black text-slate-700 hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap min-w-[70px]"
+              title="Voice Language (மொழி)"
+            >
+              {voiceLanguage === 'ta-IN' ? 'தமிழ்' : 'English'}
+            </button>
+
+            {/* Mic Toggle Button */}
+            <button
+              onClick={toggleListening}
+              className={`p-2 rounded-lg border transition-all flex items-center justify-center shadow-sm ${
+                isListening 
+                  ? 'bg-red-500 text-white border-red-500 animate-pulse' 
+                  : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+              }`}
+              title="Voice Search (Ctrl + M)"
+            >
+              {isListening ? <Mic className="w-5 h-5 animate-pulse" /> : <MicOff className="w-5 h-5" />}
+            </button>
           </div>
+
+          {/* Voice status banner */}
+          {voiceStatus && (
+            <div className={`mt-2 px-3 py-1.5 rounded-md text-xs font-bold transition-all shadow-sm flex items-center gap-2 ${
+              voiceStatusType === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+              voiceStatusType === 'error' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
+              voiceStatusType === 'listening' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+              'bg-slate-100 text-slate-700 border border-slate-200'
+            }`}>
+              <div className={`w-2 h-2 rounded-full ${
+                voiceStatusType === 'success' ? 'bg-emerald-500' :
+                voiceStatusType === 'error' ? 'bg-rose-500' :
+                voiceStatusType === 'listening' ? 'bg-blue-500 animate-ping' :
+                'bg-slate-500'
+              }`} />
+              <span>{voiceStatus}</span>
+            </div>
+          )}
 
           {/* Search Dropdown Overlay */}
           {showProductDropdown && searchResults.length > 0 && (
@@ -619,7 +805,8 @@ export const PosTerminal = () => {
                   key={p.id}
                   data-idx={idx}
                   onClick={() => {
-                    addProductToCart(p);
+                    addProductToCart(p, voiceQuantity || undefined);
+                    setVoiceQuantity(null);
                     setProductQuery('');
                     setSearchResults([]);
                     setShowProductDropdown(false);

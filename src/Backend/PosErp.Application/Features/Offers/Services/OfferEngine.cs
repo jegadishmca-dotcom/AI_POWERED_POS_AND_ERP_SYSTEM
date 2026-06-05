@@ -138,7 +138,10 @@ public class OfferEngine : IOfferEngine
             }
         }
         bestCart.TaxTotal = actualTax;
-        bestCart.FinalTotal = bestCart.Subtotal - bestCart.TotalDiscount + bestCart.TaxTotal;
+        // FinalTotal = sum of each item's post-discount line total + actual GST
+        // Do NOT use (Subtotal - TotalDiscount) since Subtotal may differ from sum(FinalLineTotal)
+        // when BILL-level discounts are applied. Using sum(FinalLineTotal) is always accurate.
+        bestCart.FinalTotal = bestCart.Items.Sum(i => i.FinalLineTotal) + bestCart.TaxTotal;
 
         return bestCart;
     }
@@ -221,8 +224,10 @@ public class OfferEngine : IOfferEngine
         }
 
         cart.TotalDiscount += cart.Items.Sum(i => i.DiscountAmount);
-        cart.TaxTotal = Math.Round((cart.Subtotal - cart.TotalDiscount) * 0.05m, 2);
-        cart.FinalTotal = cart.Subtotal - cart.TotalDiscount + cart.TaxTotal;
+        // TaxTotal is intentionally left as 0 here; real per-slab tax is recalculated
+        // in EvaluateOffersAsync after the best offer combination is selected.
+        cart.TaxTotal = 0;
+        cart.FinalTotal = cart.Items.Sum(i => i.FinalLineTotal) + cart.TaxTotal;
         return cart;
     }
 }

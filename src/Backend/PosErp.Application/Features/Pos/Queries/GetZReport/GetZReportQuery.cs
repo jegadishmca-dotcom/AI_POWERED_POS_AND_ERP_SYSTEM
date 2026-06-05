@@ -74,7 +74,8 @@ public class GetZReportQueryHandler : IRequestHandler<GetZReportQuery, ZReportDt
             request.TerminalId,
             request.BusinessDate,
             invoices.Count,
-            invoices.Sum(i => i.TotalAmount),
+            // TotalSales = sum of NetPayable (actual amount charged to customer, matches receipt)
+            invoices.Sum(i => i.NetPayable),
             invoices.Sum(i => i.TaxAmount),
             invoices.Sum(i => i.DiscountAmount),
             invoices.Sum(i => i.CashAmount),

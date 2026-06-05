@@ -120,10 +120,14 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 TerminalSequence = nextSeq,
                 CustomerId = customer?.Id,
                 BusinessDate = today,
-                SubTotal = cartEvaluation.Subtotal,
+                // SubTotal = sum of post-discount line totals (what's printed in the item section)
+                SubTotal = cartEvaluation.Items.Sum(i => i.FinalLineTotal),
+                // DiscountAmount = total discount applied (for reporting purposes)
                 DiscountAmount = cartEvaluation.TotalDiscount,
-                TaxAmount = cartEvaluation.TaxTotal,
-                TotalAmount = cartEvaluation.FinalTotal,
+                // TaxAmount will be set after the items loop (sum of per-item CGST + SGST)
+                TaxAmount = 0,
+                // TotalAmount and NetPayable will also be set after items loop
+                TotalAmount = 0,
                 RoundOff = request.RoundOff,
                 NetPayable = request.NetPayable,
                 PaymentMode = request.PaymentMode,
@@ -160,6 +164,15 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                     SgstAmount = sgstAmount
                 });
             }
+
+            // Now that all items are built with their CGST/SGST amounts,
+            // set invoice-level TaxAmount and TotalAmount from actual item sums.
+            // This ensures the stored values match exactly what is printed on the receipt.
+            invoice.TaxAmount = invoice.Items.Sum(i => i.CgstAmount + i.SgstAmount);
+            // TotalAmount = discounted subtotal + actual tax (pre-round-off amount billed)
+            invoice.TotalAmount = invoice.SubTotal + invoice.TaxAmount;
+            // NetPayable (already set from frontend, includes round-off) is the source of truth
+            // but TotalAmount without round-off is used for revenue reporting accuracy.
 
             _context.Invoices.Add(invoice);
             await _context.SaveChangesAsync(cancellationToken); 

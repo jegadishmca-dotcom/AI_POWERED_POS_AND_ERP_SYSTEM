@@ -364,7 +364,8 @@ public class PosController : ControllerBase
 
         var metrics = new {
             TotalInvoices = invoices.Count,
-            TotalSales = invoices.Sum(i => i.TotalAmount),
+            // TotalSales = NetPayable (actual amount billed to customer, matches the receipt)
+            TotalSales = invoices.Sum(i => i.NetPayable),
             TotalTax = invoices.Sum(i => i.TaxAmount),
             TotalDiscount = invoices.Sum(i => i.DiscountAmount),
             CashCollected = invoices.Sum(i => i.CashAmount),

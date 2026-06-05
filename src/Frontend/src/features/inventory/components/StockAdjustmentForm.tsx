@@ -494,37 +494,35 @@ export const StockAdjustmentForm = () => {
                 <PlusCircle className="w-4 h-4 mr-1.5" /> Add Product Row
               </button>
             </div>
-          </div>
-
-          <table className="w-full border-collapse">
-            <thead className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider">
+          </div>          <table className="w-full border-collapse">
+            <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
               <tr>
-                <th className="p-3 border text-left w-5/12">Product Search</th>
-                <th className="p-3 border text-left w-3/12">Select Batch</th>
-                <th className="p-3 border text-center w-1.5/12">Current Stock</th>
-                <th className="p-3 border text-center w-1.5/12">Adjusted Qty (- / +)</th>
-                <th className="p-3 border text-center w-1/12"></th>
+                <th className="p-3 text-left w-5/12">Product Search</th>
+                <th className="p-3 text-left w-3/12">Select Batch</th>
+                <th className="p-3 text-center w-1.5/12">Current Stock</th>
+                <th className="p-3 text-center w-1.5/12">Adjusted Qty (- / +)</th>
+                <th className="p-3 text-center w-1/12"></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="bg-white dark:bg-slate-800">
               {formItems.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-400 text-sm">
+                  <td colSpan={5} className="p-8 text-center text-slate-400 text-sm border-b-2 border-blue-200 dark:border-blue-800/80">
                     No rows added yet. Click "Add Product Row" to begin.
                   </td>
                 </tr>
               ) : (
                 formItems.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/20">
+                  <tr key={idx} className="hover:bg-slate-50/20 dark:hover:bg-slate-700/20 transition">
                     
                     {/* Product Search Input */}
-                    <td className="p-3 border relative">
+                    <td className="p-3 relative border-b-2 border-blue-200 dark:border-blue-800/80">
                       <div className="relative">
                         <Search className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
                         <input 
                           type="text" 
                           placeholder="Search product..." 
-                          className="w-full pl-9 pr-4 py-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-semibold"
+                          className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-semibold bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                           value={item.searchQuery}
                           onChange={(e) => handleProductSearch(idx, e.target.value)}
                         />
@@ -532,29 +530,29 @@ export const StockAdjustmentForm = () => {
                       
                       {/* Dropdown search overlay */}
                       {item.searchResults.length > 0 && (
-                        <div className="absolute left-3 right-3 bg-white border border-slate-200 rounded-lg shadow-xl mt-1 z-50 max-h-48 overflow-y-auto">
+                        <div className="absolute left-3 right-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl mt-1 z-50 max-h-48 overflow-y-auto">
                           {item.searchResults.map((p) => (
                             <div 
                               key={p.id}
                               onClick={() => selectProduct(idx, p)}
-                              className="px-4 py-2 cursor-pointer hover:bg-indigo-50 flex justify-between items-center text-xs font-semibold"
+                              className="px-4 py-2 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950 flex justify-between items-center text-xs font-semibold text-slate-800 dark:text-slate-200"
                             >
                               <div>
-                                <p className="font-bold text-slate-800">{p.name}</p>
-                                <p className="text-[10px] text-slate-400">Code: {p.productCode}</p>
+                                <p className="font-bold text-slate-800 dark:text-white">{p.name}</p>
+                                <p className="text-[10px] text-slate-400 dark:text-slate-500">Code: {p.productCode}</p>
                               </div>
-                              <span className="text-indigo-600 font-bold">MRP: ₹{p.sellingPrice.toFixed(2)}</span>
+                              <span className="text-indigo-650 dark:text-indigo-400 font-bold">MRP: ₹{p.sellingPrice.toFixed(2)}</span>
                             </div>
                           ))}
                         </div>
                       )}
                     </td>
-
+ 
                     {/* Batch Selector */}
-                    <td className="p-3 border">
+                    <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
                       {item.batches.length > 0 ? (
                         <select
-                          className="w-full p-2 border rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-700 bg-white"
+                          className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-950"
                           value={item.batchId}
                           onChange={(e) => handleBatchChange(idx, e.target.value)}
                         >
@@ -568,19 +566,19 @@ export const StockAdjustmentForm = () => {
                         <span className="text-xs text-slate-400 font-bold pl-2">No active batches</span>
                       )}
                     </td>
-
+ 
                     {/* Current Stock */}
-                    <td className="p-3 border text-center font-bold text-slate-700 text-sm">
+                    <td className="p-3 text-center font-bold text-slate-750 dark:text-slate-300 text-sm border-b-2 border-blue-200 dark:border-blue-800/80">
                       {item.productId ? item.currentStock : '-'}
                     </td>
-
+ 
                     {/* Delta adjustment quantity */}
-                    <td className="p-3 border">
+                    <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
                       <input 
                         type="number"
                         placeholder="-1"
-                        className={`w-full p-2 border rounded-lg text-center font-black text-sm outline-none focus:ring-2 focus:ring-indigo-500 ${
-                          item.adjustedQuantity < 0 ? 'text-red-600 bg-red-50/50 focus:border-red-500' : 'text-green-600 bg-green-50/50 focus:border-green-500'
+                        className={`w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-center font-black text-sm outline-none focus:ring-2 focus:ring-indigo-500 ${
+                          item.adjustedQuantity < 0 ? 'text-red-600 bg-red-50/50 dark:bg-red-950/20 focus:border-red-500' : 'text-green-600 bg-green-50/50 dark:bg-green-950/20 focus:border-green-500'
                         }`}
                         value={item.adjustedQuantity}
                         onChange={(e) => {
@@ -590,9 +588,9 @@ export const StockAdjustmentForm = () => {
                         }}
                       />
                     </td>
-
+ 
                     {/* Delete Line Row */}
-                    <td className="p-3 border text-center">
+                    <td className="p-3 text-center border-b-2 border-blue-200 dark:border-blue-800/80">
                       <button 
                         onClick={() => handleRemoveRow(idx)}
                         className="text-slate-300 hover:text-red-500 transition"
@@ -600,7 +598,7 @@ export const StockAdjustmentForm = () => {
                         <Trash2 className="w-5 h-5" />
                       </button>
                     </td>
-
+ 
                   </tr>
                 ))
               )}

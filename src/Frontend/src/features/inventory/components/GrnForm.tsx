@@ -225,36 +225,36 @@ export const GrnForm = () => {
       {grnItems.length > 0 && (
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
-            <thead className="bg-slate-100 text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800 text-sm">
               <tr>
-                <th className="p-3 border">Product</th>
-                <th className="p-3 border text-center">Pending Qty</th>
-                <th className="p-3 border bg-blue-50 text-center text-blue-800">Accepted Qty</th>
-                <th className="p-3 border bg-red-50 text-center text-red-800">Rejected Qty</th>
-                <th className="p-3 border w-48">Batch / Expiry</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400">Product</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-center">Pending Qty</th>
+                <th className="p-3 font-semibold text-blue-700 dark:text-blue-300 text-center">Accepted Qty</th>
+                <th className="p-3 font-semibold text-red-700 dark:text-red-300 text-center">Rejected Qty</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 w-48">Batch / Expiry</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="bg-white dark:bg-slate-800">
               {grnItems.map((item, idx) => (
-                <tr key={item.id} className="border-b">
-                  <td className="p-3">
-                    <p className="font-bold">{item.name}</p>
-                    <p className="text-xs text-gray-500">Cost: ₹{item.unitCost.toFixed(2)}</p>
+                <tr key={item.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
+                  <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <p className="font-bold text-slate-800 dark:text-white">{item.name}</p>
+                    <p className="text-xs text-gray-500 dark:text-slate-400">Cost: ₹{item.unitCost.toFixed(2)}</p>
                   </td>
-                  <td className="p-3 text-center text-lg font-bold text-gray-600">{item.pending}</td>
-                  <td className="p-3 bg-blue-50/30">
+                  <td className="p-3 text-center text-lg font-bold text-gray-600 dark:text-slate-300 border-b-2 border-blue-200 dark:border-blue-800/80">{item.pending}</td>
+                  <td className="p-3 bg-blue-50/30 dark:bg-blue-950/20 border-b-2 border-blue-200 dark:border-blue-800/80">
                     <input 
                       type="number" 
-                      className="w-full p-2 border border-blue-200 rounded text-center" 
+                      className="w-full p-2 border border-blue-200 dark:border-blue-900 rounded text-center bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-semibold" 
                       value={item.accepted} 
                       onChange={(e) => handleQuantityChange(idx, 'accepted', parseFloat(e.target.value) || 0)}
                       onFocus={(e) => e.target.select()}
                     />
                   </td>
-                  <td className="p-3 bg-red-50/30">
+                  <td className="p-3 bg-red-50/30 dark:bg-red-950/20 border-b-2 border-blue-200 dark:border-blue-800/80">
                     <input 
                       type="number" 
-                      className="w-full p-2 border border-red-200 rounded text-center mb-1" 
+                      className="w-full p-2 border border-red-200 dark:border-red-900 rounded text-center mb-1 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-semibold" 
                       value={item.rejected} 
                       onChange={(e) => handleQuantityChange(idx, 'rejected', parseFloat(e.target.value) || 0)}
                       onFocus={(e) => e.target.select()}
@@ -263,23 +263,23 @@ export const GrnForm = () => {
                       <input 
                         type="text" 
                         placeholder="Reason" 
-                        className="w-full p-1 text-xs border border-red-200 rounded"
+                        className="w-full p-1 text-xs border border-red-200 dark:border-red-900 rounded bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                         onChange={(e) => handleQuantityChange(idx, 'rejectionReason', e.target.value)}
                       />
                     )}
                   </td>
-                  <td className="p-3">
+                  <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
                     <input 
                       type="text" 
                       placeholder="Batch No (Optional)" 
-                      className="w-full p-2 border rounded text-sm mb-2"
+                      className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded text-sm mb-2 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-semibold"
                       value={item.batch}
                       onChange={(e) => handleQuantityChange(idx, 'batch', e.target.value)}
                     />
                     <div className="flex items-center">
                       <input 
                         type="date" 
-                        className={`w-full p-2 border rounded text-sm ${item.hasExpiry ? 'border-orange-300' : ''}`}
+                        className={`w-full p-2 border rounded text-sm bg-white dark:bg-slate-950 text-slate-900 dark:text-white ${item.hasExpiry ? 'border-orange-300 dark:border-orange-900' : 'border-slate-200 dark:border-slate-700'}`}
                         value={item.expiry}
                         onChange={(e) => handleQuantityChange(idx, 'expiry', e.target.value)}
                       />
@@ -317,24 +317,24 @@ export const GrnForm = () => {
               />
 
               {aiMatches.length > 0 && (
-                <div className="mt-6 border rounded-lg overflow-hidden">
-                  <table className="w-full text-sm text-left">
-                    <thead className="bg-gray-50">
+                <div className="mt-6 border border-slate-200 dark:border-slate-800 rounded-lg overflow-hidden">
+                  <table className="w-full text-sm text-left border-collapse">
+                    <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800">
                       <tr>
-                        <th className="p-2 border-b">Supplier Product</th>
-                        <th className="p-2 border-b">Matched Internal Product</th>
-                        <th className="p-2 border-b">Confidence</th>
+                        <th className="p-2.5 font-semibold text-slate-500 dark:text-slate-400">Supplier Product</th>
+                        <th className="p-2.5 font-semibold text-slate-500 dark:text-slate-400">Matched Internal Product</th>
+                        <th className="p-2.5 font-semibold text-slate-500 dark:text-slate-400">Confidence</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="bg-white dark:bg-slate-800">
                       {aiMatches.map((m, i) => (
-                        <tr key={i} className="border-b">
-                          <td className="p-2 font-medium">{m.supplierProductName}</td>
-                          <td className="p-2 text-indigo-700 font-bold">{m.matchedProductName || 'No match found'}</td>
-                          <td className="p-2">
+                        <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition">
+                          <td className="p-2.5 font-medium text-slate-800 dark:text-white border-b-2 border-blue-200 dark:border-blue-800/80">{m.supplierProductName}</td>
+                          <td className="p-2.5 text-indigo-700 dark:text-indigo-400 font-bold border-b-2 border-blue-200 dark:border-blue-800/80">{m.matchedProductName || 'No match found'}</td>
+                          <td className="p-2.5 border-b-2 border-blue-200 dark:border-blue-800/80">
                             <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                              m.confidence === 'High' ? 'bg-green-100 text-green-800' :
-                              m.confidence === 'Medium' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'
+                              m.confidence === 'High' ? 'bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-300' :
+                              m.confidence === 'Medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-950 dark:text-yellow-300' : 'bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300'
                             }`}>
                               {m.confidence}
                             </span>

@@ -206,53 +206,53 @@ export const StockPositionReport = () => {
       {/* Positions Table */}
       <div className="overflow-x-auto border rounded-xl shadow-sm">
         <table className="w-full text-left border-collapse">
-          <thead className="bg-indigo-50/50 text-indigo-900 text-xs font-bold uppercase tracking-wider">
+          <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             <tr>
-              <th className="p-4 border-b">Product Code</th>
-              <th className="p-4 border-b">Product Name</th>
-              <th className="p-4 border-b">Category</th>
-              <th className="p-4 border-b text-right">Current Stock</th>
-              <th className="p-4 border-b text-right">Last Unit Cost</th>
-              <th className="p-4 border-b text-right">Stock Value</th>
+              <th className="p-4">Product Code</th>
+              <th className="p-4">Product Name</th>
+              <th className="p-4">Category</th>
+              <th className="p-4 text-right">Current Stock</th>
+              <th className="p-4 text-right">Last Unit Cost</th>
+              <th className="p-4 text-right">Stock Value</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody className="bg-white dark:bg-slate-800">
             {loading ? (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-slate-400 font-bold text-sm">
-                  <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-600" />
+                <td colSpan={6} className="p-8 text-center text-slate-400 font-bold text-sm border-b-2 border-blue-200 dark:border-blue-800/80">
+                  <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-650" />
                   Loading inventory position reports...
                 </td>
               </tr>
             ) : stockData.length === 0 ? (
               <tr>
-                <td colSpan={6} className="p-8 text-center text-slate-400 font-bold text-sm">
+                <td colSpan={6} className="p-8 text-center text-slate-400 font-bold text-sm border-b-2 border-blue-200 dark:border-blue-800/80">
                   No stock items match the current filters.
                 </td>
               </tr>
             ) : (
               stockData.map((item) => (
-                <tr key={item.productId} className="border-b hover:bg-slate-50/50 transition">
-                  <td className="p-4 text-xs font-mono text-slate-500">{item.productCode}</td>
-                  <td className="p-4 font-bold text-slate-800">{item.productName}</td>
-                  <td className="p-4 text-sm font-semibold text-slate-500">
-                    <span className="bg-slate-100 px-2 py-0.5 rounded">{item.categoryName || 'General'}</span>
+                <tr key={item.productId} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/50 transition">
+                  <td className="p-4 text-xs font-mono text-slate-500 dark:text-slate-400 border-b-2 border-blue-200 dark:border-blue-800/80">{item.productCode}</td>
+                  <td className="p-4 font-bold text-slate-800 dark:text-white border-b-2 border-blue-200 dark:border-blue-800/80">{item.productName}</td>
+                  <td className="p-4 text-sm font-semibold text-slate-550 dark:text-slate-400 border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <span className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-2 py-0.5 rounded">{item.categoryName || 'General'}</span>
                   </td>
-                  <td className="p-4 text-right font-black text-md text-slate-800">
-                    <span className={item.currentStock < 10 ? 'text-red-600 bg-red-50 px-2 py-0.5 rounded' : ''}>
+                  <td className="p-4 text-right font-black text-md text-slate-800 dark:text-white border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <span className={item.currentStock < 10 ? 'text-red-650 bg-red-50 dark:bg-red-950 px-2 py-0.5 rounded' : ''}>
                       {item.currentStock}
                     </span>
                   </td>
-                  <td className="p-4 text-right font-bold text-slate-600">₹{item.lastUnitCost.toFixed(2)}</td>
-                  <td className="p-4 text-right font-black text-slate-800">₹{item.totalValue.toFixed(2)}</td>
+                  <td className="p-4 text-right font-bold text-slate-600 dark:text-slate-300 border-b-2 border-blue-200 dark:border-blue-800/80">₹{item.lastUnitCost.toFixed(2)}</td>
+                  <td className="p-4 text-right font-black text-slate-800 dark:text-white border-b-2 border-blue-200 dark:border-blue-800/80">₹{item.totalValue.toFixed(2)}</td>
                 </tr>
               ))
             )}
           </tbody>
-          <tfoot className="bg-slate-50/50 font-bold text-slate-700">
+          <tfoot className="bg-slate-50/50 dark:bg-slate-900/50 font-bold text-slate-700 dark:text-slate-300 border-t-2 border-blue-200 dark:border-blue-800">
             <tr>
               <td colSpan={5} className="p-4 text-right text-sm">Total Inventory Valuation:</td>
-              <td className="p-4 text-right text-indigo-700 text-lg font-black">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+              <td className="p-4 text-right text-indigo-700 dark:text-indigo-400 text-lg font-black">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
             </tr>
           </tfoot>
         </table>

@@ -90,47 +90,47 @@ export const SupplierList: React.FC<SupplierListProps> = ({ onEdit, onAddNew }) 
           <div className="p-8 text-center text-gray-500">Loading suppliers...</div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50 text-gray-600 text-sm">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800 text-sm">
                 <tr>
-                  <th className="px-6 py-4 font-semibold">Name</th>
-                  <th className="px-6 py-4 font-semibold">GSTIN</th>
-                  <th className="px-6 py-4 font-semibold">Phone</th>
-                  <th className="px-6 py-4 font-semibold">Payment Terms</th>
-                  <th className="px-6 py-4 font-semibold">Status</th>
-                  <th className="px-6 py-4 font-semibold text-right">Actions</th>
+                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">Name</th>
+                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">GSTIN</th>
+                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">Phone</th>
+                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">Payment Terms</th>
+                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400">Status</th>
+                  <th className="px-6 py-4 font-semibold text-slate-500 dark:text-slate-400 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="bg-white dark:bg-slate-800">
                 {filteredSuppliers.map((supplier) => (
-                  <tr key={supplier.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-medium text-gray-800">{supplier.name}</div>
+                  <tr key={supplier.id} className="hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors">
+                    <td className="px-6 py-4 border-b-2 border-blue-200 dark:border-blue-800/80">
+                      <div className="font-medium text-gray-800 dark:text-white">{supplier.name}</div>
                     </td>
-                    <td className="px-6 py-4 text-gray-600">{supplier.gstin || '-'}</td>
-                    <td className="px-6 py-4 text-gray-600">{supplier.phone}</td>
-                    <td className="px-6 py-4 text-gray-600">{supplier.paymentTerms}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-6 py-4 text-gray-600 dark:text-slate-300 border-b-2 border-blue-200 dark:border-blue-800/80">{supplier.gstin || '-'}</td>
+                    <td className="px-6 py-4 text-gray-600 dark:text-slate-300 border-b-2 border-blue-200 dark:border-blue-800/80">{supplier.phone}</td>
+                    <td className="px-6 py-4 text-gray-600 dark:text-slate-300 border-b-2 border-blue-200 dark:border-blue-800/80">{supplier.paymentTerms}</td>
+                    <td className="px-6 py-4 border-b-2 border-blue-200 dark:border-blue-800/80">
                       <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
                         supplier.isActive 
-                          ? 'bg-green-100 text-green-700' 
-                          : 'bg-red-100 text-red-700'
+                          ? 'bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300' 
+                          : 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
                       }`}>
                         {supplier.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-6 py-4 text-right border-b-2 border-blue-200 dark:border-blue-800/80">
                       <div className="flex justify-end gap-1">
                         <button 
                           onClick={() => onEdit(supplier)}
-                          className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="p-2 text-gray-400 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/20 rounded-lg transition-colors"
                           title="Edit Supplier"
                         >
                           <Edit2 size={18} />
                         </button>
                         <button 
                           onClick={() => handleDelete(supplier.id, supplier.name)}
-                          className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                          className="p-2 text-gray-400 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors"
                           title="Delete Supplier"
                         >
                           <Trash2 size={18} />
@@ -141,7 +141,7 @@ export const SupplierList: React.FC<SupplierListProps> = ({ onEdit, onAddNew }) 
                 ))}
                 {filteredSuppliers.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                    <td colSpan={6} className="px-6 py-8 text-center text-gray-500 dark:text-slate-400 border-b-2 border-blue-200 dark:border-blue-800/80">
                       No suppliers found.
                     </td>
                   </tr>

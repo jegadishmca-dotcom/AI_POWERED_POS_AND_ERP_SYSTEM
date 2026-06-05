@@ -312,49 +312,49 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
           </div>
 
           <table className="w-full text-left border-collapse mb-6">
-            <thead className="bg-slate-100 text-sm">
+            <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800 text-sm">
               <tr>
-                <th className="p-3 border">Product Details</th>
-                <th className="p-3 border text-right w-36">Ordered Quantity</th>
-                <th className="p-3 border text-right w-36">Unit Cost (₹)</th>
-                <th className="p-3 border text-right w-36">Total (₹)</th>
-                <th className="p-3 border text-center w-12"></th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400">Product Details</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right w-36">Ordered Quantity</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right w-36">Unit Cost (₹)</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-right w-36">Total (₹)</th>
+                <th className="p-3 font-semibold text-slate-500 dark:text-slate-400 text-center w-12"></th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="bg-white dark:bg-slate-800">
               {items.map((item, idx) => (
-                <tr key={item.productId} className="border-b hover:bg-slate-50/50">
-                  <td className="p-3">
-                    <div className="font-bold text-slate-800">{item.name}</div>
-                    {item.productCode && <div className="text-xs text-slate-500">Code: {item.productCode}</div>}
+                <tr key={item.productId} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/50 transition">
+                  <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
+                    <div className="font-bold text-slate-800 dark:text-white">{item.name}</div>
+                    {item.productCode && <div className="text-xs text-slate-500 dark:text-slate-400">Code: {item.productCode}</div>}
                   </td>
-                  <td className="p-3">
+                  <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
                     <input 
                       type="number" 
                       min="1"
                       step="any"
-                      className="w-full p-1.5 border rounded text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20" 
+                      className="w-full p-1.5 border border-slate-200 dark:border-slate-700 rounded text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-semibold" 
                       value={item.orderedQty} 
                       onChange={(e) => handleQtyChange(idx, parseFloat(e.target.value) || 0)}
                     />
                   </td>
-                  <td className="p-3">
+                  <td className="p-3 border-b-2 border-blue-200 dark:border-blue-800/80">
                     <input 
                       type="number" 
                       min="0.01"
                       step="any"
-                      className="w-full p-1.5 border rounded text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20" 
+                      className="w-full p-1.5 border border-slate-200 dark:border-slate-700 rounded text-right focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-white dark:bg-slate-950 text-slate-900 dark:text-white font-semibold" 
                       value={item.unitCost} 
                       onChange={(e) => handleCostChange(idx, parseFloat(e.target.value) || 0)}
                     />
                   </td>
-                  <td className="p-3 text-right font-black text-slate-700">
+                  <td className="p-3 text-right font-black text-slate-700 dark:text-slate-200 border-b-2 border-blue-200 dark:border-blue-800/80">
                     ₹{(item.orderedQty * item.unitCost).toFixed(2)}
                   </td>
-                  <td className="p-3 text-center">
+                  <td className="p-3 text-center border-b-2 border-blue-200 dark:border-blue-800/80">
                     <button 
                       onClick={() => handleRemoveItem(idx)} 
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 rounded-lg transition-colors"
                     >
                       <Trash2 className="w-5 h-5" />
                     </button>
@@ -363,7 +363,7 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
               ))}
               {items.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="p-8 text-center text-gray-500">
+                  <td colSpan={5} className="p-8 text-center text-gray-500 dark:text-slate-400 border-b-2 border-blue-200 dark:border-blue-800/80">
                     No items added yet. Search and select a product above to add it.
                   </td>
                 </tr>

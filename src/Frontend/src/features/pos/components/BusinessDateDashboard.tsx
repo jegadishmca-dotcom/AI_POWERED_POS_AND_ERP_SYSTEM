@@ -94,7 +94,6 @@ export const BusinessDateDashboard: React.FC = () => {
   };
 
   const handleCloseDay = async () => {
-    const hasOpenShifts = sessions.some(s => s.status === 'OPEN');
     if (hasOpenShifts) {
       alert('CANNOT PERFORM END-OF-DAY:\nThere are still open cashier shifts. All cashiers must close their shifts before EOD can be run.');
       return;
@@ -122,7 +121,7 @@ export const BusinessDateDashboard: React.FC = () => {
     }
   };
 
-  const hasOpenSessions = sessions.some(s => s.status === 'OPEN');
+  const hasOpenShifts = sessions.some(s => s.status === 'OPEN');
 
   if (loading) {
     return (

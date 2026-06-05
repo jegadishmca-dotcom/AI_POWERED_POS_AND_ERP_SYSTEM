@@ -19,7 +19,8 @@ import {
   Bot,
   TrendingUp,
   TrendingDown,
-  ShieldAlert
+  ShieldAlert,
+  Palette
 } from 'lucide-react';
 import { useAuthStore } from './features/auth/store/auth.store';
 import { Login } from './features/auth/routes/Login';
@@ -49,6 +50,17 @@ const AppLayout: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [sidebarCollapsed, setSidebarCollapsed] = React.useState(false);
+  const [theme, setTheme] = React.useState(() => {
+    return localStorage.getItem('erp_theme') || 'blue';
+  });
+  const [showThemeDropdown, setShowThemeDropdown] = React.useState(false);
+
+  React.useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove('theme-blue', 'theme-green', 'theme-orange', 'theme-purple', 'theme-obsidian');
+    root.classList.add(`theme-${theme}`);
+    localStorage.setItem('erp_theme', theme);
+  }, [theme]);
 
   const handleLogout = () => {
     clearAuth();
@@ -205,6 +217,50 @@ const AppLayout: React.FC = () => {
             <div className="text-right hidden sm:block">
               <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 block">Business Date</span>
               <span className="text-sm font-bold text-slate-800 dark:text-slate-200">{new Date().toLocaleDateString('en-IN', { dateStyle: 'medium' })}</span>
+            </div>
+            <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
+            {/* Theme Selector */}
+            <div className="relative">
+              <button 
+                onClick={() => setShowThemeDropdown(!showThemeDropdown)}
+                className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-500 dark:text-slate-400 transition-colors flex items-center justify-center border border-slate-200 dark:border-slate-700 shadow-sm gap-1.5"
+                title="Change Theme Palette"
+              >
+                <Palette className="w-4 h-4 text-slate-500 dark:text-slate-400" />
+                <span className="text-xs font-bold capitalize hidden md:inline">{theme} Theme</span>
+              </button>
+
+              {showThemeDropdown && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowThemeDropdown(false)} />
+                  <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg py-2 z-50 animate-in fade-in slide-in-from-top-2 duration-150">
+                    <div className="px-3 py-1.5 text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                      Select System Theme
+                    </div>
+                    {[
+                      { id: 'blue', name: 'Classic Royal Blue', colorClass: 'bg-blue-600' },
+                      { id: 'green', name: 'Premium Emerald Mint', colorClass: 'bg-emerald-600' },
+                      { id: 'orange', name: 'Sunset Terracotta', colorClass: 'bg-orange-600' },
+                      { id: 'purple', name: 'Royal Velvet Purple', colorClass: 'bg-purple-600' },
+                      { id: 'obsidian', name: 'Midnight Obsidian', colorClass: 'bg-slate-800' },
+                    ].map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => {
+                          setTheme(t.id);
+                          setShowThemeDropdown(false);
+                        }}
+                        className={`w-full px-4 py-2.5 text-left text-xs font-bold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 flex items-center gap-3 transition-colors ${
+                          theme === t.id ? 'bg-slate-50 dark:bg-slate-700' : ''
+                        }`}
+                      >
+                        <span className={`w-3.5 h-3.5 rounded-full border border-black/10 ${t.colorClass}`} />
+                        {t.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
             <div className="h-8 w-px bg-slate-200 dark:bg-slate-700 hidden sm:block"></div>
             <div className="flex items-center space-x-2 text-slate-700 dark:text-slate-200">

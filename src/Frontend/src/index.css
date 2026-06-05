@@ -2,6 +2,138 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Theme Color variables mapping */
+:root, .theme-blue {
+  --blue-50: #eff6ff;
+  --blue-100: #dbeafe;
+  --blue-200: #bfdbfe;
+  --blue-300: #93c5fd;
+  --blue-400: #60a5fa;
+  --blue-500: #3b82f6;
+  --blue-600: #2563eb;
+  --blue-700: #1d4ed8;
+  --blue-800: #1e40af;
+  --blue-900: #1e3a8a;
+  --blue-955: #172554;
+
+  --indigo-50: #e0e7ff;
+  --indigo-100: #c7d2fe;
+  --indigo-200: #a5b4fc;
+  --indigo-300: #818cf8;
+  --indigo-400: #6366f1;
+  --indigo-500: #6366f1;
+  --indigo-600: #4f46e5;
+  --indigo-700: #4338ca;
+  --indigo-800: #3730a3;
+  --indigo-900: #312e81;
+  --indigo-950: #1e1b4b;
+}
+
+.theme-green {
+  --blue-50: #f0fdf4;
+  --blue-100: #d1fae5;
+  --blue-200: #a7f3d0;
+  --blue-300: #6ee7b7;
+  --blue-400: #34d399;
+  --blue-500: #10b981;
+  --blue-600: #059669;
+  --blue-700: #047857;
+  --blue-800: #065f46;
+  --blue-900: #064e3b;
+  --blue-955: #022c22;
+
+  --indigo-50: #f0fdf4;
+  --indigo-100: #dcfce7;
+  --indigo-200: #bbf7d0;
+  --indigo-300: #86efac;
+  --indigo-400: #4ade80;
+  --indigo-500: #22c55e;
+  --indigo-600: #16a34a;
+  --indigo-700: #15803d;
+  --indigo-800: #166534;
+  --indigo-900: #14532d;
+  --indigo-950: #052e16;
+}
+
+.theme-orange {
+  --blue-50: #fff7ed;
+  --blue-100: #ffedd5;
+  --blue-200: #fed7aa;
+  --blue-300: #fdba74;
+  --blue-400: #fb923c;
+  --blue-500: #f97316;
+  --blue-600: #ea580c;
+  --blue-700: #c2410c;
+  --blue-800: #9a3412;
+  --blue-900: #7c2d12;
+  --blue-955: #431407;
+
+  --indigo-50: #fffbeb;
+  --indigo-100: #fef3c7;
+  --indigo-200: #fde68a;
+  --indigo-300: #fcd34d;
+  --indigo-400: #fbbf24;
+  --indigo-500: #f59e0b;
+  --indigo-600: #d97706;
+  --indigo-700: #b45309;
+  --indigo-800: #92400e;
+  --indigo-900: #78350f;
+  --indigo-950: #451a03;
+}
+
+.theme-purple {
+  --blue-50: #faf5ff;
+  --blue-100: #f3e8ff;
+  --blue-200: #e9d5ff;
+  --blue-300: #d8b4fe;
+  --blue-400: #c084fc;
+  --blue-500: #a855f7;
+  --blue-600: #9333ea;
+  --blue-700: #7e22ce;
+  --blue-800: #6b21a8;
+  --blue-900: #581c87;
+  --blue-955: #3b0764;
+
+  --indigo-50: #f5f3ff;
+  --indigo-100: #ede9fe;
+  --indigo-200: #ddd6fe;
+  --indigo-300: #c4b5fd;
+  --indigo-400: #a78bfa;
+  --indigo-500: #8b5cf6;
+  --indigo-600: #7c3aed;
+  --indigo-700: #6d28d9;
+  --indigo-800: #5b21b6;
+  --indigo-900: #4c1d95;
+  --indigo-950: #2e1065;
+}
+
+.theme-obsidian {
+  --blue-50: #f8fafc;
+  --blue-100: #f1f5f9;
+  --blue-200: #e2e8f0;
+  --blue-300: #cbd5e1;
+  --blue-400: #94a3b8;
+  --blue-500: #64748b;
+  --blue-600: #475569;
+  --blue-700: #334155;
+  --blue-800: #1e293b;
+  --blue-900: #0f172a;
+  --blue-955: #020617;
+
+  --indigo-50: #fafafa;
+  --indigo-100: #f5f5f5;
+  --indigo-200: #e5e5e5;
+  --indigo-300: #d4d4d4;
+  --indigo-400: #a3a3a3;
+  --indigo-500: #737373;
+  --indigo-600: #525252;
+  --indigo-700: #404040;
+  --indigo-800: #262626;
+  --indigo-900: #171717;
+  --indigo-950: #0a0a0a;
+}
+
+
 @media print {
   /* Hide every element on the page */
   body * {

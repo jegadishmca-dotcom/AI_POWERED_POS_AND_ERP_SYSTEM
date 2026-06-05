@@ -9,7 +9,7 @@ import {
   BusinessDateMetricsDto,
   SessionSummaryDto
 } from '../api/pos.api';
-import { useAuthStore } from '@/features/auth/store/auth.store';
+import { useAuthStore } from '../../auth/store/auth.store';
 import { 
   Calendar, 
   Clock, 
@@ -23,7 +23,6 @@ import {
   Wallet,
   Activity,
   User as UserIcon,
-  ShieldCheck,
   CheckCircle,
   RefreshCw,
   Mail
@@ -169,7 +168,7 @@ export const BusinessDateDashboard: React.FC = () => {
             <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-full blur-xl"></div>
             
             <h2 className="text-lg font-bold text-slate-800 dark:text-white mb-4 flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-indigo-600" />
+              <CheckCircle className="w-5 h-5 text-indigo-600" />
               Operational Status
             </h2>
 

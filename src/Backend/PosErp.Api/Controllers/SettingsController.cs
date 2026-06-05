@@ -436,7 +436,8 @@ public class SettingsController : ControllerBase
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { success = false, message = $"SMTP connection test failed: {ex.Message}" });
+            var detail = ex.InnerException != null ? $"{ex.Message} (Inner: {ex.InnerException.Message})" : ex.Message;
+            return StatusCode(500, new { success = false, message = $"SMTP connection test failed: {detail}" });
         }
     }
 }

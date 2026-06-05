@@ -37,6 +37,7 @@ export const PosTerminal = () => {
   const customerInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const isVoiceSearchingRef = useRef(false);
 
   // Shift Management State
   const [activeSession, setActiveSession] = useState<any>(null);
@@ -178,94 +179,99 @@ export const PosTerminal = () => {
   };
 
   const handleVoiceCommand = async (result: any) => {
-    setProductQuery(result.rawText);
-
-    if (result.isQuantityOnly) {
-      if (cart.items.length > 0) {
-        const lastItem = cart.items[cart.items.length - 1];
-        updateItemQtyExact(lastItem.productId, result.quantity);
-        setVoiceStatus(voiceLanguage === 'ta-IN'
-          ? `அளவு மாற்றப்பட்டது: ${lastItem.name} x${result.quantity}`
-          : `Updated quantity: ${lastItem.name} to ${result.quantity}`
-        );
-        setVoiceStatusType('success');
-        setProductQuery('');
-      } else {
-        setVoiceStatus(voiceLanguage === 'ta-IN'
-          ? 'வண்டியில் பொருட்கள் இல்லை. அளவை மாற்ற முடியாது.'
-          : 'Cart is empty. Cannot change quantity.'
-        );
-        setVoiceStatusType('error');
-      }
-      return;
-    }
-
+    isVoiceSearchingRef.current = true;
     try {
-      setVoiceStatus(voiceLanguage === 'ta-IN' ? 'தேடுகிறது...' : 'Searching catalog...');
-      setVoiceStatusType('info');
+      setProductQuery(result.rawText);
 
-      const results = await searchProducts(result.parsedQuery);
-
-      if (results.length === 1) {
-        addProductToCart(results[0], result.quantity);
-        setVoiceStatus(voiceLanguage === 'ta-IN'
-          ? `சேர்க்கப்பட்டது: ${results[0].tamilName || results[0].name} x${result.quantity}`
-          : `Added: ${results[0].name} x${result.quantity}`
-        );
-        setVoiceStatusType('success');
-        setProductQuery('');
-        setSearchResults([]);
-        setShowProductDropdown(false);
-        setFocusedProductIndex(-1);
-      } else if (results.length > 1) {
-        setSearchResults(results);
-        setShowProductDropdown(true);
-        setFocusedProductIndex(0);
-        setVoiceQuantity(result.quantity);
-        setVoiceStatus(voiceLanguage === 'ta-IN'
-          ? `${results.length} பொருட்கள் கண்டறியப்பட்டன. ஒன்றை தேர்ந்தெடுக்கவும்.`
-          : `Found ${results.length} matches. Please select one.`
-        );
-        setVoiceStatusType('info');
-      } else {
-        if (result.parsedQuery !== result.rawText) {
-          const rawResults = await searchProducts(result.rawText);
-          if (rawResults.length === 1) {
-            addProductToCart(rawResults[0], result.quantity);
-            setVoiceStatus(voiceLanguage === 'ta-IN'
-              ? `சேர்க்கப்பட்டது: ${rawResults[0].tamilName || rawResults[0].name} x${result.quantity}`
-              : `Added: ${rawResults[0].name} x${result.quantity}`
-            );
-            setVoiceStatusType('success');
-            setProductQuery('');
-            setSearchResults([]);
-            setShowProductDropdown(false);
-            setFocusedProductIndex(-1);
-            return;
-          } else if (rawResults.length > 1) {
-            setSearchResults(rawResults);
-            setShowProductDropdown(true);
-            setFocusedProductIndex(0);
-            setVoiceQuantity(result.quantity);
-            setVoiceStatus(voiceLanguage === 'ta-IN'
-              ? `${rawResults.length} பொருட்கள் கண்டறியப்பட்டன. ஒன்றை தேர்ந்தெடுக்கவும்.`
-              : `Found ${rawResults.length} matches. Please select one.`
-            );
-            setVoiceStatusType('info');
-            return;
-          }
+      if (result.isQuantityOnly) {
+        if (cart.items.length > 0) {
+          const lastItem = cart.items[cart.items.length - 1];
+          updateItemQtyExact(lastItem.productId, result.quantity);
+          setVoiceStatus(voiceLanguage === 'ta-IN'
+            ? `அளவு மாற்றப்பட்டது: ${lastItem.name} x${result.quantity}`
+            : `Updated quantity: ${lastItem.name} to ${result.quantity}`
+          );
+          setVoiceStatusType('success');
+          setProductQuery('');
+        } else {
+          setVoiceStatus(voiceLanguage === 'ta-IN'
+            ? 'வண்டியில் பொருட்கள் இல்லை. அளவை மாற்ற முடியாது.'
+            : 'Cart is empty. Cannot change quantity.'
+          );
+          setVoiceStatusType('error');
         }
+        return;
+      }
 
-        setVoiceStatus(voiceLanguage === 'ta-IN'
-          ? `"${result.parsedQuery}" என்ற பெயரில் பொருள் இல்லை`
-          : `No product found matching "${result.parsedQuery}"`
-        );
+      try {
+        setVoiceStatus(voiceLanguage === 'ta-IN' ? 'தேடுகிறது...' : 'Searching catalog...');
+        setVoiceStatusType('info');
+
+        const results = await searchProducts(result.parsedQuery);
+
+        if (results.length === 1) {
+          addProductToCart(results[0], result.quantity);
+          setVoiceStatus(voiceLanguage === 'ta-IN'
+            ? `சேர்க்கப்பட்டது: ${results[0].tamilName || results[0].name} x${result.quantity}`
+            : `Added: ${results[0].name} x${result.quantity}`
+          );
+          setVoiceStatusType('success');
+          setProductQuery('');
+          setSearchResults([]);
+          setShowProductDropdown(false);
+          setFocusedProductIndex(-1);
+        } else if (results.length > 1) {
+          setSearchResults(results);
+          setShowProductDropdown(true);
+          setFocusedProductIndex(0);
+          setVoiceQuantity(result.quantity);
+          setVoiceStatus(voiceLanguage === 'ta-IN'
+            ? `${results.length} பொருட்கள் கண்டறியப்பட்டன. ஒன்றை தேர்ந்தெடுக்கவும்.`
+            : `Found ${results.length} matches. Please select one.`
+          );
+          setVoiceStatusType('info');
+        } else {
+          if (result.parsedQuery !== result.rawText) {
+            const rawResults = await searchProducts(result.rawText);
+            if (rawResults.length === 1) {
+              addProductToCart(rawResults[0], result.quantity);
+              setVoiceStatus(voiceLanguage === 'ta-IN'
+                ? `சேர்க்கப்பட்டது: ${rawResults[0].tamilName || rawResults[0].name} x${result.quantity}`
+                : `Added: ${rawResults[0].name} x${result.quantity}`
+              );
+              setVoiceStatusType('success');
+              setProductQuery('');
+              setSearchResults([]);
+              setShowProductDropdown(false);
+              setFocusedProductIndex(-1);
+              return;
+            } else if (rawResults.length > 1) {
+              setSearchResults(rawResults);
+              setShowProductDropdown(true);
+              setFocusedProductIndex(0);
+              setVoiceQuantity(result.quantity);
+              setVoiceStatus(voiceLanguage === 'ta-IN'
+                ? `${rawResults.length} பொருட்கள் கண்டறியப்பட்டன. ஒன்றை தேர்ந்தெடுக்கவும்.`
+                : `Found ${rawResults.length} matches. Please select one.`
+              );
+              setVoiceStatusType('info');
+              return;
+            }
+          }
+
+          setVoiceStatus(voiceLanguage === 'ta-IN'
+            ? `"${result.parsedQuery}" என்ற பெயரில் பொருள் இல்லை`
+            : `No product found matching "${result.parsedQuery}"`
+          );
+          setVoiceStatusType('error');
+        }
+      } catch (err) {
+        console.error('Voice search failed:', err);
+        setVoiceStatus(voiceLanguage === 'ta-IN' ? 'தேடலில் பிழை ஏற்பட்டது.' : 'Voice search error.');
         setVoiceStatusType('error');
       }
-    } catch (err) {
-      console.error('Voice search failed:', err);
-      setVoiceStatus(voiceLanguage === 'ta-IN' ? 'தேடலில் பிழை ஏற்பட்டது.' : 'Voice search error.');
-      setVoiceStatusType('error');
+    } finally {
+      isVoiceSearchingRef.current = false;
     }
   };
 
@@ -317,6 +323,8 @@ export const PosTerminal = () => {
 
   // Debounced instant search trigger on text change
   useEffect(() => {
+    if (isVoiceSearchingRef.current) return;
+
     const val = productQuery.trim();
     if (!val) {
       setSearchResults([]);
@@ -330,9 +338,13 @@ export const PosTerminal = () => {
     // If it's a normal short text query (2 or more characters), search instantly.
     if (val.length < 2) return;
 
+    let active = true;
+
     const delayDebounceFn = setTimeout(async () => {
       try {
         const results = await searchProducts(val);
+        if (!active) return;
+
         if (results.length > 0) {
           setSearchResults(results);
           setShowProductDropdown(true);
@@ -348,7 +360,10 @@ export const PosTerminal = () => {
       }
     }, 200); // 200ms debounce delay for instant responsiveness without performance lag
 
-    return () => clearTimeout(delayDebounceFn);
+    return () => {
+      active = false;
+      clearTimeout(delayDebounceFn);
+    };
   }, [productQuery]);
 
   // Helper: scroll a specific dropdown item into view.

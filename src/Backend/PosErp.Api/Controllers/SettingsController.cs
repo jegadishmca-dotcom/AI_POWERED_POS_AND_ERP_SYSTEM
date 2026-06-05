@@ -19,17 +19,20 @@ public class SettingsController : ControllerBase
     private readonly IPasswordHasher _passwordHasher;
     private readonly PosErp.Application.Features.Audit.Services.IAuditLoggingService _auditLoggingService;
     private readonly PosErp.Application.Features.Inventory.Services.IEmailSettingsManager _emailSettingsManager;
+    private readonly IEmailService _emailService;
 
     public SettingsController(
         IApplicationDbContext context, 
         IPasswordHasher passwordHasher,
         PosErp.Application.Features.Audit.Services.IAuditLoggingService auditLoggingService,
-        PosErp.Application.Features.Inventory.Services.IEmailSettingsManager emailSettingsManager)
+        PosErp.Application.Features.Inventory.Services.IEmailSettingsManager emailSettingsManager,
+        IEmailService emailService)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _auditLoggingService = auditLoggingService;
         _emailSettingsManager = emailSettingsManager;
+        _emailService = emailService;
     }
 
     // ── User Management Endpoints ─────────────────────────────────────────────
@@ -313,7 +316,15 @@ public class SettingsController : ControllerBase
                 : (string.IsNullOrEmpty(settings.SenderPassword) ? "" : "••••••••"),
             settings.RecipientEmail,
             settings.EnableSsl,
-            settings.TriggerIntervalMinutes
+            settings.TriggerIntervalMinutes,
+            settings.DeliveryMethod,
+            settings.MailgunDomain,
+            MailgunApiKey = isSuperAdmin 
+                ? settings.MailgunApiKey 
+                : (string.IsNullOrEmpty(settings.MailgunApiKey) ? "" : "••••••••"),
+            PostmarkToken = isSuperAdmin 
+                ? settings.PostmarkToken 
+                : (string.IsNullOrEmpty(settings.PostmarkToken) ? "" : "••••••••")
         };
         return Ok(displaySettings);
     }
@@ -333,15 +344,26 @@ public class SettingsController : ControllerBase
 
         if (!isSuperAdmin)
         {
-            // Non-superadmins cannot modify the password or sender email
+            // Non-superadmins cannot modify the password or sender email or keys
             settings.SenderPassword = oldSettings.SenderPassword;
             settings.SenderEmail = oldSettings.SenderEmail;
+            settings.MailgunApiKey = oldSettings.MailgunApiKey;
+            settings.MailgunDomain = oldSettings.MailgunDomain;
+            settings.PostmarkToken = oldSettings.PostmarkToken;
         }
         else
         {
             if (string.IsNullOrWhiteSpace(settings.SenderPassword) || settings.SenderPassword == "••••••••")
             {
                 settings.SenderPassword = oldSettings.SenderPassword;
+            }
+            if (string.IsNullOrWhiteSpace(settings.MailgunApiKey) || settings.MailgunApiKey == "••••••••")
+            {
+                settings.MailgunApiKey = oldSettings.MailgunApiKey;
+            }
+            if (string.IsNullOrWhiteSpace(settings.PostmarkToken) || settings.PostmarkToken == "••••••••")
+            {
+                settings.PostmarkToken = oldSettings.PostmarkToken;
             }
         }
 
@@ -352,8 +374,8 @@ public class SettingsController : ControllerBase
         Guid? userId = Guid.TryParse(userIdClaim, out var guid) ? guid : null;
         var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
-        var oldSettingsMasked = new { oldSettings.SmtpServer, oldSettings.SmtpPort, oldSettings.SenderEmail, oldSettings.RecipientEmail, oldSettings.EnableSsl, oldSettings.TriggerIntervalMinutes };
-        var newSettingsMasked = new { settings.SmtpServer, settings.SmtpPort, settings.SenderEmail, settings.RecipientEmail, settings.EnableSsl, settings.TriggerIntervalMinutes };
+        var oldSettingsMasked = new { oldSettings.SmtpServer, oldSettings.SmtpPort, oldSettings.SenderEmail, oldSettings.RecipientEmail, oldSettings.EnableSsl, oldSettings.TriggerIntervalMinutes, oldSettings.DeliveryMethod, oldSettings.MailgunDomain };
+        var newSettingsMasked = new { settings.SmtpServer, settings.SmtpPort, settings.SenderEmail, settings.RecipientEmail, settings.EnableSsl, settings.TriggerIntervalMinutes, settings.DeliveryMethod, settings.MailgunDomain };
 
         await _auditLoggingService.LogActionAsync(
             userId,
@@ -386,12 +408,23 @@ public class SettingsController : ControllerBase
             // If the requester is not admin@supermarket.local, enforce original credentials
             settings.SenderPassword = oldSettings.SenderPassword;
             settings.SenderEmail = oldSettings.SenderEmail;
+            settings.MailgunApiKey = oldSettings.MailgunApiKey;
+            settings.MailgunDomain = oldSettings.MailgunDomain;
+            settings.PostmarkToken = oldSettings.PostmarkToken;
         }
         else
         {
             if (string.IsNullOrWhiteSpace(settings.SenderPassword) || settings.SenderPassword == "••••••••")
             {
                 settings.SenderPassword = oldSettings.SenderPassword;
+            }
+            if (string.IsNullOrWhiteSpace(settings.MailgunApiKey) || settings.MailgunApiKey == "••••••••")
+            {
+                settings.MailgunApiKey = oldSettings.MailgunApiKey;
+            }
+            if (string.IsNullOrWhiteSpace(settings.PostmarkToken) || settings.PostmarkToken == "••••••••")
+            {
+                settings.PostmarkToken = oldSettings.PostmarkToken;
             }
         }
 
@@ -401,43 +434,29 @@ public class SettingsController : ControllerBase
             settings.SenderEmail = oldSettings.SenderEmail;
         }
 
+        // Save current test settings to database so the SendEmailAsync uses it
+        _emailSettingsManager.SaveSettings(settings);
+
         try
         {
-            if (string.IsNullOrWhiteSpace(settings.SenderEmail) || string.IsNullOrWhiteSpace(settings.SenderPassword))
-            {
-                return BadRequest(new { success = false, message = "Sender email and password are required for the test." });
-            }
-
             var to = !string.IsNullOrWhiteSpace(settings.RecipientEmail) ? settings.RecipientEmail : "jegadishmca@gmail.com";
-            var subject = "🍎 Apple Supermarket POS - SMTP Connection Test";
+            var subject = "🍎 Apple Supermarket POS - Connection Test";
             var htmlBody = $@"
                 <div style='font-family: sans-serif; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;'>
-                    <h2 style='color: #4f46e5;'>SMTP Setup Connection Test</h2>
-                    <p>Congratulations! Your SMTP settings configuration is correct.</p>
+                    <h2 style='color: #4f46e5;'>Email Setup Connection Test</h2>
+                    <p>Congratulations! Your email settings configuration is correct.</p>
                     <hr style='border: none; border-top: 1px solid #f3f4f6; margin: 20px 0;' />
                     <p style='font-size: 12px; color: #9ca3af;'>Sent at: {DateTime.UtcNow.AddHours(5.5):dd MMM yyyy HH:mm:ss} IST</p>
                 </div>";
 
-            using var mailMessage = new System.Net.Mail.MailMessage();
-            mailMessage.From = new System.Net.Mail.MailAddress(settings.SenderEmail, "Apple Supermarket ERP");
-            mailMessage.To.Add(to);
-            mailMessage.Subject = subject;
-            mailMessage.Body = htmlBody;
-            mailMessage.IsBodyHtml = true;
-
-            using var smtpClient = new System.Net.Mail.SmtpClient(settings.SmtpServer, settings.SmtpPort);
-            smtpClient.EnableSsl = settings.EnableSsl;
-            smtpClient.UseDefaultCredentials = false;
-            smtpClient.Credentials = new System.Net.NetworkCredential(settings.SenderEmail, settings.SenderPassword);
-
-            await smtpClient.SendMailAsync(mailMessage);
+            await _emailService.SendEmailAsync(to, subject, htmlBody);
 
             return Ok(new { success = true, message = $"Test email sent successfully to {to}" });
         }
         catch (Exception ex)
         {
             var detail = ex.InnerException != null ? $"{ex.Message} (Inner: {ex.InnerException.Message})" : ex.Message;
-            return StatusCode(500, new { success = false, message = $"SMTP connection test failed: {detail}" });
+            return StatusCode(500, new { success = false, message = $"Email connection test failed: {detail}" });
         }
     }
 }

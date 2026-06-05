@@ -17,6 +17,10 @@ public class EmailSettings
     public string RecipientEmail { get; set; } = "jegadishmca@gmail.com";
     public bool EnableSsl { get; set; } = true;
     public int TriggerIntervalMinutes { get; set; } = 0;
+    public string DeliveryMethod { get; set; } = "POSTMARK";
+    public string MailgunDomain { get; set; } = "";
+    public string MailgunApiKey { get; set; } = "";
+    public string PostmarkToken { get; set; } = "";
 }
 
 public interface IEmailSettingsManager
@@ -105,7 +109,7 @@ public class EmailSettingsManager : IEmailSettingsManager
 
             using (var cmd = conn.CreateCommand())
             {
-                cmd.CommandText = "SELECT smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes FROM email_settings WHERE id = 'global'";
+                cmd.CommandText = "SELECT smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes, delivery_method, mailgun_domain, mailgun_api_key, postmark_token FROM email_settings WHERE id = 'global'";
                 using (var reader = cmd.ExecuteReader())
                 {
                     if (reader.Read())
@@ -113,11 +117,21 @@ public class EmailSettingsManager : IEmailSettingsManager
                         settings.SmtpServer = reader.IsDBNull(0) ? "smtp.gmail.com" : reader.GetString(0);
                         settings.SmtpPort = reader.IsDBNull(1) ? 587 : reader.GetInt32(1);
                         settings.SenderEmail = reader.IsDBNull(2) ? "fortabletuse999@gmail.com" : reader.GetString(2);
+                        
                         var encryptedPassword = reader.IsDBNull(3) ? "" : reader.GetString(3);
                         settings.SenderPassword = Decrypt(encryptedPassword);
+                        
                         settings.RecipientEmail = reader.IsDBNull(4) ? "jegadishmca@gmail.com" : reader.GetString(4);
                         settings.EnableSsl = reader.IsDBNull(5) ? true : reader.GetBoolean(5);
                         settings.TriggerIntervalMinutes = reader.IsDBNull(6) ? 0 : reader.GetInt32(6);
+                        settings.DeliveryMethod = reader.IsDBNull(7) ? "POSTMARK" : reader.GetString(7);
+                        settings.MailgunDomain = reader.IsDBNull(8) ? "" : reader.GetString(8);
+                        
+                        var encryptedMgKey = reader.IsDBNull(9) ? "" : reader.GetString(9);
+                        settings.MailgunApiKey = Decrypt(encryptedMgKey);
+                        
+                        var encryptedPmToken = reader.IsDBNull(10) ? "" : reader.GetString(10);
+                        settings.PostmarkToken = Decrypt(encryptedPmToken);
                     }
                 }
             }
@@ -145,8 +159,8 @@ public class EmailSettingsManager : IEmailSettingsManager
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
-                    INSERT INTO email_settings (id, smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes)
-                    VALUES ('global', @smtp_server, @smtp_port, @sender_email, @sender_password, @recipient_email, @enable_ssl, @trigger_interval_minutes)
+                    INSERT INTO email_settings (id, smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes, delivery_method, mailgun_domain, mailgun_api_key, postmark_token)
+                    VALUES ('global', @smtp_server, @smtp_port, @sender_email, @sender_password, @recipient_email, @enable_ssl, @trigger_interval_minutes, @delivery_method, @mailgun_domain, @mailgun_api_key, @postmark_token)
                     ON CONFLICT (id) DO UPDATE SET
                         smtp_server = EXCLUDED.smtp_server,
                         smtp_port = EXCLUDED.smtp_port,
@@ -154,7 +168,11 @@ public class EmailSettingsManager : IEmailSettingsManager
                         sender_password = EXCLUDED.sender_password,
                         recipient_email = EXCLUDED.recipient_email,
                         enable_ssl = EXCLUDED.enable_ssl,
-                        trigger_interval_minutes = EXCLUDED.trigger_interval_minutes;";
+                        trigger_interval_minutes = EXCLUDED.trigger_interval_minutes,
+                        delivery_method = EXCLUDED.delivery_method,
+                        mailgun_domain = EXCLUDED.mailgun_domain,
+                        mailgun_api_key = EXCLUDED.mailgun_api_key,
+                        postmark_token = EXCLUDED.postmark_token;";
 
                 var pSmtpServer = cmd.CreateParameter();
                 pSmtpServer.ParameterName = "@smtp_server";
@@ -190,6 +208,26 @@ public class EmailSettingsManager : IEmailSettingsManager
                 pTriggerIntervalMinutes.ParameterName = "@trigger_interval_minutes";
                 pTriggerIntervalMinutes.Value = settings.TriggerIntervalMinutes;
                 cmd.Parameters.Add(pTriggerIntervalMinutes);
+
+                var pDeliveryMethod = cmd.CreateParameter();
+                pDeliveryMethod.ParameterName = "@delivery_method";
+                pDeliveryMethod.Value = settings.DeliveryMethod ?? "POSTMARK";
+                cmd.Parameters.Add(pDeliveryMethod);
+
+                var pMailgunDomain = cmd.CreateParameter();
+                pMailgunDomain.ParameterName = "@mailgun_domain";
+                pMailgunDomain.Value = settings.MailgunDomain ?? "";
+                cmd.Parameters.Add(pMailgunDomain);
+
+                var pMailgunApiKey = cmd.CreateParameter();
+                pMailgunApiKey.ParameterName = "@mailgun_api_key";
+                pMailgunApiKey.Value = Encrypt(settings.MailgunApiKey);
+                cmd.Parameters.Add(pMailgunApiKey);
+
+                var pPostmarkToken = cmd.CreateParameter();
+                pPostmarkToken.ParameterName = "@postmark_token";
+                pPostmarkToken.Value = Encrypt(settings.PostmarkToken);
+                cmd.Parameters.Add(pPostmarkToken);
 
                 cmd.ExecuteNonQuery();
             }

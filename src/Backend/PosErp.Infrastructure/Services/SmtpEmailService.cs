@@ -40,6 +40,10 @@ public class SmtpEmailService : IEmailService
             {
                 await SendViaMailgunAsync(savedSettings, to, subject, htmlBody);
             }
+            else if (deliveryMethod == "RESEND")
+            {
+                await SendViaResendAsync(savedSettings, to, subject, htmlBody);
+            }
             else
             {
                 await SendViaSmtpAsync(savedSettings, to, subject, htmlBody);
@@ -50,6 +54,40 @@ public class SmtpEmailService : IEmailService
             Console.WriteLine($"[SmtpEmailService] [ERROR] Failed to send email: {ex.Message}");
             throw; // Propagate up to SettingsController connection test so the test error shows in UI
         }
+    }
+
+    private async Task SendViaResendAsync(EmailSettings settings, string to, string subject, string htmlBody)
+    {
+        if (string.IsNullOrWhiteSpace(settings.ResendApiKey))
+        {
+            throw new InvalidOperationException("Resend API Key is not configured.");
+        }
+        if (string.IsNullOrWhiteSpace(settings.SenderEmail))
+        {
+            throw new InvalidOperationException("Sender email account is not configured.");
+        }
+
+        var payload = new
+        {
+            from = settings.SenderEmail,
+            to = to,
+            subject = subject,
+            html = htmlBody
+        };
+
+        var json = JsonSerializer.Serialize(payload);
+        using var request = new HttpRequestMessage(HttpMethod.Post, "https://api.resend.com/emails");
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", settings.ResendApiKey.Trim());
+        request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+
+        var response = await _httpClient.SendAsync(request);
+        if (!response.IsSuccessStatusCode)
+        {
+            var errContent = await response.Content.ReadAsStringAsync();
+            throw new Exception($"Resend HTTP API returned status {response.StatusCode}: {errContent}");
+        }
+        Console.WriteLine($"[SmtpEmailService] Email successfully sent to {to} via Resend HTTP API.");
     }
 
     private async Task SendViaPostmarkAsync(EmailSettings settings, string to, string subject, string htmlBody)

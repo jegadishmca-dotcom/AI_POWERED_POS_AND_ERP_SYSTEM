@@ -324,7 +324,10 @@ public class SettingsController : ControllerBase
                 : (string.IsNullOrEmpty(settings.MailgunApiKey) ? "" : "••••••••"),
             PostmarkToken = isSuperAdmin 
                 ? settings.PostmarkToken 
-                : (string.IsNullOrEmpty(settings.PostmarkToken) ? "" : "••••••••")
+                : (string.IsNullOrEmpty(settings.PostmarkToken) ? "" : "••••••••"),
+            ResendApiKey = isSuperAdmin 
+                ? settings.ResendApiKey 
+                : (string.IsNullOrEmpty(settings.ResendApiKey) ? "" : "••••••••")
         };
         return Ok(displaySettings);
     }
@@ -350,6 +353,7 @@ public class SettingsController : ControllerBase
             settings.MailgunApiKey = oldSettings.MailgunApiKey;
             settings.MailgunDomain = oldSettings.MailgunDomain;
             settings.PostmarkToken = oldSettings.PostmarkToken;
+            settings.ResendApiKey = oldSettings.ResendApiKey;
         }
         else
         {
@@ -364,6 +368,10 @@ public class SettingsController : ControllerBase
             if (string.IsNullOrWhiteSpace(settings.PostmarkToken) || settings.PostmarkToken == "••••••••")
             {
                 settings.PostmarkToken = oldSettings.PostmarkToken;
+            }
+            if (string.IsNullOrWhiteSpace(settings.ResendApiKey) || settings.ResendApiKey == "••••••••")
+            {
+                settings.ResendApiKey = oldSettings.ResendApiKey;
             }
         }
 
@@ -411,6 +419,7 @@ public class SettingsController : ControllerBase
             settings.MailgunApiKey = oldSettings.MailgunApiKey;
             settings.MailgunDomain = oldSettings.MailgunDomain;
             settings.PostmarkToken = oldSettings.PostmarkToken;
+            settings.ResendApiKey = oldSettings.ResendApiKey;
         }
         else
         {
@@ -425,6 +434,10 @@ public class SettingsController : ControllerBase
             if (string.IsNullOrWhiteSpace(settings.PostmarkToken) || settings.PostmarkToken == "••••••••")
             {
                 settings.PostmarkToken = oldSettings.PostmarkToken;
+            }
+            if (string.IsNullOrWhiteSpace(settings.ResendApiKey) || settings.ResendApiKey == "••••••••")
+            {
+                settings.ResendApiKey = oldSettings.ResendApiKey;
             }
         }
 

@@ -19,6 +19,9 @@ export const EmailConfig: React.FC = () => {
   // Postmark Fields
   const [postmarkToken, setPostmarkToken] = useState('');
 
+  // Resend Fields
+  const [resendApiKey, setResendApiKey] = useState('');
+
   // Shared Fields
   const [senderEmail, setSenderEmail] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
@@ -35,6 +38,7 @@ export const EmailConfig: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showMgKey, setShowMgKey] = useState(false);
   const [showPmToken, setShowPmToken] = useState(false);
+  const [showRsKey, setShowRsKey] = useState(false);
 
   const { user } = useAuthStore();
   const isSuperAdmin = user?.username?.toLowerCase() === 'admin@supermarket.local';
@@ -59,6 +63,7 @@ export const EmailConfig: React.FC = () => {
       setMailgunDomain(res.data.mailgunDomain || '');
       setMailgunApiKey(res.data.mailgunApiKey || '');
       setPostmarkToken(res.data.postmarkToken || '');
+      setResendApiKey(res.data.resendApiKey || '');
     } catch (err: any) {
       console.error('Failed to load email configuration settings', err);
       setErrorMsg('Failed to load email settings configuration from server.');
@@ -88,7 +93,8 @@ export const EmailConfig: React.FC = () => {
         triggerIntervalMinutes: Number(triggerIntervalMinutes),
         mailgunDomain,
         mailgunApiKey,
-        postmarkToken
+        postmarkToken,
+        resendApiKey
       };
 
       await api.post('/api/settings/email', payload);
@@ -120,7 +126,8 @@ export const EmailConfig: React.FC = () => {
         triggerIntervalMinutes: Number(triggerIntervalMinutes),
         mailgunDomain,
         mailgunApiKey,
-        postmarkToken
+        postmarkToken,
+        resendApiKey
       };
 
       const res = await api.post('/api/settings/email/test', payload);
@@ -200,12 +207,13 @@ export const EmailConfig: React.FC = () => {
               onChange={(e) => setDeliveryMethod(e.target.value)}
               className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
             >
-              <option value="POSTMARK">Postmark HTTP API (Recommended for Free Render Tier)</option>
+              <option value="POSTMARK">Postmark HTTP API (Requires Work/Custom Domain Email)</option>
+              <option value="RESEND">Resend HTTP API (Recommended: Free & supports Gmail sign-up)</option>
               <option value="MAILGUN">Mailgun HTTP API (Alternative HTTP API)</option>
               <option value="SMTP">SMTP (Standard SMTP Server - Timed out on Free Render Tier)</option>
             </select>
-            <p className="text-[10px] text-slate-400 font-medium">
-              Note: SMTP port 587 is blocked by default on Render's free tier. Use Postmark or Mailgun HTTP APIs to bypass.
+            <p className="text-[10px] text-slate-400 font-medium font-sans">
+              Note: SMTP port 587 is blocked by default on Render's free tier. Use Resend or Postmark HTTP APIs to bypass.
             </p>
           </div>
 
@@ -383,6 +391,53 @@ export const EmailConfig: React.FC = () => {
                   />
                   <p className="text-[10px] text-slate-400">
                     Postmark requires the Sender Email to match a verified single sender signature or domain signature in your Postmark account.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {deliveryMethod === 'RESEND' && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Resend API Key */}
+                {isSuperAdmin && (
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-xs font-black text-slate-500 uppercase flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5" /> Resend API Key
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showRsKey ? 'text' : 'password'}
+                        placeholder="e.g. re_xxxxxxxxxxxx"
+                        value={resendApiKey}
+                        onChange={(e) => setResendApiKey(e.target.value)}
+                        className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRsKey(!showRsKey)}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600"
+                      >
+                        {showRsKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sender Email */}
+                <div className="space-y-1 md:col-span-2">
+                  <label className="text-xs font-black text-slate-500 uppercase">
+                    Sender Email (Use "onboarding@resend.dev" for free tier testing)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="onboarding@resend.dev"
+                    value={senderEmail}
+                    onChange={(e) => setSenderEmail(e.target.value)}
+                    disabled={!isSuperAdmin}
+                    className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:bg-slate-50"
+                  />
+                  <p className="text-[10px] text-slate-400 font-sans">
+                    Resend allows sending from <strong>onboarding@resend.dev</strong> to your own verified login email account. Once you add your custom domain to Resend, you can send from any address.
                   </p>
                 </div>
               </div>

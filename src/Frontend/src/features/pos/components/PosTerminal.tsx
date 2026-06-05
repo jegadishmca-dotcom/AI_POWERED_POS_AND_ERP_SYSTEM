@@ -214,6 +214,9 @@ export const PosTerminal = () => {
         );
         setVoiceStatusType('success');
         setProductQuery('');
+        setSearchResults([]);
+        setShowProductDropdown(false);
+        setFocusedProductIndex(-1);
       } else if (results.length > 1) {
         setSearchResults(results);
         setShowProductDropdown(true);
@@ -235,6 +238,9 @@ export const PosTerminal = () => {
             );
             setVoiceStatusType('success');
             setProductQuery('');
+            setSearchResults([]);
+            setShowProductDropdown(false);
+            setFocusedProductIndex(-1);
             return;
           } else if (rawResults.length > 1) {
             setSearchResults(rawResults);

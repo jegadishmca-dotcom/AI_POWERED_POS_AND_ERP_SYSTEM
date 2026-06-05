@@ -48,11 +48,27 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, L
 
         if (!string.IsNullOrEmpty(q))
         {
-            productsQuery = productsQuery.Where(p => 
-                EF.Functions.ILike(p.Name, $"%{q}%")
-                || EF.Functions.ILike(p.ProductCode, $"%{q}%")
-                || (p.TamilName != null && EF.Functions.ILike(p.TamilName, $"%{q}%"))
-                || p.Barcodes.Any(b => b.BarcodeValue == q));
+            var words = q.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length > 1)
+            {
+                foreach (var word in words)
+                {
+                    var w = word.Trim();
+                    productsQuery = productsQuery.Where(p => 
+                        EF.Functions.ILike(p.Name, $"%{w}%")
+                        || EF.Functions.ILike(p.ProductCode, $"%{w}%")
+                        || (p.TamilName != null && EF.Functions.ILike(p.TamilName, $"%{w}%"))
+                        || p.Barcodes.Any(b => b.BarcodeValue == w));
+                }
+            }
+            else
+            {
+                productsQuery = productsQuery.Where(p => 
+                    EF.Functions.ILike(p.Name, $"%{q}%")
+                    || EF.Functions.ILike(p.ProductCode, $"%{q}%")
+                    || (p.TamilName != null && EF.Functions.ILike(p.TamilName, $"%{q}%"))
+                    || p.Barcodes.Any(b => b.BarcodeValue == q));
+            }
         }
 
         var results = await productsQuery

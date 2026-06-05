@@ -97,7 +97,7 @@ export const useVoiceBilling = ({
     }
 
     const recognition = new SpeechRecognition();
-    recognition.continuous = false;
+    recognition.continuous = true;
     recognition.interimResults = false;
     recognition.lang = language;
     recognition.maxAlternatives = 1;
@@ -130,7 +130,8 @@ export const useVoiceBilling = ({
     };
 
     recognition.onresult = (event: any) => {
-      const resultText = event.results[0][0].transcript;
+      const currentIndex = event.resultIndex;
+      const resultText = event.results[currentIndex][0].transcript;
       if (resultText) {
         const parsed = parseVoiceInput(resultText);
         onVoiceCommandRef.current(parsed);

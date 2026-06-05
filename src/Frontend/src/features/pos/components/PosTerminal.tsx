@@ -305,11 +305,16 @@ export const PosTerminal = () => {
   useEffect(() => {
     if (voiceStatus && voiceStatusType !== 'listening') {
       const timer = setTimeout(() => {
-        setVoiceStatus(null);
+        if (isListening) {
+          setVoiceStatus(voiceLanguage === 'ta-IN' ? 'கேட்டுக்கொண்டிருக்கிறது... பேசவும்.' : 'Listening... Speak now.');
+          setVoiceStatusType('listening');
+        } else {
+          setVoiceStatus(null);
+        }
       }, 3000);
       return () => clearTimeout(timer);
     }
-  }, [voiceStatus, voiceStatusType]);
+  }, [voiceStatus, voiceStatusType, isListening, voiceLanguage]);
 
   useEffect(() => {
     const handleVoiceShortcut = (e: KeyboardEvent) => {

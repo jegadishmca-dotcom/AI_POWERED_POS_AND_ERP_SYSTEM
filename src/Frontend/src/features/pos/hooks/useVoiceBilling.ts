@@ -120,6 +120,8 @@ export const useVoiceBilling = ({
         userMsg = 'No speech detected. Please speak clearly into your mic.';
       } else if (event.error === 'network') {
         userMsg = 'Network error. Speech recognition requires internet connection.';
+      } else if (event.error === 'audio-capture') {
+        userMsg = 'Microphone not detected or in use by another application. Check connection.';
       } else if (event.error === 'aborted') {
         userMsg = 'Voice recognition was stopped.';
       }

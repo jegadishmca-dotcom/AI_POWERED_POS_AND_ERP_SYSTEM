@@ -99,6 +99,7 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
       - Redis__ConnectionString=pos_redis:6379,abortConnect=false
+      - JWT__Secret=UatDeploymentSecretKey_ReplaceInRealProduction_MinLength64Chars1234567890ABCD
       - EmailSettings__SmtpServer=smtp.gmail.com
       - EmailSettings__SmtpPort=587
       - EmailSettings__SenderEmail=fortabletuse999@gmail.com

@@ -108,8 +108,9 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                 _context.Invoices.Add(invoice);
 
                 // Financial Double-Entry Posting for Sync
-                decimal cgst = dto.TaxAmount / 2m;
-                decimal sgst = dto.TaxAmount / 2m;
+                decimal totalCess = dto.Items.Sum(i => i.CessAmount);
+                decimal cgst = Math.Round((dto.TaxAmount - totalCess) / 2m, 2);
+                decimal sgst = dto.TaxAmount - totalCess - cgst;
                 decimal taxableValue = dto.TotalAmount - dto.TaxAmount;
 
                 var journalLines = new List<PosErp.Application.Features.Finance.Services.JournalLineDto>();
@@ -119,14 +120,17 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                     journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = "1100", Description = "Digital Tender", Debit = dto.NetPayable, Credit = 0 });
 
                 journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = "4000", Description = "Sales Revenue", Debit = 0, Credit = taxableValue });
-                if (cgst > 0) journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = "2200", Description = "Output CGST", Debit = 0, Credit = cgst });
-                if (sgst > 0) journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = "2201", Description = "Output SGST", Debit = 0, Credit = sgst });
+                // For double entry posting, we split total tax (including Cess) between CGST/SGST to match system Chart of Accounts
+                decimal ledgerCgst = Math.Round(dto.TaxAmount / 2m, 2);
+                decimal ledgerSgst = dto.TaxAmount - ledgerCgst;
+                if (ledgerCgst > 0) journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = "2200", Description = "Output CGST", Debit = 0, Credit = ledgerCgst });
+                if (ledgerSgst > 0) journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = "2201", Description = "Output SGST", Debit = 0, Credit = ledgerSgst });
 
                 await _financialPostingService.PostJournalEntryAsync(
                     null, dto.BusinessDate.Date, $"Offline POS Invoice {dto.InvoiceNumber}", $"INV-{dto.Id}", journalLines, cancellationToken);
 
                 await _financialPostingService.RecordGstTransactionAsync(
-                    null, "SALE", dto.InvoiceNumber, dto.BusinessDate.Date, taxableValue, cgst, sgst, null, cancellationToken);
+                    null, "SALE", dto.InvoiceNumber, dto.BusinessDate.Date, taxableValue, cgst, sgst, totalCess, null, cancellationToken);
 
                 synced++;
             }

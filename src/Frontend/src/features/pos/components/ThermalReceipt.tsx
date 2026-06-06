@@ -33,18 +33,31 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
     const changeDue     = Math.max(0, totalTendered - netPayable);
 
     // ── Per-slab GST summary ─────────────────────────────────────────────────
-    const taxSlabs: Record<string, { taxable: number; cgst: number; sgst: number }> = {};
+    const taxSlabs: Record<string, { taxable: number; cgst: number; sgst: number; cess: number }> = {};
+    let totalCessAmount = 0;
+    let totalGstAmount = 0;
+    const hasCess = (invoice.items || []).some((item: any) => safe(item.cessRate) > 0 || safe(item.cessAmount) > 0);
     (invoice.items || []).forEach((item: any) => {
       const cgstRate = safe(item.cgstRate);
       const sgstRate = safe(item.sgstRate);
+      const cessRate = safe(item.cessRate);
       const totalRate = cgstRate + sgstRate;
-      if (totalRate === 0) return;
-      const key       = `GST ${totalRate}%`;
       const itemBase  = safe(item.unitPrice) * safe(item.quantity) - safe(item.discountAmount);
-      if (!taxSlabs[key]) taxSlabs[key] = { taxable: 0, cgst: 0, sgst: 0 };
+      
+      const cgstAmt = item.cgstAmount !== undefined ? safe(item.cgstAmount) : itemBase * (cgstRate / 100);
+      const sgstAmt = item.sgstAmount !== undefined ? safe(item.sgstAmount) : itemBase * (sgstRate / 100);
+      const cessAmt = item.cessAmount !== undefined ? safe(item.cessAmount) : itemBase * (cessRate / 100);
+      
+      totalCessAmount += cessAmt;
+      totalGstAmount += cgstAmt + sgstAmt;
+
+      if (totalRate === 0 && cessRate === 0) return;
+      const key       = `GST ${totalRate}%`;
+      if (!taxSlabs[key]) taxSlabs[key] = { taxable: 0, cgst: 0, sgst: 0, cess: 0 };
       taxSlabs[key].taxable += itemBase;
-      taxSlabs[key].cgst    += itemBase * (cgstRate / 100);
-      taxSlabs[key].sgst    += itemBase * (sgstRate / 100);
+      taxSlabs[key].cgst    += cgstAmt;
+      taxSlabs[key].sgst    += sgstAmt;
+      taxSlabs[key].cess    += cessAmt;
     });
 
     // ── Terminal code from localStorage ──────────────────────────────────────
@@ -148,8 +161,13 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
           {safe(invoice.discountAmount) > 0 && (
             <div style={S.row}><span>Discount</span><span>-{fmt(invoice.discountAmount)}</span></div>
           )}
-          {safe(invoice.taxAmount) > 0 && (
+          {totalGstAmount > 0 ? (
+            <div style={S.row}><span>GST (CGST+SGST)</span><span>+{fmt(totalGstAmount)}</span></div>
+          ) : (safe(invoice.taxAmount) > 0 && !totalCessAmount) ? (
             <div style={S.row}><span>GST (CGST+SGST)</span><span>+{fmt(invoice.taxAmount)}</span></div>
+          ) : null}
+          {totalCessAmount > 0 && (
+            <div style={S.row}><span>GST CESS</span><span>+{fmt(totalCessAmount)}</span></div>
           )}
           {roundOffAmt !== 0 && (
             <div style={S.row}><span>Round Off</span><span>{roundOffAmt > 0 ? '+' : ''}{fmt(roundOffAmt)}</span></div>
@@ -187,6 +205,7 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
                 <span style={{ flex: 1, textAlign: 'right' }}>Taxable</span>
                 <span style={{ flex: 1, textAlign: 'right' }}>CGST</span>
                 <span style={{ flex: 1, textAlign: 'right' }}>SGST</span>
+                {hasCess && <span style={{ flex: 1, textAlign: 'right' }}>CESS</span>}
               </div>
               {Object.entries(taxSlabs).map(([key, slab], i) => (
                 <div key={i} style={{ ...S.itemRow, ...S.small }}>
@@ -194,6 +213,7 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
                   <span style={{ flex: 1, textAlign: 'right' }}>{fmt(slab.taxable)}</span>
                   <span style={{ flex: 1, textAlign: 'right' }}>{fmt(slab.cgst)}</span>
                   <span style={{ flex: 1, textAlign: 'right' }}>{fmt(slab.sgst)}</span>
+                  {hasCess && <span style={{ flex: 1, textAlign: 'right' }}>{fmt(slab.cess)}</span>}
                 </div>
               ))}
             </>

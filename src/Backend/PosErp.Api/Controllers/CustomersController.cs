@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using MediatR;
 using System.Threading.Tasks;
 using PosErp.Application.Features.Crm.Commands.RegisterCustomer;
@@ -8,6 +9,7 @@ namespace PosErp.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class CustomersController : ControllerBase
 {
     private readonly IMediator _mediator;

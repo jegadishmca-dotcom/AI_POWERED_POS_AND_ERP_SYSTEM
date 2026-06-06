@@ -81,7 +81,7 @@ public class OfferEngine : IOfferEngine
         // All offers must be configured in the Offers database table.
         // If no offers fire, TotalDiscount remains 0 and no discount is applied.
 
-        // Calculate actual GST based on each product's tax slab
+        // Calculate actual GST based on each product's tax slab (including CGST, SGST, and Cess)
         decimal actualTax = 0;
         var itemProductIds = bestCart.Items.Select(i => i.ProductId).Distinct().ToList();
         var itemsProducts = await _context.Products
@@ -95,7 +95,13 @@ public class OfferEngine : IOfferEngine
             {
                 decimal cgstRate = prod.TaxSlab?.CgstRate ?? 0;
                 decimal sgstRate = prod.TaxSlab?.SgstRate ?? 0;
-                actualTax += Math.Round(item.FinalLineTotal * ((cgstRate + sgstRate) / 100m), 2);
+                decimal cessRate = prod.TaxSlab?.CessRate ?? 0;
+                
+                decimal cgstAmount = Math.Round(item.FinalLineTotal * (cgstRate / 100m), 2);
+                decimal sgstAmount = Math.Round(item.FinalLineTotal * (sgstRate / 100m), 2);
+                decimal cessAmount = Math.Round(item.FinalLineTotal * (cessRate / 100m), 2);
+                
+                actualTax += cgstAmount + sgstAmount + cessAmount;
             }
         }
         bestCart.TaxTotal = actualTax;
@@ -183,7 +189,6 @@ public class OfferEngine : IOfferEngine
                          if (item.FinalLineTotal < 0) item.FinalLineTotal = 0;
                          item.AppliedOfferName = offer.Name;
                      }
-                     cart.TotalDiscount += billDiscount;
                      offerApplied = true;
                  }
             }
@@ -195,7 +200,7 @@ public class OfferEngine : IOfferEngine
             }
         }
 
-        cart.TotalDiscount += cart.Items.Sum(i => i.DiscountAmount);
+        cart.TotalDiscount = cart.Items.Sum(i => i.DiscountAmount);
         // TaxTotal is intentionally left as 0 here; real per-slab tax is recalculated
         // in EvaluateOffersAsync after the best offer combination is selected.
         cart.TaxTotal = 0;

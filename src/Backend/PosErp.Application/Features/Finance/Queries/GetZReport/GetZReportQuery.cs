@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using System;
@@ -23,6 +23,7 @@ public class ZReportDto
     // Detailed GST Breakup for Day Closing
     public decimal TotalCgst { get; set; }
     public decimal TotalSgst { get; set; }
+    public decimal TotalCess { get; set; }
     
     // Tender Breakdown (Ideally this would be tracked explicitly in a tender table, simulating from journals here)
     public decimal CashCollected { get; set; }
@@ -52,7 +53,7 @@ public class GetZReportQueryHandler : IRequestHandler<GetZReportQuery, ZReportDt
             GrossSales = invoices.Sum(i => i.SubTotal),
             TotalDiscounts = invoices.Sum(i => i.TotalDiscount),
             TotalTax = invoices.Sum(i => i.TaxTotal),
-            FinalCollections = invoices.Sum(i => i.TotalAmount),
+            FinalCollections = invoices.Sum(i => i.NetPayable),
             NetSales = invoices.Sum(i => i.SubTotal - i.TotalDiscount)
         };
 
@@ -64,6 +65,7 @@ public class GetZReportQueryHandler : IRequestHandler<GetZReportQuery, ZReportDt
 
         report.TotalCgst = taxRecords.Sum(t => t.CgstAmount);
         report.TotalSgst = taxRecords.Sum(t => t.SgstAmount);
+        report.TotalCess = taxRecords.Sum(t => t.CessAmount);
 
         // 3. To find exact Cash vs Digital collections, we aggregate from the JournalEntryLines connected to these invoices
         // Account 1000 = Cash, 1100 = Digital, 2100 = Wallet

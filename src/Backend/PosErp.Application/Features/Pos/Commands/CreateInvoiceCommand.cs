@@ -146,9 +146,11 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 var product = productsInfo.TryGetValue(item.ProductId, out var p) ? p : null;
                 decimal cgstRate = product?.TaxSlab?.CgstRate ?? 0;
                 decimal sgstRate = product?.TaxSlab?.SgstRate ?? 0;
+                decimal cessRate = product?.TaxSlab?.CessRate ?? 0;
                 // Tax is computed on the post-discount line total (FinalLineTotal)
                 decimal cgstAmount = Math.Round(item.FinalLineTotal * (cgstRate / 100m), 2);
                 decimal sgstAmount = Math.Round(item.FinalLineTotal * (sgstRate / 100m), 2);
+                decimal cessAmount = Math.Round(item.FinalLineTotal * (cessRate / 100m), 2);
                 // H2: Populate Barcode from the product's first barcode entry
                 string? primaryBarcode = product?.Barcodes?.FirstOrDefault()?.BarcodeValue;
 
@@ -168,14 +170,16 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                     CgstRate = cgstRate,
                     CgstAmount = cgstAmount,
                     SgstRate = sgstRate,
-                    SgstAmount = sgstAmount
+                    SgstAmount = sgstAmount,
+                    CessRate = cessRate,
+                    CessAmount = cessAmount
                 });
             }
 
-            // Now that all items are built with their CGST/SGST amounts,
+            // Now that all items are built with their CGST/SGST/Cess amounts,
             // set invoice-level TaxAmount and TotalAmount from actual item sums.
             // This ensures the stored values match exactly what is printed on the receipt.
-            invoice.TaxAmount = invoice.Items.Sum(i => i.CgstAmount + i.SgstAmount);
+            invoice.TaxAmount = invoice.Items.Sum(i => i.CgstAmount + i.SgstAmount + i.CessAmount);
             // TotalAmount = discounted subtotal + actual tax (pre-round-off amount billed)
             invoice.TotalAmount = invoice.SubTotal + invoice.TaxAmount;
             // NetPayable (already set from frontend, includes round-off) is the source of truth
@@ -205,7 +209,13 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                         if (!string.IsNullOrWhiteSpace(request.SupervisorOverridePin))
                         {
                             var usersWithPin = await _context.Users
-                                .Where(u => u.IsActive && !u.IsDeleted && u.PinHash != null)
+                                .Join(_context.Roles,
+                                    u => u.RoleId,
+                                    r => r.Id,
+                                    (u, r) => new { User = u, Role = r })
+                                .Where(x => x.User.IsActive && !x.User.IsDeleted && x.User.PinHash != null &&
+                                    (x.Role.Name == "Admin" || x.Role.Name == "Manager" || x.Role.Name == "Owner"))
+                                .Select(x => x.User)
                                 .ToListAsync(cancellationToken);
 
                             foreach (var user in usersWithPin)
@@ -296,7 +306,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                     batchId: selectedBatchId,
                     movementType: movementTypeVal,
                     quantity: -item.Quantity,
-                    unitCost: item.UnitPrice,
+                    unitCost: pInfo?.PurchasePrice ?? 0m,
                     expiryDate: expiryDate,
                     referenceDocId: invoice.Id,
                     referenceNumber: invoiceRef,
@@ -323,6 +333,11 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             
             // C5: Use invoice-level tax amounts (computed from actual per-item CGST/SGST)
             // NOT stale cartEvaluation values which were pre-fix
+            decimal totalCgst = invoice.Items.Sum(i => i.CgstAmount);
+            decimal totalSgst = invoice.Items.Sum(i => i.SgstAmount);
+            decimal totalCess = invoice.Items.Sum(i => i.CessAmount);
+
+            // For double-entry posting, we split the total tax amount (CGST+SGST+Cess) between CGST/SGST
             decimal cgst = Math.Round(invoice.TaxAmount / 2m, 2);
             decimal sgst = invoice.TaxAmount - cgst; // ensure CGST+SGST = TaxAmount exactly
             decimal taxableValue = invoice.SubTotal; // SubTotal = sum of post-discount item totals (ex-tax)
@@ -348,7 +363,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
             // Post Dedicated Tax Transaction for GSTR Returns
             await _financialPostingService.RecordGstTransactionAsync(
-                null, "SALE", invoice.InvoiceNumber, DateTime.UtcNow, taxableValue, cgst, sgst, null, cancellationToken);
+                null, "SALE", invoice.InvoiceNumber, DateTime.UtcNow, taxableValue, totalCgst, totalSgst, totalCess, null, cancellationToken);
 
             // Flush ALL pending EF changes (loyalty ledger, wallet, financial lines) before committing the transaction
             await _context.SaveChangesAsync(cancellationToken);

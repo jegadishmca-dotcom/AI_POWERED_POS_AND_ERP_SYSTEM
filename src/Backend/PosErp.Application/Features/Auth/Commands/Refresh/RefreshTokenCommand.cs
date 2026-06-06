@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Auth;
@@ -61,7 +61,15 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, R
 
         // Generate new tokens
         var user = await _context.Users.FindAsync(new object[] { existingToken.UserId }, cancellationToken);
-        var accessToken = _jwtGenerator.GenerateToken(user, "UserRolePlaceholder");
+
+        // S4 FIX: Fetch actual role — "UserRolePlaceholder" was a stub that broke all
+        // role-protected endpoints after the first token refresh.
+        var roleName = await _context.Roles
+            .Where(r => r.Id == user!.RoleId)
+            .Select(r => r.Name)
+            .FirstOrDefaultAsync(cancellationToken) ?? "Staff";
+
+        var accessToken = _jwtGenerator.GenerateToken(user!, roleName);
         var newRefreshTokenStr = _jwtGenerator.GenerateRefreshToken();
 
         var newRefreshToken = new RefreshToken

@@ -427,7 +427,7 @@ export const PosTerminal = () => {
     // --- INSTANT OPTIMISTIC LOCAL CALCULATION ---
     let localSubtotal = items.reduce((sum: number, item: any) => sum + (item.qty * item.unitPrice), 0);
     let localTaxTotal = items.reduce((sum: number, item: any) => {
-        const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0);
+        const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0) + (item.cessRate || 0);
         return sum + ((item.qty * item.unitPrice) * (itemTaxRate / 100));
     }, 0);
 
@@ -460,7 +460,8 @@ export const PosTerminal = () => {
             finalLineTotal: calcItem.finalLineTotal,
             appliedOfferName: calcItem.appliedOfferName,
             cgstRate: calcItem.cgstRate,
-            sgstRate: calcItem.sgstRate
+            sgstRate: calcItem.sgstRate,
+            cessRate: calcItem.cessRate
           };
         });
 
@@ -524,6 +525,7 @@ export const PosTerminal = () => {
         appliedOfferName: null,
         cgstRate: product.cgstRate || 0,
         sgstRate: product.sgstRate || 0,
+        cessRate: product.cessRate || 0,
         isWeighable: product.isWeighable || false,
         batches: [],
         batchId: undefined
@@ -1202,6 +1204,7 @@ export const PosTerminal = () => {
                 unitPrice: item.unitPrice,
                 cgstRate: item.cgstRate || 0,
                 sgstRate: item.sgstRate || 0,
+                cessRate: item.cessRate || 0,
                 discountAmount: item.discountAmount || 0,
                 totalAmount: item.finalLineTotal || item.lineTotal,
                 // Add mapping for Sync API expected fields
@@ -1209,8 +1212,7 @@ export const PosTerminal = () => {
                 productName: item.name,
                 cgstAmount: ((item.finalLineTotal || item.lineTotal) * (item.cgstRate || 0)) / 100,
                 sgstAmount: ((item.finalLineTotal || item.lineTotal) * (item.sgstRate || 0)) / 100,
-                cessRate: 0,
-                cessAmount: 0
+                cessAmount: ((item.finalLineTotal || item.lineTotal) * (item.cessRate || 0)) / 100
               }))
             };
 

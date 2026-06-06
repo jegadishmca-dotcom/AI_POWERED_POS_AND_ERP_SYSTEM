@@ -48,7 +48,7 @@ public class InventoryController : ControllerBase
         }
         catch (Exception ex)
         {
-            return BadRequest(new { message = ex.ToString() });
+            return BadRequest(new { message = ex.Message });
         }
     }
 
@@ -58,13 +58,21 @@ public class InventoryController : ControllerBase
     {
         try
         {
-            // For UserId, usually we extract from Claims, here passing null for simplicity as backend supports it
-            var result = await _mediator.Send(new ConfirmGRNCommand(id, null));
+            // M4 FIX: Extract UserId from Claims principal
+            var callerIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? User.FindFirst("sub")?.Value;
+            Guid? callerId = null;
+            if (Guid.TryParse(callerIdStr, out var parsedId))
+            {
+                callerId = parsedId;
+            }
+
+            var result = await _mediator.Send(new ConfirmGRNCommand(id, callerId));
             return Ok(result);
         }
         catch (Exception ex)
         {
-            return BadRequest(new { message = ex.ToString() });
+            return BadRequest(new { message = ex.Message });
         }
     }
 
@@ -234,8 +242,15 @@ public class InventoryController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> ApproveStockAdjustment(Guid id)
     {
-        // For security, can extract User ID from claims if present. For simplicity we support null
-        var result = await _mediator.Send(new ApproveStockAdjustmentCommand(id, null));
+        var callerIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+        Guid? callerId = null;
+        if (Guid.TryParse(callerIdStr, out var parsedId))
+        {
+            callerId = parsedId;
+        }
+
+        var result = await _mediator.Send(new ApproveStockAdjustmentCommand(id, callerId));
         return Ok(result);
     }
 
@@ -243,7 +258,15 @@ public class InventoryController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> RejectStockAdjustment(Guid id)
     {
-        var result = await _mediator.Send(new PosErp.Application.Features.Inventory.Commands.RejectStockAdjustment.RejectStockAdjustmentCommand(id, null));
+        var callerIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+        Guid? callerId = null;
+        if (Guid.TryParse(callerIdStr, out var parsedId))
+        {
+            callerId = parsedId;
+        }
+
+        var result = await _mediator.Send(new PosErp.Application.Features.Inventory.Commands.RejectStockAdjustment.RejectStockAdjustmentCommand(id, callerId));
         return Ok(result);
     }
 
@@ -272,7 +295,15 @@ public class InventoryController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> ApproveStockTake(Guid id)
     {
-        var result = await _mediator.Send(new ApproveStockTakeCommand(id, null));
+        var callerIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+        Guid? callerId = null;
+        if (Guid.TryParse(callerIdStr, out var parsedId))
+        {
+            callerId = parsedId;
+        }
+
+        var result = await _mediator.Send(new ApproveStockTakeCommand(id, callerId));
         return Ok(result);
     }
 
@@ -280,7 +311,15 @@ public class InventoryController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> RejectStockTake(Guid id)
     {
-        var result = await _mediator.Send(new RejectStockTakeCommand(id, null));
+        var callerIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+        Guid? callerId = null;
+        if (Guid.TryParse(callerIdStr, out var parsedId))
+        {
+            callerId = parsedId;
+        }
+
+        var result = await _mediator.Send(new RejectStockTakeCommand(id, callerId));
         return Ok(result);
     }
 

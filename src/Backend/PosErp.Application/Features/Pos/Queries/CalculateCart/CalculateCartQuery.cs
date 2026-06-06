@@ -39,7 +39,9 @@ public record CartItemCalculationResultDto(
     decimal CgstRate,
     decimal CgstAmount,
     decimal SgstRate,
-    decimal SgstAmount
+    decimal SgstAmount,
+    decimal CessRate,
+    decimal CessAmount
 );
 
 public class CalculateCartQueryHandler : IRequestHandler<CalculateCartQuery, CartCalculationResultDto>
@@ -56,8 +58,6 @@ public class CalculateCartQueryHandler : IRequestHandler<CalculateCartQuery, Car
     public async Task<CartCalculationResultDto> Handle(CalculateCartQuery request, CancellationToken cancellationToken)
     {
         var resultItems = new List<CartItemCalculationResultDto>();
-        decimal subTotal = 0;
-        decimal totalTax = 0;
 
         // 1. Fetch Product details (Price, Taxes)
         var productIds = request.Items.Select(i => i.ProductId).Distinct().ToList();
@@ -66,73 +66,66 @@ public class CalculateCartQueryHandler : IRequestHandler<CalculateCartQuery, Car
             .Where(p => productIds.Contains(p.Id))
             .ToDictionaryAsync(p => p.Id, cancellationToken);
 
-        foreach (var item in request.Items)
+        // Fetch Customer for tier info
+        var customer = request.CustomerId.HasValue 
+            ? await _context.Customers.Include(c => c.Tier).FirstOrDefaultAsync(c => c.Id == request.CustomerId.Value, cancellationToken) 
+            : null;
+
+        var cartEvaluation = new PosErp.Application.Features.Offers.Models.CartEvaluationDto
+        {
+            Items = request.Items.Select(i => new PosErp.Application.Features.Offers.Models.CartItemEvaluationDto
+            {
+                ProductId = i.ProductId,
+                CategoryId = products.TryGetValue(i.ProductId, out var pInfo) ? pInfo.CategoryId : null,
+                Quantity = i.Quantity,
+                UnitPrice = products.TryGetValue(i.ProductId, out var pInfo2) ? pInfo2.SellingPrice : 0
+            }).ToList()
+        };
+
+        // 2. Evaluate promotions dynamically
+        cartEvaluation = await _offerEngine.EvaluateOffersAsync(cartEvaluation, customer?.Tier?.Name, request.PromoCode, cancellationToken);
+
+        // 3. Map results and calculate taxes based on post-discount prices
+        foreach (var item in cartEvaluation.Items)
         {
             if (products.TryGetValue(item.ProductId, out var product))
             {
-                var lineTotal = product.SellingPrice * item.Quantity;
-                subTotal += lineTotal;
-                
-                // Calculate tax
                 decimal cgstRate = product.TaxSlab?.CgstRate ?? 0;
                 decimal sgstRate = product.TaxSlab?.SgstRate ?? 0;
+                decimal cessRate = product.TaxSlab?.CessRate ?? 0;
                 
-                decimal cgstAmount = lineTotal * (cgstRate / 100m);
-                decimal sgstAmount = lineTotal * (sgstRate / 100m);
-                totalTax += (cgstAmount + sgstAmount);
+                decimal cgstAmount = Math.Round(item.FinalLineTotal * (cgstRate / 100m), 2);
+                decimal sgstAmount = Math.Round(item.FinalLineTotal * (sgstRate / 100m), 2);
+                decimal cessAmount = Math.Round(item.FinalLineTotal * (cessRate / 100m), 2);
 
                 resultItems.Add(new CartItemCalculationResultDto(
                     ProductId: product.Id,
                     ProductName: product.Name,
                     Quantity: item.Quantity,
                     UnitPrice: product.SellingPrice,
-                    LineTotal: lineTotal,
-                    DiscountAmount: 0, // Will be updated by OfferEngine
-                    FinalLineTotal: lineTotal,
-                    AppliedOfferName: null,
+                    LineTotal: item.LineTotal,
+                    DiscountAmount: item.DiscountAmount,
+                    FinalLineTotal: item.FinalLineTotal,
+                    AppliedOfferName: item.AppliedOfferName,
                     CgstRate: cgstRate,
                     CgstAmount: cgstAmount,
                     SgstRate: sgstRate,
-                    SgstAmount: sgstAmount
+                    SgstAmount: sgstAmount,
+                    CessRate: cessRate,
+                    CessAmount: cessAmount
                 ));
             }
         }
 
-        // 2. Apply Promotions using real OfferEngine
-        // Since OfferEngine takes an Invoice entity, we might need to mock it or use the evaluate method if it supports DTOs.
-        // For now, let's just do a basic global discount if PromoCode is provided and valid.
-        decimal totalDiscount = 0;
-        var appliedOfferNames = new List<string>();
-
-        if (!string.IsNullOrWhiteSpace(request.PromoCode))
-        {
-            var offer = await _context.Offers
-                .FirstOrDefaultAsync(o => o.PromoCode != null && o.PromoCode.ToUpper() == request.PromoCode.ToUpper() && o.IsActive, cancellationToken);
-            
-            if (offer != null)
-            {
-                decimal discountAmt = 0;
-                // Since RulesJson is used, we'll do a simple mock implementation here for the sake of the endpoint
-                // Assuming it's a FLAT 50 off if promo code matched for now until RulesEngine is plugged in
-                discountAmt = 50m;
-
-                if (discountAmt > subTotal) discountAmt = subTotal;
-
-                totalDiscount = discountAmt;
-                appliedOfferNames.Add(offer.Name);
-            }
-        }
-
-        // 3. Pro-rate discount across items (optional, but good for item-level gross)
-        // For simplicity, we just apply it to the final total
-        decimal finalTotal = subTotal - totalDiscount + totalTax;
+        decimal preDiscountSubtotal = cartEvaluation.Items.Sum(i => i.LineTotal);
+        decimal taxTotal = resultItems.Sum(i => i.CgstAmount + i.SgstAmount + i.CessAmount);
 
         return new CartCalculationResultDto(
-            SubTotal: Math.Round(subTotal, 2),
-            TotalDiscount: Math.Round(totalDiscount, 2),
-            TaxTotal: Math.Round(totalTax, 2),
-            FinalTotal: Math.Round(finalTotal, 2),
-            AppliedOfferNames: appliedOfferNames,
+            SubTotal: Math.Round(preDiscountSubtotal, 2),
+            TotalDiscount: Math.Round(cartEvaluation.TotalDiscount, 2),
+            TaxTotal: Math.Round(taxTotal, 2),
+            FinalTotal: Math.Round(cartEvaluation.Items.Sum(i => i.FinalLineTotal) + taxTotal, 2),
+            AppliedOfferNames: cartEvaluation.AppliedOfferNames,
             Items: resultItems
         );
     }

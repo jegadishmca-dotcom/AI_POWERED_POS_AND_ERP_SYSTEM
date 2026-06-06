@@ -1,5 +1,6 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
+using PosErp.Application.Features.Inventory.Services;
 using System;
 using System.Linq;
 using System.Threading.Tasks;
@@ -9,15 +10,19 @@ namespace PosErp.Infrastructure.Jobs;
 public class CheckExpiryJob
 {
     private readonly IApplicationDbContext _context;
+    private readonly IEmailSettingsManager _emailSettingsManager;
 
-    public CheckExpiryJob(IApplicationDbContext context)
+    public CheckExpiryJob(IApplicationDbContext context, IEmailSettingsManager emailSettingsManager)
     {
         _context = context;
+        _emailSettingsManager = emailSettingsManager;
     }
 
     public async Task ExecuteAsync()
     {
-        var thresholdDate = DateTime.UtcNow.AddDays(30);
+        var settings = _emailSettingsManager.GetSettings();
+        int thresholdDays = settings.ExpiryAlertThresholdDays > 0 ? settings.ExpiryAlertThresholdDays : 10;
+        var thresholdDate = DateTime.UtcNow.AddDays(thresholdDays);
 
         var expiringBatches = await _context.ProductBatches
             .Where(b => b.IsActive && b.ExpiryDate != null && b.ExpiryDate <= thresholdDate)

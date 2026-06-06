@@ -50,7 +50,10 @@ function generateReceiptText(invoice: any, terminalCode: string): string {
   sb += "Item                     Qty  Rate   Amt\n";
   sb += "----------------------------------------\n";
 
-  const taxSlabs: Record<string, { taxable: number; cgst: number; sgst: number }> = {};
+  const taxSlabs: Record<string, { taxable: number; cgst: number; sgst: number; cess: number }> = {};
+  let totalCessAmount = 0;
+  let totalGstAmount = 0;
+  const hasCess = (invoice.items || []).some((item: any) => safe(item.cessRate) > 0 || safe(item.cessAmount) > 0);
 
   (invoice.items || []).forEach((item: any) => {
     const qty  = safe(item.quantity, safe(item.qty));
@@ -71,13 +74,23 @@ function generateReceiptText(invoice: any, terminalCode: string): string {
 
     const cgstRate = safe(item.cgstRate);
     const sgstRate = safe(item.sgstRate);
+    const cessRate = safe(item.cessRate);
     const totalRate = cgstRate + sgstRate;
-    if (totalRate > 0) {
+
+    const cgstAmt = item.cgstAmount !== undefined ? safe(item.cgstAmount) : lineAmt * (cgstRate / 100);
+    const sgstAmt = item.sgstAmount !== undefined ? safe(item.sgstAmount) : lineAmt * (sgstRate / 100);
+    const cessAmt = item.cessAmount !== undefined ? safe(item.cessAmount) : lineAmt * (cessRate / 100);
+
+    totalCessAmount += cessAmt;
+    totalGstAmount += cgstAmt + sgstAmt;
+
+    if (totalRate > 0 || cessRate > 0) {
       const key = `GST ${totalRate}%`;
-      if (!taxSlabs[key]) taxSlabs[key] = { taxable: 0, cgst: 0, sgst: 0 };
+      if (!taxSlabs[key]) taxSlabs[key] = { taxable: 0, cgst: 0, sgst: 0, cess: 0 };
       taxSlabs[key].taxable += lineAmt;
-      taxSlabs[key].cgst    += lineAmt * (cgstRate / 100);
-      taxSlabs[key].sgst    += lineAmt * (sgstRate / 100);
+      taxSlabs[key].cgst    += cgstAmt;
+      taxSlabs[key].sgst    += sgstAmt;
+      taxSlabs[key].cess    += cessAmt;
     }
   });
 
@@ -86,8 +99,13 @@ function generateReceiptText(invoice: any, terminalCode: string): string {
   if (safe(invoice.discountAmount) > 0) {
     sb += `Discount:                  -${fmt(invoice.discountAmount).padStart(12, ' ')}\n`;
   }
-  if (safe(invoice.taxAmount) > 0) {
+  if (totalGstAmount > 0) {
+    sb += `GST (CGST+SGST):           +${fmt(totalGstAmount).padStart(12, ' ')}\n`;
+  } else if (safe(invoice.taxAmount) > 0 && !totalCessAmount) {
     sb += `GST (CGST+SGST):           +${fmt(invoice.taxAmount).padStart(12, ' ')}\n`;
+  }
+  if (totalCessAmount > 0) {
+    sb += `GST CESS:                  +${fmt(totalCessAmount).padStart(12, ' ')}\n`;
   }
   if (roundOff !== 0) {
     const sign = roundOff > 0 ? '+' : '';
@@ -105,13 +123,20 @@ function generateReceiptText(invoice: any, terminalCode: string): string {
 
   sb += "----------------------------------------\n";
   sb += "GST Summary:\n";
-  sb += "Slab      Taxable       CGST        SGST\n";
 
   const hasAnyTax = Object.keys(taxSlabs).length > 0;
   if (hasAnyTax) {
-    Object.entries(taxSlabs).forEach(([key, s]) => {
-      sb += `${key.padEnd(9, ' ')} ${fmt(s.taxable).padStart(10, ' ')} ${fmt(s.cgst).padStart(10, ' ')} ${fmt(s.sgst).padStart(10, ' ')}\n`;
-    });
+    if (hasCess) {
+      sb += "Slab".padEnd(8, ' ') + " " + "Taxable".padStart(7, ' ') + " " + "CGST".padStart(7, ' ') + " " + "SGST".padStart(7, ' ') + " " + "CESS".padStart(7, ' ') + "\n";
+      Object.entries(taxSlabs).forEach(([key, s]) => {
+        sb += `${key.padEnd(8, ' ')} ${fmt(s.taxable).padStart(7, ' ')} ${fmt(s.cgst).padStart(7, ' ')} ${fmt(s.sgst).padStart(7, ' ')} ${fmt(s.cess).padStart(7, ' ')}\n`;
+      });
+    } else {
+      sb += "Slab      Taxable       CGST        SGST\n";
+      Object.entries(taxSlabs).forEach(([key, s]) => {
+        sb += `${key.padEnd(9, ' ')} ${fmt(s.taxable).padStart(10, ' ')} ${fmt(s.cgst).padStart(10, ' ')} ${fmt(s.sgst).padStart(10, ' ')}\n`;
+      });
+    }
   } else {
     sb += "All items: Nil Rated / Exempt\n";
   }
@@ -158,7 +183,10 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
     </div>`;
 
   // GST slab summary
-  const taxSlabs: Record<string, { taxable: number; cgst: number; sgst: number }> = {};
+  const taxSlabs: Record<string, { taxable: number; cgst: number; sgst: number; cess: number }> = {};
+  let totalCessAmount = 0;
+  let totalGstAmount = 0;
+  const hasCess = (invoice.items || []).some((item: any) => safe(item.cessRate) > 0 || safe(item.cessAmount) > 0);
 
   (invoice.items || []).forEach((item: any) => {
     const qty  = safe(item.quantity, safe(item.qty));
@@ -177,13 +205,23 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
 
     const cgstRate = safe(item.cgstRate);
     const sgstRate = safe(item.sgstRate);
+    const cessRate = safe(item.cessRate);
     const totalRate = cgstRate + sgstRate;
-    if (totalRate > 0) {
+
+    const cgstAmt = item.cgstAmount !== undefined ? safe(item.cgstAmount) : lineAmt * (cgstRate / 100);
+    const sgstAmt = item.sgstAmount !== undefined ? safe(item.sgstAmount) : lineAmt * (sgstRate / 100);
+    const cessAmt = item.cessAmount !== undefined ? safe(item.cessAmount) : lineAmt * (cessRate / 100);
+
+    totalCessAmount += cessAmt;
+    totalGstAmount += cgstAmt + sgstAmt;
+
+    if (totalRate > 0 || cessRate > 0) {
       const key = `GST ${totalRate}%`;
-      if (!taxSlabs[key]) taxSlabs[key] = { taxable: 0, cgst: 0, sgst: 0 };
+      if (!taxSlabs[key]) taxSlabs[key] = { taxable: 0, cgst: 0, sgst: 0, cess: 0 };
       taxSlabs[key].taxable += lineAmt;
-      taxSlabs[key].cgst    += lineAmt * (cgstRate / 100);
-      taxSlabs[key].sgst    += lineAmt * (sgstRate / 100);
+      taxSlabs[key].cgst    += cgstAmt;
+      taxSlabs[key].sgst    += sgstAmt;
+      taxSlabs[key].cess    += cessAmt;
     }
   });
 
@@ -202,28 +240,56 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   const hasAnyTax = Object.keys(taxSlabs).length > 0;
   gstHtml = hr() + `<div style="font-weight:bold;font-size:9px;margin-bottom:2px;">GST Summary</div>`;
   if (hasAnyTax) {
-    gstHtml += `<div style="display:flex;font-weight:bold;font-size:9px;border-bottom:1px dashed #000;padding-bottom:1px;">
-      <span style="width:42px;">Slab</span>
-      <span style="flex:1;text-align:right;">Taxable</span>
-      <span style="flex:1;text-align:right;">CGST</span>
-      <span style="flex:1;text-align:right;">SGST</span>
-    </div>`;
-    let totalCgst = 0, totalSgst = 0, totalTaxable = 0;
-    Object.entries(taxSlabs).forEach(([key, s]) => {
-      gstHtml += `<div style="display:flex;font-size:9px;">
-        <span style="width:42px;">${key}</span>
-        <span style="flex:1;text-align:right;">${fmt(s.taxable)}</span>
-        <span style="flex:1;text-align:right;">${fmt(s.cgst)}</span>
-        <span style="flex:1;text-align:right;">${fmt(s.sgst)}</span>
+    if (hasCess) {
+      gstHtml += `<div style="display:flex;font-weight:bold;font-size:9px;border-bottom:1px dashed #000;padding-bottom:1px;">
+        <span style="width:40px;">Slab</span>
+        <span style="flex:1;text-align:right;">Taxable</span>
+        <span style="flex:1;text-align:right;">CGST</span>
+        <span style="flex:1;text-align:right;">SGST</span>
+        <span style="flex:1;text-align:right;">CESS</span>
       </div>`;
-      totalCgst += s.cgst; totalSgst += s.sgst; totalTaxable += s.taxable;
-    });
-    gstHtml += `<div style="display:flex;font-size:9px;font-weight:bold;border-top:1px dashed #000;padding-top:1px;">
-      <span style="width:42px;">Total</span>
-      <span style="flex:1;text-align:right;">${fmt(totalTaxable)}</span>
-      <span style="flex:1;text-align:right;">${fmt(totalCgst)}</span>
-      <span style="flex:1;text-align:right;">${fmt(totalSgst)}</span>
-    </div>`;
+      let totalCgst = 0, totalSgst = 0, totalCess = 0, totalTaxable = 0;
+      Object.entries(taxSlabs).forEach(([key, s]) => {
+        gstHtml += `<div style="display:flex;font-size:9px;">
+          <span style="width:40px;">${key}</span>
+          <span style="flex:1;text-align:right;">${fmt(s.taxable)}</span>
+          <span style="flex:1;text-align:right;">${fmt(s.cgst)}</span>
+          <span style="flex:1;text-align:right;">${fmt(s.sgst)}</span>
+          <span style="flex:1;text-align:right;">${fmt(s.cess)}</span>
+        </div>`;
+        totalCgst += s.cgst; totalSgst += s.sgst; totalCess += s.cess; totalTaxable += s.taxable;
+      });
+      gstHtml += `<div style="display:flex;font-size:9px;font-weight:bold;border-top:1px dashed #000;padding-top:1px;">
+        <span style="width:40px;">Total</span>
+        <span style="flex:1;text-align:right;">${fmt(totalTaxable)}</span>
+        <span style="flex:1;text-align:right;">${fmt(totalCgst)}</span>
+        <span style="flex:1;text-align:right;">${fmt(totalSgst)}</span>
+        <span style="flex:1;text-align:right;">${fmt(totalCess)}</span>
+      </div>`;
+    } else {
+      gstHtml += `<div style="display:flex;font-weight:bold;font-size:9px;border-bottom:1px dashed #000;padding-bottom:1px;">
+        <span style="width:42px;">Slab</span>
+        <span style="flex:1;text-align:right;">Taxable</span>
+        <span style="flex:1;text-align:right;">CGST</span>
+        <span style="flex:1;text-align:right;">SGST</span>
+      </div>`;
+      let totalCgst = 0, totalSgst = 0, totalTaxable = 0;
+      Object.entries(taxSlabs).forEach(([key, s]) => {
+        gstHtml += `<div style="display:flex;font-size:9px;">
+          <span style="width:42px;">${key}</span>
+          <span style="flex:1;text-align:right;">${fmt(s.taxable)}</span>
+          <span style="flex:1;text-align:right;">${fmt(s.cgst)}</span>
+          <span style="flex:1;text-align:right;">${fmt(s.sgst)}</span>
+        </div>`;
+        totalCgst += s.cgst; totalSgst += s.sgst; totalTaxable += s.taxable;
+      });
+      gstHtml += `<div style="display:flex;font-size:9px;font-weight:bold;border-top:1px dashed #000;padding-top:1px;">
+        <span style="width:42px;">Total</span>
+        <span style="flex:1;text-align:right;">${fmt(totalTaxable)}</span>
+        <span style="flex:1;text-align:right;">${fmt(totalCgst)}</span>
+        <span style="flex:1;text-align:right;">${fmt(totalSgst)}</span>
+      </div>`;
+    }
   } else {
     gstHtml += `<div style="font-size:9px;font-style:italic;">All items: Nil Rated / Exempt (GST \u20b90.00)</div>`;
   }
@@ -306,7 +372,8 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   ${hr()}
   ${row('Sub Total', fmt(invoice.subTotal || invoice.totalAmount))}
   ${safe(invoice.discountAmount) > 0 ? row('Discount', '-' + fmt(invoice.discountAmount)) : ''}
-  ${safe(invoice.taxAmount) > 0 ? row('GST (CGST+SGST)', '+' + fmt(invoice.taxAmount)) : ''}
+  ${totalGstAmount > 0 ? row('GST (CGST+SGST)', '+' + fmt(totalGstAmount)) : (safe(invoice.taxAmount) > 0 && !totalCessAmount ? row('GST (CGST+SGST)', '+' + fmt(invoice.taxAmount)) : '')}
+  ${totalCessAmount > 0 ? row('GST CESS', '+' + fmt(totalCessAmount)) : ''}
   ${roundOff !== 0 ? row('Round Off', (roundOff > 0 ? '+' : '') + fmt(roundOff)) : ''}
   <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;border-top:1px dashed #000;padding-top:4px;margin-top:4px;">
     <span>NET PAYABLE</span><span>&#8377; ${rounded}</span>

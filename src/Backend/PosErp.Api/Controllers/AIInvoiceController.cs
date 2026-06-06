@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Application.Features.Inventory.Services;
@@ -17,6 +18,7 @@ namespace PosErp.Api.Controllers;
 
 [ApiController]
 [Route("api/inventory")]
+[Authorize(Roles = "Admin,Manager,Owner")]
 public class AIInvoiceController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
@@ -191,6 +193,15 @@ public class AIInvoiceController : ControllerBase
         if (request == null || request.Items == null || request.Items.Count == 0)
         {
             return BadRequest("No items to import.");
+        }
+
+        // H6 FIX: Retrieve caller User ID from claims principal
+        var callerIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+        Guid? callerId = null;
+        if (Guid.TryParse(callerIdStr, out var parsedId))
+        {
+            callerId = parsedId;
         }
 
         var rules = InventoryRulesManager.GetRules();
@@ -376,7 +387,7 @@ public class AIInvoiceController : ControllerBase
                     expiryDate: expiryDate,
                     referenceDocId: adjustment.Id,
                     referenceNumber: adjustment.AdjustmentNumber,
-                    userId: null,
+                    userId: callerId,
                     cancellationToken: cancellationToken
                 );
             }

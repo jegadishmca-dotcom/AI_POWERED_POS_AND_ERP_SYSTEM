@@ -10,6 +10,7 @@ export interface LocalProduct {
   isWeighable: boolean;
   cgstRate: number;
   sgstRate: number;
+  cessRate: number;
 }
 
 export class PosDatabase extends Dexie {

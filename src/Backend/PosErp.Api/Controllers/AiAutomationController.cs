@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
@@ -19,6 +20,7 @@ namespace PosErp.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize(Roles = "Admin,Manager,Owner")]
 public class AiAutomationController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
@@ -383,11 +385,11 @@ public class AiAutomationController : ControllerBase
         {
             var yesterday = DateTime.UtcNow.Date.AddDays(-1);
             var yesterdayInvoices = await _context.Invoices
-                .Where(i => i.BusinessDate == yesterday)
+                .Where(i => i.BusinessDate == yesterday && i.Status == "COMPLETED")
                 .ToListAsync(cancellationToken);
 
             int count = yesterdayInvoices.Count;
-            decimal total = yesterdayInvoices.Sum(i => i.TotalAmount);
+            decimal total = yesterdayInvoices.Sum(i => i.NetPayable);
             decimal cash = yesterdayInvoices.Sum(i => i.CashAmount);
             decimal upi = yesterdayInvoices.Sum(i => i.UpiAmount);
 
@@ -407,11 +409,11 @@ public class AiAutomationController : ControllerBase
             var weekStart = DateTime.UtcNow.Date.AddDays(-7);
             var weekEnd = DateTime.UtcNow.Date.AddDays(-1);
             var weekInvoices = await _context.Invoices
-                .Where(i => i.BusinessDate >= weekStart && i.BusinessDate <= weekEnd)
+                .Where(i => i.BusinessDate >= weekStart && i.BusinessDate <= weekEnd && i.Status == "COMPLETED")
                 .ToListAsync(cancellationToken);
 
             int count = weekInvoices.Count;
-            decimal total = weekInvoices.Sum(i => i.TotalAmount);
+            decimal total = weekInvoices.Sum(i => i.NetPayable);
             decimal cash = weekInvoices.Sum(i => i.CashAmount);
             decimal upi = weekInvoices.Sum(i => i.UpiAmount);
             decimal daily = count > 0 ? total / 7m : 0;
@@ -433,11 +435,11 @@ public class AiAutomationController : ControllerBase
             var monthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
             var today = DateTime.UtcNow.Date;
             var monthInvoices = await _context.Invoices
-                .Where(i => i.BusinessDate >= monthStart && i.BusinessDate <= today)
+                .Where(i => i.BusinessDate >= monthStart && i.BusinessDate <= today && i.Status == "COMPLETED")
                 .ToListAsync(cancellationToken);
 
             int count = monthInvoices.Count;
-            decimal total = monthInvoices.Sum(i => i.TotalAmount);
+            decimal total = monthInvoices.Sum(i => i.NetPayable);
             decimal cash = monthInvoices.Sum(i => i.CashAmount);
             decimal upi = monthInvoices.Sum(i => i.UpiAmount);
             int daysElapsed = (today - monthStart).Days + 1;
@@ -460,11 +462,11 @@ public class AiAutomationController : ControllerBase
             var lastMonthStart = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddMonths(-1);
             var lastMonthEnd = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1).AddDays(-1);
             var lastMonthInvoices = await _context.Invoices
-                .Where(i => i.BusinessDate >= lastMonthStart && i.BusinessDate <= lastMonthEnd)
+                .Where(i => i.BusinessDate >= lastMonthStart && i.BusinessDate <= lastMonthEnd && i.Status == "COMPLETED")
                 .ToListAsync(cancellationToken);
 
             int count = lastMonthInvoices.Count;
-            decimal total = lastMonthInvoices.Sum(i => i.TotalAmount);
+            decimal total = lastMonthInvoices.Sum(i => i.NetPayable);
             decimal cash = lastMonthInvoices.Sum(i => i.CashAmount);
             decimal upi = lastMonthInvoices.Sum(i => i.UpiAmount);
             int daysInMonth = (lastMonthEnd - lastMonthStart).Days + 1;
@@ -486,11 +488,11 @@ public class AiAutomationController : ControllerBase
         {
             var today = DateTime.UtcNow.Date;
             var todayInvoices = await _context.Invoices
-                .Where(i => i.BusinessDate == today)
+                .Where(i => i.BusinessDate == today && i.Status == "COMPLETED")
                 .ToListAsync(cancellationToken);
 
             int count = todayInvoices.Count;
-            decimal total = todayInvoices.Sum(i => i.TotalAmount);
+            decimal total = todayInvoices.Sum(i => i.NetPayable);
             decimal cash = todayInvoices.Sum(i => i.CashAmount);
             decimal upi = todayInvoices.Sum(i => i.UpiAmount);
 
@@ -514,8 +516,8 @@ public class AiAutomationController : ControllerBase
         // ── Total Sales ───────────────────────────────────────────────
         if (promptLower.Contains("total sales") || promptLower.Contains("total invoice") || promptLower.Contains("total revenue") || promptLower.Contains("sales figure"))
         {
-            var allInvoices = await _context.Invoices.ToListAsync(cancellationToken);
-            decimal total = allInvoices.Sum(i => i.TotalAmount);
+            var allInvoices = await _context.Invoices.Where(i => i.Status == "COMPLETED").ToListAsync(cancellationToken);
+            decimal total = allInvoices.Sum(i => i.NetPayable);
             int count = allInvoices.Count;
 
             return Ok(new
@@ -531,7 +533,7 @@ public class AiAutomationController : ControllerBase
         {
             var topInvoice = await _context.Invoices
                 .Where(i => i.Status == "COMPLETED")
-                .OrderByDescending(i => i.TotalAmount)
+                .OrderByDescending(i => i.NetPayable)
                 .FirstOrDefaultAsync(cancellationToken);
 
             if (topInvoice == null)
@@ -555,7 +557,7 @@ public class AiAutomationController : ControllerBase
                        $"- **Invoice #**: {topInvoice.InvoiceNumber}\n" +
                        $"- **Customer**: {customerName}\n" +
                        $"- **Date**: {topInvoice.BusinessDate:dd MMM yyyy}\n" +
-                       $"- **Total Amount**: ₹{topInvoice.TotalAmount:N2}\n" +
+                       $"- **Total Amount**: ₹{topInvoice.NetPayable:N2}\n" +
                        $"- **Payment Mode**: {topInvoice.PaymentMode}\n" +
                        $"- **Counter Terminal**: {topInvoice.TerminalId}"
             });

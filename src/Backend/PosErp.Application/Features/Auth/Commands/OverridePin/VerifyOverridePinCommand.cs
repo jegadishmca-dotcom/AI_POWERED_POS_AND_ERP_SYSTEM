@@ -28,9 +28,15 @@ public class VerifyOverridePinCommandHandler : IRequestHandler<VerifyOverridePin
     {
         if (string.IsNullOrWhiteSpace(request.Pin)) return false;
 
-        // Fetch all active users who have an override PIN set (Owner / Manager roles)
+        // Fetch all active users who have an override PIN set and belong to Admin / Manager / Owner roles
         var usersWithPin = await _context.Users
-            .Where(u => u.IsActive && !u.IsDeleted && u.PinHash != null)
+            .Join(_context.Roles,
+                u => u.RoleId,
+                r => r.Id,
+                (u, r) => new { User = u, Role = r })
+            .Where(x => x.User.IsActive && !x.User.IsDeleted && x.User.PinHash != null &&
+                (x.Role.Name == "Admin" || x.Role.Name == "Manager" || x.Role.Name == "Owner"))
+            .Select(x => x.User)
             .ToListAsync(cancellationToken);
 
         foreach (var user in usersWithPin)

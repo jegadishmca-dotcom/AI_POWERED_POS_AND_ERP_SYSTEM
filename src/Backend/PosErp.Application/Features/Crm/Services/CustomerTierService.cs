@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using System;
 using System.Linq;
@@ -31,7 +31,7 @@ public class CustomerTierService : ICustomerTierService
         // In reality, sum completed invoices from the Invoices table
         decimal rollingSpend = await _context.Invoices
             .Where(i => i.CustomerId == customerId && i.CreatedAt >= last12Months && i.Status == "COMPLETED")
-            .SumAsync(i => i.TotalAmount, cancellationToken);
+            .SumAsync(i => i.NetPayable, cancellationToken);
 
         var eligibleTier = await _context.CustomerTiers
             .Where(t => rollingSpend >= t.MinimumSpend)

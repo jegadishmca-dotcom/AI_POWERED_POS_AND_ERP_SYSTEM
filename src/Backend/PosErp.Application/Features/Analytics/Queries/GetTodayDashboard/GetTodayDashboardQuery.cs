@@ -37,7 +37,7 @@ public class GetTodayDashboardQueryHandler : IRequestHandler<GetTodayDashboardQu
             .Where(i => i.BusinessDate == today && i.Status == "COMPLETED")
             .GroupBy(i => 1)
             .Select(g => new {
-                Sales = g.Sum(i => i.TotalAmount),
+                Sales = g.Sum(i => i.NetPayable),
                 Orders = g.Count()
             })
             .FirstOrDefaultAsync(cancellationToken);
@@ -45,7 +45,7 @@ public class GetTodayDashboardQueryHandler : IRequestHandler<GetTodayDashboardQu
         // Fetch yesterday's sales to calculate growth
         var yesterdaySales = await _context.Invoices
             .Where(i => i.BusinessDate == yesterday && i.Status == "COMPLETED")
-            .Select(i => i.TotalAmount)
+            .Select(i => i.NetPayable)
             .SumAsync(cancellationToken);
 
         decimal todaySales = todayStats?.Sales ?? 0m;

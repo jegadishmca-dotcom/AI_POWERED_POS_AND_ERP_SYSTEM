@@ -4,9 +4,12 @@ using System.Threading.Tasks;
 using PosErp.Application.Features.Auth.Commands.Login;
 using PosErp.Application.Features.Auth.Commands.Refresh;
 using PosErp.Application.Features.Auth.Commands.OverridePin;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
+using Microsoft.EntityFrameworkCore;
+using PosErp.Application.Interfaces;
 using System;
-using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace PosErp.Api.Controllers;
 
@@ -15,10 +18,12 @@ namespace PosErp.Api.Controllers;
 public class AuthController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly IApplicationDbContext _context;
 
-    public AuthController(IMediator mediator)
+    public AuthController(IMediator mediator, IApplicationDbContext context)
     {
         _mediator = mediator;
+        _context = context;
     }
 
     [HttpPost("login")]
@@ -46,32 +51,76 @@ public class AuthController : ControllerBase
     }
 
     /// <summary>
-    /// Verifies a manager override PIN — called from the POS Manager Override modal.
-    /// Returns { authorized: true/false }. Does NOT reveal which user matched.
-    /// No [Authorize] needed: any authenticated user (with a valid token) can call this.
+    /// H5 FIX: Logout — revokes the current refresh token so stolen tokens cannot be reused.
+    /// </summary>
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout()
+    {
+        var refreshToken = Request.Cookies["refreshToken"];
+        if (!string.IsNullOrEmpty(refreshToken))
+        {
+            var token = await _context.RefreshTokens
+                .FirstOrDefaultAsync(t => t.Token == refreshToken);
+            if (token != null)
+            {
+                token.IsRevoked = true;
+                await _context.SaveChangesAsync(default);
+            }
+        }
+
+        // Clear the cookie regardless
+        Response.Cookies.Delete("refreshToken", new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict
+        });
+
+        return Ok(new { message = "Logged out successfully." });
+    }
+
+    /// <summary>
+    /// Verifies a manager override PIN. Caller must be authenticated.
     /// </summary>
     [HttpPost("verify-override-pin")]
+    [Authorize]
     public async Task<IActionResult> VerifyOverridePin([FromBody] VerifyOverridePinRequest req)
     {
-        // Require a valid Bearer token (caller must be logged in)
-        if (!TryGetCallerUserId(out _))
-            return Unauthorized(new { message = "A valid login session is required." });
-
         var authorized = await _mediator.Send(new VerifyOverridePinCommand(req.Pin));
         return Ok(new { authorized });
     }
 
     /// <summary>
-    /// Sets/changes the override PIN for the currently logged-in user.
-    /// Extracts user ID directly from the Bearer JWT token (Sub claim).
+    /// S5 FIX: Sets/changes override PIN.
+    /// - A user can always change their own PIN.
+    /// - Only Manager/Owner can change another user's PIN.
+    /// H3 FIX: Uses HttpContext.User (signature-validated Claims principal) instead of
+    ///          manually decoding the JWT without signature verification.
     /// </summary>
     [HttpPost("set-override-pin")]
+    [Authorize]
     public async Task<IActionResult> SetOverridePin([FromBody] SetOverridePinRequest req)
     {
-        if (!TryGetCallerUserId(out var callerId))
+        // H3 FIX: Use validated Claims principal — NOT ReadJwtToken() which skips validation
+        var callerIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+
+        if (!Guid.TryParse(callerIdStr, out var callerId))
             return Unauthorized(new { message = "A valid login session is required." });
 
         var targetId = req.UserId.HasValue ? req.UserId.Value : callerId;
+
+        // S5 FIX: Only Manager/Owner can set another user's PIN
+        if (targetId != callerId)
+        {
+            var callerRole = User.FindFirst(ClaimTypes.Role)?.Value ?? string.Empty;
+            if (!callerRole.Equals("Manager", StringComparison.OrdinalIgnoreCase) &&
+                !callerRole.Equals("Owner", StringComparison.OrdinalIgnoreCase) &&
+                !callerRole.Equals("Admin", StringComparison.OrdinalIgnoreCase))
+            {
+                return Forbid(); // 403: only Manager/Owner can change other users' PINs
+            }
+        }
 
         await _mediator.Send(new SetOverridePinCommand(targetId, req.NewPin, req.ConfirmPin));
         return Ok(new { message = "Override PIN updated successfully." });
@@ -89,32 +138,6 @@ public class AuthController : ControllerBase
             Expires = DateTime.UtcNow.AddDays(7)
         };
         Response.Cookies.Append("refreshToken", token, cookieOptions);
-    }
-
-    /// <summary>
-    /// Reads the Bearer token from the Authorization header and extracts the
-    /// user ID from the 'sub' claim (set by JwtTokenGenerator.GenerateToken).
-    /// Returns false if the token is missing or malformed.
-    /// </summary>
-    private bool TryGetCallerUserId(out Guid userId)
-    {
-        userId = Guid.Empty;
-        var authHeader = Request.Headers["Authorization"].ToString();
-        if (string.IsNullOrWhiteSpace(authHeader) || !authHeader.StartsWith("Bearer "))
-            return false;
-
-        var tokenStr = authHeader["Bearer ".Length..].Trim();
-        try
-        {
-            var handler = new JwtSecurityTokenHandler();
-            var jwt = handler.ReadJwtToken(tokenStr);
-            var sub = jwt.Subject; // 'sub' claim = user ID
-            return Guid.TryParse(sub, out userId);
-        }
-        catch
-        {
-            return false;
-        }
     }
 }
 

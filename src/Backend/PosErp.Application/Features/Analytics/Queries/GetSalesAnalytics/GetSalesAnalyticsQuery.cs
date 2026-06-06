@@ -39,7 +39,7 @@ public class GetSalesAnalyticsQueryHandler : IRequestHandler<GetSalesAnalyticsQu
             {
                 Date = g.Key,
                 GrossSales = g.Sum(i => i.SubTotal),
-                NetSales = g.Sum(i => i.TotalAmount),
+                NetSales = g.Sum(i => i.NetPayable),
                 TotalInvoices = g.Count()
             })
             .OrderBy(g => g.Date)

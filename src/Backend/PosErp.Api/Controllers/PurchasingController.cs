@@ -53,7 +53,15 @@ public class PurchasingController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> ApprovePurchaseOrder(Guid id)
     {
-        var result = await _mediator.Send(new ApprovePurchaseOrderCommand(id, null));
+        var callerIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+        Guid? callerId = null;
+        if (Guid.TryParse(callerIdStr, out var parsedId))
+        {
+            callerId = parsedId;
+        }
+
+        var result = await _mediator.Send(new ApprovePurchaseOrderCommand(id, callerId));
         return Ok(result);
     }
 

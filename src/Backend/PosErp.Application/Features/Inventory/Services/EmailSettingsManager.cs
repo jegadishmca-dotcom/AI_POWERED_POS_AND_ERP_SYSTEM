@@ -22,6 +22,7 @@ public class EmailSettings
     public string MailgunApiKey { get; set; } = "";
     public string PostmarkToken { get; set; } = "";
     public string ResendApiKey { get; set; } = "";
+    public int ExpiryAlertThresholdDays { get; set; } = 30; // L2 FIX: configurable threshold
 }
 
 public interface IEmailSettingsManager
@@ -110,7 +111,7 @@ public class EmailSettingsManager : IEmailSettingsManager
 
             using (var cmd = conn.CreateCommand())
             {
-                cmd.CommandText = "SELECT smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes, delivery_method, mailgun_domain, mailgun_api_key, postmark_token, resend_api_key FROM email_settings WHERE id = 'global'";
+                cmd.CommandText = "SELECT smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes, delivery_method, mailgun_domain, mailgun_api_key, postmark_token, resend_api_key, expiry_alert_threshold_days FROM email_settings WHERE id = 'global'";
                 using (var reader = cmd.ExecuteReader())
                 {
                     if (reader.Read())
@@ -136,6 +137,8 @@ public class EmailSettingsManager : IEmailSettingsManager
 
                         var encryptedRsKey = reader.IsDBNull(11) ? "" : reader.GetString(11);
                         settings.ResendApiKey = Decrypt(encryptedRsKey);
+
+                        settings.ExpiryAlertThresholdDays = reader.IsDBNull(12) ? 30 : reader.GetInt32(12);
                     }
                 }
             }
@@ -163,8 +166,8 @@ public class EmailSettingsManager : IEmailSettingsManager
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
-                    INSERT INTO email_settings (id, smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes, delivery_method, mailgun_domain, mailgun_api_key, postmark_token, resend_api_key)
-                    VALUES ('global', @smtp_server, @smtp_port, @sender_email, @sender_password, @recipient_email, @enable_ssl, @trigger_interval_minutes, @delivery_method, @mailgun_domain, @mailgun_api_key, @postmark_token, @resend_api_key)
+                    INSERT INTO email_settings (id, smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes, delivery_method, mailgun_domain, mailgun_api_key, postmark_token, resend_api_key, expiry_alert_threshold_days)
+                    VALUES ('global', @smtp_server, @smtp_port, @sender_email, @sender_password, @recipient_email, @enable_ssl, @trigger_interval_minutes, @delivery_method, @mailgun_domain, @mailgun_api_key, @postmark_token, @resend_api_key, @expiry_alert_threshold_days)
                     ON CONFLICT (id) DO UPDATE SET
                         smtp_server = EXCLUDED.smtp_server,
                         smtp_port = EXCLUDED.smtp_port,
@@ -177,7 +180,8 @@ public class EmailSettingsManager : IEmailSettingsManager
                         mailgun_domain = EXCLUDED.mailgun_domain,
                         mailgun_api_key = EXCLUDED.mailgun_api_key,
                         postmark_token = EXCLUDED.postmark_token,
-                        resend_api_key = EXCLUDED.resend_api_key;";
+                        resend_api_key = EXCLUDED.resend_api_key,
+                        expiry_alert_threshold_days = EXCLUDED.expiry_alert_threshold_days;";
 
                 var pSmtpServer = cmd.CreateParameter();
                 pSmtpServer.ParameterName = "@smtp_server";
@@ -238,6 +242,11 @@ public class EmailSettingsManager : IEmailSettingsManager
                 pResendApiKey.ParameterName = "@resend_api_key";
                 pResendApiKey.Value = Encrypt(settings.ResendApiKey);
                 cmd.Parameters.Add(pResendApiKey);
+
+                var pExpiryThreshold = cmd.CreateParameter();
+                pExpiryThreshold.ParameterName = "@expiry_alert_threshold_days";
+                pExpiryThreshold.Value = settings.ExpiryAlertThresholdDays;
+                cmd.Parameters.Add(pExpiryThreshold);
 
                 cmd.ExecuteNonQuery();
             }

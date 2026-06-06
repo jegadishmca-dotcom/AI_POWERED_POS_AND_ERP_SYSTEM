@@ -14,7 +14,7 @@ namespace PosErp.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-// [Authorize] // Commented out for easier testing without token
+[Authorize] // H1 FIX: Restored — was deliberately commented out for testing
 public class CatalogController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -27,6 +27,7 @@ public class CatalogController : ControllerBase
     }
 
     [HttpGet("search")]
+    [AllowAnonymous] // POS terminal needs product search without pre-auth token on login screen
     public async Task<IActionResult> Search([FromQuery] string? q = "", [FromQuery] int limit = 20)
     {
         var result = await _mediator.Send(new SearchProductsQuery(q ?? string.Empty, limit));
@@ -34,6 +35,7 @@ public class CatalogController : ControllerBase
     }
 
     [HttpGet("tax-slabs")]
+    [AllowAnonymous] // Tax slabs needed during cart calculation before auth in some flows
     public async Task<IActionResult> GetTaxSlabs()
     {
         var slabs = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
@@ -42,6 +44,7 @@ public class CatalogController : ControllerBase
     }
 
     [HttpPost("import")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> ImportCsv(IFormFile file)
     {
         var result = await _mediator.Send(new ImportProductsCommand(file));
@@ -49,6 +52,7 @@ public class CatalogController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> Create([FromBody] CreateProductCommand command)
     {
         var result = await _mediator.Send(command);
@@ -56,6 +60,7 @@ public class CatalogController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductCommand command)
     {
         if (id != command.Id)
@@ -67,6 +72,7 @@ public class CatalogController : ControllerBase
     }
 
     [HttpDelete("{id}")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> Delete(Guid id)
     {
         var result = await _mediator.Send(new DeleteProductCommand(id));

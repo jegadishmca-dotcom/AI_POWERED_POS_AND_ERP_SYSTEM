@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("PosErp.Infrastructure")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Release")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+170e7cc7f4278422727ac9f65ba8e815f5a9529f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6e71a101051092a134da537c186b06d3c21e1f5d")]
 [assembly: System.Reflection.AssemblyProductAttribute("PosErp.Infrastructure")]
 [assembly: System.Reflection.AssemblyTitleAttribute("PosErp.Infrastructure")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

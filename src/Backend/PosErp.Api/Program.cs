@@ -71,9 +71,17 @@ builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IPrintService, EscPosPrintService>();
 builder.Services.AddScoped<IEmailService, PosErp.Infrastructure.Services.SmtpEmailService>();
 
-// JWT Authentication Configuration
-var secret = "SuperSecretKeyForDevelopmentPurposesOnlyReplaceInProdSuperSecretKeyForDevelopmentPurposesOnlyReplaceInProd";
-var key = Encoding.UTF8.GetBytes(secret);
+// S1: JWT secret from environment variable (set JWT__Secret on Render / secrets manager).
+// NEVER use the fallback value in Production — startup will throw if it is missing.
+var jwtSecret = builder.Configuration["JWT__Secret"]
+    ?? builder.Configuration["JWT:Secret"]
+    ?? (builder.Environment.IsDevelopment()
+        ? "DevOnlyFallbackKey_ReplaceWithEnvVarInProduction_MinLength64Chars1234567890ABCD"
+        : throw new InvalidOperationException(
+            "FATAL: JWT__Secret environment variable is not set. " +
+            "Set it on Render under Environment > Secret Files or Environment Variables."));
+
+var key = Encoding.UTF8.GetBytes(jwtSecret);
 
 builder.Services.AddAuthentication(options =>
 {
@@ -111,22 +119,39 @@ builder.Services.AddScoped<IEmailSettingsManager, EmailSettingsManager>();
 // Register Materialized View Periodic Refresher
 builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.StockPositionRefreshService>();
 builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.DailyReportEmailService>();
+builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.RefreshTokenCleanupService>();
 
+// M1: CORS — restrict to known frontend origin in Production; allow all in Development.
+// Set FRONTEND_URL environment variable on Render (e.g. https://apple-supermarket.vercel.app)
+var frontendUrl = builder.Configuration["FRONTEND_URL"] ?? "";
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowAll", policy =>
     {
-        policy.SetIsOriginAllowed(_ => true) // Allows any origin dynamically, not wildcard
-              .AllowCredentials()            // Required for withCredentials: true
-              .AllowAnyMethod()
-              .AllowAnyHeader();
+        if (builder.Environment.IsDevelopment() || string.IsNullOrWhiteSpace(frontendUrl))
+        {
+            // Development: allow any origin for local testing
+            policy.SetIsOriginAllowed(_ => true)
+                  .AllowCredentials()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        }
+        else
+        {
+            // Production: restrict to known Vercel frontend URL
+            policy.WithOrigins(frontendUrl)
+                  .AllowCredentials()
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        }
     });
 });
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment() || app.Environment.IsProduction())
+// S2: Swagger only in Development — never expose interactive API docs in Production.
+if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();

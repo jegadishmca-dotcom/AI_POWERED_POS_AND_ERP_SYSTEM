@@ -25,6 +25,28 @@ public class DailyReportEmailService : BackgroundService
 
     private DateTime _lastSentUtc = DateTime.MinValue;
 
+    private static DateTime GetIstTime(DateTime utcTime)
+    {
+        try
+        {
+            var tz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+            return TimeZoneInfo.ConvertTimeFromUtc(utcTime, tz);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            try
+            {
+                var tz = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+                return TimeZoneInfo.ConvertTimeFromUtc(utcTime, tz);
+            }
+            catch
+            {
+                // Fallback to manual +5.5 hours if system time zones are completely missing
+                return utcTime.AddHours(5.5);
+            }
+        }
+    }
+
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         Console.WriteLine("[DailyReportEmailService] Background worker started.");
@@ -39,7 +61,7 @@ public class DailyReportEmailService : BackgroundService
                     var settings = settingsManager.GetSettings();
 
                     var nowUtc = DateTime.UtcNow;
-                    var nowIst = nowUtc.AddHours(5.5);
+                    var nowIst = GetIstTime(nowUtc);
 
                     bool shouldTrigger = false;
 
@@ -60,7 +82,7 @@ public class DailyReportEmailService : BackgroundService
                     else
                     {
                         var targetTimeIst = nowIst.Date.AddHours(23).AddMinutes(59).AddSeconds(0);
-                        if (nowIst >= targetTimeIst && _lastSentUtc.AddHours(5.5).Date < nowIst.Date)
+                        if (nowIst >= targetTimeIst && GetIstTime(_lastSentUtc).Date < nowIst.Date)
                         {
                             shouldTrigger = true;
                         }
@@ -99,7 +121,7 @@ public class DailyReportEmailService : BackgroundService
         var recipientEmail = !string.IsNullOrWhiteSpace(savedSettings.RecipientEmail)
             ? savedSettings.RecipientEmail
             : (_configuration["EmailSettings:RecipientEmail"] ?? "jegadishmca@gmail.com");
-        var today = reportDate?.Date ?? DateTime.UtcNow.AddHours(5.5).Date;
+        var today = reportDate?.Date ?? GetIstTime(DateTime.UtcNow).Date;
 
         Console.WriteLine($"[DailyReportEmailService] Generating EOD Daily Report for {today:yyyy-MM-dd}...");
 

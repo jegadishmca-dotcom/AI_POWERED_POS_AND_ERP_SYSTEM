@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MediatR;
 using System.Threading.Tasks;
@@ -12,6 +13,7 @@ namespace PosErp.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize] // S3 FIX: All POS endpoints require authentication
 public class PosController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -106,6 +108,7 @@ public class PosController : ControllerBase
     }
 
     [HttpGet("z-report")]
+    [Authorize(Roles = "Manager,Owner")] // Z-Report is Manager/Owner only
     public async Task<IActionResult> GetZReport([FromQuery] Guid terminalId, [FromQuery] DateTime businessDate, [FromQuery] Guid? cashierId = null, [FromQuery] Guid? sessionId = null)
     {
         return Ok(await _mediator.Send(new GetZReportQuery(terminalId, businessDate, cashierId, sessionId)));
@@ -214,15 +217,26 @@ public class PosController : ControllerBase
                 sb.AppendLine($"  Discount: -{item.DiscountAmount:0.00}");
             }
         }
+        decimal totalCessAmount = invoice.Items.Sum(item => item.CessAmount);
+        decimal totalGstAmount = invoice.Items.Sum(item => item.CgstAmount + item.SgstAmount);
+
         sb.AppendLine("----------------------------------------");
         sb.AppendLine($"Sub Total:                  {invoice.SubTotal,12:0.00}");
         if (invoice.DiscountAmount > 0)
         {
             sb.AppendLine($"Discount:                  -{invoice.DiscountAmount,12:0.00}");
         }
-        if (invoice.TaxAmount > 0)
+        if (totalGstAmount > 0)
+        {
+            sb.AppendLine($"GST (CGST+SGST):           +{totalGstAmount,12:0.00}");
+        }
+        else if (invoice.TaxAmount > 0 && totalCessAmount == 0)
         {
             sb.AppendLine($"GST (CGST+SGST):           +{invoice.TaxAmount,12:0.00}");
+        }
+        if (totalCessAmount > 0)
+        {
+            sb.AppendLine($"GST CESS:                  +{totalCessAmount,12:0.00}");
         }
         if (invoice.RoundOff != 0)
         {
@@ -247,37 +261,63 @@ public class PosController : ControllerBase
 
         sb.AppendLine("----------------------------------------");
         sb.AppendLine("GST Summary:");
-        sb.AppendLine("Slab      Taxable       CGST        SGST");
 
-        var gstGroups = new System.Collections.Generic.Dictionary<decimal, (decimal taxable, decimal cgst, decimal sgst)>();
-        foreach (var item in invoice.Items)
+        bool hasCess = invoice.Items.Any(item => item.CessRate > 0 || item.CessAmount > 0);
+        if (hasCess)
         {
-            decimal rate = item.CgstRate + item.SgstRate;
-            if (rate > 0)
+            sb.AppendLine("Slab     Taxable     CGST     SGST     CESS");
+            var gstGroups = new System.Collections.Generic.Dictionary<decimal, (decimal taxable, decimal cgst, decimal sgst, decimal cess)>();
+            foreach (var item in invoice.Items)
             {
-                if (!gstGroups.ContainsKey(rate))
-                    gstGroups[rate] = (0, 0, 0);
+                decimal rate = item.CgstRate + item.SgstRate;
+                if (rate > 0 || item.CessRate > 0)
+                {
+                    if (!gstGroups.ContainsKey(rate))
+                        gstGroups[rate] = (0, 0, 0, 0);
 
-                decimal lineAmt = item.Quantity * item.UnitPrice - item.DiscountAmount;
-                var current = gstGroups[rate];
-                gstGroups[rate] = (
-                    current.taxable + lineAmt,
-                    current.cgst + item.CgstAmount,
-                    current.sgst + item.SgstAmount
-                );
+                    decimal lineAmt = item.Quantity * item.UnitPrice - item.DiscountAmount;
+                    var current = gstGroups[rate];
+                    gstGroups[rate] = (
+                        current.taxable + lineAmt,
+                        current.cgst + item.CgstAmount,
+                        current.sgst + item.SgstAmount,
+                        current.cess + item.CessAmount
+                    );
+                }
             }
-        }
 
-        if (gstGroups.Count > 0)
-        {
             foreach (var kvp in gstGroups)
             {
-                sb.AppendLine($"GST {kvp.Key,2:0}% {kvp.Value.taxable,10:0.00} {kvp.Value.cgst,10:0.00} {kvp.Value.sgst,10:0.00}");
+                string key = $"GST {kvp.Key:0}%";
+                sb.AppendLine($"{key,-8} {kvp.Value.taxable,7:0.00} {kvp.Value.cgst,7:0.00} {kvp.Value.sgst,7:0.00} {kvp.Value.cess,7:0.00}");
             }
         }
         else
         {
-            sb.AppendLine("All items: Nil Rated / Exempt");
+            sb.AppendLine("Slab      Taxable       CGST        SGST");
+            var gstGroups = new System.Collections.Generic.Dictionary<decimal, (decimal taxable, decimal cgst, decimal sgst)>();
+            foreach (var item in invoice.Items)
+            {
+                decimal rate = item.CgstRate + item.SgstRate;
+                if (rate > 0)
+                {
+                    if (!gstGroups.ContainsKey(rate))
+                        gstGroups[rate] = (0, 0, 0);
+
+                    decimal lineAmt = item.Quantity * item.UnitPrice - item.DiscountAmount;
+                    var current = gstGroups[rate];
+                    gstGroups[rate] = (
+                        current.taxable + lineAmt,
+                        current.cgst + item.CgstAmount,
+                        current.sgst + item.SgstAmount
+                    );
+                }
+            }
+
+            foreach (var kvp in gstGroups)
+            {
+                sb.AppendLine($"GST {kvp.Key,2:0}% {kvp.Value.taxable,10:0.00} {kvp.Value.cgst,10:0.00} {kvp.Value.sgst,10:0.00}");
+            }
         }
 
         sb.AppendLine("----------------------------------------");
@@ -302,6 +342,7 @@ public class PosController : ControllerBase
     }
 
     [HttpPost("business-date/open")]
+    [Authorize(Roles = "Manager,Owner")] // Business day open is Manager/Owner only
     public async Task<IActionResult> OpenBusinessDate([FromBody] PosErp.Application.Features.Pos.Commands.OpenBusinessDateCommand command)
     {
         var success = await _mediator.Send(command);
@@ -309,6 +350,7 @@ public class PosController : ControllerBase
     }
 
     [HttpPost("business-date/close")]
+    [Authorize(Roles = "Manager,Owner")] // EOD close is Manager/Owner only
     public async Task<IActionResult> CloseBusinessDate([FromBody] PosErp.Application.Features.Pos.Commands.CloseBusinessDateCommand command)
     {
         var closedDate = await _mediator.Send(command);

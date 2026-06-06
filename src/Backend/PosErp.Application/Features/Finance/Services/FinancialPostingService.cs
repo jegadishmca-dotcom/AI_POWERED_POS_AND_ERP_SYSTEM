@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Finance;
 using System;
@@ -12,7 +12,7 @@ namespace PosErp.Application.Features.Finance.Services;
 public interface IFinancialPostingService
 {
     Task<Guid> PostJournalEntryAsync(Guid? storeId, DateTime date, string description, string refDoc, List<JournalLineDto> lines, CancellationToken cancellationToken);
-    Task RecordGstTransactionAsync(Guid? storeId, string type, string docNumber, DateTime date, decimal taxable, decimal cgst, decimal sgst, string? gstin, CancellationToken cancellationToken);
+    Task RecordGstTransactionAsync(Guid? storeId, string type, string docNumber, DateTime date, decimal taxable, decimal cgst, decimal sgst, decimal cess, string? gstin, CancellationToken cancellationToken);
 }
 
 public class JournalLineDto
@@ -70,7 +70,7 @@ public class FinancialPostingService : IFinancialPostingService
         return entry.Id;
     }
 
-    public async Task RecordGstTransactionAsync(Guid? storeId, string type, string docNumber, DateTime date, decimal taxable, decimal cgst, decimal sgst, string? gstin, CancellationToken cancellationToken)
+    public async Task RecordGstTransactionAsync(Guid? storeId, string type, string docNumber, DateTime date, decimal taxable, decimal cgst, decimal sgst, decimal cess, string? gstin, CancellationToken cancellationToken)
     {
         var tax = new TaxTransaction
         {
@@ -81,6 +81,7 @@ public class FinancialPostingService : IFinancialPostingService
             TaxableAmount = taxable,
             CgstAmount = cgst,
             SgstAmount = sgst,
+            CessAmount = cess,
             Gstin = gstin
         };
 

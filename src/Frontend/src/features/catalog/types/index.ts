@@ -7,6 +7,7 @@ export interface ProductSearchResult {
   primaryBarcode: string;
   cgstRate: number;
   sgstRate: number;
+  cessRate: number;
   isWeighable: boolean;
   mrp: number;
   purchasePrice: number;

@@ -213,15 +213,20 @@ using (var scope = app.Services.CreateScope())
                 if (rolesExist && historyCount == 0)
                 {
                     // Seed migration_history for the original 16 migrations
-                    foreach (var f in sqlFiles.Where(x => !x.Contains("17_")))
+                    foreach (var f in sqlFiles)
                     {
-                        var seedCmd = connection.CreateCommand();
-                        seedCmd.CommandText = "INSERT INTO migration_history (migration_name) VALUES (@p0) ON CONFLICT DO NOTHING";
-                        var p = seedCmd.CreateParameter();
-                        p.ParameterName = "@p0";
-                        p.Value = Path.GetFileName(f);
-                        seedCmd.Parameters.Add(p);
-                        await seedCmd.ExecuteNonQueryAsync();
+                        var filename = Path.GetFileName(f);
+                        var prefixStr = filename.Split('_')[0];
+                        if (int.TryParse(prefixStr, out int prefixNum) && prefixNum <= 16)
+                        {
+                            var seedCmd = connection.CreateCommand();
+                            seedCmd.CommandText = "INSERT INTO migration_history (migration_name) VALUES (@p0) ON CONFLICT DO NOTHING";
+                            var p = seedCmd.CreateParameter();
+                            p.ParameterName = "@p0";
+                            p.Value = filename;
+                            seedCmd.Parameters.Add(p);
+                            await seedCmd.ExecuteNonQueryAsync();
+                        }
                     }
                 }
             }

@@ -10,7 +10,13 @@ CREATE TABLE IF NOT EXISTS email_settings (
     sender_password TEXT NOT NULL,
     recipient_email VARCHAR(255) NOT NULL,
     enable_ssl BOOLEAN NOT NULL,
-    trigger_interval_minutes INT NOT NULL DEFAULT 0
+    trigger_interval_minutes INT NOT NULL DEFAULT 0,
+    delivery_method VARCHAR(20) DEFAULT 'POSTMARK',
+    mailgun_domain VARCHAR(255) DEFAULT '',
+    mailgun_api_key TEXT DEFAULT '',
+    postmark_token TEXT DEFAULT '',
+    resend_api_key TEXT DEFAULT '',
+    expiry_alert_threshold_days INT DEFAULT 30
 );
 
 -- Seed initial email configuration

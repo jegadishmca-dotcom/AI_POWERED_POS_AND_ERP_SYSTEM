@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
+using PosErp.Application.Features.Audit.Services;
 using PosErp.Domain.Entities.Auth;
 using System;
 using System.Linq;
@@ -16,11 +17,13 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, R
 {
     private readonly IApplicationDbContext _context;
     private readonly IJwtTokenGenerator _jwtGenerator;
+    private readonly IAuditLoggingService _auditLoggingService;
 
-    public RefreshTokenCommandHandler(IApplicationDbContext context, IJwtTokenGenerator jwtGenerator)
+    public RefreshTokenCommandHandler(IApplicationDbContext context, IJwtTokenGenerator jwtGenerator, IAuditLoggingService auditLoggingService)
     {
         _context = context;
         _jwtGenerator = jwtGenerator;
+        _auditLoggingService = auditLoggingService;
     }
 
     public async Task<RefreshResponse> Handle(RefreshTokenCommand request, CancellationToken cancellationToken)
@@ -45,9 +48,28 @@ public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, R
             foreach (var t in familyTokens) t.IsRevoked = true;
             await _context.SaveChangesAsync(cancellationToken);
             
-            // TODO: Log security alert to AuditLog
+            // GAP-03 FIX: Log the security alert to the audit trail.
+            // A revoked token being reused is a strong indicator of token theft.
+            // This event MUST be logged so the security team can investigate compromised accounts.
+            await _auditLoggingService.LogActionAsync(
+                userId: existingToken.UserId,
+                action: "SECURITY_ALERT_TOKEN_REUSE",
+                entityName: "RefreshToken",
+                entityId: existingToken.TokenFamily,
+                oldValues: null,
+                newValues: new
+                {
+                    Message = "Revoked refresh token was reused — possible account compromise.",
+                    TokenFamily = existingToken.TokenFamily,
+                    DeviceId = request.DeviceId,
+                    AllFamilyTokensRevoked = true
+                },
+                ipAddress: "unknown",
+                cancellationToken: cancellationToken);
+
             throw new UnauthorizedAccessException("Token reuse detected. Access revoked.");
         }
+
 
         if (existingToken.ExpiresAt < DateTime.UtcNow)
         {

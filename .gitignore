@@ -2,3 +2,14 @@ node_modules/
 dist/
 build/
 .env
+
+# .NET Build artifacts
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+.vs/
+.idea/
+.vscode/

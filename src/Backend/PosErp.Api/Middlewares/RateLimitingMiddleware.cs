@@ -23,7 +23,10 @@ public class RateLimitingMiddleware
 
     public async Task InvokeAsync(HttpContext context)
     {
-        var ipAddress = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        // SEC-02 FIX: Prefer X-Forwarded-For when running behind a reverse proxy (Nginx/Render).
+        // Without this, all requests appear to come from the proxy IP, sharing one rate limit bucket.
+        // We validate the header is a real IP and fall back to the direct connection address.
+        string ipAddress = GetClientIpAddress(context);
         var endpoint = context.Request.Path.Value;
 
         // Only rate limit API calls
@@ -56,5 +59,27 @@ public class RateLimitingMiddleware
         }
 
         await _next(context);
+    }
+
+    /// <summary>
+    /// Returns the real client IP address. Reads X-Forwarded-For first (for proxy deployments),
+    /// validates it is a valid IP address to prevent header injection, and falls back to the
+    /// direct TCP connection remote address.
+    /// </summary>
+    private static string GetClientIpAddress(HttpContext context)
+    {
+        // X-Forwarded-For may contain a comma-separated list: "client, proxy1, proxy2"
+        // The leftmost value is the original client IP.
+        var forwardedFor = context.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        if (!string.IsNullOrWhiteSpace(forwardedFor))
+        {
+            var firstIp = forwardedFor.Split(',')[0].Trim();
+            if (IPAddress.TryParse(firstIp, out _))
+            {
+                return firstIp;
+            }
+        }
+
+        return context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
     }
 }

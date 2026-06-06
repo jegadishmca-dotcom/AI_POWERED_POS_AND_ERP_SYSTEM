@@ -1,4 +1,4 @@
-﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Crm;
 using System;
@@ -27,13 +27,13 @@ public class WalletService : IWalletService
         var customer = await _context.Customers.FindAsync(new object[] { customerId }, cancellationToken);
         if (customer == null) throw new Exception("Customer not found.");
 
-        // Fetch latest ledger entry to safely calculate running balance
-        var lastEntry = await _context.WalletLedger
+        // BUG-06 FIX: Use SUM(Amount) across all ledger entries as the authoritative balance.
+        // The previous approach read the last entry's RunningBalance, which is stale under concurrent
+        // wallet redemptions (two simultaneous SPENDs could both pass the overdraft check using the
+        // same pre-deduction balance). Summing is always consistent with the actual ledger state.
+        decimal currentBalance = await _context.WalletLedger
             .Where(w => w.CustomerId == customerId)
-            .OrderByDescending(w => w.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
-
-        decimal currentBalance = lastEntry?.RunningBalance ?? 0;
+            .SumAsync(w => w.Amount, cancellationToken);
         
         // Ensure spend doesn't exceed balance
         if (transactionType == "SPEND" && currentBalance + amount < 0)

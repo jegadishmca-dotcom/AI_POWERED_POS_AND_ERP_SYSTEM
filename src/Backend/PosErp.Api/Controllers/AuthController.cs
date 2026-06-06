@@ -42,7 +42,22 @@ public class AuthController : ControllerBase
         var refreshToken = Request.Cookies["refreshToken"];
         if (string.IsNullOrEmpty(refreshToken)) return Unauthorized();
 
-        var command = new RefreshTokenCommand(refreshToken, "device-123");
+        // SEC-03 FIX: Use a real device identifier so stolen token detection is meaningful.
+        // The frontend should send X-Device-Id with a stable device fingerprint (e.g., terminal code).
+        // Fall back to a hash of User-Agent + IP if the header is not present.
+        var deviceId = Request.Headers["X-Device-Id"].FirstOrDefault();
+        if (string.IsNullOrWhiteSpace(deviceId))
+        {
+            var ua = Request.Headers["User-Agent"].FirstOrDefault() ?? "unknown";
+            var ip = Request.HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            deviceId = Convert.ToBase64String(
+                System.Security.Cryptography.SHA256.HashData(
+                    System.Text.Encoding.UTF8.GetBytes($"{ua}|{ip}")
+                )
+            ).Substring(0, 16);
+        }
+
+        var command = new RefreshTokenCommand(refreshToken, deviceId);
         var result = await _mediator.Send(command);
         
         SetRefreshTokenCookie(result.RefreshToken);

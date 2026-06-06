@@ -18,18 +18,30 @@ public class DemoSandboxMiddleware
     {
         var method = context.Request.Method;
 
-        // Block writing operations (POST, PUT, DELETE, PATCH)
+        // Block writing operations (POST, PUT, DELETE, PATCH) for the demo user
         if (!HttpMethods.IsGet(method))
         {
             var path = context.Request.Path.Value?.ToLower() ?? "";
             
-            // Exception: Allow logins, logouts, token refresh, and the transient SMTP test
-            bool isAllowedEndpoint = path.Contains("/api/auth/login") || 
-                                     path.Contains("/api/auth/refresh") || 
-                                     path.Contains("/api/auth/logout") ||
-                                     path.Contains("/api/settings/email/test") ||
-                                     path.Contains("/api/pos/") ||
-                                     path.Contains("/api/aiautomation/");
+            // SEC-05 FIX: Use an explicit allowlist instead of a wildcard path.Contains("/api/pos/").
+            // The old wildcard allowed the demo user to open/close the business date and close shifts —
+            // all destructive operations. Only the specific POS billing operations needed for demo are permitted.
+            bool isAllowedEndpoint = 
+                // Auth endpoints — always needed
+                path.Contains("/api/auth/login") || 
+                path.Contains("/api/auth/refresh") || 
+                path.Contains("/api/auth/logout") ||
+                // Email test — transient and doesn't mutate data
+                path.Contains("/api/settings/email/test") ||
+                // POS billing-only operations (exact matches for safety)
+                path.Equals("/api/pos/invoice") ||
+                path.Equals("/api/pos/calculate-cart") ||
+                path.StartsWith("/api/pos/sync") ||
+                path.StartsWith("/api/pos/session/open") ||
+                path.StartsWith("/api/pos/session/close") ||
+                // AI Automation is read-only analytics for demo
+                path.Contains("/api/aiautomation/chat") ||
+                path.Contains("/api/aiautomation/status");
 
             // Allow creating and updating operational data (POST/PUT) for demo purposes, but block DELETE
             if ((path.StartsWith("/api/catalog") || 

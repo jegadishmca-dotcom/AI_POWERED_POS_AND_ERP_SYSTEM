@@ -27,52 +27,69 @@ public class ClosePosSessionCommandHandler : IRequestHandler<ClosePosSessionComm
         var session = await _context.PosSessions.FindAsync(new object[] { request.SessionId }, cancellationToken);
         if (session == null || session.Status == "CLOSED") return false;
 
-        // Calculate expected cash from invoices during this session
-        // For simplicity right now, we can query invoices for the specific terminal and cashier between StartTime and now
-        var endTime = DateTime.UtcNow;
-        var invoices = await _context.Invoices
-            .Where(i => i.TerminalId == session.TerminalId && i.CashierId == session.CashierId && i.CreatedAt >= session.StartTime && i.CreatedAt <= endTime)
-            .ToListAsync(cancellationToken);
+        var db = (DbContext)_context;
 
-        // H1 fix: sum CashAmount directly from all invoices in this session.
-        // Previously filtered by PaymentMode == "CASH" which excluded split-payment invoices
-        // (e.g. Cash+UPI marked as "SPLIT") — causing ExpectedClosingCash to be understated.
-        decimal totalCashSales = invoices.Sum(i => i.CashAmount);
-        
-        session.ExpectedClosingCash = session.OpeningFloatCash + totalCashSales;
-        session.ActualClosingCash = request.ActualClosingCash;
-        session.Difference = session.ActualClosingCash - session.ExpectedClosingCash;
-        session.EndTime = endTime;
-        session.Status = "CLOSED";
+        // BUG-05 FIX: Wrap the entire shift-close operation in a single transaction.
+        // Previously, a failure between account creation and session update could leave the
+        // session permanently stuck as OPEN (non-atomic operations across SaveChangesAsync calls).
+        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
 
-        // Post discrepancy to journal if Difference != 0
-        if (session.Difference != 0)
+        try
         {
-            var journalLines = new List<JournalLineDto>();
-            if (session.Difference > 0)
+            // Calculate expected cash from invoices during this session
+            var endTime = DateTime.UtcNow;
+            var invoices = await _context.Invoices
+                .Where(i => i.TerminalId == session.TerminalId && i.CashierId == session.CashierId && i.CreatedAt >= session.StartTime && i.CreatedAt <= endTime)
+                .ToListAsync(cancellationToken);
+
+            // H1 fix: sum CashAmount directly from all invoices in this session.
+            // Previously filtered by PaymentMode == "CASH" which excluded split-payment invoices
+            // (e.g. Cash+UPI marked as "SPLIT") — causing ExpectedClosingCash to be understated.
+            decimal totalCashSales = invoices.Sum(i => i.CashAmount);
+            
+            session.ExpectedClosingCash = session.OpeningFloatCash + totalCashSales;
+            session.ActualClosingCash = request.ActualClosingCash;
+            session.Difference = session.ActualClosingCash - session.ExpectedClosingCash;
+            session.EndTime = endTime;
+            session.Status = "CLOSED";
+
+            // Post discrepancy to journal if Difference != 0
+            if (session.Difference != 0)
             {
-                // Cash Over
-                journalLines.Add(new JournalLineDto { AccountCode = "1000", Description = "Cash Drawer Overage", Debit = session.Difference, Credit = 0 });
-                journalLines.Add(new JournalLineDto { AccountCode = "4200", Description = "Other Income (Cash Over)", Debit = 0, Credit = session.Difference });
-            }
-            else
-            {
-                // Cash Short
-                decimal shortage = Math.Abs(session.Difference);
-                journalLines.Add(new JournalLineDto { AccountCode = "5200", Description = "Cash Drawer Shortage", Debit = shortage, Credit = 0 });
-                journalLines.Add(new JournalLineDto { AccountCode = "1000", Description = "Cash Drawer Shortage", Debit = 0, Credit = shortage });
+                var journalLines = new List<JournalLineDto>();
+                if (session.Difference > 0)
+                {
+                    // Cash Over
+                    journalLines.Add(new JournalLineDto { AccountCode = "1000", Description = "Cash Drawer Overage", Debit = session.Difference, Credit = 0 });
+                    journalLines.Add(new JournalLineDto { AccountCode = "4200", Description = "Other Income (Cash Over)", Debit = 0, Credit = session.Difference });
+                }
+                else
+                {
+                    // Cash Short
+                    decimal shortage = Math.Abs(session.Difference);
+                    journalLines.Add(new JournalLineDto { AccountCode = "5200", Description = "Cash Drawer Shortage", Debit = shortage, Credit = 0 });
+                    journalLines.Add(new JournalLineDto { AccountCode = "1000", Description = "Cash Drawer Shortage", Debit = 0, Credit = shortage });
+                }
+
+                // Ensure discrepancy accounts exist in Chart of Accounts (within the same transaction)
+                await EnsureAccountExistsAsync("1000", "Cash on Hand", "ASSET", cancellationToken);
+                await EnsureAccountExistsAsync("4200", "Cash Drawer Overage (Other Income)", "REVENUE", cancellationToken);
+                await EnsureAccountExistsAsync("5200", "Cash Drawer Shortage (Expense)", "EXPENSE", cancellationToken);
+
+                await _financialPostingService.PostJournalEntryAsync(null, endTime.Date, $"Cash Discrepancy Session {session.Id}", $"SES-{session.Id}", journalLines, cancellationToken);
             }
 
-            // Ensure discrepancy accounts exist in Chart of Accounts
-            await EnsureAccountExistsAsync("1000", "Cash on Hand", "ASSET", cancellationToken);
-            await EnsureAccountExistsAsync("4200", "Cash Drawer Overage (Other Income)", "REVENUE", cancellationToken);
-            await EnsureAccountExistsAsync("5200", "Cash Drawer Shortage (Expense)", "EXPENSE", cancellationToken);
+            // Commit all changes (session status + accounts + journal) atomically
+            await _context.SaveChangesAsync(cancellationToken);
+            await transaction.CommitAsync(cancellationToken);
 
-            await _financialPostingService.PostJournalEntryAsync(null, endTime.Date, $"Cash Discrepancy Session {session.Id}", $"SES-{session.Id}", journalLines, cancellationToken);
+            return true;
         }
-
-        await _context.SaveChangesAsync(cancellationToken);
-        return true;
+        catch
+        {
+            await transaction.RollbackAsync(cancellationToken);
+            throw;
+        }
     }
 
     private async Task EnsureAccountExistsAsync(string code, string name, string type, CancellationToken cancellationToken)
@@ -89,7 +106,6 @@ public class ClosePosSessionCommandHandler : IRequestHandler<ClosePosSessionComm
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             });
-            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

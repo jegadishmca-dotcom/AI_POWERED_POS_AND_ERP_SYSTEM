@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Net;
@@ -11,11 +12,13 @@ public class GlobalExceptionMiddleware
 {
     private readonly RequestDelegate _next;
     private readonly ILogger<GlobalExceptionMiddleware> _logger;
+    private readonly IHostEnvironment _env;
 
-    public GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger)
+    public GlobalExceptionMiddleware(RequestDelegate next, ILogger<GlobalExceptionMiddleware> logger, IHostEnvironment env)
     {
         _next = next;
         _logger = logger;
+        _env = env;
     }
 
     public async Task InvokeAsync(HttpContext httpContext)
@@ -27,22 +30,42 @@ public class GlobalExceptionMiddleware
         catch (Exception ex)
         {
             _logger.LogError(ex, "An unhandled exception occurred.");
-            await HandleExceptionAsync(httpContext, ex);
+            await HandleExceptionAsync(httpContext, ex, _env.IsDevelopment());
         }
     }
 
-    private static Task HandleExceptionAsync(HttpContext context, Exception exception)
+    private static Task HandleExceptionAsync(HttpContext context, Exception exception, bool isDevelopment)
     {
         context.Response.ContentType = "application/json";
-        context.Response.StatusCode = (int)HttpStatusCode.InternalServerError;
+
+        // Map specific exception types to appropriate HTTP status codes
+        context.Response.StatusCode = exception is UnauthorizedAccessException
+            ? (int)HttpStatusCode.Unauthorized
+            : (int)HttpStatusCode.InternalServerError;
 
         var innerMsg = exception.InnerException != null ? exception.InnerException.Message : "";
-        var response = new
+
+        // SEC-01 FIX: Never expose full stack traces to clients in Production.
+        // Stack traces reveal internal class names, file paths, and SQL errors.
+        object response;
+        if (isDevelopment)
         {
-            StatusCode = context.Response.StatusCode,
-            Message = $"{exception.Message} {innerMsg}".Trim(),
-            Detailed = exception.ToString()
-        };
+            response = new
+            {
+                StatusCode = context.Response.StatusCode,
+                Message = $"{exception.Message} {innerMsg}".Trim(),
+                Detailed = exception.ToString()
+            };
+        }
+        else
+        {
+            response = new
+            {
+                StatusCode = context.Response.StatusCode,
+                Message = $"{exception.Message} {innerMsg}".Trim()
+                // Detailed is intentionally omitted in Production to prevent information disclosure
+            };
+        }
 
         var options = new JsonSerializerOptions
         {

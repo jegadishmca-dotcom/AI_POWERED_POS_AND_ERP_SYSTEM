@@ -514,7 +514,7 @@ export const PosTerminal = () => {
       recalculateCart(updatedItems);
     } else {
       const newItem = {
-        id: Math.random().toString(),
+        id: crypto.randomUUID(), // CQ-04 FIX: use crypto.randomUUID() instead of Math.random().toString()
         productId: product.id,
         name: product.name,
         qty: qtyToAdd,
@@ -1017,11 +1017,16 @@ export const PosTerminal = () => {
                         <input 
                           type="number"
                           min="1"
+                          // GAP-05 FIX: enforce integer quantities for non-weighable products
+                          step={item.isWeighable ? 'any' : '1'}
                           className="font-black text-lg w-16 text-center border border-slate-200 rounded focus:outline-none focus:border-indigo-500 bg-white"
                           value={item.qty}
                           onChange={(e) => {
-                            const val = parseInt(e.target.value, 10);
-                            if (!isNaN(val) && val > 0) {
+                            const raw = item.isWeighable
+                              ? parseFloat(e.target.value)
+                              : parseInt(e.target.value, 10);
+                            const val = isNaN(raw) ? 1 : raw;
+                            if (val > 0) {
                               updateItemQtyExact(item.productId, val);
                             }
                           }}

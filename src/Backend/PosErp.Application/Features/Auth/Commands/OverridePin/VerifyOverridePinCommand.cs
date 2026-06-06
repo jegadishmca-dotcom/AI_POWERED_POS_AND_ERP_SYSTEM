@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 namespace PosErp.Application.Features.Auth.Commands.OverridePin;
 
 /// <summary>
-/// Verifies a Manager Override PIN against any active Owner/Manager/Cashier
+/// Verifies a Manager Override PIN against any active Owner/Manager/Supervisor
 /// who has a PinHash set. Returns true if the pin matches any authorised user.
 /// Called from the POS terminal's Manager Override modal.
 /// </summary>
@@ -28,14 +28,16 @@ public class VerifyOverridePinCommandHandler : IRequestHandler<VerifyOverridePin
     {
         if (string.IsNullOrWhiteSpace(request.Pin)) return false;
 
-        // Fetch all active users who have an override PIN set and belong to Admin / Manager / Owner roles
+        // BUG-04 FIX: "Admin" role does not exist in the seeded role table.
+        // Seeded roles are: "Owner", "Manager", "Supervisor", "Cashier".
+        // Override-authorized roles are Owner, Manager, and Supervisor.
         var usersWithPin = await _context.Users
             .Join(_context.Roles,
                 u => u.RoleId,
                 r => r.Id,
                 (u, r) => new { User = u, Role = r })
             .Where(x => x.User.IsActive && !x.User.IsDeleted && x.User.PinHash != null &&
-                (x.Role.Name == "Admin" || x.Role.Name == "Manager" || x.Role.Name == "Owner"))
+                (x.Role.Name == "Supervisor" || x.Role.Name == "Manager" || x.Role.Name == "Owner"))
             .Select(x => x.User)
             .ToListAsync(cancellationToken);
 

@@ -143,7 +143,23 @@ public class SettingsController : ControllerBase
     {
         if (string.IsNullOrWhiteSpace(request.Password) || request.Password.Length < 8)
         {
-            return BadRequest(new { message = "Password must be at least 8 characters long." });
+            return BadRequest(new { message = "New password must be at least 8 characters long." });
+        }
+
+        // SEC-06 FIX: Require the requester's current password to authorize a password change.
+        // Without this check, any Manager/Owner can change any user's password without knowing it,
+        // enabling privilege abuse (e.g., a terminated manager locking out accounts).
+        if (string.IsNullOrWhiteSpace(request.CurrentPassword))
+        {
+            return BadRequest(new { message = "Current password is required to authorize this change." });
+        }
+
+        // Find the calling user (the one making the request) to verify their own password
+        var currentUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
+        var callerUser = await _context.Users.FirstOrDefaultAsync(u => u.Username == currentUsername && !u.IsDeleted);
+        if (callerUser == null || !_passwordHasher.VerifyPassword(request.CurrentPassword, callerUser.PasswordHash))
+        {
+            return StatusCode(403, new { message = "Your current password is incorrect. Password change denied." });
         }
 
         var user = await _context.Users.FirstOrDefaultAsync(u => u.Id == id && !u.IsDeleted);
@@ -152,17 +168,29 @@ public class SettingsController : ControllerBase
             return NotFound(new { message = "User not found." });
         }
 
-        var currentUsername = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value;
         var isDemoUser = string.Equals(currentUsername, "demo@supermarket.com", StringComparison.OrdinalIgnoreCase);
-
         if (isDemoUser && user.Username.ToLower().EndsWith("@supermarket.local"))
         {
             return StatusCode(403, new { message = "Demo Sandbox User cannot modify system accounts." });
         }
 
         user.PasswordHash = _passwordHasher.HashPassword(request.Password);
-        await _context.SaveChangesAsync(default);
 
+        // Audit the password change
+        var userIdClaim = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+        Guid? userId = Guid.TryParse(userIdClaim, out var guid) ? guid : null;
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        await _auditLoggingService.LogActionAsync(
+            userId,
+            "CHANGE_PASSWORD",
+            "User",
+            id.ToString(),
+            null,
+            new { TargetUsername = user.Username },
+            ipAddress,
+            default);
+
+        await _context.SaveChangesAsync(default);
         return Ok(new { message = "Password updated successfully." });
     }
 
@@ -499,7 +527,7 @@ public record UpdateUserRequest(
     bool IsActive,
     Guid? StoreId);
 
-public record ChangePasswordRequest(string Password);
+public record ChangePasswordRequest(string Password, string CurrentPassword);
 
 public record TerminalRequest(
     string TerminalCode,

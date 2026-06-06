@@ -16,10 +16,20 @@ public static class InventoryRulesManager
     private static readonly string FilePath = Path.Combine(AppContext.BaseDirectory, "inventory_rules.json");
     private static readonly object LockObj = new();
 
+    // CQ-01 FIX: Cache the rules in-memory so we don't read from disk on every stock ledger write.
+    // Rules are only re-read from disk when SaveRules() is called or on first access.
+    private static InventoryRules? _cachedRules;
+
     public static InventoryRules GetRules()
     {
+        // Fast path: return cached value without locking
+        if (_cachedRules != null) return _cachedRules;
+
         lock (LockObj)
         {
+            // Double-check after acquiring lock
+            if (_cachedRules != null) return _cachedRules;
+
             if (!File.Exists(FilePath))
             {
                 var defaultRules = new InventoryRules();
@@ -30,7 +40,8 @@ public static class InventoryRulesManager
             try
             {
                 string json = File.ReadAllText(FilePath);
-                return JsonSerializer.Deserialize<InventoryRules>(json) ?? new InventoryRules();
+                _cachedRules = JsonSerializer.Deserialize<InventoryRules>(json) ?? new InventoryRules();
+                return _cachedRules;
             }
             catch (Exception ex)
             {
@@ -48,6 +59,8 @@ public static class InventoryRulesManager
             {
                 string json = JsonSerializer.Serialize(rules, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(FilePath, json);
+                // Invalidate the cache so next read picks up the new values
+                _cachedRules = rules;
             }
             catch (Exception ex)
             {

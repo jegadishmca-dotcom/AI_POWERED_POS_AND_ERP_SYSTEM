@@ -30,6 +30,7 @@ export const UserManagement: React.FC = () => {
   // Change Password Form State
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
 
   const [saving, setSaving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -119,10 +120,14 @@ export const UserManagement: React.FC = () => {
     setActionError(null);
     setSaving(true);
     try {
-      await changeUserPassword(selectedUser.id, { password: newPassword });
+      await changeUserPassword(selectedUser.id, { 
+        password: newPassword,
+        currentPassword: currentPassword
+      });
       setShowPwdModal(false);
       setNewPassword('');
       setConfirmNewPassword('');
+      setCurrentPassword('');
       alert(`Password for ${selectedUser.username} has been updated.`);
     } catch (err: any) {
       setActionError(err.response?.data?.message || 'Failed to change password.');
@@ -144,6 +149,7 @@ export const UserManagement: React.FC = () => {
     setSelectedUser(user);
     setNewPassword('');
     setConfirmNewPassword('');
+    setCurrentPassword('');
     setActionError(null);
     setShowPwdModal(true);
   };
@@ -417,6 +423,17 @@ export const UserManagement: React.FC = () => {
               </div>
             )}
             <form onSubmit={handleChangePassword} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Your Current Password</label>
+                <input
+                  type="password"
+                  required
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-xl text-sm"
+                  placeholder="Enter your current admin password"
+                />
+              </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">New Password</label>
                 <input

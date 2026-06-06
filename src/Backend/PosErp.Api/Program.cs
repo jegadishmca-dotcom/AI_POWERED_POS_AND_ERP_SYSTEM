@@ -207,17 +207,14 @@ using (var scope = app.Services.CreateScope())
                 checkCmd.CommandText = "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'roles')";
                 var rolesExist = (bool)(await checkCmd.ExecuteScalarAsync() ?? false);
 
-                checkCmd.CommandText = "SELECT COUNT(*) FROM migration_history";
-                var historyCount = Convert.ToInt32(await checkCmd.ExecuteScalarAsync() ?? 0);
-
-                if (rolesExist && historyCount == 0)
+                if (rolesExist)
                 {
-                    // Seed migration_history for the original 16 migrations
+                    // Seed migration_history for the original 17 migrations
                     foreach (var f in sqlFiles)
                     {
                         var filename = Path.GetFileName(f);
                         var prefixStr = filename.Split('_')[0];
-                        if (int.TryParse(prefixStr, out int prefixNum) && prefixNum <= 16)
+                        if (int.TryParse(prefixStr, out int prefixNum) && prefixNum <= 17)
                         {
                             var seedCmd = connection.CreateCommand();
                             seedCmd.CommandText = "INSERT INTO migration_history (migration_name) VALUES (@p0) ON CONFLICT DO NOTHING";

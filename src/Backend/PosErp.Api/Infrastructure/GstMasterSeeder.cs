@@ -129,16 +129,16 @@ public static class GstMasterSeeder
 
         foreach (var (id, name, cgst, sgst, igst, cess) in slabs)
         {
-            await context.Database.ExecuteSqlRawAsync($@"
+            await context.Database.ExecuteSqlRawAsync(@"
                 INSERT INTO tax_slabs (id, name, cgst_rate, sgst_rate, igst_rate, cess_rate, created_at, is_deleted)
-                VALUES ('{id}','{name}',{cgst},{sgst},{igst},{cess},NOW(),false)
+                VALUES ({0}, {1}, {2}, {3}, {4}, {5}, NOW(), false)
                 ON CONFLICT (id) DO UPDATE
                     SET name=EXCLUDED.name,
                         cgst_rate=EXCLUDED.cgst_rate,
                         sgst_rate=EXCLUDED.sgst_rate,
                         igst_rate=EXCLUDED.igst_rate,
                         cess_rate=EXCLUDED.cess_rate;
-            ");
+            ", Guid.Parse(id), name, cgst, sgst, igst, cess);
         }
         Console.WriteLine("[GST] TaxSlab master: 0%, 5%, 12%, 18%, 28%, 28%+Cess seeded.");
 
@@ -626,19 +626,21 @@ public static class GstMasterSeeder
             var notes   = e.notes.Replace("'", "''");
             var notif   = e.notif.Replace("'", "''");
 
-            await context.Database.ExecuteSqlRawAsync($@"
+            await context.Database.ExecuteSqlRawAsync(@"
                 INSERT INTO gst_hsn_master_india (
                     id, hsn_code, description, category, example_products,
                     gst_rate_percent, cgst_rate, sgst_rate, igst_rate, cess_rate,
                     is_exempt, notes, notification_ref, tax_slab_id,
                     created_at, is_deleted)
                 VALUES (
-                    '{id}','{e.hsn}','{desc}','{e.cat}','{ex}',
-                    {e.rate},{cgst},{sgst},{igst},{cess},
-                    {exemptSql},'{notes}','{notif}','{e.slab}',
-                    NOW(),false)
+                    {0}, {1}, {2}, {3}, {4},
+                    {5}, {6}, {7}, {8}, {9},
+                    {10}, {11}, {12}, {13},
+                    NOW(), false)
                 ON CONFLICT DO NOTHING;
-            ");
+            ", id, e.hsn, desc, e.cat, ex,
+               e.rate, cgst, sgst, igst, cess,
+               e.exempt, notes, notif, Guid.Parse(e.slab));
             count++;
         }
 

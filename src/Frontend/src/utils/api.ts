@@ -1,10 +1,10 @@
 import axios from 'axios';
 import { useAuthStore } from '../features/auth/store/auth.store';
 
-const getServerUrl = () => {
+export const getServerUrl = () => {
   const savedIp = localStorage.getItem('pos_server_ip');
   if (savedIp) {
-    return savedIp.startsWith('http') ? savedIp : `http://${savedIp}`;
+    return savedIp.startsWith('http') ? savedIp : `https://${savedIp}`; // Default to https for remote
   }
   return import.meta.env.VITE_API_URL || '';
 };
@@ -15,7 +15,14 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  config.baseURL = getServerUrl();
+  const serverUrl = getServerUrl();
+  config.baseURL = serverUrl;
+  
+  // If no server URL is configured, throw a clear error instead of sending to Vercel root
+  if (!serverUrl) {
+    return Promise.reject(new Error("SERVER_URL_MISSING"));
+  }
+
   const token = useAuthStore.getState().accessToken;
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -26,12 +33,17 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
+    // Check if we manually rejected due to missing server URL
+    if (error.message === "SERVER_URL_MISSING") {
+      return Promise.reject(error);
+    }
+
     const originalRequest = error.config;
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true;
       try {
         const res = await axios.post(
-          `/api/auth/refresh`,
+          `${getServerUrl()}/api/auth/refresh`,
           {},
           { withCredentials: true }
         );

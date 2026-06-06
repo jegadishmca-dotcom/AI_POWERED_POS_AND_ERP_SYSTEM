@@ -78,7 +78,11 @@ export const Login = () => {
       const redirectPath = location.state?.from?.pathname || defaultPath;
       navigate(redirectPath, { replace: true });
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Invalid username or password. Please try again.');
+      if (err.message === 'SERVER_URL_MISSING') {
+        setError('Backend API URL is not configured. Please verify that VITE_API_URL is set in your environment.');
+      } else {
+        setError(err.response?.data?.message || 'Invalid username or password. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }

@@ -63,7 +63,8 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
 
         // GAP-02 FIX: Validate the terminal code exists and is active before issuing a token.
         // Previously, any terminal code (even fictional ones) was accepted silently.
-        if (!string.IsNullOrEmpty(request.TerminalCode))
+        // We bypass this check for "BACK-OFFICE" which represents ERP Back-Office login rather than a POS counter.
+        if (!string.IsNullOrEmpty(request.TerminalCode) && request.TerminalCode.Trim().ToUpper() != "BACK-OFFICE")
         {
             var terminal = await _context.Terminals
                 .FirstOrDefaultAsync(t => t.TerminalCode == request.TerminalCode.Trim().ToUpper(), cancellationToken);

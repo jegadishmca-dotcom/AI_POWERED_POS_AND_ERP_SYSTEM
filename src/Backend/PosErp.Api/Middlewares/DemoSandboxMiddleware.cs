@@ -39,6 +39,9 @@ public class DemoSandboxMiddleware
                 path.StartsWith("/api/pos/sync") ||
                 path.StartsWith("/api/pos/session/open") ||
                 path.StartsWith("/api/pos/session/close") ||
+                // Business Date (EOD) operations
+                path.StartsWith("/api/pos/business-date/open") ||
+                path.StartsWith("/api/pos/business-date/close") ||
                 // AI Automation is read-only analytics for demo
                 path.Contains("/api/aiautomation/chat") ||
                 path.Contains("/api/aiautomation/status");

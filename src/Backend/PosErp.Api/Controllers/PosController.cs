@@ -333,7 +333,26 @@ public class PosController : ControllerBase
     [HttpGet("sessions/summary")]
     public async Task<IActionResult> GetSessionsSummary()
     {
+        // M4: Filter sessions to the current active business date only.
+        // Previously returned 50 most recent sessions across ALL dates,
+        // which polluted the Terminal Shifts Monitor with historical sessions.
+        var activeBusinessDate = await _context.StoreBusinessDates
+            .Where(d => d.StoreId == Guid.Empty && d.Status == "OPEN")
+            .FirstOrDefaultAsync();
+
+        // If no open business date, fall back to the most recently opened one (closed days)
+        if (activeBusinessDate == null)
+        {
+            activeBusinessDate = await _context.StoreBusinessDates
+                .Where(d => d.StoreId == Guid.Empty)
+                .OrderByDescending(d => d.OpenedAt)
+                .FirstOrDefaultAsync();
+        }
+
+        var cutoffTime = activeBusinessDate?.OpenedAt ?? DateTime.UtcNow.Date;
+
         var sessions = await _context.PosSessions
+            .Where(s => s.StartTime >= cutoffTime)
             .Select(s => new {
                 s.Id,
                 s.TerminalId,

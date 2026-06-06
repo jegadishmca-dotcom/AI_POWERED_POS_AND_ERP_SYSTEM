@@ -34,7 +34,10 @@ public class ClosePosSessionCommandHandler : IRequestHandler<ClosePosSessionComm
             .Where(i => i.TerminalId == session.TerminalId && i.CashierId == session.CashierId && i.CreatedAt >= session.StartTime && i.CreatedAt <= endTime)
             .ToListAsync(cancellationToken);
 
-        decimal totalCashSales = invoices.Where(i => i.PaymentMode == "CASH").Sum(i => i.NetPayable);
+        // H1 fix: sum CashAmount directly from all invoices in this session.
+        // Previously filtered by PaymentMode == "CASH" which excluded split-payment invoices
+        // (e.g. Cash+UPI marked as "SPLIT") — causing ExpectedClosingCash to be understated.
+        decimal totalCashSales = invoices.Sum(i => i.CashAmount);
         
         session.ExpectedClosingCash = session.OpeningFloatCash + totalCashSales;
         session.ActualClosingCash = request.ActualClosingCash;

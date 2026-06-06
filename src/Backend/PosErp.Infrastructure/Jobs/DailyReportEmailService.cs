@@ -109,7 +109,9 @@ public class DailyReportEmailService : BackgroundService
             .ToListAsync(cancellationToken);
 
         int invoiceCount = todayInvoices.Count;
-        decimal totalSales = todayInvoices.Sum(i => i.TotalAmount);
+        // C7: Use NetPayable (actual amount charged to customer) for accurate revenue reporting
+        // TotalAmount was previously understated due to double-discount bug
+        decimal totalSales = todayInvoices.Sum(i => i.NetPayable);
         decimal cashTotal = todayInvoices.Sum(i => i.CashAmount);
         decimal upiTotal = todayInvoices.Sum(i => i.UpiAmount);
         decimal cardTotal = todayInvoices.Sum(i => i.CardAmount);
@@ -197,7 +199,7 @@ public class DailyReportEmailService : BackgroundService
             border-radius: 12px;
             box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
             overflow: hidden;
-            border: 1px border #e5e7eb;
+            border: 1px solid #e5e7eb;
         }}
         .header {{
             background: linear-gradient(135deg, #1e1b4b 0%, #312e81 100%);

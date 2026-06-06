@@ -74,6 +74,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             var productIds = request.Items.Select(i => i.ProductId).ToList();
             var productsInfo = await _context.Products
                 .Include(p => p.TaxSlab)
+                .Include(p => p.Barcodes)  // H2: needed to populate InvoiceItem.Barcode
                 .Where(p => productIds.Contains(p.Id))
                 .ToDictionaryAsync(p => p.Id, cancellationToken);
 
@@ -91,8 +92,10 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             cartEvaluation = await _offerEngine.EvaluateOffersAsync(cartEvaluation, customer?.Tier?.Name, request.PromoCode, cancellationToken);
 
             decimal totalTender = request.WalletAmountUsed + request.CashAmount + request.UpiAmount + request.CardAmount;
-            if (totalTender < cartEvaluation.FinalTotal)
-                throw new Exception("Total tender is less than the final invoice amount.");
+            // M3: validate against NetPayable (what frontend computed as the final bill amount)
+            // Allow a small ₹1 tolerance for rounding edge-cases on split payments
+            if (totalTender < request.NetPayable - 1m)
+                throw new Exception($"Total tender (₹{totalTender:F2}) is less than the invoice amount (₹{request.NetPayable:F2}).");
 
             // Retrieve the current active business date
             var activeDateSession = await _context.StoreBusinessDates
@@ -143,8 +146,11 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 var product = productsInfo.TryGetValue(item.ProductId, out var p) ? p : null;
                 decimal cgstRate = product?.TaxSlab?.CgstRate ?? 0;
                 decimal sgstRate = product?.TaxSlab?.SgstRate ?? 0;
-                decimal cgstAmount = item.FinalLineTotal * (cgstRate / 100m);
-                decimal sgstAmount = item.FinalLineTotal * (sgstRate / 100m);
+                // Tax is computed on the post-discount line total (FinalLineTotal)
+                decimal cgstAmount = Math.Round(item.FinalLineTotal * (cgstRate / 100m), 2);
+                decimal sgstAmount = Math.Round(item.FinalLineTotal * (sgstRate / 100m), 2);
+                // H2: Populate Barcode from the product's first barcode entry
+                string? primaryBarcode = product?.Barcodes?.FirstOrDefault()?.BarcodeValue;
 
                 invoice.Items.Add(new InvoiceItem
                 {
@@ -152,6 +158,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                     InvoiceId = invoiceId,
                     ProductId = item.ProductId,
                     ProductName = product?.Name ?? string.Empty,
+                    Barcode = primaryBarcode,
                     Quantity = item.Quantity,
                     UnitPrice = item.UnitPrice,
                     Total = item.LineTotal,
@@ -305,29 +312,33 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             if (request.WalletAmountUsed > 0 && customer != null)
                 await _walletService.RecordTransactionAsync(customer.Id, null, "SPEND", -request.WalletAmountUsed, finalInvoiceRef, null, cancellationToken);
 
+            // C6: Loyalty points calculated on NetPayable (actual amount charged)
+            // This call is AFTER invoice.TotalAmount is set (post-items-loop), so points are non-zero
             if (customer != null)
-                await _loyaltyService.CalculateAndAwardPointsForInvoiceAsync(invoice.Id, customer.Id, invoice.TotalAmount, cancellationToken);
+                await _loyaltyService.CalculateAndAwardPointsForInvoiceAsync(invoice.Id, customer.Id, invoice.NetPayable, cancellationToken);
 
             // ==========================================
             // PHASE 4: FINANCIAL DOUBLE-ENTRY POSTING
             // ==========================================
             
-            // For Indian GST, usually it's split 50/50 CGST/SGST for intra-state. 
-            // In a real system, the cart Evaluation provides exact tax breakdown per item. We mock a 50/50 split here.
-            decimal cgst = cartEvaluation.TaxTotal / 2m;
-            decimal sgst = cartEvaluation.TaxTotal / 2m;
-            decimal taxableValue = cartEvaluation.FinalTotal - cartEvaluation.TaxTotal;
+            // C5: Use invoice-level tax amounts (computed from actual per-item CGST/SGST)
+            // NOT stale cartEvaluation values which were pre-fix
+            decimal cgst = Math.Round(invoice.TaxAmount / 2m, 2);
+            decimal sgst = invoice.TaxAmount - cgst; // ensure CGST+SGST = TaxAmount exactly
+            decimal taxableValue = invoice.SubTotal; // SubTotal = sum of post-discount item totals (ex-tax)
 
             var journalLines = new List<JournalLineDto>();
 
-            // Debits (What we received)
-            decimal actualCashPaid = cartEvaluation.FinalTotal - request.UpiAmount - request.CardAmount - request.WalletAmountUsed;
+            // Debits (What we received) — use NetPayable as the total bill amount
+            decimal actualCashPaid = invoice.NetPayable - request.UpiAmount - request.CardAmount - request.WalletAmountUsed;
             if (actualCashPaid > 0) journalLines.Add(new JournalLineDto { AccountCode = "1000", Description = "Cash Tender", Debit = actualCashPaid, Credit = 0 });
             if (request.UpiAmount > 0 || request.CardAmount > 0) journalLines.Add(new JournalLineDto { AccountCode = "1100", Description = "Digital Tender", Debit = request.UpiAmount + request.CardAmount, Credit = 0 });
-            if (request.WalletAmountUsed > 0) journalLines.Add(new JournalLineDto { AccountCode = "2100", Description = "Wallet Redemption", Debit = request.WalletAmountUsed, Credit = 0 }); // Reducing liability
+            if (request.WalletAmountUsed > 0) journalLines.Add(new JournalLineDto { AccountCode = "2100", Description = "Wallet Redemption", Debit = request.WalletAmountUsed, Credit = 0 });
             
             // Credits (Revenue & Tax Liability)
-            journalLines.Add(new JournalLineDto { AccountCode = "4000", Description = "Sales Revenue", Debit = 0, Credit = taxableValue });
+            // Sales Revenue = SubTotal (post-discount, ex-tax) + any round-off adjustment
+            decimal revenueCredit = taxableValue + invoice.RoundOff;
+            journalLines.Add(new JournalLineDto { AccountCode = "4000", Description = "Sales Revenue", Debit = 0, Credit = revenueCredit });
             if (cgst > 0) journalLines.Add(new JournalLineDto { AccountCode = "2200", Description = "Output CGST", Debit = 0, Credit = cgst });
             if (sgst > 0) journalLines.Add(new JournalLineDto { AccountCode = "2201", Description = "Output SGST", Debit = 0, Credit = sgst });
 

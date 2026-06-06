@@ -30,6 +30,23 @@ import {
 
 export const BusinessDateDashboard: React.FC = () => {
   const { user } = useAuthStore();
+
+  /**
+   * M5: Safe date-only parser.
+   * When the backend returns a DateTime like "2026-06-06T00:00:00" (midnight UTC),
+   * the browser converts it to the local timezone. In IST (+5:30) that means
+   * midnight UTC = 5:30 AM IST on June 6, but in timezones behind UTC (e.g. UTC-6)
+   * it becomes June 5! We parse only the date portion to avoid this entirely.
+   */
+  const formatBusinessDate = (isoString: string): string => {
+    // Split on 'T' to get just the date portion "YYYY-MM-DD"
+    const datePart = isoString.split('T')[0];
+    const [year, month, day] = datePart.split('-').map(Number);
+    // Construct using local-time components (avoids timezone conversion)
+    const localDate = new Date(year, month - 1, day);
+    return localDate.toLocaleDateString('en-IN', { dateStyle: 'long' });
+  };
+
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [activeDateInfo, setActiveDateInfo] = useState<ActiveBusinessDateResponse | null>(null);
@@ -203,7 +220,7 @@ export const BusinessDateDashboard: React.FC = () => {
                   <div>
                     <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Store Day Open</p>
                     <p className="text-xl font-black text-emerald-800 dark:text-emerald-200">
-                      {new Date(activeDateInfo.businessDate!).toLocaleDateString('en-IN', { dateStyle: 'long' })}
+                      {formatBusinessDate(activeDateInfo.businessDate!)}
                     </p>
                   </div>
                 </div>

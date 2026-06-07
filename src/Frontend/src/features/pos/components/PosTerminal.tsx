@@ -832,6 +832,17 @@ export const PosTerminal = () => {
             {openingDateSubmitting ? 'Opening Day...' : 'Open Business Day'}
           </button>
         </div>
+
+        <ManagerPinModal
+          isOpen={isManagerModalOpen}
+          onClose={() => setManagerModalOpen(false)}
+          actionName={managerAction?.name}
+          onSuccess={(pin?: string) => {
+              setManagerModalOpen(false);
+              managerAction?.callback(pin);
+              setManagerAction(null);
+          }}
+        />
       </div>
     );
   }

@@ -71,7 +71,7 @@ export const getActiveBusinessDate = async (storeId?: string): Promise<ActiveBus
   return data;
 };
 
-export const openBusinessDate = async (payload: { businessDate: string; storeId?: string; openedBy?: string }): Promise<boolean> => {
+export const openBusinessDate = async (payload: { businessDate: string; storeId?: string; openedBy?: string; managerOverridePin?: string }): Promise<boolean> => {
   const { data } = await api.post('/api/pos/business-date/open', payload);
   return data.success;
 };

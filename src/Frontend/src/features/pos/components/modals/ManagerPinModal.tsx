@@ -19,8 +19,8 @@ export const ManagerPinModal = ({ isOpen, onClose, onSuccess, actionName }: any)
     try {
       const res = await api.post('/api/auth/verify-override-pin', { pin });
       if (res.data?.authorized) {
+        onSuccess(pin);
         setPin('');
-        onSuccess();
       } else {
         setError('Invalid Manager PIN. Access denied.');
         setPin('');

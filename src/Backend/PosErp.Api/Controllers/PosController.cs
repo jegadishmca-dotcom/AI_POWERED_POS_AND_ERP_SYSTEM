@@ -342,7 +342,7 @@ public class PosController : ControllerBase
     }
 
     [HttpPost("business-date/open")]
-    [Authorize(Roles = "Manager,Owner")] // Business day open is Manager/Owner only
+    [Authorize] // Allow Cashiers to hit this endpoint; validated internally using manager PIN override
     public async Task<IActionResult> OpenBusinessDate([FromBody] PosErp.Application.Features.Pos.Commands.OpenBusinessDateCommand command)
     {
         var success = await _mediator.Send(command);

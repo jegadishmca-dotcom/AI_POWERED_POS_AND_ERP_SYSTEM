@@ -781,33 +781,48 @@ export const PosTerminal = () => {
           <button
             onClick={async () => {
               if (!selectedOpenDate) return;
-              try {
-                setOpeningDateSubmitting(true);
-                setDateLoading(true);
-                const success = await openBusinessDate({ businessDate: selectedOpenDate, openedBy: cashierId });
-                if (success) {
-                  alert(`Business Date ${selectedOpenDate} opened successfully!`);
-                  // Reload business date state
-                  const activeState = await getActiveBusinessDate();
-                  setBusinessDateOpen(activeState.isOpen);
-                  setActiveBusinessDate(activeState.businessDate);
-                  
-                  if (activeState.isOpen) {
-                    const sessionData = await getCurrentSession(terminalId, cashierId);
-                    if (sessionData && sessionData.status === 'OPEN') {
-                      setActiveSession(sessionData);
-                    } else {
-                      setOpenShiftModalOpen(true);
+
+              const performOpen = async (overridePin?: string) => {
+                try {
+                  setOpeningDateSubmitting(true);
+                  setDateLoading(true);
+                  const success = await openBusinessDate({ 
+                    businessDate: selectedOpenDate, 
+                    openedBy: cashierId,
+                    managerOverridePin: overridePin
+                  });
+                  if (success) {
+                    alert(`Business Date ${selectedOpenDate} opened successfully!`);
+                    // Reload business date state
+                    const activeState = await getActiveBusinessDate();
+                    setBusinessDateOpen(activeState.isOpen);
+                    setActiveBusinessDate(activeState.businessDate);
+                    
+                    if (activeState.isOpen) {
+                      const sessionData = await getCurrentSession(terminalId, cashierId);
+                      if (sessionData && sessionData.status === 'OPEN') {
+                        setActiveSession(sessionData);
+                      } else {
+                        setOpenShiftModalOpen(true);
+                      }
                     }
                   }
+                } catch (err: any) {
+                  console.error(err);
+                  const msg = err.response?.data ? (typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data)) : err.message;
+                  alert(`Failed to open business date: ${msg}`);
+                } finally {
+                  setDateLoading(false);
+                  setOpeningDateSubmitting(false);
                 }
-              } catch (err: any) {
-                console.error(err);
-                const msg = err.response?.data ? (typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data)) : err.message;
-                alert(`Failed to open business date: ${msg}`);
-              } finally {
-                setDateLoading(false);
-                setOpeningDateSubmitting(false);
+              };
+
+              if (user?.role === 'Cashier') {
+                requestManagerOverride('Open Business Date', (pin?: string) => {
+                  performOpen(pin);
+                });
+              } else {
+                performOpen();
               }
             }}
             disabled={openingDateSubmitting || !selectedOpenDate}
@@ -1338,9 +1353,9 @@ export const PosTerminal = () => {
         isOpen={isManagerModalOpen}
         onClose={() => setManagerModalOpen(false)}
         actionName={managerAction?.name}
-        onSuccess={() => {
+        onSuccess={(pin?: string) => {
             setManagerModalOpen(false);
-            managerAction?.callback();
+            managerAction?.callback(pin);
             setManagerAction(null);
         }}
       />

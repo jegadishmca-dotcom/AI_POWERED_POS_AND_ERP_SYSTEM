@@ -6,7 +6,21 @@ export const getServerUrl = () => {
   if (savedIp) {
     return savedIp.startsWith('http') ? savedIp : `https://${savedIp}`; // Default to https for remote
   }
-  return import.meta.env.VITE_API_URL || '';
+  
+  const envUrl = import.meta.env.VITE_API_URL;
+  
+  // Dynamic fallback: If accessing remotely (not localhost/127.0.0.1) and VITE_API_URL is empty or points to localhost,
+  // route API requests through the current browser origin via Nginx reverse proxy.
+  if (typeof window !== 'undefined') {
+    const hostname = window.location.hostname;
+    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+      if (!envUrl || envUrl.includes('localhost') || envUrl.includes('127.0.0.1')) {
+        return window.location.origin;
+      }
+    }
+  }
+  
+  return envUrl || '';
 };
 
 export const api = axios.create({

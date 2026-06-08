@@ -36,6 +36,7 @@ builder.Services.AddScoped<IApplicationDbContext>(provider =>
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+builder.Services.AddHttpClient();
 
 // Health Checks
 builder.Services.AddHealthChecks();
@@ -118,7 +119,9 @@ builder.Services.AddScoped<IEmailSettingsManager, EmailSettingsManager>();
 
 // Register Materialized View Periodic Refresher
 builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.StockPositionRefreshService>();
-builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.DailyReportEmailService>();
+builder.Services.AddSingleton<PosErp.Infrastructure.Jobs.DailyReportEmailService>();
+builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.DailyReportEmailService>(
+    sp => sp.GetRequiredService<PosErp.Infrastructure.Jobs.DailyReportEmailService>());
 builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.RefreshTokenCleanupService>();
 
 // M1: CORS — restrict to known frontend origin in Production; allow all in Development.

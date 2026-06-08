@@ -24,11 +24,17 @@ namespace PosErp.Api.Controllers;
 public class AiAutomationController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
-    private static readonly HttpClient _httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly PosErp.Infrastructure.Jobs.DailyReportEmailService _dailyReportEmailService;
 
-    public AiAutomationController(IApplicationDbContext context)
+    public AiAutomationController(
+        IApplicationDbContext context, 
+        IHttpClientFactory httpClientFactory,
+        PosErp.Infrastructure.Jobs.DailyReportEmailService dailyReportEmailService)
     {
         _context = context;
+        _httpClientFactory = httpClientFactory;
+        _dailyReportEmailService = dailyReportEmailService;
     }
 
     public record ChatRequest(string Prompt);
@@ -50,14 +56,18 @@ public class AiAutomationController : ControllerBase
             try
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-                var response = await _httpClient.GetAsync(ollamaUrl, cts.Token);
+                var client = _httpClientFactory.CreateClient();
+                client.Timeout = TimeSpan.FromSeconds(5);
+                var response = await client.GetAsync(ollamaUrl, cts.Token);
                 ollamaOnline = response.IsSuccessStatusCode;
             }
             catch
             {
                 ollamaUrl = "http://localhost:11434";
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-                var response = await _httpClient.GetAsync(ollamaUrl, cts.Token);
+                var client = _httpClientFactory.CreateClient();
+                client.Timeout = TimeSpan.FromSeconds(5);
+                var response = await client.GetAsync(ollamaUrl, cts.Token);
                 ollamaOnline = response.IsSuccessStatusCode;
             }
         }
@@ -348,12 +358,7 @@ public class AiAutomationController : ControllerBase
     {
         try
         {
-            var scopeFactory = HttpContext.RequestServices.GetRequiredService<IServiceScopeFactory>();
-            var config = HttpContext.RequestServices.GetRequiredService<IConfiguration>();
-
-            var reportService = new PosErp.Infrastructure.Jobs.DailyReportEmailService(scopeFactory, config);
-            await reportService.SendDailyReportAsync(cancellationToken);
-
+            await _dailyReportEmailService.SendDailyReportAsync(cancellationToken);
             return Ok(new { success = true, message = "Daily report email triggered successfully." });
         }
         catch (Exception ex)
@@ -706,7 +711,9 @@ public class AiAutomationController : ControllerBase
             {
                 // Check if pos_ollama responds quickly
                 using var testCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-                await _httpClient.GetAsync(baseUrl, testCts.Token);
+                var client = _httpClientFactory.CreateClient();
+                client.Timeout = TimeSpan.FromSeconds(5);
+                await client.GetAsync(baseUrl, testCts.Token);
             }
             catch
             {
@@ -718,7 +725,8 @@ public class AiAutomationController : ControllerBase
             bool hasModels = false;
             try
             {
-                using var tagsClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+                var tagsClient = _httpClientFactory.CreateClient();
+                tagsClient.Timeout = TimeSpan.FromSeconds(3);
                 var tagsResponse = await tagsClient.GetAsync($"{baseUrl}/api/tags", cancellationToken);
                 if (tagsResponse.IsSuccessStatusCode)
                 {
@@ -769,7 +777,8 @@ public class AiAutomationController : ControllerBase
             }
 
             // 2. Query the LLM with a 90-second timeout to handle CPU-only generation safely
-            using var ollamaClient = new HttpClient { Timeout = TimeSpan.FromSeconds(90) };
+            var ollamaClient = _httpClientFactory.CreateClient();
+            ollamaClient.Timeout = TimeSpan.FromSeconds(90);
             var requestBody = new
             {
                 model = activeModel,
@@ -867,7 +876,9 @@ public class AiAutomationController : ControllerBase
             try
             {
                 using var testCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-                await _httpClient.GetAsync(baseUrl, testCts.Token);
+                var client = _httpClientFactory.CreateClient();
+                client.Timeout = TimeSpan.FromSeconds(5);
+                await client.GetAsync(baseUrl, testCts.Token);
             }
             catch { baseUrl = "http://localhost:11434"; }
 
@@ -875,7 +886,8 @@ public class AiAutomationController : ControllerBase
             string activeModel = "llama2";
             try
             {
-                using var tagsClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+                var tagsClient = _httpClientFactory.CreateClient();
+                tagsClient.Timeout = TimeSpan.FromSeconds(3);
                 var tagsResponse = await tagsClient.GetAsync($"{baseUrl}/api/tags", cancellationToken);
                 if (tagsResponse.IsSuccessStatusCode)
                 {
@@ -899,7 +911,8 @@ public class AiAutomationController : ControllerBase
             }
             catch { }
 
-            using var ollamaClient = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+            var ollamaClient = _httpClientFactory.CreateClient();
+            ollamaClient.Timeout = TimeSpan.FromSeconds(60);
             var requestBody = new
             {
                 model = activeModel,
@@ -989,14 +1002,17 @@ public class AiAutomationController : ControllerBase
             try
             {
                 using var testCts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-                await _httpClient.GetAsync(baseUrl, testCts.Token);
+                var client = _httpClientFactory.CreateClient();
+                client.Timeout = TimeSpan.FromSeconds(5);
+                await client.GetAsync(baseUrl, testCts.Token);
             }
             catch { baseUrl = "http://localhost:11434"; }
 
             string activeModel = "llama2";
             try
             {
-                using var tagsClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+                var tagsClient = _httpClientFactory.CreateClient();
+                tagsClient.Timeout = TimeSpan.FromSeconds(3);
                 var tagsResponse = await tagsClient.GetAsync($"{baseUrl}/api/tags", cancellationToken);
                 if (tagsResponse.IsSuccessStatusCode)
                 {
@@ -1020,7 +1036,8 @@ public class AiAutomationController : ControllerBase
             }
             catch { }
 
-            using var ollamaClient = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+            var ollamaClient = _httpClientFactory.CreateClient();
+            ollamaClient.Timeout = TimeSpan.FromSeconds(60);
             var requestBody = new
             {
                 model = activeModel,

@@ -41,20 +41,21 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
       const cgstRate = safe(item.cgstRate);
       const sgstRate = safe(item.sgstRate);
       const cessRate = safe(item.cessRate);
-      const totalRate = cgstRate + sgstRate;
-      const itemBase  = safe(item.unitPrice) * safe(item.quantity) - safe(item.discountAmount);
+      const totalRate = cgstRate + sgstRate + cessRate;
+      const itemBaseInclusive = safe(item.unitPrice) * safe(item.quantity) - safe(item.discountAmount);
+      const itemBaseTaxable = totalRate > 0 ? itemBaseInclusive / (1 + totalRate / 100) : itemBaseInclusive;
       
-      const cgstAmt = item.cgstAmount !== undefined ? safe(item.cgstAmount) : itemBase * (cgstRate / 100);
-      const sgstAmt = item.sgstAmount !== undefined ? safe(item.sgstAmount) : itemBase * (sgstRate / 100);
-      const cessAmt = item.cessAmount !== undefined ? safe(item.cessAmount) : itemBase * (cessRate / 100);
+      const cgstAmt = item.cgstAmount !== undefined ? safe(item.cgstAmount) : itemBaseTaxable * (cgstRate / 100);
+      const sgstAmt = item.sgstAmount !== undefined ? safe(item.sgstAmount) : itemBaseTaxable * (sgstRate / 100);
+      const cessAmt = item.cessAmount !== undefined ? safe(item.cessAmount) : itemBaseTaxable * (cessRate / 100);
       
       totalCessAmount += cessAmt;
       totalGstAmount += cgstAmt + sgstAmt;
 
-      if (totalRate === 0 && cessRate === 0) return;
-      const key       = `GST ${totalRate}%`;
+      if ((cgstRate + sgstRate) === 0 && cessRate === 0) return;
+      const key       = `GST ${(cgstRate + sgstRate)}%`;
       if (!taxSlabs[key]) taxSlabs[key] = { taxable: 0, cgst: 0, sgst: 0, cess: 0 };
-      taxSlabs[key].taxable += itemBase;
+      taxSlabs[key].taxable += itemBaseTaxable;
       taxSlabs[key].cgst    += cgstAmt;
       taxSlabs[key].sgst    += sgstAmt;
       taxSlabs[key].cess    += cessAmt;

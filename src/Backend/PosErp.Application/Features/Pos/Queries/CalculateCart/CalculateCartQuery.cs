@@ -85,6 +85,9 @@ public class CalculateCartQueryHandler : IRequestHandler<CalculateCartQuery, Car
         // 2. Evaluate promotions dynamically
         cartEvaluation = await _offerEngine.EvaluateOffersAsync(cartEvaluation, customer?.Tier?.Name, request.PromoCode, cancellationToken);
 
+        decimal preDiscountSubtotalExTax = 0;
+        decimal totalDiscountExTax = 0;
+
         // 3. Map results and calculate taxes based on post-discount prices
         foreach (var item in cartEvaluation.Items)
         {
@@ -93,10 +96,26 @@ public class CalculateCartQueryHandler : IRequestHandler<CalculateCartQuery, Car
                 decimal cgstRate = product.TaxSlab?.CgstRate ?? 0;
                 decimal sgstRate = product.TaxSlab?.SgstRate ?? 0;
                 decimal cessRate = product.TaxSlab?.CessRate ?? 0;
+                decimal totalTaxRate = cgstRate + sgstRate + cessRate;
                 
-                decimal cgstAmount = Math.Round(item.FinalLineTotal * (cgstRate / 100m), 2);
-                decimal sgstAmount = Math.Round(item.FinalLineTotal * (sgstRate / 100m), 2);
-                decimal cessAmount = Math.Round(item.FinalLineTotal * (cessRate / 100m), 2);
+                decimal taxableAmount = totalTaxRate > 0
+                    ? item.FinalLineTotal / (1 + (totalTaxRate / 100m))
+                    : item.FinalLineTotal;
+
+                decimal cgstAmount = Math.Round(taxableAmount * (cgstRate / 100m), 2);
+                decimal sgstAmount = Math.Round(taxableAmount * (sgstRate / 100m), 2);
+                decimal cessAmount = Math.Round(taxableAmount * (cessRate / 100m), 2);
+
+                decimal preDiscountLineExTax = totalTaxRate > 0
+                    ? item.LineTotal / (1 + (totalTaxRate / 100m))
+                    : item.LineTotal;
+
+                decimal discountExTax = totalTaxRate > 0
+                    ? item.DiscountAmount / (1 + (totalTaxRate / 100m))
+                    : item.DiscountAmount;
+
+                preDiscountSubtotalExTax += preDiscountLineExTax;
+                totalDiscountExTax += discountExTax;
 
                 resultItems.Add(new CartItemCalculationResultDto(
                     ProductId: product.Id,
@@ -117,14 +136,14 @@ public class CalculateCartQueryHandler : IRequestHandler<CalculateCartQuery, Car
             }
         }
 
-        decimal preDiscountSubtotal = cartEvaluation.Items.Sum(i => i.LineTotal);
         decimal taxTotal = resultItems.Sum(i => i.CgstAmount + i.SgstAmount + i.CessAmount);
+        decimal finalTotal = cartEvaluation.Items.Sum(i => i.FinalLineTotal);
 
         return new CartCalculationResultDto(
-            SubTotal: Math.Round(preDiscountSubtotal, 2),
-            TotalDiscount: Math.Round(cartEvaluation.TotalDiscount, 2),
+            SubTotal: Math.Round(preDiscountSubtotalExTax, 2),
+            TotalDiscount: Math.Round(totalDiscountExTax, 2),
             TaxTotal: Math.Round(taxTotal, 2),
-            FinalTotal: Math.Round(cartEvaluation.Items.Sum(i => i.FinalLineTotal) + taxTotal, 2),
+            FinalTotal: Math.Round(finalTotal, 2),
             AppliedOfferNames: cartEvaluation.AppliedOfferNames,
             Items: resultItems
         );

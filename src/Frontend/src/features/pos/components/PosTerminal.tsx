@@ -418,25 +418,47 @@ export const PosTerminal = () => {
     appliedOfferNames: []
   });
 
-  const recalculateCart = async (items: any[], overrideCustomerId?: string | null) => {
+  const recalculateCart = useCallback(async (items: any[], overrideCustomerId?: string | null) => {
     if (items.length === 0) {
       setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
       return;
     }
 
     // --- INSTANT OPTIMISTIC LOCAL CALCULATION ---
-    let localSubtotal = items.reduce((sum: number, item: any) => sum + (item.qty * item.unitPrice), 0);
-    let localTaxTotal = items.reduce((sum: number, item: any) => {
-        const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0) + (item.cessRate || 0);
-        return sum + ((item.qty * item.unitPrice) * (itemTaxRate / 100));
-    }, 0);
+    let localFinalTotal = 0;
+    let localTaxTotal = 0;
+    const mappedItems = items.map((item: any) => {
+      const qty = item.qty;
+      const unitPrice = item.unitPrice;
+      const lineTotal = qty * unitPrice; // MRP is tax-inclusive, so line total is unitPrice * qty
+      const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0) + (item.cessRate || 0);
+      const taxable = lineTotal / (1 + itemTaxRate / 100);
+      const cgstAmount = taxable * ((item.cgstRate || 0) / 100);
+      const sgstAmount = taxable * ((item.sgstRate || 0) / 100);
+      const cessAmount = taxable * ((item.cessRate || 0) / 100);
+
+      localFinalTotal += lineTotal;
+      localTaxTotal += (cgstAmount + sgstAmount + cessAmount);
+
+      return {
+        ...item,
+        finalLineTotal: lineTotal,
+        discountAmount: item.discountAmount || 0,
+        appliedOfferName: item.appliedOfferName || null,
+        cgstAmount: +cgstAmount.toFixed(2),
+        sgstAmount: +sgstAmount.toFixed(2),
+        cessAmount: +cessAmount.toFixed(2)
+      };
+    });
+
+    let localSubtotal = localFinalTotal - localTaxTotal;
 
     setCart({
-      items: items.map(i => ({ ...i, finalLineTotal: i.qty * i.unitPrice, discountAmount: i.discountAmount || 0, appliedOfferName: i.appliedOfferName || null })),
+      items: mappedItems,
       subtotal: localSubtotal,
       totalDiscount: 0, 
       taxTotal: localTaxTotal,
-      finalTotal: localSubtotal + localTaxTotal,
+      finalTotal: localFinalTotal,
       appliedOfferNames: [] 
     });
 
@@ -461,7 +483,10 @@ export const PosTerminal = () => {
             appliedOfferName: calcItem.appliedOfferName,
             cgstRate: calcItem.cgstRate,
             sgstRate: calcItem.sgstRate,
-            cessRate: calcItem.cessRate
+            cessRate: calcItem.cessRate,
+            cgstAmount: calcItem.cgstAmount,
+            sgstAmount: calcItem.sgstAmount,
+            cessAmount: calcItem.cessAmount
           };
         });
 
@@ -478,14 +503,14 @@ export const PosTerminal = () => {
     } catch (err) {
       console.warn('Backend calculation failed, keeping basic offline calculation', err);
     }
-  };
+  }, [promoCode, customer]);
 
   // Evaluate whenever promo code or customer changes, only if cart is not empty
   useEffect(() => {
     if (cart.items.length > 0) {
       recalculateCart(cart.items);
     }
-  }, [promoCode, customer]);
+  }, [recalculateCart]);
 
   const updateItemBatch = (productId: string, batchId: string) => {
     const updatedItems = cart.items.map((item: any) => {
@@ -1241,9 +1266,24 @@ export const PosTerminal = () => {
                 // Add mapping for Sync API expected fields
                 barcode: item.barcode || item.primaryBarcode || undefined,
                 productName: item.name,
-                cgstAmount: ((item.finalLineTotal || item.lineTotal) * (item.cgstRate || 0)) / 100,
-                sgstAmount: ((item.finalLineTotal || item.lineTotal) * (item.sgstRate || 0)) / 100,
-                cessAmount: ((item.finalLineTotal || item.lineTotal) * (item.cessRate || 0)) / 100
+                cgstAmount: (() => {
+                  const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0) + (item.cessRate || 0);
+                  const lineTotal = item.finalLineTotal || item.lineTotal;
+                  const taxable = lineTotal / (1 + itemTaxRate / 100);
+                  return +(taxable * ((item.cgstRate || 0) / 100)).toFixed(2);
+                })(),
+                sgstAmount: (() => {
+                  const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0) + (item.cessRate || 0);
+                  const lineTotal = item.finalLineTotal || item.lineTotal;
+                  const taxable = lineTotal / (1 + itemTaxRate / 100);
+                  return +(taxable * ((item.sgstRate || 0) / 100)).toFixed(2);
+                })(),
+                cessAmount: (() => {
+                  const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0) + (item.cessRate || 0);
+                  const lineTotal = item.finalLineTotal || item.lineTotal;
+                  const taxable = lineTotal / (1 + itemTaxRate / 100);
+                  return +(taxable * ((item.cessRate || 0) / 100)).toFixed(2);
+                })()
               }))
             };
 

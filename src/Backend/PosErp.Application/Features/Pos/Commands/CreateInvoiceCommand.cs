@@ -147,10 +147,16 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 decimal cgstRate = product?.TaxSlab?.CgstRate ?? 0;
                 decimal sgstRate = product?.TaxSlab?.SgstRate ?? 0;
                 decimal cessRate = product?.TaxSlab?.CessRate ?? 0;
-                // Tax is computed on the post-discount line total (FinalLineTotal)
-                decimal cgstAmount = Math.Round(item.FinalLineTotal * (cgstRate / 100m), 2);
-                decimal sgstAmount = Math.Round(item.FinalLineTotal * (sgstRate / 100m), 2);
-                decimal cessAmount = Math.Round(item.FinalLineTotal * (cessRate / 100m), 2);
+                decimal totalTaxRate = cgstRate + sgstRate + cessRate;
+
+                decimal taxableAmount = totalTaxRate > 0 
+                    ? item.FinalLineTotal / (1 + (totalTaxRate / 100m)) 
+                    : item.FinalLineTotal;
+
+                // Tax is computed on the post-discount line total (FinalLineTotal) using tax-inclusive formula
+                decimal cgstAmount = Math.Round(taxableAmount * (cgstRate / 100m), 2);
+                decimal sgstAmount = Math.Round(taxableAmount * (sgstRate / 100m), 2);
+                decimal cessAmount = Math.Round(taxableAmount * (cessRate / 100m), 2);
                 // H2: Populate Barcode from the product's first barcode entry
                 string? primaryBarcode = product?.Barcodes?.FirstOrDefault()?.BarcodeValue;
 
@@ -180,7 +186,11 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             // set invoice-level TaxAmount and TotalAmount from actual item sums.
             // This ensures the stored values match exactly what is printed on the receipt.
             invoice.TaxAmount = invoice.Items.Sum(i => i.CgstAmount + i.SgstAmount + i.CessAmount);
-            // TotalAmount = discounted subtotal + actual tax (pre-round-off amount billed)
+            
+            // SubTotal is the ex-tax final total (discounted total minus tax)
+            invoice.SubTotal = invoice.Items.Sum(i => i.FinalTotal - (i.CgstAmount + i.SgstAmount + i.CessAmount));
+            
+            // TotalAmount = discounted subtotal + actual tax (pre-round-off amount billed) which matches sum of FinalTotals
             invoice.TotalAmount = invoice.SubTotal + invoice.TaxAmount;
             // NetPayable (already set from frontend, includes round-off) is the source of truth
             // but TotalAmount without round-off is used for revenue reporting accuracy.
@@ -214,7 +224,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                                     r => r.Id,
                                     (u, r) => new { User = u, Role = r })
                                 .Where(x => x.User.IsActive && !x.User.IsDeleted && x.User.PinHash != null &&
-                                    (x.Role.Name == "Admin" || x.Role.Name == "Manager" || x.Role.Name == "Owner"))
+                                    (x.Role.Name == "Supervisor" || x.Role.Name == "Manager" || x.Role.Name == "Owner"))
                                 .Select(x => x.User)
                                 .ToListAsync(cancellationToken);
 

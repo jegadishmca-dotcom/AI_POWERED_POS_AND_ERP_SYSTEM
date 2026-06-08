@@ -19,12 +19,18 @@ public class PosController : ControllerBase
     private readonly IMediator _mediator;
     private readonly IPrintService _printService;
     private readonly IApplicationDbContext _context;
+    private readonly PosErp.Infrastructure.Jobs.DailyReportEmailService _dailyReportEmailService;
 
-    public PosController(IMediator mediator, IPrintService printService, IApplicationDbContext context)
+    public PosController(
+        IMediator mediator, 
+        IPrintService printService, 
+        IApplicationDbContext context,
+        PosErp.Infrastructure.Jobs.DailyReportEmailService dailyReportEmailService)
     {
         _mediator = mediator;
         _printService = printService;
         _context = context;
+        _dailyReportEmailService = dailyReportEmailService;
     }
 
     [HttpGet("invoice/{id}")]
@@ -358,10 +364,7 @@ public class PosController : ControllerBase
         // Trigger daily report email automatically
         try
         {
-            var scopeFactory = HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.DependencyInjection.IServiceScopeFactory>();
-            var config = HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
-            var reportService = new PosErp.Infrastructure.Jobs.DailyReportEmailService(scopeFactory, config);
-            await reportService.SendDailyReportAsync(default, closedDate);
+            await _dailyReportEmailService.SendDailyReportAsync(default, closedDate);
             Console.WriteLine($"[PosController] Automatically sent daily email report for closed Business Date: {closedDate:yyyy-MM-dd}");
         }
         catch (Exception ex)

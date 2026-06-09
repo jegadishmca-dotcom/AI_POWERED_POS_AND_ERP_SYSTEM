@@ -4,7 +4,7 @@ import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistra
 import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
 import { searchCustomers, registerCustomer } from '../../crm/api/crm.api';
-import { createInvoice, closeShift, getZReport, getProductBatches, getCurrentSession, openSession, calculateCart, getActiveBusinessDate, openBusinessDate } from '../api/pos.api';
+import { createInvoice, closeShift, getZReport, getProductBatches, getCurrentSession, openSession, calculateCart, getActiveBusinessDate, openBusinessDate, holdInvoice } from '../api/pos.api';
 import { printReceipt } from '../utils/printReceipt';
 import { printZReport } from '../utils/printZReport';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -638,21 +638,47 @@ export const PosTerminal = () => {
       return;
     }
     
+    const uuid = crypto.randomUUID();
     const invoiceToHold = {
-      id: Math.random().toString(36).substring(2, 15) + Date.now().toString(36),
+      id: uuid,
       invoiceNumber: `HOLD-${Date.now()}`,
-      businessDate: new Date().toISOString(),
-      items: cart.items,
+      businessDate: activeBusinessDate || new Date().toISOString(),
+      terminalId: terminalId,
+      cashierId: cashierId,
+      customerId: customer?.id || null,
+      subTotal: cart.subtotal,
+      discountAmount: cart.totalDiscount,
+      taxAmount: cart.taxTotal,
       totalAmount: cart.finalTotal,
-      status: 'HELD',
-      customer: customer // Save customer details!
+      roundOff: 0,
+      netPayable: cart.finalTotal,
+      items: cart.items.map((item: any) => ({
+        productId: item.productId,
+        barcode: item.barcode || '',
+        productName: item.name,
+        quantity: item.qty,
+        unitPrice: item.unitPrice,
+        discountAmount: item.discountAmount || 0,
+        totalAmount: item.finalLineTotal,
+        cgstRate: item.cgstRate || 0,
+        cgstAmount: item.cgstAmount || 0,
+        sgstRate: item.sgstRate || 0,
+        sgstAmount: item.sgstAmount || 0,
+        cessRate: item.cessRate || 0,
+        cessAmount: item.cessAmount || 0
+      }))
     };
     
-    await posDb.held_invoices.put(invoiceToHold as any);
-    setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
-    setCustomer(null);
-    setCustomerQuery('');
-    alert('Cart put on hold successfully.');
+    try {
+      await holdInvoice(invoiceToHold);
+      setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
+      setCustomer(null);
+      setCustomerQuery('');
+      alert('Cart put on hold successfully.');
+    } catch (err: any) {
+      console.error(err);
+      alert('Failed to hold cart globally: ' + (err.response?.data?.message || err.message));
+    }
   };
 
   const handleResumeCart = (invoice: any) => {

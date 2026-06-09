@@ -123,12 +123,30 @@ public class SettingsController : ControllerBase
             return StatusCode(403, new { message = "Demo Sandbox User cannot modify system accounts." });
         }
 
+        if (string.IsNullOrWhiteSpace(request.Username))
+        {
+            return BadRequest(new { message = "Username is required." });
+        }
+
+        var usernameNormalized = request.Username.Trim().ToLower();
+        if (isDemoUser && usernameNormalized.EndsWith("@supermarket.local") && !user.Username.ToLower().EndsWith("@supermarket.local"))
+        {
+            return StatusCode(403, new { message = "Demo Sandbox User cannot assign system usernames ending with @supermarket.local." });
+        }
+
+        var exists = await _context.Users.AnyAsync(u => u.Username.ToLower() == usernameNormalized && u.Id != id && !u.IsDeleted);
+        if (exists)
+        {
+            return BadRequest(new { message = "Username is already taken by another account." });
+        }
+
         var roleExists = await _context.Roles.AnyAsync(r => r.Id == request.RoleId);
         if (!roleExists)
         {
             return BadRequest(new { message = "Invalid Role ID selected." });
         }
 
+        user.Username = request.Username.Trim();
         user.FullName = request.FullName.Trim();
         user.RoleId = request.RoleId;
         user.IsActive = request.IsActive;
@@ -522,6 +540,7 @@ public record CreateUserRequest(
     Guid? StoreId);
 
 public record UpdateUserRequest(
+    string Username,
     string FullName,
     Guid RoleId,
     bool IsActive,

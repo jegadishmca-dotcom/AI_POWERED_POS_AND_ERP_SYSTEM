@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Clock, Play } from 'lucide-react';
-import { posDb } from '../../db/pos.db';
+import { getHeldInvoices, deleteHeldInvoice } from '../../api/pos.api';
 import { Invoice } from '../../types';
 
 export const HoldResumeModal = ({ isOpen, onClose, onResume }: any) => {
@@ -8,14 +8,18 @@ export const HoldResumeModal = ({ isOpen, onClose, onResume }: any) => {
 
   useEffect(() => {
     if (isOpen) {
-      posDb.held_invoices.toArray().then(setHeldInvoices);
+      getHeldInvoices().then(setHeldInvoices).catch(console.error);
     }
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleResume = async (invoice: Invoice) => {
-    await posDb.held_invoices.delete(invoice.id);
+    try {
+      await deleteHeldInvoice(invoice.id);
+    } catch (err) {
+      console.error("Failed to delete held invoice on backend", err);
+    }
     onResume(invoice);
   };
 

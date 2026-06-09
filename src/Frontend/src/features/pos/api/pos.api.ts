@@ -118,3 +118,19 @@ export const getBusinessDateMetrics = async (businessDate: string): Promise<Busi
   });
   return data;
 };
+
+export const holdInvoice = async (payload: any): Promise<any> => {
+  const { data } = await api.post('/api/pos/invoices/hold', payload);
+  return data;
+};
+
+export const getHeldInvoices = async (): Promise<any[]> => {
+  const { data } = await api.get('/api/pos/invoices/held');
+  return data;
+};
+
+export const deleteHeldInvoice = async (id: string): Promise<any> => {
+  const { data } = await api.delete(`/api/pos/invoices/hold/${id}`);
+  return data;
+};
+

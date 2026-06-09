@@ -8,6 +8,8 @@ using PosErp.Application.Features.Pos.Commands.SyncInvoices;
 using PosErp.Infrastructure.Printing;
 using System;
 using PosErp.Application.Features.Pos.Queries.GetZReport;
+using PosErp.Domain.Entities.Pos;
+using PosErp.Domain.Entities.Crm;
 
 namespace PosErp.Api.Controllers;
 
@@ -440,4 +442,192 @@ public class PosController : ControllerBase
 
         return Ok(metrics);
     }
+
+    [HttpPost("invoices/hold")]
+    public async Task<IActionResult> HoldInvoice([FromBody] HoldInvoiceRequest request)
+    {
+        if (request == null || request.Id == Guid.Empty)
+        {
+            return BadRequest("Invalid hold invoice request.");
+        }
+
+        var businessDate = request.BusinessDate.Date;
+
+        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync();
+        try
+        {
+            var existing = await _context.Invoices
+                .Include(i => i.Items)
+                .FirstOrDefaultAsync(i => i.Id == request.Id && i.BusinessDate == businessDate);
+
+            if (existing != null)
+            {
+                _context.InvoiceItems.RemoveRange(existing.Items);
+                _context.Invoices.Remove(existing);
+                await _context.SaveChangesAsync(default);
+            }
+
+            var invoice = new Invoice
+            {
+                Id = request.Id,
+                InvoiceNumber = request.InvoiceNumber,
+                BusinessDate = businessDate,
+                TerminalId = request.TerminalId,
+                TerminalSequence = 0,
+                CashierId = request.CashierId,
+                CustomerId = request.CustomerId,
+                SubTotal = request.SubTotal,
+                DiscountAmount = request.DiscountAmount,
+                TaxAmount = request.TaxAmount,
+                TotalAmount = request.TotalAmount,
+                RoundOff = request.RoundOff,
+                NetPayable = request.NetPayable,
+                Status = "HOLD",
+                PaymentMode = "Cash",
+                CreatedAt = DateTime.UtcNow
+            };
+
+            foreach (var item in request.Items)
+            {
+                invoice.Items.Add(new InvoiceItem
+                {
+                    Id = Guid.NewGuid(),
+                    InvoiceId = invoice.Id,
+                    BusinessDate = businessDate,
+                    ProductId = item.ProductId,
+                    Barcode = item.Barcode,
+                    ProductName = item.ProductName,
+                    Quantity = item.Quantity,
+                    UnitPrice = item.UnitPrice,
+                    DiscountAmount = item.DiscountAmount,
+                    CgstRate = item.CgstRate,
+                    CgstAmount = item.CgstAmount,
+                    SgstRate = item.SgstRate,
+                    SgstAmount = item.SgstAmount,
+                    CessRate = item.CessRate,
+                    CessAmount = item.CessAmount,
+                    TotalAmount = item.TotalAmount,
+                    Total = item.TotalAmount
+                });
+            }
+
+            _context.Invoices.Add(invoice);
+            await _context.SaveChangesAsync(default);
+            await transaction.CommitAsync();
+
+            return Ok(new { success = true, message = "Invoice held successfully." });
+        }
+        catch (Exception ex)
+        {
+            await transaction.RollbackAsync();
+            return StatusCode(500, new { message = $"Failed to hold invoice: {ex.Message}" });
+        }
+    }
+
+    [HttpGet("invoices/held")]
+    public async Task<IActionResult> GetHeldInvoices()
+    {
+        var invoices = await _context.Invoices
+            .Include(i => i.Items)
+            .Where(i => i.Status == "HOLD" && !i.IsDeleted)
+            .OrderByDescending(i => i.CreatedAt)
+            .ToListAsync();
+
+        var result = new System.Collections.Generic.List<object>();
+        foreach (var inv in invoices)
+        {
+            Customer customer = null;
+            if (inv.CustomerId.HasValue)
+            {
+                customer = await _context.Customers
+                    .Include(c => c.Tier)
+                    .FirstOrDefaultAsync(c => c.Id == inv.CustomerId.Value);
+            }
+
+            var customerObj = customer == null ? null : new {
+                id = customer.Id,
+                name = customer.Name,
+                phone = customer.Phone,
+                walletBalance = customer.RunningWalletBalance,
+                points = customer.RunningLoyaltyPoints,
+                tier = customer.Tier?.Name ?? "Silver"
+            };
+
+            result.Add(new
+            {
+                id = inv.Id,
+                invoiceNumber = inv.InvoiceNumber,
+                businessDate = inv.BusinessDate,
+                totalAmount = inv.NetPayable,
+                customer = customerObj,
+                items = inv.Items.Select(ii => new {
+                    productId = ii.ProductId,
+                    name = ii.ProductName,
+                    qty = ii.Quantity,
+                    unitPrice = ii.UnitPrice,
+                    discountAmount = ii.DiscountAmount,
+                    finalLineTotal = ii.TotalAmount,
+                    cgstRate = ii.CgstRate,
+                    sgstRate = ii.SgstRate,
+                    cessRate = ii.CessRate,
+                    barcode = ii.Barcode
+                }).ToList()
+            });
+        }
+
+        return Ok(result);
+    }
+
+    [HttpDelete("invoices/hold/{id}")]
+    public async Task<IActionResult> DeleteHeldInvoice(Guid id)
+    {
+        var invoice = await _context.Invoices
+            .Include(i => i.Items)
+            .FirstOrDefaultAsync(i => i.Id == id && i.Status == "HOLD");
+
+        if (invoice == null)
+        {
+            return NotFound("Held invoice not found.");
+        }
+
+        _context.InvoiceItems.RemoveRange(invoice.Items);
+        _context.Invoices.Remove(invoice);
+        await _context.SaveChangesAsync(default);
+
+        return Ok(new { success = true, message = "Held invoice deleted/removed." });
+    }
+}
+
+public class HoldInvoiceRequest
+{
+    public Guid Id { get; set; }
+    public string InvoiceNumber { get; set; } = string.Empty;
+    public DateTime BusinessDate { get; set; }
+    public Guid TerminalId { get; set; }
+    public Guid CashierId { get; set; }
+    public Guid? CustomerId { get; set; }
+    public decimal SubTotal { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal TotalAmount { get; set; }
+    public decimal RoundOff { get; set; }
+    public decimal NetPayable { get; set; }
+    public List<HoldInvoiceItemDto> Items { get; set; } = new();
+}
+
+public class HoldInvoiceItemDto
+{
+    public Guid ProductId { get; set; }
+    public string? Barcode { get; set; }
+    public string ProductName { get; set; } = string.Empty;
+    public decimal Quantity { get; set; }
+    public decimal UnitPrice { get; set; }
+    public decimal DiscountAmount { get; set; }
+    public decimal TotalAmount { get; set; }
+    public decimal CgstRate { get; set; }
+    public decimal CgstAmount { get; set; }
+    public decimal SgstRate { get; set; }
+    public decimal SgstAmount { get; set; }
+    public decimal CessRate { get; set; }
+    public decimal CessAmount { get; set; }
 }

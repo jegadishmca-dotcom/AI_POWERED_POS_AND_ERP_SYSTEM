@@ -23,6 +23,7 @@ export const UserManagement: React.FC = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   
   // Edit User Form State
+  const [editUsername, setEditUsername] = useState('');
   const [editFullName, setEditFullName] = useState('');
   const [editRoleId, setEditRoleId] = useState('');
   const [editIsActive, setEditIsActive] = useState(true);
@@ -94,6 +95,7 @@ export const UserManagement: React.FC = () => {
     setSaving(true);
     try {
       await updateUser(selectedUser.id, {
+        username: editUsername,
         fullName: editFullName,
         roleId: editRoleId,
         isActive: editIsActive,
@@ -138,6 +140,7 @@ export const UserManagement: React.FC = () => {
 
   const openEditModal = (user: UserSettingsDto) => {
     setSelectedUser(user);
+    setEditUsername(user.username);
     setEditFullName(user.fullName);
     setEditRoleId(user.roleId);
     setEditIsActive(user.isActive);
@@ -359,6 +362,17 @@ export const UserManagement: React.FC = () => {
               </div>
             )}
             <form onSubmit={handleEditUser} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Username / E-mail</label>
+                <input
+                  type="text"
+                  required
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value)}
+                  className="w-full px-4 py-2 border rounded-xl text-sm"
+                  placeholder="e.g. cashier03@supermarket.local"
+                />
+              </div>
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Full Name</label>
                 <input

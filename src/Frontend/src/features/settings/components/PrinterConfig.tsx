@@ -143,10 +143,9 @@ export const PrinterConfig: React.FC = () => {
         JsBarcode(svg, barcodeValue, {
           format: "CODE128",
           width: 2,
-          height: 50,
-          displayValue: true,
-          fontSize: 14,
-          font: "monospace"
+          height: 40,
+          displayValue: false, // Hide numeric text below barcode lines
+          margin: 0
         });
       } catch (e) {
         console.error("Barcode generation failed", e);
@@ -156,61 +155,155 @@ export const PrinterConfig: React.FC = () => {
 
       const svgHtml = svg.outerHTML;
 
+      // Mock Packed and Expiry dates
+      const pkdDate = "09/06/2026";
+      const expDate = "09/12/2026";
+
+      const labelColHtml = `
+      <div class="label-col">
+        <div class="header-band">
+          <svg viewBox="0 0 24 24" width="9" height="9" fill="#ffffff" style="margin-right: 2px;">
+            <path d="M12 2C11.38 2 10.19 2.9 9.5 3.5C8.81 4.1 8.5 5.5 8.5 5.5C8.5 5.5 9.9 5.5 10.6 4.8C11.3 4.1 12 2 12 2Z" />
+            <path d="M15.5 7.5C14.2 7.5 13.5 8.2 12.5 8.2C11.5 8.2 10.9 7.5 9.6 7.5C7.5 7.5 6 9.5 6 12.5C6 16.2 8.9 21.5 11 21.5C12.1 21.5 12.3 20.8 13.3 20.8C14.3 20.8 14.5 21.5 15.6 21.5C17.7 21.5 20 17 20 13.5C20 9.8 17.6 7.5 15.5 7.5Z" />
+          </svg>
+          <span class="header-title">ஆப்பிள் சூப்பர் மார்க்கெட்</span>
+        </div>
+        <div class="middle-row">
+          <div class="code-vertical">3387</div>
+          <div class="barcode-svg">${svgHtml}</div>
+        </div>
+        <div class="product-name">Test Sticker Label</div>
+        <div class="price-row">₹ : 0.00</div>
+        <div class="dates-row">
+          <span>PKD:${pkdDate}</span>
+          <span>EXP:${expDate}</span>
+        </div>
+      </div>
+    `;
+
       const html = `<!DOCTYPE html>
 <html>
 <head>
   <meta charset="UTF-8"/>
   <title>Print Barcode - Test Label</title>
   <style>
-    body {
+    @page {
+      size: 102mm 22mm;
       margin: 0;
-      padding: 10px;
-      font-family: 'Courier New', Courier, monospace;
-      text-align: center;
-      width: 50mm; /* Standard label size: 50mm x 25mm */
-      height: 25mm;
+    }
+    * {
+      margin: 0;
+      padding: 0;
       box-sizing: border-box;
+    }
+    body {
+      width: 102mm;
+      height: 22mm;
+      display: flex;
+      flex-direction: row;
+      justify-content: space-between;
+      align-items: center;
+      background: #fff;
+      overflow: hidden;
+      padding: 0 1.5mm;
+    }
+    .label-col {
+      width: 31mm;
+      height: 22mm;
       display: flex;
       flex-direction: column;
+      justify-content: flex-start;
+      overflow: hidden;
+    }
+    .header-band {
+      background-color: #0b7a54;
+      color: #fff;
+      height: 4.5mm;
+      display: flex;
       align-items: center;
       justify-content: center;
-    }
-    .store-name {
-      font-size: 8px;
-      font-weight: bold;
-      text-transform: uppercase;
-      margin-bottom: 2px;
-      letter-spacing: 0.5px;
-    }
-    .product-name {
-      font-size: 9px;
-      font-weight: bold;
-      margin-bottom: 2px;
-      white-space: nowrap;
+      border-radius: 2px;
       overflow: hidden;
-      text-overflow: ellipsis;
-      width: 100%;
     }
-    .price-tag {
-      font-size: 10px;
-      font-weight: 900;
-      margin-bottom: 2px;
+    .header-title {
+      font-size: 7.5px;
+      font-weight: bold;
+      font-family: 'Latha', 'Arial', sans-serif;
+      white-space: nowrap;
+    }
+    .middle-row {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: space-between;
+      height: 9mm;
+      margin-top: 0.5mm;
+    }
+    .code-vertical {
+      font-size: 7px;
+      font-weight: bold;
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      white-space: nowrap;
+      width: 3mm;
+      text-align: center;
+      font-family: Arial, sans-serif;
+    }
+    .barcode-svg {
+      flex-grow: 1;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100%;
+      overflow: hidden;
+      padding-left: 1mm;
     }
     .barcode-svg svg {
       width: 100%;
       height: auto;
-      max-height: 12mm;
+      max-height: 9mm;
+    }
+    .product-name {
+      font-size: 7.5px;
+      font-weight: bold;
+      text-align: center;
+      margin-top: 0.3mm;
+      height: 3mm;
+      line-height: 3mm;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      font-family: Arial, sans-serif;
+    }
+    .price-row {
+      font-size: 9.5px;
+      font-weight: bold;
+      text-align: center;
+      height: 3.2mm;
+      line-height: 3.2mm;
+      font-family: Arial, sans-serif;
+    }
+    .dates-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 5.2px;
+      font-family: monospace;
+      height: 1.8mm;
+      line-height: 1.8mm;
+      padding: 0 0.5mm;
     }
     @media print {
-      body { width: 50mm; height: 25mm; }
+      body {
+        width: 102mm;
+        height: 22mm;
+      }
     }
   </style>
 </head>
 <body>
-  <div class="store-name">Apple Supermarket</div>
-  <div class="product-name">Test Sticker Label</div>
-  <div class="price-tag">Price: Rs.0.00</div>
-  <div class="barcode-svg">${svgHtml}</div>
+  ${labelColHtml}
+  ${labelColHtml}
+  ${labelColHtml}
   <script>
     window.onload = function() {
       window.print();
@@ -220,7 +313,7 @@ export const PrinterConfig: React.FC = () => {
 </body>
 </html>`;
 
-      const printWindow = window.open('', '_blank', 'width=300,height=300');
+      const printWindow = window.open('', '_blank', 'width=450,height=250');
       if (printWindow) {
         printWindow.document.open();
         printWindow.document.write(html);

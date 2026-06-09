@@ -31,9 +31,12 @@ public class DemoSandboxMiddleware
                 path.Contains("/api/auth/login") || 
                 path.Contains("/api/auth/refresh") || 
                 path.Contains("/api/auth/logout") ||
+                path.Equals("/api/auth/set-override-pin") ||
+                path.Equals("/api/auth/verify-override-pin") ||
                 // Email test — transient and doesn't mutate data
                 path.Contains("/api/settings/email/test") ||
                 // POS billing-only operations (exact matches for safety)
+                path.Equals("/api/pos/create") ||
                 path.Equals("/api/pos/invoice") ||
                 path.Equals("/api/pos/calculate-cart") ||
                 path.StartsWith("/api/pos/sync") ||

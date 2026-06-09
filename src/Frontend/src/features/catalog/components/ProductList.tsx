@@ -107,13 +107,7 @@ export const ProductList = ({
 
     const labelColHtml = `
       <div class="label-col">
-        <div class="header-band">
-          <svg viewBox="0 0 24 24" width="9" height="9" fill="#ffffff" style="margin-right: 2px;">
-            <path d="M12 2C11.38 2 10.19 2.9 9.5 3.5C8.81 4.1 8.5 5.5 8.5 5.5C8.5 5.5 9.9 5.5 10.6 4.8C11.3 4.1 12 2 12 2Z" />
-            <path d="M15.5 7.5C14.2 7.5 13.5 8.2 12.5 8.2C11.5 8.2 10.9 7.5 9.6 7.5C7.5 7.5 6 9.5 6 12.5C6 16.2 8.9 21.5 11 21.5C12.1 21.5 12.3 20.8 13.3 20.8C14.3 20.8 14.5 21.5 15.6 21.5C17.7 21.5 20 17 20 13.5C20 9.8 17.6 7.5 15.5 7.5Z" />
-          </svg>
-          <span class="header-title">ஆப்பிள் சூப்பர் மார்க்கெட்</span>
-        </div>
+        <div class="header-spacer"></div>
         <div class="middle-row">
           <div class="code-vertical">${product.productCode || ''}</div>
           <div class="barcode-svg">${svgHtml}</div>
@@ -161,21 +155,9 @@ export const ProductList = ({
       justify-content: flex-start;
       overflow: hidden;
     }
-    .header-band {
-      background-color: #0b7a54;
-      color: #fff;
+    .header-spacer {
       height: 4.5mm;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      border-radius: 2px;
-      overflow: hidden;
-    }
-    .header-title {
-      font-size: 7.5px;
-      font-weight: bold;
-      font-family: 'Latha', 'Arial', sans-serif;
-      white-space: nowrap;
+      width: 100%;
     }
     .middle-row {
       display: flex;

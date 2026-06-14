@@ -34,6 +34,16 @@ export const closeShift = async (payload: { sessionId: string; actualClosingCash
   return data;
 };
 
+export const forceCloseShift = async (sessionId: string): Promise<boolean> => {
+  const { data } = await api.post(`/api/pos/session/force-close/${sessionId}`);
+  return data.success;
+};
+
+export const forceCloseAllShifts = async (): Promise<boolean> => {
+  const { data } = await api.post('/api/pos/session/force-close-all');
+  return data.success;
+};
+
 export const getZReport = async (terminalId: string, businessDate: string, cashierId: string, sessionId?: string) => {
   const { data } = await api.get('/api/pos/z-report', {
     params: { terminalId, businessDate, cashierId, sessionId }

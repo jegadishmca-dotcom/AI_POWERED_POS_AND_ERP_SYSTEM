@@ -159,6 +159,22 @@ public class PosController : ControllerBase
         return Ok(await _mediator.Send(command));
     }
 
+    [HttpPost("session/force-close/{id}")]
+    [Authorize(Roles = "Manager,Owner")]
+    public async Task<IActionResult> ForceCloseSession(Guid id)
+    {
+        var result = await _mediator.Send(new PosErp.Application.Features.Pos.Commands.ForceClosePosSessionCommand(id));
+        return Ok(new { success = result });
+    }
+
+    [HttpPost("session/force-close-all")]
+    [Authorize(Roles = "Manager,Owner")]
+    public async Task<IActionResult> ForceCloseAllSessions()
+    {
+        var result = await _mediator.Send(new PosErp.Application.Features.Pos.Commands.ForceCloseAllPosSessionsCommand());
+        return Ok(new { success = result });
+    }
+
     [HttpPost("print/{invoiceId}")]
     public async Task<IActionResult> PrintReceipt(Guid invoiceId, [FromQuery] string printerIp = "192.168.1.100")
     {

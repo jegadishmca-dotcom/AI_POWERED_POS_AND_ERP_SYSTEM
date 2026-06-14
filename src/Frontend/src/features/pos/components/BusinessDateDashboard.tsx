@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { 
   getActiveBusinessDate, 
@@ -7,7 +8,9 @@ import {
   getSessionsSummary,
   ActiveBusinessDateResponse,
   BusinessDateMetricsDto,
-  SessionSummaryDto
+  SessionSummaryDto,
+  forceCloseShift,
+  forceCloseAllShifts
 } from '../api/pos.api';
 import { useAuthStore } from '../../auth/store/auth.store';
 import { 
@@ -63,6 +66,9 @@ export const BusinessDateDashboard: React.FC = () => {
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [alertInfo, setAlertInfo] = useState<{ title: string; message: string; type: 'success' | 'error' | 'warning' } | null>(null);
+  const [showForceCloseModal, setShowForceCloseModal] = useState(false);
+  const [selectedSessionToForceClose, setSelectedSessionToForceClose] = useState<{ id: string; terminalCode: string; cashierName: string } | null>(null);
+  const [showForceCloseAllModal, setShowForceCloseAllModal] = useState(false);
 
   const loadData = async () => {
     try {
@@ -161,6 +167,69 @@ export const BusinessDateDashboard: React.FC = () => {
     }
   };
 
+  const handleForceCloseSingle = async (sessionId: string, terminalCode: string, cashierName: string) => {
+    setSelectedSessionToForceClose({ id: sessionId, terminalCode, cashierName });
+    setShowForceCloseModal(true);
+  };
+
+  const handleForceCloseSingleConfirm = async () => {
+    if (!selectedSessionToForceClose) return;
+    setShowForceCloseModal(false);
+    try {
+      setSubmitting(true);
+      const success = await forceCloseShift(selectedSessionToForceClose.id);
+      if (success) {
+        setAlertInfo({
+          title: 'Shift Force Closed',
+          message: `The active shift on ${selectedSessionToForceClose.terminalCode} for cashier ${selectedSessionToForceClose.cashierName} has been force closed successfully.`,
+          type: 'success'
+        });
+        await loadData();
+      }
+    } catch (err: any) {
+      console.error(err);
+      const msg = err.response?.data ? (typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data)) : err.message;
+      setAlertInfo({
+        title: 'Force Close Failed',
+        message: `Error detail: ${msg}`,
+        type: 'error'
+      });
+    } finally {
+      setSubmitting(false);
+      setSelectedSessionToForceClose(null);
+    }
+  };
+
+  const handleForceCloseAll = () => {
+    setShowForceCloseAllModal(true);
+  };
+
+  const handleForceCloseAllConfirm = async () => {
+    setShowForceCloseAllModal(false);
+    try {
+      setSubmitting(true);
+      const success = await forceCloseAllShifts();
+      if (success) {
+        setAlertInfo({
+          title: 'All Shifts Force Closed',
+          message: 'All open cashier shifts across all POS terminals have been force closed successfully.',
+          type: 'success'
+        });
+        await loadData();
+      }
+    } catch (err: any) {
+      console.error(err);
+      const msg = err.response?.data ? (typeof err.response.data === 'string' ? err.response.data : JSON.stringify(err.response.data)) : err.message;
+      setAlertInfo({
+        title: 'Force Close All Failed',
+        message: `Error detail: ${msg}`,
+        type: 'error'
+      });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const hasOpenShifts = sessions.some(s => s.status === 'OPEN');
 
   if (loading) {
@@ -243,11 +312,21 @@ export const BusinessDateDashboard: React.FC = () => {
                   </div>
 
                   {hasOpenShifts && (
-                    <div className="p-3 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 rounded-xl flex items-start gap-2.5">
-                      <AlertTriangle className="w-4.5 h-4.5 text-red-500 shrink-0 mt-0.5" />
-                      <p className="text-xs text-red-700 dark:text-red-300 font-semibold leading-relaxed">
-                        Cannot close day! There are active open cashier shifts. Please close them first.
-                      </p>
+                    <div className="p-4 bg-red-50 dark:bg-red-950/20 border border-red-100 dark:border-red-900/30 rounded-xl space-y-3">
+                      <div className="flex items-start gap-2.5">
+                        <AlertTriangle className="w-4.5 h-4.5 text-red-500 shrink-0 mt-0.5" />
+                        <p className="text-xs text-red-700 dark:text-red-300 font-semibold leading-relaxed">
+                          Cannot close day! There are active open cashier shifts. Please close them first.
+                        </p>
+                      </div>
+                      <button
+                        onClick={handleForceCloseAll}
+                        disabled={submitting}
+                        className="w-full py-2 px-3 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-lg transition-all duration-150 flex items-center justify-center gap-1.5 shadow"
+                      >
+                        <Lock className="w-3.5 h-3.5" />
+                        Force Close All Active Shifts
+                      </button>
                     </div>
                   )}
 
@@ -412,6 +491,7 @@ export const BusinessDateDashboard: React.FC = () => {
                       <th className="py-3 px-4 text-right">Float</th>
                       <th className="py-3 px-4 text-right">Variance</th>
                       <th className="py-3 px-4 text-center">Status</th>
+                      <th className="py-3 px-4 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
@@ -442,6 +522,19 @@ export const BusinessDateDashboard: React.FC = () => {
                           }`}>
                             {s.status}
                           </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-center">
+                          {s.status === 'OPEN' ? (
+                            <button
+                              onClick={() => handleForceCloseSingle(s.id, s.terminalCode, s.cashierName)}
+                              disabled={submitting}
+                              className="px-2.5 py-1 text-xs font-bold text-amber-600 dark:text-amber-400 border border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded-lg shadow-sm transition-all duration-150"
+                            >
+                              Force Close
+                            </button>
+                          ) : (
+                            <span className="text-xs text-slate-400 dark:text-slate-500 font-medium">-</span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -508,6 +601,100 @@ export const BusinessDateDashboard: React.FC = () => {
                   className="py-3 px-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold rounded-xl transition-all shadow-md shadow-red-500/10 text-sm"
                 >
                   {submitting ? 'Executing EOD...' : 'Confirm & Close Day'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showForceCloseModal && selectedSessionToForceClose && (
+        <div className="fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all border border-slate-100 dark:border-slate-700">
+            <div className="bg-gradient-to-r from-amber-500 to-orange-600 p-6 text-white">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-6 h-6 text-white shrink-0" />
+                <h2 className="text-xl font-bold">Force Close Shift</h2>
+              </div>
+              <p className="text-amber-100 text-xs mt-1">
+                You are performing an administrative force close on an active shift.
+              </p>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                <p>
+                  <strong>Terminal:</strong> {selectedSessionToForceClose.terminalCode}
+                </p>
+                <p>
+                  <strong>Cashier:</strong> {selectedSessionToForceClose.cashierName}
+                </p>
+                <div className="p-3 bg-amber-50 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/30 rounded-xl">
+                  <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed font-semibold">
+                    Note: Force-closing a shift reconciles the register assuming actual cash equals the expected sales totals (zero variance discrepancy).
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  onClick={() => {
+                    setShowForceCloseModal(false);
+                    setSelectedSessionToForceClose(null);
+                  }}
+                  className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleForceCloseSingleConfirm}
+                  disabled={submitting}
+                  className="py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 text-white font-bold rounded-xl transition-all shadow-md shadow-amber-500/10 text-sm"
+                >
+                  {submitting ? 'Force Closing...' : 'Confirm Force Close'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showForceCloseAllModal && (
+        <div className="fixed inset-0 bg-slate-900/80 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all border border-slate-100 dark:border-slate-700">
+            <div className="bg-gradient-to-r from-red-600 to-rose-600 p-6 text-white">
+              <div className="flex items-center gap-3">
+                <AlertTriangle className="w-6 h-6 text-white shrink-0" />
+                <h2 className="text-xl font-bold">Force Close All Shifts</h2>
+              </div>
+              <p className="text-red-100 text-xs mt-1">
+                Caution: This is a store-wide bulk operations action.
+              </p>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="space-y-2 text-sm text-slate-600 dark:text-slate-300">
+                <p className="font-semibold text-red-600 dark:text-red-400">
+                  Are you sure you want to force close all active cashier shifts across all POS terminals?
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                  This will immediately close and reconcile every open shift register. Each terminal's actual closing balance will be set equal to its expected sales count, clearing any blocks preventing End-of-Day.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-2">
+                <button
+                  onClick={() => setShowForceCloseAllModal(false)}
+                  className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold rounded-xl transition-colors text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleForceCloseAllConfirm}
+                  disabled={submitting}
+                  className="py-2.5 px-4 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold rounded-xl transition-all shadow-md shadow-red-500/10 text-sm"
+                >
+                  {submitting ? 'Force Closing All...' : 'Confirm Bulk Close'}
                 </button>
               </div>
             </div>

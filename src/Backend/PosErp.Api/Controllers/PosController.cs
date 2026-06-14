@@ -483,13 +483,20 @@ public class PosController : ControllerBase
                 await _context.SaveChangesAsync(default);
             }
 
+            // Generate a unique negative terminal sequence for held invoices to avoid unique constraint violations
+            var minSeq = await _context.Invoices
+                .Where(i => i.TerminalId == request.TerminalId && i.BusinessDate == businessDate)
+                .Select(i => (int?)i.TerminalSequence)
+                .MinAsync(default) ?? 0;
+            var nextSeq = minSeq <= 0 ? minSeq - 1 : -1;
+
             var invoice = new Invoice
             {
                 Id = request.Id,
                 InvoiceNumber = request.InvoiceNumber,
                 BusinessDate = businessDate,
                 TerminalId = request.TerminalId,
-                TerminalSequence = 0,
+                TerminalSequence = nextSeq,
                 CashierId = request.CashierId,
                 CustomerId = request.CustomerId,
                 SubTotal = request.SubTotal,
@@ -536,7 +543,8 @@ public class PosController : ControllerBase
         catch (Exception ex)
         {
             await transaction.RollbackAsync();
-            return StatusCode(500, new { message = $"Failed to hold invoice: {ex.Message}" });
+            var innerMsg = ex.InnerException != null ? $" (Inner: {ex.InnerException.Message})" : "";
+            return StatusCode(500, new { message = $"Failed to hold invoice: {ex.Message}{innerMsg}" });
         }
     }
 

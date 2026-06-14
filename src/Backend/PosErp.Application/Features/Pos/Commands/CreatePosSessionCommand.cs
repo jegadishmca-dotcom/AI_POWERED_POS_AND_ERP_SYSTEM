@@ -1,7 +1,9 @@
 using MediatR;
+using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Pos;
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -20,6 +22,17 @@ public class CreatePosSessionCommandHandler : IRequestHandler<CreatePosSessionCo
 
     public async Task<Guid> Handle(CreatePosSessionCommand request, CancellationToken cancellationToken)
     {
+        // Safety constraint check: Ensure no duplicate active open sessions exist for this terminal or cashier.
+        var existingSession = await _context.PosSessions
+            .Where(s => s.Status == "OPEN" && (s.TerminalId == request.TerminalId || s.CashierId == request.CashierId))
+            .FirstOrDefaultAsync(cancellationToken);
+
+        if (existingSession != null)
+        {
+            // Return existing active session ID to make the operation idempotent and prevent duplicates.
+            return existingSession.Id;
+        }
+
         var session = new PosSession
         {
             Id = Guid.NewGuid(),

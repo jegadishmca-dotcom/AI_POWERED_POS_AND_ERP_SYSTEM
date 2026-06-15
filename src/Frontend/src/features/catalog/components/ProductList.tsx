@@ -17,10 +17,10 @@ export const ProductList = ({
   const [searchTerm, setSearchTerm] = useState('');
 
   const downloadTemplate = () => {
-    const headers = ['ProductCode', 'Name', 'TamilName', 'Description', 'Mrp', 'SellingPrice', 'PurchasePrice', 'Barcode', 'TaxSlabName', 'IsWeighable', 'HasExpiry'];
+    const headers = ['ProductCode', 'Name', 'TamilName', 'Description', 'Mrp', 'SellingPrice', 'PurchasePrice', 'Barcode', 'TaxSlabName', 'IsWeighable', 'HasExpiry', 'Uom'];
     const rows = [
-      ['PROD-001', 'Sample Item 1', 'மாதிரி பொருள் 1', 'Sample description', '100.00', '80.00', '60.00', '2900000000001', 'GST 18%', 'FALSE', 'FALSE'],
-      ['PROD-002', 'Sample Item 2', '', 'Another description', '50.00', '45.00', '35.00', '2900000000002', 'GST 5%', 'FALSE', 'FALSE']
+      ['PROD-001', 'Sample Item 1', 'மாதிரி பொருள் 1', 'Sample description', '100.00', '80.00', '60.00', '2900000000001', 'GST 18%', 'FALSE', 'FALSE', 'Pcs'],
+      ['PROD-002', 'Sample Item 2', '', 'Another description', '50.00', '45.00', '35.00', '2900000000002', 'GST 5%', 'FALSE', 'FALSE', 'Kgs']
     ];
     const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
     const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });

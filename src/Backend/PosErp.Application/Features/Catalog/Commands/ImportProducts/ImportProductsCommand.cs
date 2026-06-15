@@ -59,6 +59,8 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
             int taxSlabIdx = headers.IndexOf("taxslabname");
             int weighableIdx = headers.IndexOf("isweighable");
             int expiryIdx = headers.IndexOf("hasexpiry");
+            int uomIdx = headers.IndexOf("uom");
+            if (uomIdx == -1) uomIdx = headers.IndexOf("unitofmeasure");
 
             if (codeIdx == -1 || nameIdx == -1 || mrpIdx == -1 || sellingIdx == -1)
             {
@@ -72,6 +74,11 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
             {
                 return new ImportProductResult(0, 0, new List<string> { "No active Tax Slabs found in database to map products." });
             }
+
+            // Pre-load UOMs to map symbols quickly
+            var uoms = await _context.UnitOfMeasures.Where(u => !u.IsDeleted).ToListAsync(cancellationToken);
+            var defaultPcsUom = uoms.FirstOrDefault(u => u.Symbol.Equals("Pcs", StringComparison.OrdinalIgnoreCase));
+            var defaultKgsUom = uoms.FirstOrDefault(u => u.Symbol.Equals("Kgs", StringComparison.OrdinalIgnoreCase));
 
             int lineNum = 1;
             while (!reader.EndOfStream)
@@ -129,6 +136,8 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                         bool.TryParse(values[expiryIdx], out hasExpiry);
                     }
 
+                    string? uomSymbol = uomIdx != -1 && uomIdx < values.Count ? values[uomIdx] : null;
+
                     // Map TaxSlab
                     var taxSlab = taxSlabs.FirstOrDefault(t => t.Name.Equals(taxSlabName, StringComparison.OrdinalIgnoreCase)) ?? defaultTaxSlab;
 
@@ -157,11 +166,29 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                     product.SellingPrice = sellingPrice;
                     product.PurchasePrice = purchasePrice;
                     product.TaxSlabId = taxSlab.Id;
-                    product.IsWeighable = isWeighable;
                     product.HasExpiry = hasExpiry;
-                    product.UnitOfMeasureId = isWeighable 
-                        ? new Guid("u0000000-0000-0000-0000-000000000002") 
-                        : new Guid("u0000000-0000-0000-0000-000000000001");
+
+                    // Resolve UOM
+                    UnitOfMeasure? matchedUom = null;
+                    if (!string.IsNullOrWhiteSpace(uomSymbol))
+                    {
+                        matchedUom = uoms.FirstOrDefault(u => u.Symbol.Equals(uomSymbol.Trim(), StringComparison.OrdinalIgnoreCase)
+                                                            || u.Name.Equals(uomSymbol.Trim(), StringComparison.OrdinalIgnoreCase));
+                    }
+
+                    if (matchedUom != null)
+                    {
+                        product.UnitOfMeasureId = matchedUom.Id;
+                        product.IsWeighable = matchedUom.Symbol.Equals("Kgs", StringComparison.OrdinalIgnoreCase) 
+                                              || matchedUom.Symbol.Equals("Gms", StringComparison.OrdinalIgnoreCase);
+                    }
+                    else
+                    {
+                        product.UnitOfMeasureId = isWeighable 
+                            ? (defaultKgsUom?.Id ?? new Guid("u0000000-0000-0000-0000-000000000002")) 
+                            : (defaultPcsUom?.Id ?? new Guid("u0000000-0000-0000-0000-000000000001"));
+                        product.IsWeighable = isWeighable;
+                    }
 
                     // Handle Barcode
                     if (!string.IsNullOrWhiteSpace(barcodeVal))

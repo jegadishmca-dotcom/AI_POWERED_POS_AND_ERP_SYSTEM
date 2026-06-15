@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2, Save } from 'lucide-react';
-import { createProduct, updateProduct, getTaxSlabs, TaxSlab } from '../api/catalog.api';
+import { createProduct, updateProduct, getTaxSlabs, TaxSlab, getUoms, getCategories, Category, UnitOfMeasure } from '../api/catalog.api';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface CreateProductModalProps {
@@ -21,11 +21,17 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
   const [barcodeValue, setBarcodeValue] = useState('');
   const [taxSlabId, setTaxSlabId] = useState('');
   const [taxSlabs, setTaxSlabs] = useState<TaxSlab[]>([]);
+  const [categoryId, setCategoryId] = useState('');
+  const [unitOfMeasureId, setUnitOfMeasureId] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [uoms, setUoms] = useState<UnitOfMeasure[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     getTaxSlabs().then(setTaxSlabs).catch(console.error);
+    getCategories().then(setCategories).catch(console.error);
+    getUoms().then(setUoms).catch(console.error);
   }, []);
 
   useEffect(() => {
@@ -40,6 +46,8 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
         setPurchasePrice(editingProduct.purchasePrice?.toString() || '');
         setBarcodeValue(editingProduct.primaryBarcode || '');
         setTaxSlabId(editingProduct.taxSlabId || '');
+        setCategoryId(editingProduct.categoryId || '');
+        setUnitOfMeasureId(editingProduct.unitOfMeasureId || '');
       } else {
         setProductCode('');
         setName('');
@@ -50,10 +58,49 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
         setPurchasePrice('');
         setBarcodeValue('');
         setTaxSlabId('');
+        setCategoryId('');
+        
+        const defaultUom = uoms.find(u => u.symbol === 'Pcs') || uoms[0];
+        setUnitOfMeasureId(defaultUom?.id || 'u0000000-0000-0000-0000-000000000001');
       }
       setError(null);
     }
-  }, [isOpen, editingProduct]);
+  }, [isOpen, editingProduct, uoms]);
+
+  const renderCategoryOptions = () => {
+    const roots = categories.filter(c => !c.parentCategoryId);
+    const options: React.ReactNode[] = [];
+    
+    roots.forEach(root => {
+      options.push(
+        <option key={root.id} value={root.id}>
+          {root.name}
+        </option>
+      );
+      const children = categories.filter(c => c.parentCategoryId === root.id);
+      children.forEach(child => {
+        options.push(
+          <option key={child.id} value={child.id}>
+            &nbsp;&nbsp;↳ {child.name}
+          </option>
+        );
+      });
+    });
+    
+    categories.forEach(c => {
+      if (!roots.some(r => r.id === c.id) && !categories.some(parent => parent.id === c.parentCategoryId && roots.some(r => r.id === parent.id))) {
+        if (!options.some((o: any) => o.key === c.id)) {
+          options.push(
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          );
+        }
+      }
+    });
+    
+    return options;
+  };
 
   if (!isOpen) return null;
 
@@ -78,7 +125,9 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
           sellingPrice: parseFloat(sellingPrice),
           purchasePrice: parseFloat(purchasePrice),
           barcodeValue: barcodeValue,
-          taxSlabId: taxSlabId || undefined
+          taxSlabId: taxSlabId || undefined,
+          categoryId: categoryId || undefined,
+          unitOfMeasureId: unitOfMeasureId || undefined
         });
       } else {
         await createProduct({
@@ -90,7 +139,9 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
           sellingPrice: parseFloat(sellingPrice),
           purchasePrice: parseFloat(purchasePrice),
           barcodeValue: barcodeValue,
-          taxSlabId: taxSlabId || undefined
+          taxSlabId: taxSlabId || undefined,
+          categoryId: categoryId || undefined,
+          unitOfMeasureId: unitOfMeasureId || undefined
         });
       }
       queryClient.invalidateQueries({ queryKey: ['products'] });
@@ -224,6 +275,34 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
                 <option value="">-- Select --</option>
                 {taxSlabs.map(ts => (
                   <option key={ts.id} value={ts.id}>{ts.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Category</label>
+              <select
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm"
+                value={categoryId}
+                onChange={(e) => setCategoryId(e.target.value)}
+              >
+                <option value="">-- No Category --</option>
+                {renderCategoryOptions()}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Unit of Measure (UOM) *</label>
+              <select
+                required
+                className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white focus:outline-none focus:border-blue-500 text-sm"
+                value={unitOfMeasureId}
+                onChange={(e) => setUnitOfMeasureId(e.target.value)}
+              >
+                <option value="">-- Select UOM --</option>
+                {uoms.map(u => (
+                  <option key={u.id} value={u.id}>{u.name} ({u.symbol})</option>
                 ))}
               </select>
             </div>

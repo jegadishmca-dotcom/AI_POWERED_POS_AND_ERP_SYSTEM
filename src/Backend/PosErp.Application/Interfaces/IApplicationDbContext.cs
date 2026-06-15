@@ -25,6 +25,7 @@ public interface IApplicationDbContext
     DbSet<Category> Categories { get; }
     DbSet<Brand> Brands { get; }
     DbSet<TaxSlab> TaxSlabs { get; }
+    DbSet<UnitOfMeasure> UnitOfMeasures { get; }
     DbSet<GstHsnMasterIndia> GstHsnMaster { get; }
 
     DbSet<Invoice> Invoices { get; }

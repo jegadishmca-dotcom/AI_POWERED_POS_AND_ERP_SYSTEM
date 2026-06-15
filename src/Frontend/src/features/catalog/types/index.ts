@@ -13,6 +13,9 @@ export interface ProductSearchResult {
   purchasePrice: number;
   description?: string;
   taxSlabName: string;
+  taxSlabId: string;
+  categoryId?: string;
+  unitOfMeasureId?: string;
 }
 
 export interface ImportResult {

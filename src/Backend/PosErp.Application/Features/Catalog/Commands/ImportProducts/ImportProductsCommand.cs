@@ -159,6 +159,9 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                     product.TaxSlabId = taxSlab.Id;
                     product.IsWeighable = isWeighable;
                     product.HasExpiry = hasExpiry;
+                    product.UnitOfMeasureId = isWeighable 
+                        ? new Guid("u0000000-0000-0000-0000-000000000002") 
+                        : new Guid("u0000000-0000-0000-0000-000000000001");
 
                     // Handle Barcode
                     if (!string.IsNullOrWhiteSpace(barcodeVal))

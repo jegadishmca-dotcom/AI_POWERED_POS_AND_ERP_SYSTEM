@@ -19,7 +19,9 @@ public record UpdateProductCommand(
     decimal SellingPrice,
     decimal PurchasePrice,
     string BarcodeValue,
-    Guid? TaxSlabId
+    Guid? TaxSlabId,
+    Guid? CategoryId,
+    Guid? UnitOfMeasureId
 ) : IRequest<bool>;
 
 public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand, bool>
@@ -63,6 +65,13 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
         if (request.TaxSlabId.HasValue)
         {
             product.TaxSlabId = request.TaxSlabId.Value;
+        }
+        product.CategoryId = request.CategoryId;
+        if (request.UnitOfMeasureId.HasValue)
+        {
+            product.UnitOfMeasureId = request.UnitOfMeasureId.Value;
+            var uom = await _context.UnitOfMeasures.FirstOrDefaultAsync(u => u.Id == request.UnitOfMeasureId.Value, cancellationToken);
+            product.IsWeighable = uom != null && (uom.Symbol == "Kgs" || uom.Symbol == "Gms");
         }
         product.UpdatedAt = DateTime.UtcNow;
 

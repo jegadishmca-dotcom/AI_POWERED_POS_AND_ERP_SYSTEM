@@ -17,7 +17,9 @@ public record CreateProductCommand(
     decimal SellingPrice,
     decimal PurchasePrice,
     string BarcodeValue,
-    Guid? TaxSlabId
+    Guid? TaxSlabId,
+    Guid? CategoryId,
+    Guid? UnitOfMeasureId
 ) : IRequest<Guid>;
 
 public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand, Guid>
@@ -59,6 +61,10 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         }
 
         // 2. Map new product
+        var uomId = request.UnitOfMeasureId ?? new Guid("u0000000-0000-0000-0000-000000000001");
+        var uom = await _context.UnitOfMeasures.FirstOrDefaultAsync(u => u.Id == uomId, cancellationToken);
+        var isWeighable = uom != null && (uom.Symbol == "Kgs" || uom.Symbol == "Gms");
+
         var product = new Product
         {
             Id = Guid.NewGuid(),
@@ -66,11 +72,13 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
             Name = request.Name,
             TamilName = request.TamilName,
             Description = request.Description,
+            CategoryId = request.CategoryId,
+            UnitOfMeasureId = uomId,
             TaxSlabId = taxSlab.Id,
             Mrp = request.Mrp,
             SellingPrice = request.SellingPrice,
             PurchasePrice = request.PurchasePrice,
-            IsWeighable = false,
+            IsWeighable = isWeighable,
             IsActive = true
         };
 

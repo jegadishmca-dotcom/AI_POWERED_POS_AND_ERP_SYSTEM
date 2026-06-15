@@ -31,6 +31,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Category> Categories => Set<Category>();
     public DbSet<Brand> Brands => Set<Brand>();
     public DbSet<TaxSlab> TaxSlabs => Set<TaxSlab>();
+    public DbSet<UnitOfMeasure> UnitOfMeasures => Set<UnitOfMeasure>();
     public DbSet<GstHsnMasterIndia> GstHsnMaster => Set<GstHsnMasterIndia>();
 
     public DbSet<Invoice> Invoices => Set<Invoice>();
@@ -188,10 +189,15 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasColumnName("barcode");
 
         modelBuilder.Entity<PosErp.Domain.Entities.Catalog.Product>()
-            .Ignore(p => p.UnitOfMeasureId)
             .Ignore(p => p.MinStockLevel)
             .Ignore(p => p.ReorderPoint)
             .Ignore(p => p.SearchVector);
+
+        modelBuilder.Entity<PosErp.Domain.Entities.Catalog.Product>()
+            .HasOne<UnitOfMeasure>()
+            .WithMany()
+            .HasForeignKey(p => p.UnitOfMeasureId)
+            .OnDelete(DeleteBehavior.Restrict);
 
         // StockLedgerEntry.Version (uint) is a C#-side optimistic concurrency field
         // but the stock_ledger table has no such column — ignore it to prevent EF mapping error

@@ -30,6 +30,28 @@ export const getTaxSlabs = async (): Promise<TaxSlab[]> => {
   return data;
 };
 
+export interface UnitOfMeasure {
+  id: string;
+  name: string;
+  symbol: string;
+}
+
+export interface Category {
+  id: string;
+  name: string;
+  parentCategoryId?: string;
+}
+
+export const getUoms = async (): Promise<UnitOfMeasure[]> => {
+  const { data } = await api.get('/api/catalog/uoms');
+  return data;
+};
+
+export const getCategories = async (): Promise<Category[]> => {
+  const { data } = await api.get('/api/catalog/categories');
+  return data;
+};
+
 export interface CreateProductPayload {
   productCode: string;
   name: string;
@@ -40,6 +62,8 @@ export interface CreateProductPayload {
   purchasePrice: number;
   barcodeValue: string;
   taxSlabId?: string;
+  categoryId?: string;
+  unitOfMeasureId?: string;
 }
 
 export const createProduct = async (payload: CreateProductPayload): Promise<string> => {

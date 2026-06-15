@@ -43,6 +43,24 @@ public class CatalogController : ControllerBase
         return Ok(slabs);
     }
 
+    [HttpGet("uoms")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetUoms()
+    {
+        var uoms = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+            System.Linq.Queryable.Where(_context.UnitOfMeasures, u => !u.IsDeleted));
+        return Ok(uoms);
+    }
+
+    [HttpGet("categories")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetCategories()
+    {
+        var categories = await Microsoft.EntityFrameworkCore.EntityFrameworkQueryableExtensions.ToListAsync(
+            System.Linq.Queryable.Where(_context.Categories, c => !c.IsDeleted));
+        return Ok(categories);
+    }
+
     [HttpPost("import")]
     [Authorize(Roles = "Admin,Manager,Owner")]
     public async Task<IActionResult> ImportCsv(IFormFile file)

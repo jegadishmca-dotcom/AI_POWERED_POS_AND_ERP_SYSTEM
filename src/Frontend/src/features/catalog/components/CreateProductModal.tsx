@@ -61,7 +61,7 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
         setCategoryId('');
         
         const defaultUom = uoms.find(u => u.symbol === 'Pcs') || uoms[0];
-        setUnitOfMeasureId(defaultUom?.id || 'u0000000-0000-0000-0000-000000000001');
+        setUnitOfMeasureId(defaultUom?.id || 'a0000000-0000-0000-0000-000000000001');
       }
       setError(null);
     }

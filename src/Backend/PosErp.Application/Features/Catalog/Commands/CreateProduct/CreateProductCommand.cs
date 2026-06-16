@@ -61,7 +61,7 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
         }
 
         // 2. Map new product
-        var uomId = request.UnitOfMeasureId ?? new Guid("u0000000-0000-0000-0000-000000000001");
+        var uomId = request.UnitOfMeasureId ?? new Guid("a0000000-0000-0000-0000-000000000001");
         var uom = await _context.UnitOfMeasures.FirstOrDefaultAsync(u => u.Id == uomId, cancellationToken);
         var isWeighable = uom != null && (uom.Symbol == "Kgs" || uom.Symbol == "Gms");
 

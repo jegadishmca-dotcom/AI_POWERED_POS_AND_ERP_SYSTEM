@@ -14,13 +14,13 @@ CREATE TABLE IF NOT EXISTS unit_of_measures (
 
 -- Seed standard UOMs
 INSERT INTO unit_of_measures (id, name, symbol, created_at, is_deleted) VALUES
-('u0000000-0000-0000-0000-000000000001', 'Pieces', 'Pcs', NOW(), FALSE),
-('u0000000-0000-0000-0000-000000000002', 'Kilograms', 'Kgs', NOW(), FALSE),
-('u0000000-0000-0000-0000-000000000003', 'Grams', 'Gms', NOW(), FALSE),
-('u0000000-0000-0000-0000-000000000004', 'Litres', 'Ltrs', NOW(), FALSE),
-('u0000000-0000-0000-0000-000000000005', 'Millilitres', 'Mls', NOW(), FALSE),
-('u0000000-0000-0000-0000-000000000006', 'Packets', 'Pack', NOW(), FALSE),
-('u0000000-0000-0000-0000-000000000007', 'Boxes', 'Box', NOW(), FALSE)
+('a0000000-0000-0000-0000-000000000001', 'Pieces', 'Pcs', NOW(), FALSE),
+('a0000000-0000-0000-0000-000000000002', 'Kilograms', 'Kgs', NOW(), FALSE),
+('a0000000-0000-0000-0000-000000000003', 'Grams', 'Gms', NOW(), FALSE),
+('a0000000-0000-0000-0000-000000000004', 'Litres', 'Ltrs', NOW(), FALSE),
+('a0000000-0000-0000-0000-000000000005', 'Millilitres', 'Mls', NOW(), FALSE),
+('a0000000-0000-0000-0000-000000000006', 'Packets', 'Pack', NOW(), FALSE),
+('a0000000-0000-0000-0000-000000000007', 'Boxes', 'Box', NOW(), FALSE)
 ON CONFLICT (id) DO NOTHING;
 
 -- Seed standard default Category Hierarchy
@@ -61,8 +61,8 @@ BEGIN
         -- Migrate existing products based on is_weighable
         UPDATE products 
         SET unit_of_measure_id = CASE 
-            WHEN is_weighable = TRUE THEN 'u0000000-0000-0000-0000-000000000002'::UUID 
-            ELSE 'u0000000-0000-0000-0000-000000000001'::UUID 
+            WHEN is_weighable = TRUE THEN 'a0000000-0000-0000-0000-000000000002'::UUID 
+            ELSE 'a0000000-0000-0000-0000-000000000001'::UUID 
         END;
         
         -- Set not-null constraint

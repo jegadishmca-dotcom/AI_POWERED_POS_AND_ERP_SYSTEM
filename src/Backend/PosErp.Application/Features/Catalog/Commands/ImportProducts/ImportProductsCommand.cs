@@ -185,8 +185,8 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                     else
                     {
                         product.UnitOfMeasureId = isWeighable 
-                            ? (defaultKgsUom?.Id ?? new Guid("u0000000-0000-0000-0000-000000000002")) 
-                            : (defaultPcsUom?.Id ?? new Guid("u0000000-0000-0000-0000-000000000001"));
+                            ? (defaultKgsUom?.Id ?? new Guid("a0000000-0000-0000-0000-000000000002")) 
+                            : (defaultPcsUom?.Id ?? new Guid("a0000000-0000-0000-0000-000000000001"));
                         product.IsWeighable = isWeighable;
                     }
 

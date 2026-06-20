@@ -114,7 +114,11 @@ export const PosTerminal = () => {
     // Focus barcode scanner input on mount
     productInputRef.current?.focus();
     
-    // Check business date and active shift
+    // Only check when cashierId is loaded and is not the fallback GUID
+    if (!user?.id || cashierId === '00000000-0000-0000-0000-000000000001') {
+      return;
+    }
+
     const checkBusinessDate = async () => {
       try {
         setDateLoading(true);
@@ -127,6 +131,7 @@ export const PosTerminal = () => {
           const sessionData = await getCurrentSession(terminalId, cashierId);
           if (sessionData && sessionData.status === 'OPEN') {
             setActiveSession(sessionData);
+            setOpenShiftModalOpen(false);
           } else {
             setOpenShiftModalOpen(true);
           }
@@ -138,7 +143,7 @@ export const PosTerminal = () => {
       }
     };
     checkBusinessDate();
-  }, []);
+  }, [cashierId, terminalId, user?.id]);
   
   const handleOpenShift = async (openingCash: number) => {
     try {

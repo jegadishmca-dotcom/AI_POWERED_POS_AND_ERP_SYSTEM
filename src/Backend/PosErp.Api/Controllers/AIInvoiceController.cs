@@ -10,6 +10,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using UglyToad.PdfPig;
@@ -52,9 +53,17 @@ public class AIInvoiceController : ControllerBase
 
         try
         {
+            // Use spatial (coordinate-based) extraction — handles column-format Tally invoices
             using (var stream = file.OpenReadStream())
             {
-                using (var document = PdfDocument.Open(stream))
+                items = ExtractItemsFromPdfSpatially(stream);
+            }
+
+            // If spatial extraction yielded nothing, fall back to line-based text approach
+            if (items.Count == 0)
+            {
+                using (var stream2 = file.OpenReadStream())
+                using (var document = PdfDocument.Open(stream2))
                 {
                     var linesList = new List<string>();
                     foreach (var page in document.GetPages())
@@ -65,14 +74,15 @@ public class AIInvoiceController : ControllerBase
                         var sortedWords = words.OrderByDescending(w => w.BoundingBox.Bottom).ToList();
                         var currentLineWords = new List<UglyToad.PdfPig.Content.Word>();
                         double currentY = sortedWords[0].BoundingBox.Bottom;
-                        double threshold = 5.0;
+                        const double threshold = 5.0;
 
                         foreach (var word in sortedWords)
                         {
                             if (Math.Abs(word.BoundingBox.Bottom - currentY) > threshold)
                             {
-                                var lineText = string.Join(" ", currentLineWords.OrderBy(w => w.BoundingBox.Left).Select(w => w.Text));
-                                linesList.Add(lineText);
+                                linesList.Add(string.Join(" ", currentLineWords
+                                    .OrderBy(w => w.BoundingBox.Left)
+                                    .Select(w => w.Text)));
                                 currentLineWords.Clear();
                                 currentY = word.BoundingBox.Bottom;
                             }
@@ -80,20 +90,18 @@ public class AIInvoiceController : ControllerBase
                         }
 
                         if (currentLineWords.Any())
-                        {
-                            var lineText = string.Join(" ", currentLineWords.OrderBy(w => w.BoundingBox.Left).Select(w => w.Text));
-                            linesList.Add(lineText);
-                        }
+                            linesList.Add(string.Join(" ", currentLineWords
+                                .OrderBy(w => w.BoundingBox.Left)
+                                .Select(w => w.Text)));
                     }
 
-                    string text = string.Join("\n", linesList);
-                    items = ParseInvoiceText(text);
+                    items = ParseInvoiceText(string.Join("\n", linesList));
                 }
             }
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"PdfPig extraction failed: {ex.Message}. Falling back to simulated extraction.");
+            Console.WriteLine($"PdfPig extraction failed: {ex.Message}. Falling back to mock data.");
         }
 
         if (items.Count == 0)
@@ -419,64 +427,255 @@ public class AIInvoiceController : ControllerBase
         }
     }
 
-    private List<ExtractedInvoiceItem> ParseInvoiceText(string text)
+
+    // ─── Spatial coordinate-based extraction (PRIMARY) ─────────────────────────
+    // Handles column-format invoices (e.g. Tally) where each column is a separate
+    // text element at a fixed X position but aligns with other columns on the same Y row.
+    // Uses PdfPig's per-word bounding boxes for accurate spatial grouping.
+    private List<ExtractedInvoiceItem> ExtractItemsFromPdfSpatially(Stream pdfStream)
     {
         var items = new List<ExtractedInvoiceItem>();
-        var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
 
-        foreach (var line in lines)
+        using var document = PdfDocument.Open(pdfStream);
+
+        // ─── Column X boundaries (tuned for standard Tally A4 invoice) ─────────
+        // These tolerances work for a ~595pt wide A4 PDF. Adjust if layout differs.
+        const double COL_DESC_MIN  = 56;   // Product description column
+        const double COL_DESC_MAX  = 275;  // Stop before HSN column (HSN starts ~284)
+        const double COL_HSN_MIN   = 276;  // HSN/SAC code column
+        const double COL_HSN_MAX   = 325;
+        const double COL_QTY_MIN   = 326;  // Quantity column
+        const double COL_QTY_MAX   = 390;
+        const double COL_RATE_MIN  = 385;  // Rate (cost price) column
+        const double COL_RATE_MAX  = 455;
+        const double COL_AMT_MIN   = 488;  // Line amount column (qty × rate)
+
+        const double ROW_TOLERANCE = 5.0;  // Points tolerance for grouping words into rows
+
+        foreach (var page in document.GetPages())
         {
-            var barcodeMatch = System.Text.RegularExpressions.Regex.Match(line, @"\b\d{8,13}\b");
-            if (barcodeMatch.Success)
+            var allWords = page.GetWords().ToList();
+            if (!allWords.Any()) continue;
+
+            // ── Step 1: Group words into rows by Y coordinate ─────────────────
+            // PdfPig gives per-word bounding boxes — use Bottom Y for grouping
+            var rowDict = new SortedDictionary<double, List<UglyToad.PdfPig.Content.Word>>(
+                Comparer<double>.Create((a, b) => b.CompareTo(a))); // descending (top-first)
+
+            foreach (var word in allWords)
             {
-                var barcode = barcodeMatch.Value;
-                var numbers = System.Text.RegularExpressions.Regex.Matches(line, @"\b\d+(\.\d{1,2})?\b")
-                    .Cast<System.Text.RegularExpressions.Match>()
-                    .Select(m => m.Value)
-                    .ToList();
+                double wordY = word.BoundingBox.Bottom;
+                double matchedKey = double.NaN;
 
-                if (numbers.Count >= 3)
+                foreach (var key in rowDict.Keys)
                 {
-                    numbers.Remove(barcode);
-
-                    decimal qty = 1;
-                    decimal cost = 0;
-                    decimal mrp = 0;
-
-                    if (numbers.Count >= 1) decimal.TryParse(numbers[0], out qty);
-                    if (numbers.Count >= 2) decimal.TryParse(numbers[1], out cost);
-                    if (numbers.Count >= 3) decimal.TryParse(numbers[2], out mrp);
-
-                    string name = line;
-                    name = name.Replace(barcode, "");
-                    foreach (var num in numbers)
+                    if (Math.Abs(key - wordY) <= ROW_TOLERANCE)
                     {
-                        name = name.Replace(num, "");
-                    }
-                    name = name.Trim(new[] { ' ', ',', '-', '|', '\t' }).Trim();
-                    if (string.IsNullOrWhiteSpace(name))
-                    {
-                        name = $"Product {barcode}";
-                    }
-
-                    if (cost > 0)
-                    {
-                        items.Add(new ExtractedInvoiceItem
-                        {
-                            Barcode = barcode,
-                            ProductName = name,
-                            Quantity = qty,
-                            CostPrice = cost,
-                            Mrp = mrp > 0 ? mrp : cost * 1.2m,
-                            SellingPrice = mrp > 0 ? mrp : cost * 1.15m
-                        });
+                        matchedKey = key;
+                        break;
                     }
                 }
+
+                if (double.IsNaN(matchedKey))
+                    rowDict[wordY] = new List<UglyToad.PdfPig.Content.Word> { word };
+                else
+                    rowDict[matchedKey].Add(word);
+            }
+
+            var rows = rowDict.ToList(); // ordered top-to-bottom (descending Y)
+
+            // ── Step 2: Locate the table header row ───────────────────────────
+            // Header row contains "Quantity" and "Rate" as column labels
+            int headerRowIdx = -1;
+            for (int i = 0; i < rows.Count; i++)
+            {
+                var rowText = string.Join(" ", rows[i].Value.Select(w => w.Text)).ToLower();
+                if (rowText.Contains("quantity") && (rowText.Contains("rate") || rowText.Contains("amount")))
+                {
+                    headerRowIdx = i;
+                    break;
+                }
+            }
+
+            if (headerRowIdx < 0) continue; // No table header found on this page
+
+            // ── Step 3: Locate the table footer row ───────────────────────────
+            // Footer starts when we see subtotal/tax labels like "OUTPUT CGST", "ROUND OFF"
+            int footerRowIdx = rows.Count;
+            for (int i = headerRowIdx + 1; i < rows.Count; i++)
+            {
+                var rowText = string.Join(" ", rows[i].Value.Select(w => w.Text)).ToLower();
+                if (rowText.Contains("output") || rowText.Contains("round off") ||
+                    rowText.Contains("chargeable") || rowText.Contains("tax invoice"))
+                {
+                    footerRowIdx = i;
+                    break;
+                }
+            }
+
+            // ── Step 4: Extract product data from each data row ───────────────
+            // A "product row" has a rate value in the Rate column.
+            // A "sub-row" (like "Batch: Primary Batch") has only desc text; skip it.
+            for (int i = headerRowIdx + 1; i < footerRowIdx; i++)
+            {
+                var rowWords = rows[i].Value;
+
+                // Classify words by column
+                string descText = string.Join(" ", rowWords
+                    .Where(w => w.BoundingBox.Left >= COL_DESC_MIN && w.BoundingBox.Right <= COL_DESC_MAX)
+                    .OrderBy(w => w.BoundingBox.Left)
+                    .Select(w => w.Text)).Trim();
+
+                string hsnText = string.Join("", rowWords
+                    .Where(w => w.BoundingBox.Left >= COL_HSN_MIN && w.BoundingBox.Right <= COL_HSN_MAX)
+                    .Select(w => w.Text)).Trim();
+
+                string qtyText = string.Join(" ", rowWords
+                    .Where(w => w.BoundingBox.Left >= COL_QTY_MIN && w.BoundingBox.Right <= COL_QTY_MAX)
+                    .Select(w => w.Text)).Trim();
+
+                string rateText = string.Join("", rowWords
+                    .Where(w => w.BoundingBox.Left >= COL_RATE_MIN && w.BoundingBox.Right <= COL_RATE_MAX
+                                && Regex.IsMatch(w.Text, @"^\d"))
+                    .Select(w => w.Text)).Trim();
+
+                string amtText = string.Join("", rowWords
+                    .Where(w => w.BoundingBox.Left >= COL_AMT_MIN
+                                && Regex.IsMatch(w.Text, @"[\d,]"))
+                    .Select(w => w.Text)).Replace(",", "").Trim();
+
+                // Skip rows with no rate — they are sub-lines (e.g. "Batch: Primary Batch")
+                if (string.IsNullOrWhiteSpace(rateText) || !Regex.IsMatch(rateText, @"\d"))
+                    continue;
+
+                // Also skip if description is a batch sub-line
+                if (!string.IsNullOrWhiteSpace(descText) &&
+                    (descText.Contains("Batch", StringComparison.OrdinalIgnoreCase) ||
+                     descText.Contains("Primary", StringComparison.OrdinalIgnoreCase)))
+                    continue;
+
+                // ── Parse rate (cost price) ───────────────────────────────────
+                if (!decimal.TryParse(rateText, System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out decimal rate) || rate <= 0)
+                    continue;
+
+                // ── Parse line amount ─────────────────────────────────────────
+                decimal.TryParse(amtText, System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out decimal lineAmount);
+
+                // ── Parse quantity ────────────────────────────────────────────
+                // Method 1: from Qty column (e.g. "25 PCS", "12 SET")
+                decimal qty = 0;
+                var qtyMatch = Regex.Match(qtyText, @"(\d+(?:\.\d+)?)", RegexOptions.IgnoreCase);
+                if (qtyMatch.Success)
+                    decimal.TryParse(qtyMatch.Groups[1].Value, System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out qty);
+
+                // Method 2: derive qty = amount / rate (Tally always prints both)
+                if (qty <= 0 && lineAmount > 0 && rate > 0)
+                {
+                    decimal computed = Math.Round(lineAmount / rate, 3);
+                    decimal rounded = Math.Round(computed);
+                    qty = (Math.Abs(computed - rounded) < 0.02m) ? rounded : computed;
+                }
+
+                if (qty <= 0) qty = 1;
+
+                // ── Build product name ────────────────────────────────────────
+                string productName = CleanProductName(descText);
+                if (string.IsNullOrWhiteSpace(productName))
+                    productName = $"Item {items.Count + 1}";
+
+                // ── Build unique barcode key ──────────────────────────────────
+                // This invoice has no EAN barcode; use HSN + sequential index as placeholder
+                string barcodeKey = !string.IsNullOrWhiteSpace(hsnText)
+                    ? $"HSN-{hsnText}-{items.Count + 1:D3}"
+                    : $"ITEM-{items.Count + 1:D3}";
+
+                // ── Suggested retail prices ───────────────────────────────────
+                // Rate IS the purchase price (excl. GST). Suggest MRP = rate + 18% margin.
+                // User can edit in the draft grid before approving.
+                decimal suggestedMrp  = Math.Round(rate * 1.18m, 2);
+                decimal suggestedSell = Math.Round(rate * 1.15m, 2);
+
+                items.Add(new ExtractedInvoiceItem
+                {
+                    Barcode      = barcodeKey,
+                    ProductName  = productName,
+                    Quantity     = qty,
+                    CostPrice    = rate,
+                    Mrp          = suggestedMrp,
+                    SellingPrice = suggestedSell
+                });
             }
         }
 
         return items;
     }
+
+    private static string CleanProductName(string raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return raw;
+        // Remove stray control / non-printable characters that pdfpig sometimes includes
+        var cleaned = Regex.Replace(raw, @"[^\x20-\x7E\u00A0-\uFFFF]", " ");
+        // Collapse multiple spaces
+        cleaned = Regex.Replace(cleaned, @"\s{2,}", " ").Trim();
+        return cleaned;
+    }
+
+    // ─── Fallback line-based parser (kept for non-columnar invoice formats) ────
+    private List<ExtractedInvoiceItem> ParseInvoiceText(string text)
+    {
+        var items = new List<ExtractedInvoiceItem>();
+        var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries);
+
+        // Try to detect a structured table line: has at least one numeric amount and a name
+        // Pattern: optional Sr.No, product text, optional HSN, qty, rate, amount on same line
+        foreach (var line in lines)
+        {
+            // Skip header/footer/label lines
+            if (Regex.IsMatch(line, @"^\s*(Sr|Description|Quantity|Rate|HSN|SAC|Amount|Total|CGST|SGST|Round|Chargeable|Tax|Invoice|Batch|Signatory|Declaration|Rupee)\b", RegexOptions.IgnoreCase))
+                continue;
+
+            // Look for lines containing amounts like "1,271.25" or "953.5"
+            var amountMatches = Regex.Matches(line, @"\b\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?\b");
+            if (amountMatches.Count < 2) continue;
+
+            // Extract all decimal numbers from the line
+            var numbers = Regex.Matches(line, @"\b\d+(?:\.\d{1,2})?\b")
+                .Cast<Match>()
+                .Select(m => m.Value)
+                .ToList();
+
+            if (numbers.Count < 2) continue;
+
+            // Remove serial number at start if present
+            string name = Regex.Replace(line, @"^\s*\d{1,2}\s+", "");
+            // Remove numeric sequences
+            foreach (var num in numbers.OrderByDescending(n => n.Length))
+                name = name.Replace(num, " ");
+            name = Regex.Replace(name, @"\s+", " ").Trim(" ,|.-\t".ToCharArray());
+            if (string.IsNullOrWhiteSpace(name)) continue;
+
+            if (!decimal.TryParse(numbers[numbers.Count - 2], System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out decimal rate) || rate <= 0) continue;
+            if (!decimal.TryParse(numbers[0], System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out decimal qty) || qty <= 0) qty = 1;
+
+            items.Add(new ExtractedInvoiceItem
+            {
+                Barcode      = $"ITEM-{items.Count + 1:D3}",
+                ProductName  = CleanProductName(name),
+                Quantity     = qty,
+                CostPrice    = rate,
+                Mrp          = Math.Round(rate * 1.18m, 2),
+                SellingPrice = Math.Round(rate * 1.15m, 2)
+            });
+        }
+
+        return items;
+    }
+
 
     private List<ExtractedInvoiceItem> GetMockExtractedItems()
     {

@@ -241,6 +241,9 @@ public class AIInvoiceController : ControllerBase
                 throw new Exception("No Tax Slabs found in the system to assign to new products.");
             }
 
+            var defaultUom = await _context.UnitOfMeasures.FirstOrDefaultAsync(u => !u.IsDeleted, cancellationToken);
+            Guid uomId = defaultUom?.Id ?? new Guid("a0000000-0000-0000-0000-000000000001");
+
             var generalCategory = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "General", cancellationToken);
             if (generalCategory == null)
             {
@@ -271,6 +274,14 @@ public class AIInvoiceController : ControllerBase
                 {
                     newProductOffset++;
                     var nextProdNumber = baseProductCount + newProductOffset;
+
+                    string? hsnCode = null;
+                    if (item.Barcode.StartsWith("HSN-"))
+                    {
+                        var parts = item.Barcode.Split('-');
+                        if (parts.Length > 1) hsnCode = parts[1];
+                    }
+
                     product = new Product
                     {
                         Id = Guid.NewGuid(),
@@ -281,6 +292,8 @@ public class AIInvoiceController : ControllerBase
                         SellingPrice = item.SellingPrice,
                         TaxSlabId = defaultTaxSlab.Id,
                         CategoryId = generalCategory.Id,
+                        UnitOfMeasureId = uomId,
+                        HsnCode = hsnCode,
                         IsActive = true,
                         IsWeighable = false,
                         HasExpiry = item.HasExpiry
@@ -301,6 +314,12 @@ public class AIInvoiceController : ControllerBase
                     product.PurchasePrice = item.CostPrice;
                     product.Mrp = item.Mrp;
                     product.SellingPrice = item.SellingPrice;
+
+                    if (string.IsNullOrWhiteSpace(product.HsnCode) && item.Barcode.StartsWith("HSN-"))
+                    {
+                        var parts = item.Barcode.Split('-');
+                        if (parts.Length > 1) product.HsnCode = parts[1];
+                    }
                 }
 
                 // Batch Association Handling
@@ -438,18 +457,6 @@ public class AIInvoiceController : ControllerBase
 
         using var document = PdfDocument.Open(pdfStream);
 
-        // ─── Column X boundaries (tuned for standard Tally A4 invoice) ─────────
-        // These tolerances work for a ~595pt wide A4 PDF. Adjust if layout differs.
-        const double COL_DESC_MIN  = 56;   // Product description column
-        const double COL_DESC_MAX  = 275;  // Stop before HSN column (HSN starts ~284)
-        const double COL_HSN_MIN   = 276;  // HSN/SAC code column
-        const double COL_HSN_MAX   = 325;
-        const double COL_QTY_MIN   = 326;  // Quantity column
-        const double COL_QTY_MAX   = 390;
-        const double COL_RATE_MIN  = 385;  // Rate (cost price) column
-        const double COL_RATE_MAX  = 455;
-        const double COL_AMT_MIN   = 488;  // Line amount column (qty × rate)
-
         const double ROW_TOLERANCE = 5.0;  // Points tolerance for grouping words into rows
 
         foreach (var page in document.GetPages())
@@ -485,12 +492,13 @@ public class AIInvoiceController : ControllerBase
             var rows = rowDict.ToList(); // ordered top-to-bottom (descending Y)
 
             // ── Step 2: Locate the table header row ───────────────────────────
-            // Header row contains "Quantity" and "Rate" as column labels
+            // Header row contains "Quantity" / "Qty" and "Rate" / "Price" as column labels
             int headerRowIdx = -1;
             for (int i = 0; i < rows.Count; i++)
             {
                 var rowText = string.Join(" ", rows[i].Value.Select(w => w.Text)).ToLower();
-                if (rowText.Contains("quantity") && (rowText.Contains("rate") || rowText.Contains("amount")))
+                if ((rowText.Contains("quantity") || rowText.Contains("qty")) && 
+                    (rowText.Contains("rate") || rowText.Contains("price") || rowText.Contains("amount") || rowText.Contains("amt")))
                 {
                     headerRowIdx = i;
                     break;
@@ -498,6 +506,127 @@ public class AIInvoiceController : ControllerBase
             }
 
             if (headerRowIdx < 0) continue; // No table header found on this page
+
+            // ── Step 2b: Detect Column Boundaries Dynamically ──────────────────
+            // Tuned default fallbacks for standard Tally A4 invoice
+            double pageDescMin = 56;
+            double pageDescMax = 275;
+            double pageHsnMin  = 276;
+            double pageHsnMax  = 325;
+            double pageQtyMin  = 326;
+            double pageQtyMax  = 390;
+            double pageRateMin = 385;
+            double pageRateMax = 455;
+            double pageAmtMin  = 488;
+
+            try
+            {
+                var headerWords = rows[headerRowIdx].Value.OrderBy(w => w.BoundingBox.Left).ToList();
+
+                var descWords = new List<UglyToad.PdfPig.Content.Word>();
+                var hsnWords = new List<UglyToad.PdfPig.Content.Word>();
+                var qtyWords = new List<UglyToad.PdfPig.Content.Word>();
+                var rateWords = new List<UglyToad.PdfPig.Content.Word>();
+                var amtWords = new List<UglyToad.PdfPig.Content.Word>();
+
+                foreach (var word in headerWords)
+                {
+                    var text = word.Text.ToLower();
+                    if (text.Contains("desc") || text.Contains("particular") || text.Contains("product") || text.Contains("item"))
+                        descWords.Add(word);
+                    else if (text.Contains("hsn") || text.Contains("sac") || text.Contains("code"))
+                        hsnWords.Add(word);
+                    else if (text.Contains("qty") || text.Contains("quant") || text.Contains("pcs") || text.Contains("unit"))
+                        qtyWords.Add(word);
+                    else if (text.Contains("rate") || text.Contains("price") || text.Contains("cost"))
+                        rateWords.Add(word);
+                    else if (text.Contains("amt") || text.Contains("amount") || text.Contains("total") || text.Contains("value"))
+                        amtWords.Add(word);
+                }
+
+                // Establish the sequence of found columns
+                var colsFound = new List<(string Name, double Left, double Right)>();
+                if (descWords.Any()) 
+                    colsFound.Add(("DESC", descWords.Min(w => w.BoundingBox.Left), descWords.Max(w => w.BoundingBox.Right)));
+                if (hsnWords.Any()) 
+                    colsFound.Add(("HSN", hsnWords.Min(w => w.BoundingBox.Left), hsnWords.Max(w => w.BoundingBox.Right)));
+                if (qtyWords.Any()) 
+                    colsFound.Add(("QTY", qtyWords.Min(w => w.BoundingBox.Left), qtyWords.Max(w => w.BoundingBox.Right)));
+                if (rateWords.Any()) 
+                    colsFound.Add(("RATE", rateWords.Min(w => w.BoundingBox.Left), rateWords.Max(w => w.BoundingBox.Right)));
+                if (amtWords.Any()) 
+                    colsFound.Add(("AMT", amtWords.Min(w => w.BoundingBox.Left), amtWords.Max(w => w.BoundingBox.Right)));
+
+                colsFound = colsFound.OrderBy(c => c.Left).ToList();
+
+                // Build bounds if enough columns exist to order
+                if (colsFound.Count >= 3)
+                {
+                    // 1. Description column bounds
+                    var descCol = colsFound.FirstOrDefault(c => c.Name == "DESC");
+                    if (descCol.Name != null)
+                    {
+                        pageDescMin = Math.Max(10, descCol.Left - 10);
+                        var idx = colsFound.IndexOf(descCol);
+                        if (idx < colsFound.Count - 1)
+                            pageDescMax = colsFound[idx + 1].Left - 5;
+                        else
+                            pageDescMax = descCol.Right + 150;
+                    }
+
+                    // 2. HSN column bounds
+                    var hsnCol = colsFound.FirstOrDefault(c => c.Name == "HSN");
+                    if (hsnCol.Name != null)
+                    {
+                        pageHsnMin = hsnCol.Left - 5;
+                        var idx = colsFound.IndexOf(hsnCol);
+                        if (idx < colsFound.Count - 1)
+                            pageHsnMax = colsFound[idx + 1].Left - 5;
+                        else
+                            pageHsnMax = hsnCol.Right + 15;
+                    }
+                    else
+                    {
+                        pageHsnMin = 999;
+                        pageHsnMax = 999;
+                    }
+
+                    // 3. Qty column bounds
+                    var qtyCol = colsFound.FirstOrDefault(c => c.Name == "QTY");
+                    if (qtyCol.Name != null)
+                    {
+                        pageQtyMin = qtyCol.Left - 10;
+                        var idx = colsFound.IndexOf(qtyCol);
+                        if (idx < colsFound.Count - 1)
+                            pageQtyMax = colsFound[idx + 1].Left - 2;
+                        else
+                            pageQtyMax = qtyCol.Right + 15;
+                    }
+
+                    // 4. Rate column bounds
+                    var rateCol = colsFound.FirstOrDefault(c => c.Name == "RATE");
+                    if (rateCol.Name != null)
+                    {
+                        pageRateMin = rateCol.Left - 10;
+                        var idx = colsFound.IndexOf(rateCol);
+                        if (idx < colsFound.Count - 1)
+                            pageRateMax = colsFound[idx + 1].Left - 2;
+                        else
+                            pageRateMax = rateCol.Right + 15;
+                    }
+
+                    // 5. Amount column bounds
+                    var amtCol = colsFound.FirstOrDefault(c => c.Name == "AMT");
+                    if (amtCol.Name != null)
+                    {
+                        pageAmtMin = amtCol.Left - 15;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error detecting column boundaries dynamically: {ex.Message}. Using default boundaries.");
+            }
 
             // ── Step 3: Locate the table footer row ───────────────────────────
             // Footer starts when we see subtotal/tax labels like "OUTPUT CGST", "ROUND OFF"
@@ -522,25 +651,25 @@ public class AIInvoiceController : ControllerBase
 
                 // Classify words by column
                 string descText = string.Join(" ", rowWords
-                    .Where(w => w.BoundingBox.Left >= COL_DESC_MIN && w.BoundingBox.Right <= COL_DESC_MAX)
+                    .Where(w => w.BoundingBox.Left >= pageDescMin && w.BoundingBox.Right <= pageDescMax)
                     .OrderBy(w => w.BoundingBox.Left)
                     .Select(w => w.Text)).Trim();
 
                 string hsnText = string.Join("", rowWords
-                    .Where(w => w.BoundingBox.Left >= COL_HSN_MIN && w.BoundingBox.Right <= COL_HSN_MAX)
+                    .Where(w => w.BoundingBox.Left >= pageHsnMin && w.BoundingBox.Right <= pageHsnMax)
                     .Select(w => w.Text)).Trim();
 
                 string qtyText = string.Join(" ", rowWords
-                    .Where(w => w.BoundingBox.Left >= COL_QTY_MIN && w.BoundingBox.Right <= COL_QTY_MAX)
+                    .Where(w => w.BoundingBox.Left >= pageQtyMin && w.BoundingBox.Right <= pageQtyMax)
                     .Select(w => w.Text)).Trim();
 
                 string rateText = string.Join("", rowWords
-                    .Where(w => w.BoundingBox.Left >= COL_RATE_MIN && w.BoundingBox.Right <= COL_RATE_MAX
+                    .Where(w => w.BoundingBox.Left >= pageRateMin && w.BoundingBox.Right <= pageRateMax
                                 && Regex.IsMatch(w.Text, @"^\d"))
                     .Select(w => w.Text)).Trim();
 
                 string amtText = string.Join("", rowWords
-                    .Where(w => w.BoundingBox.Left >= COL_AMT_MIN
+                    .Where(w => w.BoundingBox.Left >= pageAmtMin
                                 && Regex.IsMatch(w.Text, @"[\d,]"))
                     .Select(w => w.Text)).Replace(",", "").Trim();
 

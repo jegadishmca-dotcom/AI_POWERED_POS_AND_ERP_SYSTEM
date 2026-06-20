@@ -406,7 +406,11 @@ export const AiInvoiceImport = () => {
 
                         {/* Cost Status */}
                         <td className="p-3 text-center">
-                          {item.existingCostPrice !== null && item.existingCostPrice !== undefined && item.costPrice === item.existingCostPrice ? (
+                          {item.status === 'NEW' ? (
+                            <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              New Product: Action Required
+                            </span>
+                          ) : item.existingCostPrice !== null && item.existingCostPrice !== undefined && item.costPrice === item.existingCostPrice ? (
                             <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-150">
                               Cost is matching
                             </span>

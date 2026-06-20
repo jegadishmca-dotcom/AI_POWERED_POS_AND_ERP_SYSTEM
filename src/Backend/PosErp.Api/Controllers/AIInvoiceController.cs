@@ -594,9 +594,10 @@ public class AIInvoiceController : ControllerBase
 
                 // ── Suggested retail prices ───────────────────────────────────
                 // Rate IS the purchase price (excl. GST). Suggest MRP = rate + 18% margin.
+                // Rounded to nearest whole number (e.g. 43.86 → 44, 37.04 → 37) per policy.
                 // User can edit in the draft grid before approving.
-                decimal suggestedMrp  = Math.Round(rate * 1.18m, 2);
-                decimal suggestedSell = Math.Round(rate * 1.15m, 2);
+                decimal suggestedMrp  = Math.Round(rate * 1.18m, 0, MidpointRounding.AwayFromZero);
+                decimal suggestedSell = Math.Round(rate * 1.15m, 0, MidpointRounding.AwayFromZero);
 
                 items.Add(new ExtractedInvoiceItem
                 {
@@ -668,8 +669,8 @@ public class AIInvoiceController : ControllerBase
                 ProductName  = CleanProductName(name),
                 Quantity     = qty,
                 CostPrice    = rate,
-                Mrp          = Math.Round(rate * 1.18m, 2),
-                SellingPrice = Math.Round(rate * 1.15m, 2)
+                Mrp          = Math.Round(rate * 1.18m, 0, MidpointRounding.AwayFromZero),
+                SellingPrice = Math.Round(rate * 1.15m, 0, MidpointRounding.AwayFromZero)
             });
         }
 

@@ -566,7 +566,16 @@ public class AIInvoiceController : ControllerBase
                     var descCol = colsFound.FirstOrDefault(c => c.Name == "DESC");
                     if (descCol.Name != null)
                     {
-                        pageDescMin = Math.Max(10, descCol.Left - 10);
+                        var leftWords = headerWords.Where(w => w.BoundingBox.Left < descCol.Left).ToList();
+                        if (leftWords.Any())
+                        {
+                            pageDescMin = leftWords.Max(w => w.BoundingBox.Right) + 5;
+                        }
+                        else
+                        {
+                            pageDescMin = 35;
+                        }
+
                         var idx = colsFound.IndexOf(descCol);
                         if (idx < colsFound.Count - 1)
                             pageDescMax = colsFound[idx + 1].Left - 5;

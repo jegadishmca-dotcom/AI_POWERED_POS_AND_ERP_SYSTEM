@@ -310,7 +310,8 @@ public class AIInvoiceController : ControllerBase
                 }
                 else
                 {
-                    // Update catalog prices in the product master
+                    // Update catalog details and prices in the product master
+                    product.Name = item.ProductName;
                     product.PurchasePrice = item.CostPrice;
                     product.Mrp = item.Mrp;
                     product.SellingPrice = item.SellingPrice;

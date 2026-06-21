@@ -72,6 +72,9 @@ export const Login = () => {
       });
       
       setAuth(response.user, response.accessToken);
+      if (response.terminalId) {
+        localStorage.setItem('pos_terminal_id', response.terminalId);
+      }
       
       // Dynamic Redirect: Cashiers straight to POS, Admins/Managers to Back-office Dashboard
       const defaultPath = response.user.role === 'Cashier' ? '/pos' : '/dashboard';

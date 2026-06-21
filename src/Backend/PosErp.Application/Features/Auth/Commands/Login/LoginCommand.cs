@@ -12,7 +12,7 @@ namespace PosErp.Application.Features.Auth.Commands.Login;
 
 public record LoginCommand(string Username, string Password, string TerminalCode) : IRequest<LoginResponse>;
 
-public record LoginResponse(string AccessToken, string RefreshToken, UserDto User);
+public record LoginResponse(string AccessToken, string RefreshToken, UserDto User, Guid? TerminalId = null);
 public record UserDto(Guid Id, string Username, string FullName, string Role, Guid? StoreId);
 
 public class LoginCommandValidator : AbstractValidator<LoginCommand>
@@ -61,6 +61,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
             throw new UnauthorizedAccessException("Invalid credentials.");
         }
 
+        Guid? terminalId = null;
         // GAP-02 FIX: Validate the terminal code exists and is active before issuing a token.
         // Previously, any terminal code (even fictional ones) was accepted silently.
         // We bypass this check for "BACK-OFFICE" which represents ERP Back-Office login rather than a POS counter.
@@ -73,6 +74,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
             {
                 throw new UnauthorizedAccessException($"Terminal code '{request.TerminalCode}' is not recognized or is inactive. Please contact your administrator.");
             }
+            terminalId = terminal.Id;
         }
 
         // Retrieve actual Role name
@@ -113,6 +115,7 @@ public class LoginCommandHandler : IRequestHandler<LoginCommand, LoginResponse>
         return new LoginResponse(
             accessToken, 
             refreshTokenStr, 
-            new UserDto(user.Id, user.Username, user.FullName, roleName, user.StoreId));
+            new UserDto(user.Id, user.Username, user.FullName, roleName, user.StoreId),
+            terminalId);
     }
 }

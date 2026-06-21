@@ -98,7 +98,7 @@ export const InventorySafeguards = () => {
             </div>
             <button
               onClick={() => setPreventNegativeStock(!preventNegativeStock)}
-              className={`w-12 h-6 rounded-full shrink-0 relative transition-colors ${preventNegativeStock ? 'bg-indigo-600' : 'bg-slate-350'}`}
+              className={`w-12 h-6 rounded-full shrink-0 relative transition-colors ${preventNegativeStock ? 'bg-indigo-600' : 'bg-slate-200'}`}
             >
               <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${preventNegativeStock ? 'right-1' : 'left-1'}`} />
             </button>
@@ -116,7 +116,7 @@ export const InventorySafeguards = () => {
             </div>
             <button
               onClick={() => setMandatoryBatchTracking(!mandatoryBatchTracking)}
-              className={`w-12 h-6 rounded-full shrink-0 relative transition-colors ${mandatoryBatchTracking ? 'bg-indigo-600' : 'bg-slate-350'}`}
+              className={`w-12 h-6 rounded-full shrink-0 relative transition-colors ${mandatoryBatchTracking ? 'bg-indigo-600' : 'bg-slate-200'}`}
             >
               <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${mandatoryBatchTracking ? 'right-1' : 'left-1'}`} />
             </button>
@@ -134,7 +134,7 @@ export const InventorySafeguards = () => {
             </div>
             <button
               onClick={() => setRowLevelLocking(!rowLevelLocking)}
-              className={`w-12 h-6 rounded-full shrink-0 relative transition-colors ${rowLevelLocking ? 'bg-indigo-600' : 'bg-slate-350'}`}
+              className={`w-12 h-6 rounded-full shrink-0 relative transition-colors ${rowLevelLocking ? 'bg-indigo-600' : 'bg-slate-200'}`}
             >
               <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${rowLevelLocking ? 'right-1' : 'left-1'}`} />
             </button>

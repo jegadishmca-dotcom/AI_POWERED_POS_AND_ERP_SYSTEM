@@ -1,4 +1,4 @@
-﻿export interface User {
+export interface User {
   id: string;
   username: string;
   fullName: string;
@@ -9,4 +9,5 @@
 export interface AuthResponse {
   accessToken: string;
   user: User;
+  terminalId?: string;
 }

@@ -69,13 +69,41 @@ public class AIInvoiceController : ControllerBase
 
         // Save uploaded file to temp file for processing
         string tempFilePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}{extension}");
+        string originalTempFilePath = tempFilePath;
         using (var fileStream = new FileStream(tempFilePath, FileMode.Create))
         {
             await file.CopyToAsync(fileStream, cancellationToken);
         }
 
+        string? pdfImgPath = null;
         try
         {
+            // Scanned PDF detection: if it's a PDF but has no selectable text, convert to image for Ollama vision
+            if (!isImage && extension == ".pdf")
+            {
+                string textContent = ExtractTextFromPdf(tempFilePath);
+                if (string.IsNullOrWhiteSpace(textContent) || textContent.Trim().Length < 50)
+                {
+                    Console.WriteLine("[UploadInvoice] Detected scanned/image-based PDF. Converting to PNG for vision extraction...");
+                    pdfImgPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.png");
+                    
+                    var scriptPath = FindPythonScriptPath();
+                    if (scriptPath != null)
+                    {
+                        var converted = await ConvertPdfToImageAsync(scriptPath, tempFilePath, pdfImgPath, cancellationToken);
+                        if (converted && System.IO.File.Exists(pdfImgPath))
+                        {
+                            isImage = true;
+                            tempFilePath = pdfImgPath; 
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("[UploadInvoice] Could not find pdf_to_img.py script in workspace paths.");
+                    }
+                }
+            }
+
             // Try extracting using offline Ollama model first
             try
             {
@@ -103,9 +131,13 @@ public class AIInvoiceController : ControllerBase
         }
         finally
         {
-            if (System.IO.File.Exists(tempFilePath))
+            if (System.IO.File.Exists(originalTempFilePath))
             {
-                System.IO.File.Delete(tempFilePath);
+                System.IO.File.Delete(originalTempFilePath);
+            }
+            if (pdfImgPath != null && System.IO.File.Exists(pdfImgPath))
+            {
+                System.IO.File.Delete(pdfImgPath);
             }
         }
 
@@ -1292,5 +1324,71 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
         }
 
         return false;
+    }
+
+    private string? FindPythonScriptPath()
+    {
+        var pathsToTry = new[]
+        {
+            "pdf_to_img.py",
+            "src/Backend/pdf_to_img.py",
+            "../pdf_to_img.py",
+            "../../pdf_to_img.py",
+            "../../../pdf_to_img.py",
+            "../../../../pdf_to_img.py"
+        };
+
+        foreach (var relativePath in pathsToTry)
+        {
+            var fullPath = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, relativePath));
+            if (System.IO.File.Exists(fullPath)) return fullPath;
+
+            var cwdPath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), relativePath));
+            if (System.IO.File.Exists(cwdPath)) return cwdPath;
+        }
+
+        return null;
+    }
+
+    private async Task<bool> ConvertPdfToImageAsync(string scriptPath, string pdfPath, string outputPath, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var startInfo = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "python",
+                Arguments = $"\"{scriptPath}\" \"{pdfPath}\" \"{outputPath}\"",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = new System.Diagnostics.Process { StartInfo = startInfo };
+            process.Start();
+
+            var readOutputTask = process.StandardOutput.ReadToEndAsync();
+            var readErrorTask = process.StandardError.ReadToEndAsync();
+
+            await process.WaitForExitAsync(cancellationToken);
+
+            string output = await readOutputTask;
+            string error = await readErrorTask;
+
+            if (process.ExitCode == 0 && output.Contains("SUCCESS"))
+            {
+                return true;
+            }
+            else
+            {
+                Console.WriteLine($"[PDF to Image] Python Script Failed. Code: {process.ExitCode}, Error: {error}, Output: {output}");
+                return false;
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[PDF to Image] Exception converting PDF: {ex.Message}");
+            return false;
+        }
     }
 }

@@ -490,7 +490,7 @@ export const EmailConfig: React.FC = () => {
                 </div>
                 <button
                   onClick={() => setEnableSsl(!enableSsl)}
-                  className={`w-12 h-6 rounded-full shrink-0 relative transition-colors ${enableSsl ? 'bg-indigo-600' : 'bg-slate-350'}`}
+                  className={`w-12 h-6 rounded-full shrink-0 relative transition-colors ${enableSsl ? 'bg-indigo-600' : 'bg-slate-200'}`}
                 >
                   <div className={`w-4 h-4 bg-white rounded-full absolute top-1 transition-all ${enableSsl ? 'right-1' : 'left-1'}`} />
                 </button>

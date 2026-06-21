@@ -140,32 +140,34 @@ const AppLayout: React.FC = () => {
           </div>
 
           {/* AI Co-Pilot Section */}
-          <div className="space-y-1">
-            <div className="px-4 flex items-center gap-1.5 mb-2">
-              <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-              <span className="text-[10px] font-extrabold text-indigo-400 uppercase tracking-wider block">
-                AI Co-Pilot Hub
-              </span>
+          {aiItems.length > 0 && (
+            <div className="space-y-1">
+              <div className="px-4 flex items-center gap-1.5 mb-2">
+                <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                <span className="text-[10px] font-extrabold text-indigo-400 uppercase tracking-wider block">
+                  AI Co-Pilot Hub
+                </span>
+              </div>
+              {aiItems.map(item => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                      isActive 
+                        ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/30' 
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                    {item.name}
+                  </Link>
+                );
+              })}
             </div>
-            {aiItems.map(item => {
-              const Icon = item.icon;
-              const isActive = location.pathname === item.path;
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                    isActive 
-                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/30' 
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
-                  }`}
-                >
-                  <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                  {item.name}
-                </Link>
-              );
-            })}
-          </div>
+          )}
         </nav>
 
 

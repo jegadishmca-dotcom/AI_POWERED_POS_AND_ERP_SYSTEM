@@ -506,6 +506,20 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
             int newProductOffset = 0;
             var baseProductCount = await _context.Products.CountAsync(cancellationToken);
 
+            // Determine the next available sequential internal barcode number.
+            // Format: INT{D8} — e.g. INT00000001, INT00000002, ...
+            // This follows Global ERP standard for internally-generated item barcodes
+            // (prefix-based sequential codes, not dependent on supplier-provided EANs).
+            var lastIntBarcode = await _context.Barcodes
+                .Where(b => b.BarcodeValue.StartsWith("INT") && b.BarcodeValue.Length == 11)
+                .OrderByDescending(b => b.BarcodeValue)
+                .Select(b => b.BarcodeValue)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            int nextBarcodeSeq = 1;
+            if (lastIntBarcode != null && int.TryParse(lastIntBarcode.Substring(3), out int parsedBarcodeSeq))
+                nextBarcodeSeq = parsedBarcodeSeq + 1;
+
             // Keep track of the batch IDs mapped by barcode for use in Pass 2
             var itemBatchIds = new Dictionary<string, Guid?>();
 
@@ -542,6 +556,7 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                     newProductOffset++;
                     var nextProdNumber = baseProductCount + newProductOffset;
 
+                    // Extract HSN from the placeholder barcode if available
                     string? hsnCode = null;
                     if (item.Barcode.StartsWith("HSN-"))
                     {
@@ -549,31 +564,59 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                         if (parts.Length > 1) hsnCode = parts[1];
                     }
 
-                    product = new Product
+                    // Try to find an existing product by HSN + name match to avoid creating
+                    // duplicates when the same invoice is imported again without EAN barcodes.
+                    Product? existingByHsn = null;
+                    if (!string.IsNullOrWhiteSpace(hsnCode))
                     {
-                        Id = Guid.NewGuid(),
-                        ProductCode = $"PROD-EXT-{nextProdNumber:D3}",
-                        Name = item.ProductName,
-                        PurchasePrice = item.CostPrice,
-                        Mrp = item.Mrp,
-                        SellingPrice = item.SellingPrice,
-                        TaxSlabId = selectedTaxSlab.Id,
-                        CategoryId = generalCategory.Id,
-                        UnitOfMeasureId = resolvedUomId,
-                        HsnCode = hsnCode,
-                        IsActive = true,
-                        IsWeighable = false,
-                        HasExpiry = item.HasExpiry
-                    };
+                        existingByHsn = await _context.Products
+                            .Include(p => p.Barcodes)
+                            .FirstOrDefaultAsync(p => p.HsnCode == hsnCode &&
+                                p.Name.ToLower() == item.ProductName.ToLower(), cancellationToken);
+                    }
 
-                    product.Barcodes.Add(new Barcode
+                    if (existingByHsn != null)
                     {
-                        Id = Guid.NewGuid(),
-                        BarcodeValue = item.Barcode,
-                        IsPrimary = true
-                    });
+                        // Use the existing product as if found by barcode
+                        product = existingByHsn;
+                        product.PurchasePrice = item.CostPrice;
+                        product.Mrp = item.Mrp;
+                        product.SellingPrice = item.SellingPrice;
+                        product.TaxSlabId = selectedTaxSlab.Id;
+                        product.UnitOfMeasureId = resolvedUomId;
+                    }
+                    else
+                    {
+                        // Generate a sequential internal barcode (Global ERP standard)
+                        string assignedBarcode = $"INT{nextBarcodeSeq:D8}";
+                        nextBarcodeSeq++;
 
-                    _context.Products.Add(product);
+                        product = new Product
+                        {
+                            Id = Guid.NewGuid(),
+                            ProductCode = $"PROD-EXT-{nextProdNumber:D3}",
+                            Name = item.ProductName,
+                            PurchasePrice = item.CostPrice,
+                            Mrp = item.Mrp,
+                            SellingPrice = item.SellingPrice,
+                            TaxSlabId = selectedTaxSlab.Id,
+                            CategoryId = generalCategory.Id,
+                            UnitOfMeasureId = resolvedUomId,
+                            HsnCode = hsnCode,
+                            IsActive = true,
+                            IsWeighable = false,
+                            HasExpiry = item.HasExpiry
+                        };
+
+                        product.Barcodes.Add(new Barcode
+                        {
+                            Id = Guid.NewGuid(),
+                            BarcodeValue = assignedBarcode,
+                            IsPrimary = true
+                        });
+
+                        _context.Products.Add(product);
+                    }
                 }
                 else
                 {
@@ -918,13 +961,39 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
             }
 
             // ── Step 3: Locate the table footer row ───────────────────────────
-            // Footer starts when we see subtotal/tax labels like "OUTPUT CGST", "ROUND OFF"
+            // Footer starts when we hit tax summary rows (CGST, SGST, R.OFF, Total) or
+            // any standalone subtotal row that has no description / HSN but contains a
+            // large amount—these appear immediately after the last line item.
             int footerRowIdx = rows.Count;
             for (int i = headerRowIdx + 1; i < rows.Count; i++)
             {
                 var rowText = string.Join(" ", rows[i].Value.Select(w => w.Text)).ToLower();
+
+                // Explicit tax/summary labels used by Tally and most ERPs
                 if (rowText.Contains("output") || rowText.Contains("round off") ||
-                    rowText.Contains("chargeable") || rowText.Contains("tax invoice"))
+                    rowText.Contains("chargeable") || rowText.Contains("tax invoice") ||
+                    rowText.Contains("cgst") || rowText.Contains("sgst") ||
+                    rowText.Contains("r.off") || rowText.Contains("igst") ||
+                    rowText == "total" || rowText.StartsWith("total ") ||
+                    rowText.Contains("grand total") || rowText.Contains("sub total") ||
+                    rowText.Contains("subtotal"))
+                {
+                    footerRowIdx = i;
+                    break;
+                }
+
+                // Detect a subtotal-only row: the desc column is empty, HSN column is empty,
+                // GST column is empty, qty column is empty — only the amount column has content.
+                // This is the running total line that Tally prints (e.g. "15,753.71").
+                var rWords  = rows[i].Value;
+                bool descHasText = rWords.Any(w => w.BoundingBox.Left >= pageDescMin && w.BoundingBox.Right <= pageDescMax
+                    && !Regex.IsMatch(w.Text, @"^[\d,\.]+$"));
+                bool hsnHasText  = rWords.Any(w => w.BoundingBox.Left >= pageHsnMin  && w.BoundingBox.Right <= pageHsnMax);
+                bool qtyHasText  = rWords.Any(w => w.BoundingBox.Left >= pageQtyMin  && w.BoundingBox.Right <= pageQtyMax);
+                bool amtHasText  = rWords.Any(w => w.BoundingBox.Left >= pageAmtMin  && Regex.IsMatch(w.Text, @"[\d,]"));
+
+                // Standalone subtotal row: amount present, everything else empty
+                if (!descHasText && !hsnHasText && !qtyHasText && amtHasText)
                 {
                     footerRowIdx = i;
                     break;
@@ -994,11 +1063,6 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                      descText.Contains("Primary", StringComparison.OrdinalIgnoreCase)))
                     continue;
 
-                // ── Parse rate (cost price) ───────────────────────────────────
-                if (!decimal.TryParse(rateText, System.Globalization.NumberStyles.Any,
-                        System.Globalization.CultureInfo.InvariantCulture, out decimal rate) || rate <= 0)
-                    continue;
-
                 // ── Parse GST tax rate ────────────────────────────────────────
                 decimal taxRate = 0;
                 var gstMatch = Regex.Match(gstText, @"(\d+(?:\.\d+)?)");
@@ -1023,15 +1087,28 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                     if (!string.IsNullOrWhiteSpace(uomRaw)) uom = uomRaw;
                 }
 
-                // Fallback: derive qty = amount / rate (Tally always prints both)
-                if (qty <= 0 && lineAmount > 0 && rate > 0)
+                if (qty <= 0) qty = 1;
+
+                // ── Parse rate (unit cost price) ──────────────────────────────
+                // PRIMARY: unitRate = lineAmount / qty  (most reliable for Tally invoices —
+                // the Amount column is always the rightmost unambiguous column, while the
+                // Rate column may be misdetected due to the "per" / "Disc.%" columns sitting
+                // between Rate and Amount with variable widths across different suppliers).
+                // Per ERP standard: product master stores PURCHASE PRICE PER UNIT (per piece /
+                // set / doz — matching the UOM), NOT the line total.
+                decimal rate = 0;
+                if (lineAmount > 0 && qty > 0)
                 {
-                    decimal computed = Math.Round(lineAmount / rate, 3);
-                    decimal rounded = Math.Round(computed);
-                    qty = (Math.Abs(computed - rounded) < 0.02m) ? rounded : computed;
+                    rate = Math.Round(lineAmount / qty, 2);
+                }
+                else if (!string.IsNullOrWhiteSpace(rateText))
+                {
+                    // Fallback: explicit rate column text when amount column is unavailable
+                    decimal.TryParse(rateText, System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out rate);
                 }
 
-                if (qty <= 0) qty = 1;
+                if (rate <= 0) continue;
 
                 // ── Build product name ────────────────────────────────────────
                 // Strip the leading Tally row index from the description.

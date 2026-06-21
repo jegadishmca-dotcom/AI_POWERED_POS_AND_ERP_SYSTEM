@@ -520,8 +520,12 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
             if (lastIntBarcode != null && int.TryParse(lastIntBarcode.Substring(3), out int parsedBarcodeSeq))
                 nextBarcodeSeq = parsedBarcodeSeq + 1;
 
-            // Keep track of the batch IDs mapped by barcode for use in Pass 2
-            var itemBatchIds = new Dictionary<string, Guid?>();
+            // Keep track of placeholder barcode → resolved Product.Id and BatchId for PASS 2.
+            // We MUST use Product.Id here because PASS 1 assigns INT########
+            // barcodes to new products, so the original placeholder barcode (HSN-/ITEM-)
+            // no longer exists in the DB after SaveChanges.
+            var itemProductIds = new Dictionary<string, Guid>();
+            var itemBatchIds   = new Dictionary<string, Guid?>();
 
             // --- PASS 1: Create/Update Products and Batches ---
             foreach (var item in request.Items)
@@ -671,7 +675,8 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                     }
                 }
 
-                itemBatchIds[item.Barcode] = selectedBatchId;
+                itemProductIds[item.Barcode] = product.Id;
+                itemBatchIds[item.Barcode]   = selectedBatchId;
             }
 
             // Save Products, Barcodes, and ProductBatches first so they exist in the DB.
@@ -691,14 +696,11 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
 
             foreach (var item in request.Items)
             {
-                var product = await _context.Products
-                    .Include(p => p.Barcodes)
-                    .FirstOrDefaultAsync(p => p.Barcodes.Any(b => b.BarcodeValue == item.Barcode), cancellationToken);
-
-                if (product == null)
-                {
-                    throw new Exception($"Product with barcode {item.Barcode} was not found after saving.");
-                }
+                // Use the pre-built Product ID map (placeholder barcode → Product.Id)
+                // instead of re-querying by barcode, because new products were saved
+                // with INT######## barcodes, not the original HSN-/ITEM- placeholders.
+                if (!itemProductIds.TryGetValue(item.Barcode, out Guid productId))
+                    throw new Exception($"Import mapping error: no product ID found for barcode key '{item.Barcode}'. Please retry the import.");
 
                 var selectedBatchId = itemBatchIds[item.Barcode];
                 DateTime? expiryDate = item.ExpiryDate;
@@ -707,7 +709,7 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                 {
                     Id = Guid.NewGuid(),
                     StockAdjustmentId = adjustment.Id,
-                    ProductId = product.Id,
+                    ProductId = productId,
                     BatchId = selectedBatchId,
                     AdjustedQuantity = item.Quantity,
                     UnitCost = item.CostPrice
@@ -719,7 +721,7 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                     warehouseId: null,
                     terminalId: null,
                     businessDate: DateTime.UtcNow,
-                    productId: product.Id,
+                    productId: productId,
                     batchId: selectedBatchId,
                     movementType: "ADJ",
                     quantity: item.Quantity,

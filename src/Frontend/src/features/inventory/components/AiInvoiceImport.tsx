@@ -10,6 +10,8 @@ interface DraftItem {
   productName: string;
   productCode?: string;
   quantity: number;
+  uom: string;
+  existingUom?: string | null;
   costPrice: number;
   existingCostPrice?: number | null;
   existingSellingPrice?: number | null;
@@ -95,7 +97,12 @@ export const AiInvoiceImport = () => {
       });
 
       setInvoiceRef(res.data.invoiceReference);
-      setDraftItems(res.data.items);
+      // Normalize: ensure uom and batchNumber always have defaults
+      setDraftItems(res.data.items.map((item: any) => ({
+        ...item,
+        uom: item.uom || item.existingUom || 'PCS',
+        batchNumber: item.batchNumber || '',
+      })));
     } catch (err: any) {
       console.error('AI Extraction failed', err);
       setErrorMsg(err.response?.data?.message || err.message || 'AI invoice parsing failed.');
@@ -192,6 +199,7 @@ export const AiInvoiceImport = () => {
           mrp: Number(item.mrp),
           sellingPrice: Number(item.sellingPrice),
           quantity: item.quantity,
+          uom: item.uom || 'PCS',
           batchNumber: item.batchNumber || null,
           expiryDate: item.expiryDate || null,
           hasExpiry: item.hasExpiry,
@@ -365,22 +373,21 @@ export const AiInvoiceImport = () => {
           {/* Table Spreadsheet */}
           <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-xs table-fixed">
+              <table className="w-full text-left border-collapse text-xs table-fixed" style={{minWidth: '960px'}}>
                 <thead className="bg-slate-50 font-bold text-slate-700 border-b-2 border-slate-350 sticky top-0">
                   <tr>
-                    <th className="p-3 w-16 text-center">Status</th>
-                    <th className="p-3 w-48">Product Description</th>
-                    <th className="p-3 w-16 text-right">Qty</th>
-                    <th className="p-3 w-24 text-center">Invoice Cost</th>
-                    <th className="p-3 w-24 text-center">System Cost</th>
-                    <th className="p-3 w-36 text-center">Cost Status</th>
-                    <th className="p-3 w-28 text-center">GST Slab</th>
-                    <th className="p-3 w-12 text-center">Expiry?</th>
-                    <th className="p-3 w-28">Batch Code</th>
-                    <th className="p-3 w-36">Expiry Date</th>
-                    <th className="p-3 w-28 text-center">MRP (Editable)</th>
-                    <th className="p-3 w-28 text-center">Sell Price (Editable)</th>
-                    <th className="p-3 w-44">Remarks</th>
+                    <th className="p-2 w-12 text-center">Status</th>
+                    <th className="p-2 w-44">Product Description</th>
+                    <th className="p-2 w-10 text-right">Qty</th>
+                    <th className="p-2 w-14 text-center">UOM</th>
+                    <th className="p-2 w-28 text-center">Unit Cost</th>
+                    <th className="p-2 w-24 text-center">GST Slab</th>
+                    <th className="p-2 w-10 text-center">Exp?</th>
+                    <th className="p-2 w-24">Batch Code</th>
+                    <th className="p-2 w-28">Expiry Date</th>
+                    <th className="p-2 w-24 text-center">MRP (₹)</th>
+                    <th className="p-2 w-24 text-center">Sell Price (₹)</th>
+                    <th className="p-2 w-28">Remarks</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -390,59 +397,65 @@ export const AiInvoiceImport = () => {
                     const hasExpiryErr = isPerishable && rules.mandatoryBatchTracking && !item.expiryDate;
 
                     return (
-                      <tr key={idx} className="border-b-2 border-slate-300 hover:bg-slate-50">
+                      <tr key={idx} className="border-b border-slate-200 hover:bg-slate-50">
                         {/* Status Badge */}
-                        <td className="p-3 text-center">{getStatusBadge(item.status)}</td>
+                        <td className="p-2 text-center">{getStatusBadge(item.status)}</td>
                         
                         {/* Name & Barcode */}
-                        <td className="p-3">
-                          <div className="font-bold text-slate-800 truncate" title={item.productName}>
+                        <td className="p-2">
+                          <div className="font-semibold text-slate-800 leading-tight" title={item.productName}
+                            style={{display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'}}>
                             {item.productName}
                           </div>
-                          <div className="text-[10px] text-slate-400 font-mono mt-0.5">{item.barcode}</div>
+                          <div className="text-[9px] text-slate-400 font-mono mt-0.5 truncate">{item.barcode}</div>
                         </td>
                         
                         {/* Quantity */}
-                        <td className="p-3 text-right font-bold text-slate-800">{item.quantity}</td>
+                        <td className="p-2 text-right font-bold text-slate-800">{item.quantity}</td>
+
+                        {/* UOM — editable */}
+                        <td className="p-2 text-center">
+                          <input
+                            type="text"
+                            value={item.uom || 'PCS'}
+                            onChange={(e) => handleFieldChange(idx, 'uom', e.target.value.toUpperCase())}
+                            maxLength={6}
+                            className="w-full p-1 border border-slate-300 rounded outline-none text-center font-bold text-xs focus:ring-1 focus:ring-indigo-500 uppercase"
+                          />
+                        </td>
                         
-                        {/* Invoice Cost */}
-                        <td className="p-3 text-center font-bold text-slate-800">
-                          ₹{item.costPrice.toFixed(2)}
-                        </td>
-
-                        {/* System Cost */}
-                        <td className="p-3 text-center text-slate-600 font-medium">
+                        {/* Unit Cost — merged with system cost & status badge */}
+                        <td className="p-2 text-center">
+                          <div className="font-bold text-slate-800">₹{item.costPrice.toFixed(2)}</div>
                           {item.existingCostPrice !== null && item.existingCostPrice !== undefined ? (
-                            `₹${item.existingCostPrice.toFixed(2)}`
-                          ) : (
-                            <span className="text-slate-400 font-bold">New Product</span>
-                          )}
+                            <div className="text-[9px] text-slate-400 mt-0.5">
+                              Sys: ₹{item.existingCostPrice.toFixed(2)}
+                            </div>
+                          ) : null}
+                          <div className="mt-0.5">
+                            {item.status === 'NEW' ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+                                New Product
+                              </span>
+                            ) : item.existingCostPrice !== null && item.existingCostPrice !== undefined && item.costPrice !== item.existingCostPrice ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+                                ⚠ Cost Diff
+                              </span>
+                            ) : item.existingCostPrice !== null && item.existingCostPrice !== undefined ? (
+                              <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-green-50 text-green-700 border border-green-200 whitespace-nowrap">
+                                ✓ Match
+                              </span>
+                            ) : null}
+                          </div>
                         </td>
 
-                        {/* Cost Status */}
-                        <td className="p-3 text-center">
-                          {item.status === 'NEW' ? (
-                            <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                              New Product: Action Required
-                            </span>
-                          ) : item.existingCostPrice !== null && item.existingCostPrice !== undefined && item.costPrice === item.existingCostPrice ? (
-                            <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-green-50 text-green-700 border border-green-150">
-                              Cost is matching
-                            </span>
-                          ) : (
-                            <span className="px-2 py-1 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-150">
-                              Cost Diff : Action required
-                            </span>
-                          )}
-                        </td>
-
-                        {/* GST Slab Dropdown */}
-                        <td className="p-3 text-center">
+                        {/* GST Slab Dropdown — auto-populated from taxRate */}
+                        <td className="p-2 text-center">
                           <div className="flex flex-col items-center">
                             <select
                               value={item.taxRate}
                               onChange={(e) => handleFieldChange(idx, 'taxRate', Number(e.target.value))}
-                              className="w-full p-1.5 border border-slate-300 rounded outline-none text-xs focus:ring-1 focus:ring-indigo-500 font-bold bg-white"
+                              className="w-full p-1 border border-slate-300 rounded outline-none text-xs focus:ring-1 focus:ring-indigo-500 font-bold bg-white"
                             >
                               <option value={0}>GST 0%</option>
                               <option value={5}>GST 5%</option>
@@ -451,13 +464,13 @@ export const AiInvoiceImport = () => {
                               <option value={28}>GST 28%</option>
                             </select>
                             {item.existingTaxRate !== null && item.existingTaxRate !== undefined && (
-                              <span className="text-[10px] text-slate-400 mt-0.5">Prev: {item.existingTaxRate}%</span>
+                              <span className="text-[9px] text-slate-400 mt-0.5">Prev: {item.existingTaxRate}%</span>
                             )}
                           </div>
                         </td>
 
                         {/* Perishable Expiry Toggle */}
-                        <td className="p-3 text-center">
+                        <td className="p-2 text-center">
                           <input
                             type="checkbox"
                             checked={item.hasExpiry}
@@ -467,21 +480,21 @@ export const AiInvoiceImport = () => {
                         </td>
                         
                         {/* Batch Input */}
-                        <td className="p-3">
+                        <td className="p-2">
                           <input
                             type="text"
                             value={item.batchNumber}
                             disabled={!isPerishable}
-                            placeholder={isPerishable ? 'Required' : 'Disabled'}
+                            placeholder={isPerishable ? 'Required' : '—'}
                             onChange={(e) => handleFieldChange(idx, 'batchNumber', e.target.value)}
-                            className={`w-full p-1.5 border rounded outline-none text-xs focus:ring-1 focus:ring-indigo-500 ${
+                            className={`w-full p-1 border rounded outline-none text-xs focus:ring-1 focus:ring-indigo-500 ${
                               hasBatchErr ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-300'
-                            }`}
+                            } disabled:bg-slate-50 disabled:text-slate-400`}
                           />
                         </td>
 
                         {/* Expiry Date input */}
-                        <td className="p-3">
+                        <td className="p-2">
                           <input
                             type="date"
                             value={item.expiryDate || ''}
@@ -489,45 +502,46 @@ export const AiInvoiceImport = () => {
                             onChange={(e) => handleFieldChange(idx, 'expiryDate', e.target.value || null)}
                             className={`w-full p-1 border rounded outline-none text-xs focus:ring-1 focus:ring-indigo-500 ${
                               hasExpiryErr ? 'border-red-500 bg-red-50 focus:ring-red-500' : 'border-slate-300'
-                            }`}
+                            } disabled:bg-slate-50 disabled:text-slate-400`}
                           />
                         </td>
                         
                         {/* MRP Input */}
-                        <td className="p-3">
+                        <td className="p-2">
                           <div className="flex flex-col items-center">
                             <input
                               type="number"
                               step="0.01"
                               value={item.mrp || ''}
                               onChange={(e) => handleFieldChange(idx, 'mrp', Number(e.target.value))}
-                              className="w-full p-1.5 border border-slate-300 rounded outline-none text-center font-bold focus:ring-1 focus:ring-indigo-500"
+                              className="w-full p-1 border border-slate-300 rounded outline-none text-center font-bold focus:ring-1 focus:ring-indigo-500"
                             />
-                            {item.existingMrp !== null && (
-                              <span className="text-[10px] text-slate-400 mt-0.5">Prev: ₹{item.existingMrp?.toFixed(2)}</span>
+                            {item.existingMrp !== null && item.existingMrp !== undefined && (
+                              <span className="text-[9px] text-slate-400 mt-0.5">Prev: ₹{item.existingMrp?.toFixed(2)}</span>
                             )}
                           </div>
                         </td>
                         
                         {/* Selling Price Input */}
-                        <td className="p-3">
+                        <td className="p-2">
                           <div className="flex flex-col items-center">
                             <input
                               type="number"
                               step="0.01"
                               value={item.sellingPrice || ''}
                               onChange={(e) => handleFieldChange(idx, 'sellingPrice', Number(e.target.value))}
-                              className="w-full p-1.5 border border-slate-300 rounded outline-none text-center font-bold focus:ring-1 focus:ring-indigo-500"
+                              className="w-full p-1 border border-slate-300 rounded outline-none text-center font-bold focus:ring-1 focus:ring-indigo-500"
                             />
-                            {item.existingSellingPrice !== null && (
-                              <span className="text-[10px] text-slate-400 mt-0.5">Prev: ₹{item.existingSellingPrice?.toFixed(2)}</span>
+                            {item.existingSellingPrice !== null && item.existingSellingPrice !== undefined && (
+                              <span className="text-[9px] text-slate-400 mt-0.5">Prev: ₹{item.existingSellingPrice?.toFixed(2)}</span>
                             )}
                           </div>
                         </td>
                         
                         {/* Remarks */}
-                        <td className="p-3 text-slate-500">
-                          <div className="truncate max-w-[160px]" title={item.remarks}>
+                        <td className="p-2 text-slate-500">
+                          <div className="text-[10px] leading-tight" title={item.remarks}
+                            style={{display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden'}}>
                             {item.remarks}
                           </div>
                         </td>

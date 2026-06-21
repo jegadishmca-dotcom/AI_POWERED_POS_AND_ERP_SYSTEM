@@ -21,6 +21,8 @@ interface DraftItem {
   status: string;
   hasExpiry: boolean;
   remarks: string;
+  taxRate: number;
+  existingTaxRate?: number | null;
 }
 
 interface Rules {
@@ -192,7 +194,8 @@ export const AiInvoiceImport = () => {
           quantity: item.quantity,
           batchNumber: item.batchNumber || null,
           expiryDate: item.expiryDate || null,
-          hasExpiry: item.hasExpiry
+          hasExpiry: item.hasExpiry,
+          taxRate: Number(item.taxRate)
         }))
       };
 
@@ -243,24 +246,35 @@ export const AiInvoiceImport = () => {
             >
               <Upload className="w-12 h-12 text-slate-400" />
               <div>
-                <span className="text-sm font-bold text-slate-700 block">Select PDF invoice or delivery note</span>
-                <span className="text-xs text-slate-400 mt-1 block">Supports readable standard formatted invoices</span>
+                <span className="text-sm font-bold text-slate-700 block">Select PDF or Image invoice</span>
+                <span className="text-xs text-slate-400 mt-1 block">Supports standard formatted PDF invoices and image scans</span>
               </div>
               <input
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileChange}
-                accept="application/pdf"
+                accept="application/pdf,image/*"
                 className="hidden"
               />
             </div>
 
             {file && (
-              <div className="p-3 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold border border-indigo-100 flex items-center justify-between">
-                <span className="truncate">Selected: {file.name}</span>
-                <button type="button" onClick={() => setFile(null)} className="text-indigo-400 hover:text-indigo-600">
-                  <X className="w-4 h-4" />
-                </button>
+              <div className="space-y-4">
+                {file.type.startsWith('image/') && (
+                  <div className="flex justify-center">
+                    <img 
+                      src={URL.createObjectURL(file)} 
+                      alt="Uploaded Invoice Preview" 
+                      className="max-h-48 rounded-xl shadow border border-slate-200 object-contain"
+                    />
+                  </div>
+                )}
+                <div className="p-3 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold border border-indigo-100 flex items-center justify-between">
+                  <span className="truncate">Selected: {file.name}</span>
+                  <button type="button" onClick={() => setFile(null)} className="text-indigo-400 hover:text-indigo-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             )}
 
@@ -289,7 +303,7 @@ export const AiInvoiceImport = () => {
                 </>
               ) : (
                 <>
-                  <Sparkles className="w-4 h-4 mr-2" /> Upload & Parse PDF
+                  <Sparkles className="w-4 h-4 mr-2" /> Upload & Parse Invoice
                 </>
               )}
             </button>
@@ -360,6 +374,7 @@ export const AiInvoiceImport = () => {
                     <th className="p-3 w-24 text-center">Invoice Cost</th>
                     <th className="p-3 w-24 text-center">System Cost</th>
                     <th className="p-3 w-36 text-center">Cost Status</th>
+                    <th className="p-3 w-28 text-center">GST Slab</th>
                     <th className="p-3 w-12 text-center">Expiry?</th>
                     <th className="p-3 w-28">Batch Code</th>
                     <th className="p-3 w-36">Expiry Date</th>
@@ -419,6 +434,26 @@ export const AiInvoiceImport = () => {
                               Cost Diff : Action required
                             </span>
                           )}
+                        </td>
+
+                        {/* GST Slab Dropdown */}
+                        <td className="p-3 text-center">
+                          <div className="flex flex-col items-center">
+                            <select
+                              value={item.taxRate}
+                              onChange={(e) => handleFieldChange(idx, 'taxRate', Number(e.target.value))}
+                              className="w-full p-1.5 border border-slate-300 rounded outline-none text-xs focus:ring-1 focus:ring-indigo-500 font-bold bg-white"
+                            >
+                              <option value={0}>GST 0%</option>
+                              <option value={5}>GST 5%</option>
+                              <option value={12}>GST 12%</option>
+                              <option value={18}>GST 18%</option>
+                              <option value={28}>GST 28%</option>
+                            </select>
+                            {item.existingTaxRate !== null && item.existingTaxRate !== undefined && (
+                              <span className="text-[10px] text-slate-400 mt-0.5">Prev: {item.existingTaxRate}%</span>
+                            )}
+                          </div>
                         </td>
 
                         {/* Perishable Expiry Toggle */}

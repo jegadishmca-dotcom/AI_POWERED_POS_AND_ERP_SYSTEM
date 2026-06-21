@@ -14,6 +14,10 @@ using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using UglyToad.PdfPig;
+using System.Text.Json;
+using System.Text;
+using System.Net.Http;
+using Microsoft.Extensions.Configuration;
 
 namespace PosErp.Api.Controllers;
 
@@ -24,11 +28,19 @@ public class AIInvoiceController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
     private readonly IStockLedgerService _stockLedgerService;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly IConfiguration _configuration;
 
-    public AIInvoiceController(IApplicationDbContext context, IStockLedgerService stockLedgerService)
+    public AIInvoiceController(
+        IApplicationDbContext context, 
+        IStockLedgerService stockLedgerService,
+        IHttpClientFactory httpClientFactory,
+        IConfiguration configuration)
     {
         _context = context;
         _stockLedgerService = stockLedgerService;
+        _httpClientFactory = httpClientFactory;
+        _configuration = configuration;
     }
 
     public class ExtractedInvoiceItem
@@ -39,6 +51,7 @@ public class AIInvoiceController : ControllerBase
         public decimal Mrp { get; set; }
         public decimal SellingPrice { get; set; }
         public decimal Quantity { get; set; }
+        public decimal TaxRate { get; set; }
     }
 
     [HttpPost("ai-extract")]
@@ -50,62 +63,57 @@ public class AIInvoiceController : ControllerBase
         }
 
         var items = new List<ExtractedInvoiceItem>();
+        string extension = Path.GetExtension(file.FileName).ToLower();
+        bool isImage = extension == ".jpg" || extension == ".jpeg" || extension == ".png";
+
+        // Save uploaded file to temp file for processing
+        string tempFilePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}{extension}");
+        using (var fileStream = new FileStream(tempFilePath, FileMode.Create))
+        {
+            await file.CopyToAsync(fileStream, cancellationToken);
+        }
 
         try
         {
-            // Use spatial (coordinate-based) extraction — handles column-format Tally invoices
-            using (var stream = file.OpenReadStream())
+            // Try extracting using offline Ollama model first
+            try
             {
-                items = ExtractItemsFromPdfSpatially(stream);
+                items = await ExtractWithOllamaAsync(tempFilePath, isImage, cancellationToken);
+            }
+            catch (Exception ollamaEx)
+            {
+                Console.WriteLine($"Ollama extraction failed: {ollamaEx.Message}. Falling back to local PDF parser.");
             }
 
-            // If spatial extraction yielded nothing, fall back to line-based text approach
-            if (items.Count == 0)
+            // Local fallback for PDFs if Ollama is unreachable/failed
+            if (items.Count == 0 && !isImage)
             {
-                using (var stream2 = file.OpenReadStream())
-                using (var document = PdfDocument.Open(stream2))
+                using (var stream = file.OpenReadStream())
                 {
-                    var linesList = new List<string>();
-                    foreach (var page in document.GetPages())
-                    {
-                        var words = page.GetWords().ToList();
-                        if (!words.Any()) continue;
+                    items = ExtractItemsFromPdfSpatially(stream);
+                }
 
-                        var sortedWords = words.OrderByDescending(w => w.BoundingBox.Bottom).ToList();
-                        var currentLineWords = new List<UglyToad.PdfPig.Content.Word>();
-                        double currentY = sortedWords[0].BoundingBox.Bottom;
-                        const double threshold = 5.0;
-
-                        foreach (var word in sortedWords)
-                        {
-                            if (Math.Abs(word.BoundingBox.Bottom - currentY) > threshold)
-                            {
-                                linesList.Add(string.Join(" ", currentLineWords
-                                    .OrderBy(w => w.BoundingBox.Left)
-                                    .Select(w => w.Text)));
-                                currentLineWords.Clear();
-                                currentY = word.BoundingBox.Bottom;
-                            }
-                            currentLineWords.Add(word);
-                        }
-
-                        if (currentLineWords.Any())
-                            linesList.Add(string.Join(" ", currentLineWords
-                                .OrderBy(w => w.BoundingBox.Left)
-                                .Select(w => w.Text)));
-                    }
-
-                    items = ParseInvoiceText(string.Join("\n", linesList));
+                if (items.Count == 0)
+                {
+                    string text = ExtractTextFromPdf(tempFilePath);
+                    items = ParseInvoiceText(text);
                 }
             }
         }
-        catch (Exception ex)
+        finally
         {
-            Console.WriteLine($"PdfPig extraction failed: {ex.Message}. Falling back to mock data.");
+            if (System.IO.File.Exists(tempFilePath))
+            {
+                System.IO.File.Delete(tempFilePath);
+            }
         }
 
         if (items.Count == 0)
         {
+            if (isImage)
+            {
+                return BadRequest(new { message = "Ollama is offline or does not have a vision model pulled. Image extraction requires a running Ollama server with a vision model (e.g. llava)." });
+            }
             items = GetMockExtractedItems();
         }
 
@@ -117,6 +125,7 @@ public class AIInvoiceController : ControllerBase
             // Lookup product by barcode
             var product = await _context.Products
                 .Include(p => p.Barcodes)
+                .Include(p => p.TaxSlab)
                 .FirstOrDefaultAsync(p => p.Barcodes.Any(b => b.BarcodeValue == item.Barcode), cancellationToken);
 
             if (product != null)
@@ -143,7 +152,9 @@ public class AIInvoiceController : ControllerBase
                     ExpiryDate = (DateTime?)null,
                     Status = status,
                     HasExpiry = product.HasExpiry,
-                    Remarks = remarks
+                    Remarks = remarks,
+                    TaxRate = item.TaxRate,
+                    ExistingTaxRate = product.TaxSlab?.IgstRate ?? 0.0m
                 });
             }
             else
@@ -164,7 +175,9 @@ public class AIInvoiceController : ControllerBase
                     ExpiryDate = (DateTime?)null,
                     Status = "NEW",
                     HasExpiry = IsPerishable(item.ProductName),
-                    Remarks = "New Product - setup name & pricing details"
+                    Remarks = "New Product - setup name & pricing details",
+                    TaxRate = item.TaxRate,
+                    ExistingTaxRate = (decimal?)null
                 });
             }
         }
@@ -174,6 +187,220 @@ public class AIInvoiceController : ControllerBase
             InvoiceReference = invoiceRef,
             Items = resultItems
         });
+    }
+
+    private async Task<string> ResolveOllamaUrlAsync()
+    {
+        var configUrl = _configuration["Ollama:BaseUrl"] ?? _configuration["Ollama__BaseUrl"];
+        if (!string.IsNullOrEmpty(configUrl))
+        {
+            return configUrl.TrimEnd('/');
+        }
+
+        var client = _httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(1);
+
+        try
+        {
+            var response = await client.GetAsync("http://pos_ollama:11434");
+            if (response.IsSuccessStatusCode) return "http://pos_ollama:11434";
+        }
+        catch { }
+
+        try
+        {
+            var response = await client.GetAsync("http://localhost:11434");
+            if (response.IsSuccessStatusCode) return "http://localhost:11434";
+        }
+        catch { }
+
+        return "http://localhost:11434"; // Default fallback
+    }
+
+    private async Task<string> GetOllamaModelAsync(string ollamaUrl, bool requiresVision)
+    {
+        try
+        {
+            var client = _httpClientFactory.CreateClient();
+            client.Timeout = TimeSpan.FromSeconds(3);
+            var response = await client.GetAsync($"{ollamaUrl}/api/tags");
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                using var doc = JsonDocument.Parse(content);
+                if (doc.RootElement.TryGetProperty("models", out var modelsArr) && modelsArr.ValueKind == JsonValueKind.Array)
+                {
+                    var models = new List<string>();
+                    foreach (var m in modelsArr.EnumerateArray())
+                    {
+                        if (m.TryGetProperty("name", out var nameProp))
+                        {
+                            var name = nameProp.GetString();
+                            if (!string.IsNullOrEmpty(name)) models.Add(name);
+                        }
+                    }
+
+                    if (models.Count > 0)
+                    {
+                        if (requiresVision)
+                        {
+                            // Look for vision models (llava, vl, vision, minicpm)
+                            var visionModel = models.FirstOrDefault(m => 
+                                m.Contains("llava", StringComparison.OrdinalIgnoreCase) || 
+                                m.Contains("vl", StringComparison.OrdinalIgnoreCase) || 
+                                m.Contains("vision", StringComparison.OrdinalIgnoreCase) || 
+                                m.Contains("minicpm", StringComparison.OrdinalIgnoreCase));
+                            
+                            if (visionModel != null) return visionModel;
+                        }
+
+                        // Try standard text models (qwen, llama)
+                        var textModel = models.FirstOrDefault(m => 
+                            m.Contains("qwen", StringComparison.OrdinalIgnoreCase) || 
+                            m.Contains("llama", StringComparison.OrdinalIgnoreCase));
+                        
+                        if (textModel != null) return textModel;
+
+                        return models[0];
+                    }
+                }
+            }
+        }
+        catch { }
+
+        return requiresVision ? "llava" : "llama2";
+    }
+
+    private async Task<List<ExtractedInvoiceItem>> ExtractWithOllamaAsync(
+        string filePath, bool isImage, CancellationToken cancellationToken)
+    {
+        var items = new List<ExtractedInvoiceItem>();
+        var ollamaUrl = await ResolveOllamaUrlAsync();
+        var model = await GetOllamaModelAsync(ollamaUrl, isImage);
+
+        var client = _httpClientFactory.CreateClient();
+        client.Timeout = TimeSpan.FromSeconds(90); // 90 second timeout for offline LLM parsing
+
+        object requestBody;
+        string prompt = @"You are an expert invoice parser. Extract the line items from this invoice.
+For each item, extract:
+- barcode (use the HSN code if barcode is missing, e.g. 'HSN-12345678-001' where the last part is the item index, or generate a unique placeholder like 'ITEM-001')
+- productName
+- quantity (numerical value, e.g. 10)
+- costPrice (unit cost price excluding tax)
+- mrp (suggested or printed MRP)
+- sellingPrice (suggested or printed selling price)
+- taxRate (the GST rate percentage as a number, e.g., 5.0, 18.0, 12.0, 0.0)
+- batchNumber (if printed)
+- expiryDate (if printed, format as YYYY-MM-DD or null)
+
+Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName', 'quantity', 'costPrice', 'mrp', 'sellingPrice', 'taxRate', 'batchNumber', 'expiryDate'. Do not include markdown formatting or extra text.";
+
+        if (isImage)
+        {
+            var bytes = await System.IO.File.ReadAllBytesAsync(filePath, cancellationToken);
+            var base64Image = Convert.ToBase64String(bytes);
+
+            requestBody = new
+            {
+                model = model,
+                prompt = prompt,
+                stream = false,
+                format = "json",
+                images = new[] { base64Image }
+            };
+        }
+        else
+        {
+            // PDF: extract text
+            string textContent = ExtractTextFromPdf(filePath);
+
+            requestBody = new
+            {
+                model = model,
+                prompt = $"{prompt}\n\nInvoice text:\n{textContent}",
+                stream = false,
+                format = "json"
+            };
+        }
+
+        var jsonPayload = JsonSerializer.Serialize(requestBody);
+        var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+        var response = await client.PostAsync($"{ollamaUrl}/api/generate", content, cancellationToken);
+        if (!response.IsSuccessStatusCode)
+        {
+            throw new Exception($"Ollama request failed with status: {response.StatusCode}");
+        }
+
+        var resContent = await response.Content.ReadAsStringAsync(cancellationToken);
+        using var doc = JsonDocument.Parse(resContent);
+        if (doc.RootElement.TryGetProperty("response", out var resProp))
+        {
+            var responseText = resProp.GetString();
+            if (!string.IsNullOrEmpty(responseText))
+            {
+                responseText = responseText.Trim();
+                if (responseText.StartsWith("```json"))
+                {
+                    responseText = responseText.Substring(7);
+                }
+                if (responseText.EndsWith("```"))
+                {
+                    responseText = responseText.Substring(0, responseText.Length - 3);
+                }
+                responseText = responseText.Trim();
+
+                var parsed = JsonSerializer.Deserialize<List<ExtractedInvoiceItem>>(responseText, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                });
+
+                if (parsed != null)
+                {
+                    items = parsed;
+                }
+            }
+        }
+
+        return items;
+    }
+
+    private string ExtractTextFromPdf(string filePath)
+    {
+        var linesList = new List<string>();
+        using (var document = PdfDocument.Open(filePath))
+        {
+            foreach (var page in document.GetPages())
+            {
+                var words = page.GetWords().ToList();
+                if (!words.Any()) continue;
+
+                var sortedWords = words.OrderByDescending(w => w.BoundingBox.Bottom).ToList();
+                var currentLineWords = new List<UglyToad.PdfPig.Content.Word>();
+                double currentY = sortedWords[0].BoundingBox.Bottom;
+                const double threshold = 5.0;
+
+                foreach (var word in sortedWords)
+                {
+                    if (Math.Abs(word.BoundingBox.Bottom - currentY) > threshold)
+                    {
+                        linesList.Add(string.Join(" ", currentLineWords
+                            .OrderBy(w => w.BoundingBox.Left)
+                            .Select(w => w.Text)));
+                        currentLineWords.Clear();
+                        currentY = word.BoundingBox.Bottom;
+                    }
+                    currentLineWords.Add(word);
+                }
+
+                if (currentLineWords.Any())
+                    linesList.Add(string.Join(" ", currentLineWords
+                        .OrderBy(w => w.BoundingBox.Left)
+                        .Select(w => w.Text)));
+            }
+        }
+        return string.Join("\n", linesList);
     }
 
     public class AiImportRequestItem
@@ -187,6 +414,7 @@ public class AIInvoiceController : ControllerBase
         public string? BatchNumber { get; set; }
         public DateTime? ExpiryDate { get; set; }
         public bool HasExpiry { get; set; }
+        public decimal TaxRate { get; set; }
     }
 
     public class AiImportRequest
@@ -235,7 +463,8 @@ public class AIInvoiceController : ControllerBase
         using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
         try
         {
-            var defaultTaxSlab = await _context.TaxSlabs.FirstOrDefaultAsync(cancellationToken);
+            var taxSlabs = await _context.TaxSlabs.Where(t => !t.IsDeleted).ToListAsync(cancellationToken);
+            var defaultTaxSlab = taxSlabs.FirstOrDefault(s => s.IgstRate == 18.0m) ?? taxSlabs.FirstOrDefault();
             if (defaultTaxSlab == null)
             {
                 throw new Exception("No Tax Slabs found in the system to assign to new products.");
@@ -270,6 +499,9 @@ public class AIInvoiceController : ControllerBase
                     .Include(p => p.Barcodes)
                     .FirstOrDefaultAsync(p => p.Barcodes.Any(b => b.BarcodeValue == item.Barcode), cancellationToken);
 
+                // Look up tax slab by rate
+                var selectedTaxSlab = taxSlabs.FirstOrDefault(s => Math.Abs(s.IgstRate - item.TaxRate) < 0.1m) ?? defaultTaxSlab;
+
                 if (product == null)
                 {
                     newProductOffset++;
@@ -290,7 +522,7 @@ public class AIInvoiceController : ControllerBase
                         PurchasePrice = item.CostPrice,
                         Mrp = item.Mrp,
                         SellingPrice = item.SellingPrice,
-                        TaxSlabId = defaultTaxSlab.Id,
+                        TaxSlabId = selectedTaxSlab.Id,
                         CategoryId = generalCategory.Id,
                         UnitOfMeasureId = uomId,
                         HsnCode = hsnCode,
@@ -315,6 +547,7 @@ public class AIInvoiceController : ControllerBase
                     product.PurchasePrice = item.CostPrice;
                     product.Mrp = item.Mrp;
                     product.SellingPrice = item.SellingPrice;
+                    product.TaxSlabId = selectedTaxSlab.Id; // Update tax slab if changed
 
                     if (string.IsNullOrWhiteSpace(product.HsnCode) && item.Barcode.StartsWith("HSN-"))
                     {

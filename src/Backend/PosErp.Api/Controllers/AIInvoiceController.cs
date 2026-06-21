@@ -53,6 +53,7 @@ public class AIInvoiceController : ControllerBase
         public decimal Quantity { get; set; }
         public decimal TaxRate { get; set; }
         public string Uom { get; set; } = "PCS";
+        public decimal LineAmount { get; set; }
     }
 
     [HttpPost("ai-extract")]
@@ -63,9 +64,15 @@ public class AIInvoiceController : ControllerBase
             return BadRequest("No file uploaded.");
         }
 
-        var items = new List<ExtractedInvoiceItem>();
         string extension = Path.GetExtension(file.FileName).ToLower();
-        bool isImage = extension == ".jpg" || extension == ".jpeg" || extension == ".png";
+        if (extension != ".pdf")
+        {
+            return BadRequest("Unsupported file format. Only PDF files (.pdf) are supported for supplier invoices.");
+        }
+
+        var items = new List<ExtractedInvoiceItem>();
+        bool isImage = false;
+        decimal invoiceTotal = 0;
 
         // Save uploaded file to temp file for processing
         string tempFilePath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}{extension}");
@@ -79,7 +86,7 @@ public class AIInvoiceController : ControllerBase
         try
         {
             // Scanned PDF detection: if it's a PDF but has no selectable text, convert to image for Ollama vision
-            if (!isImage && extension == ".pdf")
+            if (extension == ".pdf")
             {
                 string textContent = ExtractTextFromPdf(tempFilePath);
                 if (string.IsNullOrWhiteSpace(textContent) || textContent.Trim().Length < 50)
@@ -107,7 +114,9 @@ public class AIInvoiceController : ControllerBase
             // Try extracting using offline Ollama model first
             try
             {
-                items = await ExtractWithOllamaAsync(tempFilePath, isImage, cancellationToken);
+                var ollamaRes = await ExtractWithOllamaAsync(tempFilePath, isImage, cancellationToken);
+                items = ollamaRes.Items;
+                invoiceTotal = ollamaRes.InvoiceTotal;
             }
             catch (Exception ollamaEx)
             {
@@ -126,6 +135,45 @@ public class AIInvoiceController : ControllerBase
                 {
                     string text = ExtractTextFromPdf(tempFilePath);
                     items = ParseInvoiceText(text);
+                }
+            }
+
+            // Post-process items: normalize UOM and scale bulk quantities to pieces
+            foreach (var item in items)
+            {
+                item.Uom = NormalizeUom(item.Uom);
+                
+                if (item.CostPrice > 0 && item.LineAmount > 0 && item.Quantity > 0)
+                {
+                    decimal rawMultiplier = item.LineAmount / item.CostPrice;
+                    if (Math.Abs(rawMultiplier - item.Quantity) > 0.5m)
+                    {
+                        decimal calculatedQty = Math.Round(rawMultiplier, 0);
+                        if (calculatedQty > 0)
+                        {
+                            item.Quantity = calculatedQty;
+                            item.Uom = "PCS"; // Convert bulk UOM to base retail unit PCS
+                        }
+                    }
+                }
+            }
+
+            // Extract Grand Total if not already extracted
+            decimal calculatedSum = items.Sum(i => i.Quantity * i.CostPrice);
+            if (invoiceTotal <= 0)
+            {
+                invoiceTotal = calculatedSum;
+                if (!isImage && extension == ".pdf")
+                {
+                    try
+                    {
+                        string text = ExtractTextFromPdf(tempFilePath);
+                        invoiceTotal = ExtractGrandTotalFromText(text, calculatedSum);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error extracting grand total: {ex.Message}");
+                    }
                 }
             }
         }
@@ -148,6 +196,7 @@ public class AIInvoiceController : ControllerBase
                 return BadRequest(new { message = "Ollama is offline or does not have a vision model pulled. Image extraction requires a running Ollama server with a vision model (e.g. llava)." });
             }
             items = GetMockExtractedItems();
+            invoiceTotal = items.Sum(i => i.Quantity * i.CostPrice);
         }
 
         var resultItems = new List<object>();
@@ -230,6 +279,7 @@ public class AIInvoiceController : ControllerBase
         return Ok(new
         {
             InvoiceReference = invoiceRef,
+            InvoiceTotal = invoiceTotal,
             Items = resultItems
         });
     }
@@ -316,10 +366,17 @@ public class AIInvoiceController : ControllerBase
         return requiresVision ? "llava" : "llama2";
     }
 
-    private async Task<List<ExtractedInvoiceItem>> ExtractWithOllamaAsync(
+    public class OllamaResponseEnvelope
+    {
+        public List<ExtractedInvoiceItem> Items { get; set; } = new();
+        public decimal InvoiceTotal { get; set; }
+    }
+
+    private async Task<(List<ExtractedInvoiceItem> Items, decimal InvoiceTotal)> ExtractWithOllamaAsync(
         string filePath, bool isImage, CancellationToken cancellationToken)
     {
         var items = new List<ExtractedInvoiceItem>();
+        decimal invoiceTotal = 0;
         var ollamaUrl = await ResolveOllamaUrlAsync();
         var model = await GetOllamaModelAsync(ollamaUrl, isImage);
 
@@ -327,20 +384,24 @@ public class AIInvoiceController : ControllerBase
         client.Timeout = TimeSpan.FromSeconds(90); // 90 second timeout for offline LLM parsing
 
         object requestBody;
-        string prompt = @"You are an expert invoice parser. Extract the line items from this invoice.
+        string prompt = @"You are an expert invoice parser. Extract the line items and overall totals from this invoice.
 For each item, extract:
 - barcode (use the HSN code if barcode is missing, e.g. 'HSN-12345678-001' where the last part is the item index, or generate a unique placeholder like 'ITEM-001')
 - productName (full product description including any continuation lines)
-- quantity (numerical value, e.g. 10)
-- uom (unit of measure as a short string, e.g. 'PCS', 'SET', 'DOZ', 'KG'. Default to 'PCS' if not found)
-- costPrice (unit cost price excluding tax)
-- mrp (suggested or printed MRP)
-- sellingPrice (suggested or printed selling price)
+- quantity (numerical value of retail unit pieces. If the invoice has quantity as '1 Bag' or '1 Carton' but the rate/costPrice is per piece, calculate the total number of pieces and return that as the quantity. For example, if Net Amount is 14,880.00 and Net Rate is 620.00, the quantity of pieces is 24. Return 24 as the quantity.)
+- uom (normalize to standard retail unit symbols like 'PCS', 'SET', 'KGS', 'GMS', 'LTRS', 'MLS', 'PACK', 'BOX'. If a bulk unit was scaled to pieces, set this to 'PCS'.)
+- costPrice (the individual retail piece/unit cost price including tax, e.g. Net Rate column, or Rate * (1 + GST%/100))
+- mrp (printed or suggested MRP)
+- sellingPrice (suggested selling price)
 - taxRate (the GST rate percentage as a number, e.g., 5.0, 18.0, 12.0, 0.0)
 - batchNumber (if printed)
 - expiryDate (if printed, format as YYYY-MM-DD or null)
 
-Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName', 'quantity', 'uom', 'costPrice', 'mrp', 'sellingPrice', 'taxRate', 'batchNumber', 'expiryDate'. Do not include markdown formatting or extra text.";
+Return ONLY a JSON object with the exact keys:
+- 'items': a JSON array of item objects containing the keys listed above.
+- 'invoiceTotal': the overall grand total value of the invoice (as a decimal number).
+
+Do not include markdown formatting or extra text.";
 
         if (isImage)
         {
@@ -397,19 +458,42 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                 }
                 responseText = responseText.Trim();
 
-                var parsed = JsonSerializer.Deserialize<List<ExtractedInvoiceItem>>(responseText, new JsonSerializerOptions
+                OllamaResponseEnvelope? envelope = null;
+                try
                 {
-                    PropertyNameCaseInsensitive = true
-                });
+                    envelope = JsonSerializer.Deserialize<OllamaResponseEnvelope>(responseText, new JsonSerializerOptions
+                    {
+                        PropertyNameCaseInsensitive = true
+                    });
+                }
+                catch {}
 
-                if (parsed != null)
+                if (envelope != null && envelope.Items != null && envelope.Items.Count > 0)
                 {
-                    items = parsed;
+                    items = envelope.Items;
+                    invoiceTotal = envelope.InvoiceTotal;
+                }
+                else
+                {
+                    // Fallback to direct list parsing if envelope parsing fails
+                    try
+                    {
+                        var parsedList = JsonSerializer.Deserialize<List<ExtractedInvoiceItem>>(responseText, new JsonSerializerOptions
+                        {
+                            PropertyNameCaseInsensitive = true
+                        });
+                        if (parsedList != null)
+                        {
+                            items = parsedList;
+                            invoiceTotal = items.Sum(i => i.Quantity * i.CostPrice);
+                        }
+                    }
+                    catch {}
                 }
             }
         }
 
-        return items;
+        return (items, invoiceTotal);
     }
 
     private string ExtractTextFromPdf(string filePath)
@@ -812,7 +896,6 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
             if (!allWords.Any()) continue;
 
             // ── Step 1: Group words into rows by Y coordinate ─────────────────
-            // PdfPig gives per-word bounding boxes — use Bottom Y for grouping
             var rowDict = new SortedDictionary<double, List<UglyToad.PdfPig.Content.Word>>(
                 Comparer<double>.Create((a, b) => b.CompareTo(a))); // descending (top-first)
 
@@ -839,7 +922,6 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
             var rows = rowDict.ToList(); // ordered top-to-bottom (descending Y)
 
             // ── Step 2: Locate the table header row ───────────────────────────
-            // Header row contains "Quantity" / "Qty" and "Rate" / "Price" as column labels
             int headerRowIdx = -1;
             for (int i = 0; i < rows.Count; i++)
             {
@@ -855,17 +937,20 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
             if (headerRowIdx < 0) continue; // No table header found on this page
 
             // ── Step 2b: Detect Column Boundaries Dynamically ──────────────────
-            // Tuned default fallbacks for standard Tally A4 invoice
             double pageDescMin = 30;   // Widened left edge to capture Sl.No + Description together
             double pageDescMax = 275;
             double pageHsnMin  = 276;
             double pageHsnMax  = 325;
-            double pageGstMin  = 326;  // GST Rate column (contains "18 %" or "5 %")
+            double pageMrpMin  = 999;
+            double pageMrpMax  = 999;
+            double pageGstMin  = 326;  // GST Rate column
             double pageGstMax  = 385;
             double pageQtyMin  = 386;
             double pageQtyMax  = 445;
             double pageRateMin = 446;
             double pageRateMax = 510;
+            double pageNetRateMin = 999;
+            double pageNetRateMax = 999;
             double pageAmtMin  = 511;
 
             try
@@ -874,22 +959,34 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
 
                 var descWords = new List<UglyToad.PdfPig.Content.Word>();
                 var hsnWords = new List<UglyToad.PdfPig.Content.Word>();
+                var mrpWords = new List<UglyToad.PdfPig.Content.Word>();
                 var gstWords = new List<UglyToad.PdfPig.Content.Word>();
                 var qtyWords = new List<UglyToad.PdfPig.Content.Word>();
                 var rateWords = new List<UglyToad.PdfPig.Content.Word>();
+                var netRateWords = new List<UglyToad.PdfPig.Content.Word>();
                 var amtWords = new List<UglyToad.PdfPig.Content.Word>();
 
-                foreach (var word in headerWords)
+                for (int wIdx = 0; wIdx < headerWords.Count; wIdx++)
                 {
+                    var word = headerWords[wIdx];
                     var text = word.Text.ToLower();
+                    string prevText = wIdx > 0 ? headerWords[wIdx - 1].Text.ToLower() : "";
+                    string nextText = wIdx < headerWords.Count - 1 ? headerWords[wIdx + 1].Text.ToLower() : "";
+
                     if (text.Contains("desc") || text.Contains("particular") || text.Contains("product") || text.Contains("item") || text.Contains("good"))
                         descWords.Add(word);
                     else if (text.Contains("hsn") || text.Contains("sac"))
                         hsnWords.Add(word);
-                    else if (text.Contains("gst") || (text.Contains("rate") && word.BoundingBox.Left < 400))
+                    else if (text.Contains("mrp"))
+                        mrpWords.Add(word);
+                    else if (text.Contains("gst") || (text.Contains("rate") && word.BoundingBox.Left < 400 && !prevText.Contains("net") && !nextText.Contains("rate")))
                         gstWords.Add(word);
                     else if (text.Contains("qty") || text.Contains("quant"))
                         qtyWords.Add(word);
+                    else if (text.Contains("net") && (text.Contains("rate") || nextText.Contains("rate") || prevText.Contains("net")))
+                        netRateWords.Add(word);
+                    else if (text.Contains("rate") && (prevText.Contains("net") || text.Contains("net")))
+                        netRateWords.Add(word);
                     else if (text.Contains("rate") || text.Contains("price") || text.Contains("cost"))
                         rateWords.Add(word);
                     else if (text.Contains("amt") || text.Contains("amount") || text.Contains("total") || text.Contains("value"))
@@ -902,12 +999,16 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                     colsFound.Add(("DESC", descWords.Min(w => w.BoundingBox.Left), descWords.Max(w => w.BoundingBox.Right)));
                 if (hsnWords.Any()) 
                     colsFound.Add(("HSN", hsnWords.Min(w => w.BoundingBox.Left), hsnWords.Max(w => w.BoundingBox.Right)));
+                if (mrpWords.Any())
+                    colsFound.Add(("MRP", mrpWords.Min(w => w.BoundingBox.Left), mrpWords.Max(w => w.BoundingBox.Right)));
                 if (gstWords.Any())
                     colsFound.Add(("GST", gstWords.Min(w => w.BoundingBox.Left), gstWords.Max(w => w.BoundingBox.Right)));
                 if (qtyWords.Any()) 
                     colsFound.Add(("QTY", qtyWords.Min(w => w.BoundingBox.Left), qtyWords.Max(w => w.BoundingBox.Right)));
                 if (rateWords.Any()) 
                     colsFound.Add(("RATE", rateWords.Min(w => w.BoundingBox.Left), rateWords.Max(w => w.BoundingBox.Right)));
+                if (netRateWords.Any()) 
+                    colsFound.Add(("NETRATE", netRateWords.Min(w => w.BoundingBox.Left), netRateWords.Max(w => w.BoundingBox.Right)));
                 if (amtWords.Any()) 
                     colsFound.Add(("AMT", amtWords.Min(w => w.BoundingBox.Left), amtWords.Max(w => w.BoundingBox.Right)));
 
@@ -916,76 +1017,50 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                 // Build bounds if enough columns exist to order
                 if (colsFound.Count >= 3)
                 {
-                    // 1. Description column bounds — always start from page left edge to capture index
-                    var descCol = colsFound.FirstOrDefault(c => c.Name == "DESC");
-                    if (descCol.Name != null)
+                    for (int cIdx = 0; cIdx < colsFound.Count; cIdx++)
                     {
-                        pageDescMin = 20; // Always start from leftmost edge to capture serial+desc
-                        var idx = colsFound.IndexOf(descCol);
-                        if (idx < colsFound.Count - 1)
-                            pageDescMax = colsFound[idx + 1].Left - 5;
-                        else
-                            pageDescMax = descCol.Right + 150;
-                    }
+                        var col = colsFound[cIdx];
+                        double nextLeft = (cIdx < colsFound.Count - 1) ? colsFound[cIdx + 1].Left - 2 : 999;
 
-                    // 2. HSN column bounds
-                    var hsnCol = colsFound.FirstOrDefault(c => c.Name == "HSN");
-                    if (hsnCol.Name != null)
-                    {
-                        pageHsnMin = hsnCol.Left - 5;
-                        var idx = colsFound.IndexOf(hsnCol);
-                        if (idx < colsFound.Count - 1)
-                            pageHsnMax = colsFound[idx + 1].Left - 5;
-                        else
-                            pageHsnMax = hsnCol.Right + 15;
-                    }
-                    else
-                    {
-                        pageHsnMin = 999;
-                        pageHsnMax = 999;
-                    }
-
-                    // 3. GST Rate column bounds
-                    var gstCol = colsFound.FirstOrDefault(c => c.Name == "GST");
-                    if (gstCol.Name != null)
-                    {
-                        pageGstMin = gstCol.Left - 5;
-                        var idx = colsFound.IndexOf(gstCol);
-                        if (idx < colsFound.Count - 1)
-                            pageGstMax = colsFound[idx + 1].Left - 2;
-                        else
-                            pageGstMax = gstCol.Right + 20;
-                    }
-
-                    // 4. Qty column bounds
-                    var qtyCol = colsFound.FirstOrDefault(c => c.Name == "QTY");
-                    if (qtyCol.Name != null)
-                    {
-                        pageQtyMin = qtyCol.Left - 10;
-                        var idx = colsFound.IndexOf(qtyCol);
-                        if (idx < colsFound.Count - 1)
-                            pageQtyMax = colsFound[idx + 1].Left - 2;
-                        else
-                            pageQtyMax = qtyCol.Right + 15;
-                    }
-
-                    // 5. Rate column bounds
-                    var rateCol = colsFound.FirstOrDefault(c => c.Name == "RATE");
-                    if (rateCol.Name != null)
-                    {
-                        pageRateMin = rateCol.Left - 10;
-                        var idx = colsFound.IndexOf(rateCol);
-                        if (idx < colsFound.Count - 1)
-                            pageRateMax = colsFound[idx + 1].Left - 2;
-                        else
-                            pageRateMax = rateCol.Right + 15;
-                    }
-
-                    // 6. Amount column bounds
-                    var amtCol = colsFound.FirstOrDefault(c => c.Name == "AMT");
-                    if (amtCol.Name != null)
-                    {
-                        pageAmtMin = amtCol.Left - 15;
+                        if (col.Name == "DESC")
+                        {
+                            pageDescMin = 20;
+                            pageDescMax = nextLeft != 999 ? nextLeft : col.Right + 150;
+                        }
+                        else if (col.Name == "HSN")
+                        {
+                            pageHsnMin = col.Left - 5;
+                            pageHsnMax = nextLeft != 999 ? nextLeft : col.Right + 15;
+                        }
+                        else if (col.Name == "MRP")
+                        {
+                            pageMrpMin = col.Left - 5;
+                            pageMrpMax = nextLeft != 999 ? nextLeft : col.Right + 15;
+                        }
+                        else if (col.Name == "GST")
+                        {
+                            pageGstMin = col.Left - 5;
+                            pageGstMax = nextLeft != 999 ? nextLeft : col.Right + 15;
+                        }
+                        else if (col.Name == "QTY")
+                        {
+                            pageQtyMin = col.Left - 10;
+                            pageQtyMax = nextLeft != 999 ? nextLeft : col.Right + 15;
+                        }
+                        else if (col.Name == "RATE")
+                        {
+                            pageRateMin = col.Left - 10;
+                            pageRateMax = nextLeft != 999 ? nextLeft : col.Right + 15;
+                        }
+                        else if (col.Name == "NETRATE")
+                        {
+                            pageNetRateMin = col.Left - 10;
+                            pageNetRateMax = nextLeft != 999 ? nextLeft : col.Right + 15;
+                        }
+                        else if (col.Name == "AMT")
+                        {
+                            pageAmtMin = col.Left - 15;
+                        }
                     }
                 }
             }
@@ -995,15 +1070,11 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
             }
 
             // ── Step 3: Locate the table footer row ───────────────────────────
-            // Footer starts when we hit tax summary rows (CGST, SGST, R.OFF, Total) or
-            // any standalone subtotal row that has no description / HSN but contains a
-            // large amount—these appear immediately after the last line item.
             int footerRowIdx = rows.Count;
             for (int i = headerRowIdx + 1; i < rows.Count; i++)
             {
                 var rowText = string.Join(" ", rows[i].Value.Select(w => w.Text)).ToLower();
 
-                // Explicit tax/summary labels used by Tally and most ERPs
                 if (rowText.Contains("output") || rowText.Contains("round off") ||
                     rowText.Contains("chargeable") || rowText.Contains("tax invoice") ||
                     rowText.Contains("cgst") || rowText.Contains("sgst") ||
@@ -1016,9 +1087,6 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                     break;
                 }
 
-                // Detect a subtotal-only row: the desc column is empty, HSN column is empty,
-                // GST column is empty, qty column is empty — only the amount column has content.
-                // This is the running total line that Tally prints (e.g. "15,753.71").
                 var rWords  = rows[i].Value;
                 bool descHasText = rWords.Any(w => w.BoundingBox.Left >= pageDescMin && w.BoundingBox.Right <= pageDescMax
                     && !Regex.IsMatch(w.Text, @"^[\d,\.]+$"));
@@ -1026,7 +1094,6 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                 bool qtyHasText  = rWords.Any(w => w.BoundingBox.Left >= pageQtyMin  && w.BoundingBox.Right <= pageQtyMax);
                 bool amtHasText  = rWords.Any(w => w.BoundingBox.Left >= pageAmtMin  && Regex.IsMatch(w.Text, @"[\d,]"));
 
-                // Standalone subtotal row: amount present, everything else empty
                 if (!descHasText && !hsnHasText && !qtyHasText && amtHasText)
                 {
                     footerRowIdx = i;
@@ -1035,13 +1102,10 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
             }
 
             // ── Step 4: Extract product data from each data row ───────────────
-            // A "product row" has a rate value in the Rate column.
-            // A "continuation row" (wrapped description, no qty/rate) gets appended to last item.
             for (int i = headerRowIdx + 1; i < footerRowIdx; i++)
             {
                 var rowWords = rows[i].Value;
 
-                // Classify words by column
                 string descText = string.Join(" ", rowWords
                     .Where(w => w.BoundingBox.Left >= pageDescMin && w.BoundingBox.Right <= pageDescMax)
                     .OrderBy(w => w.BoundingBox.Left)
@@ -1051,7 +1115,11 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                     .Where(w => w.BoundingBox.Left >= pageHsnMin && w.BoundingBox.Right <= pageHsnMax)
                     .Select(w => w.Text)).Trim();
 
-                // GST Rate: look for pattern like "18" or "18 %" or "5" in the GST column
+                string mrpText = string.Join("", rowWords
+                    .Where(w => w.BoundingBox.Left >= pageMrpMin && w.BoundingBox.Right <= pageMrpMax
+                                && Regex.IsMatch(w.Text, @"[\d,]"))
+                    .Select(w => w.Text)).Replace(",", "").Trim();
+
                 string gstText = string.Join(" ", rowWords
                     .Where(w => w.BoundingBox.Left >= pageGstMin && w.BoundingBox.Right <= pageGstMax)
                     .OrderBy(w => w.BoundingBox.Left)
@@ -1066,24 +1134,26 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                                 && Regex.IsMatch(w.Text, @"^\d"))
                     .Select(w => w.Text)).Trim();
 
+                string netRateText = string.Join("", rowWords
+                    .Where(w => w.BoundingBox.Left >= pageNetRateMin && w.BoundingBox.Right <= pageNetRateMax
+                                && Regex.IsMatch(w.Text, @"[\d,]"))
+                    .Select(w => w.Text)).Replace(",", "").Trim();
+
                 string amtText = string.Join("", rowWords
                     .Where(w => w.BoundingBox.Left >= pageAmtMin
                                 && Regex.IsMatch(w.Text, @"[\d,]"))
                     .Select(w => w.Text)).Replace(",", "").Trim();
 
-                // ── Continuation rows: description wraps to next line, no qty/rate ──
-                // If we have desc text but no rate, append to the last extracted item's name.
-                bool hasRate = !string.IsNullOrWhiteSpace(rateText) && Regex.IsMatch(rateText, @"\d");
+                bool hasRate = (!string.IsNullOrWhiteSpace(rateText) && Regex.IsMatch(rateText, @"\d")) ||
+                               (!string.IsNullOrWhiteSpace(netRateText) && Regex.IsMatch(netRateText, @"\d"));
                 bool hasDesc = !string.IsNullOrWhiteSpace(descText);
 
                 if (!hasRate && hasDesc && items.Count > 0)
                 {
-                    // Skip batch sub-lines
                     if (!descText.Contains("Batch", StringComparison.OrdinalIgnoreCase) &&
                         !descText.Contains("Primary", StringComparison.OrdinalIgnoreCase) &&
                         !descText.Contains("continued", StringComparison.OrdinalIgnoreCase))
                     {
-                        // Append continuation description to the previous item
                         items[^1].ProductName = CleanProductName(items[^1].ProductName + " " + descText);
                     }
                     continue;
@@ -1091,7 +1161,6 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
 
                 if (!hasRate) continue;
 
-                // Also skip if description is a batch sub-line
                 if (hasDesc &&
                     (descText.Contains("Batch", StringComparison.OrdinalIgnoreCase) ||
                      descText.Contains("Primary", StringComparison.OrdinalIgnoreCase)))
@@ -1109,7 +1178,6 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                     System.Globalization.CultureInfo.InvariantCulture, out decimal lineAmount);
 
                 // ── Parse quantity and UOM ────────────────────────────────────
-                // qtyText examples: "4 set", "12 pcs", "1.000 doz"
                 decimal qty = 0;
                 string uom = "PCS";
                 var qtyMatch = Regex.Match(qtyText, @"(\d+(?:\.\d+)?)\s*([a-zA-Z]*)", RegexOptions.IgnoreCase);
@@ -1123,34 +1191,48 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
 
                 if (qty <= 0) qty = 1;
 
-                // ── Parse rate (unit cost price) ──────────────────────────────
-                // PRIMARY: unitRate = lineAmount / qty  (most reliable for Tally invoices —
-                // the Amount column is always the rightmost unambiguous column, while the
-                // Rate column may be misdetected due to the "per" / "Disc.%" columns sitting
-                // between Rate and Amount with variable widths across different suppliers).
-                // Per ERP standard: product master stores PURCHASE PRICE PER UNIT (per piece /
-                // set / doz — matching the UOM), NOT the line total.
+                // ── Parse MRP ────────────────────────────────────────────────
+                decimal mrp = 0;
+                if (!string.IsNullOrWhiteSpace(mrpText))
+                {
+                    decimal.TryParse(mrpText, System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out mrp);
+                }
+
+                // ── Parse rate (unit cost price, tax-inclusive) ──────────────
                 decimal rate = 0;
-                if (lineAmount > 0 && qty > 0)
+                decimal parsedRate = 0;
+                if (!string.IsNullOrWhiteSpace(rateText))
+                {
+                    decimal.TryParse(rateText, System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out parsedRate);
+                }
+
+                decimal parsedNetRate = 0;
+                if (!string.IsNullOrWhiteSpace(netRateText))
+                {
+                    decimal.TryParse(netRateText, System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out parsedNetRate);
+                }
+
+                if (parsedNetRate > 0)
+                {
+                    rate = Math.Round(parsedNetRate, 2);
+                }
+                else if (parsedRate > 0)
+                {
+                    rate = Math.Round(parsedRate * (1 + taxRate / 100.0m), 2);
+                }
+                else if (lineAmount > 0 && qty > 0)
                 {
                     rate = Math.Round(lineAmount / qty, 2);
-                }
-                else if (!string.IsNullOrWhiteSpace(rateText))
-                {
-                    // Fallback: explicit rate column text when amount column is unavailable
-                    decimal.TryParse(rateText, System.Globalization.NumberStyles.Any,
-                        System.Globalization.CultureInfo.InvariantCulture, out rate);
                 }
 
                 if (rate <= 0) continue;
 
                 // ── Build product name ────────────────────────────────────────
-                // Strip the leading Tally row index from the description.
-                // e.g. "1Ruby Container No.2" → "Ruby Container No.2"
-                //       "2332-Royal Touch" → "332-Royal Touch" (preserve product code after index)
                 string cleanDesc = descText;
                 int expectedIdx = items.Count + 1;
-                // Try stripping leading digits that match the expected 1-based item index
                 var idxPrefixMatch = Regex.Match(cleanDesc, @"^(\d{1,2})(.+)");
                 if (idxPrefixMatch.Success)
                 {
@@ -1165,16 +1247,12 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                     productName = $"Item {expectedIdx}";
 
                 // ── Build unique barcode key ──────────────────────────────────
-                // This invoice has no EAN barcode; use HSN + sequential index as placeholder
                 string barcodeKey = !string.IsNullOrWhiteSpace(hsnText)
                     ? $"HSN-{hsnText}-{expectedIdx:D3}"
                     : $"ITEM-{expectedIdx:D3}";
 
                 // ── Suggested retail prices ───────────────────────────────────
-                // Rate IS the purchase price (excl. GST). Suggest MRP = rate + 18% margin.
-                // Rounded to nearest whole number (e.g. 43.86 → 44, 37.04 → 37) per policy.
-                // User can edit in the draft grid before approving.
-                decimal suggestedMrp  = Math.Round(rate * 1.18m, 0, MidpointRounding.AwayFromZero);
+                decimal suggestedMrp  = mrp > 0 ? mrp : Math.Round(rate * 1.18m, 0, MidpointRounding.AwayFromZero);
                 decimal suggestedSell = Math.Round(rate * 1.15m, 0, MidpointRounding.AwayFromZero);
 
                 items.Add(new ExtractedInvoiceItem
@@ -1186,7 +1264,8 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
                     Mrp          = suggestedMrp,
                     SellingPrice = suggestedSell,
                     TaxRate      = taxRate,
-                    Uom          = uom
+                    Uom          = uom,
+                    LineAmount   = lineAmount
                 });
             }
         }
@@ -1390,5 +1469,58 @@ Return ONLY a JSON array of objects with the exact keys: 'barcode', 'productName
             Console.WriteLine($"[PDF to Image] Exception converting PDF: {ex.Message}");
             return false;
         }
+    }
+
+    private static string NormalizeUom(string uom)
+    {
+        if (string.IsNullOrWhiteSpace(uom)) return "PCS";
+        var clean = uom.Trim().ToUpper();
+        if (clean == "CARTO" || clean == "CARTC" || clean == "CTN" || clean.StartsWith("CART"))
+            return "CARTON";
+        if (clean == "BAG" || clean == "BAGS")
+            return "BAG";
+        if (clean == "SET" || clean == "SETS")
+            return "SET";
+        if (clean == "PCS" || clean == "PC" || clean == "PIECE" || clean == "PIECES")
+            return "PCS";
+        if (clean == "BOX" || clean == "BOXES")
+            return "BOX";
+        if (clean == "KG" || clean == "KGS" || clean == "KILOGRAM" || clean == "KILOGRAMS")
+            return "KGS";
+        if (clean == "GM" || clean == "GMS" || clean == "GRAM" || clean == "GRAMS")
+            return "GMS";
+        return uom.Trim();
+    }
+
+    private decimal ExtractGrandTotalFromText(string text, decimal calculatedTotal)
+    {
+        if (string.IsNullOrWhiteSpace(text)) return calculatedTotal;
+        
+        var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(l => l.Trim())
+            .Reverse()
+            .ToList();
+            
+        foreach (var line in lines)
+        {
+            var lower = line.ToLower();
+            if ((lower.Contains("total") || lower.Contains("grand") || lower.Contains("payable") || lower.Contains("net amt") || lower.Contains("net amount")) 
+                && !lower.Contains("tax") && !lower.Contains("cgst") && !lower.Contains("sgst") && !lower.Contains("igst"))
+            {
+                var matches = Regex.Matches(line, @"\b\d{1,3}(?:,\d{3})*(?:\.\d{1,2})?\b");
+                foreach (Match match in matches)
+                {
+                    if (decimal.TryParse(match.Value.Replace(",", ""), System.Globalization.NumberStyles.Any,
+                        System.Globalization.CultureInfo.InvariantCulture, out decimal val))
+                    {
+                        if (val > 0 && (calculatedTotal <= 0 || Math.Abs(val - calculatedTotal) < calculatedTotal * 0.15m))
+                        {
+                            return val;
+                        }
+                    }
+                }
+            }
+        }
+        return calculatedTotal > 0 ? calculatedTotal : 0;
     }
 }

@@ -46,6 +46,7 @@ export const AiInvoiceImport = () => {
   const [extracting, setExtracting] = useState(false);
   const [invoiceRef, setInvoiceRef] = useState<string>('');
   const [draftItems, setDraftItems] = useState<DraftItem[]>([]);
+  const [extractedTotal, setExtractedTotal] = useState<number>(0);
   
   // Interaction States
   const [importing, setImporting] = useState(false);
@@ -71,7 +72,13 @@ export const AiInvoiceImport = () => {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setFile(e.target.files[0]);
+      const selectedFile = e.target.files[0];
+      if (selectedFile.type !== 'application/pdf' && !selectedFile.name.toLowerCase().endsWith('.pdf')) {
+        setErrorMsg('Only PDF files are supported for supplier invoice uploads.');
+        setFile(null);
+        return;
+      }
+      setFile(selectedFile);
       setDraftItems([]);
       setImportSuccess(null);
       setErrorMsg(null);
@@ -97,6 +104,7 @@ export const AiInvoiceImport = () => {
       });
 
       setInvoiceRef(res.data.invoiceReference);
+      setExtractedTotal(res.data.invoiceTotal || 0);
       // Normalize: ensure uom and batchNumber always have defaults
       setDraftItems(res.data.items.map((item: any) => ({
         ...item,
@@ -254,29 +262,20 @@ export const AiInvoiceImport = () => {
             >
               <Upload className="w-12 h-12 text-slate-400" />
               <div>
-                <span className="text-sm font-bold text-slate-700 block">Select PDF or Image invoice</span>
-                <span className="text-xs text-slate-400 mt-1 block">Supports standard formatted PDF invoices and image scans</span>
+                <span className="text-sm font-bold text-slate-700 block">Select PDF invoice</span>
+                <span className="text-xs text-slate-400 mt-1 block">Supports standard formatted PDF invoices only</span>
               </div>
               <input
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileChange}
-                accept="application/pdf,image/*"
+                accept="application/pdf"
                 className="hidden"
               />
             </div>
 
             {file && (
               <div className="space-y-4">
-                {file.type.startsWith('image/') && (
-                  <div className="flex justify-center">
-                    <img 
-                      src={URL.createObjectURL(file)} 
-                      alt="Uploaded Invoice Preview" 
-                      className="max-h-48 rounded-xl shadow border border-slate-200 object-contain"
-                    />
-                  </div>
-                )}
                 <div className="p-3 bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold border border-indigo-100 flex items-center justify-between">
                   <span className="truncate">Selected: {file.name}</span>
                   <button type="button" onClick={() => setFile(null)} className="text-indigo-400 hover:text-indigo-600">
@@ -352,6 +351,49 @@ export const AiInvoiceImport = () => {
               </button>
             </div>
           </div>
+
+          {/* Reconciliation Summary Bar */}
+          {(() => {
+            const calculatedTotal = draftItems.reduce((sum, item) => sum + (item.quantity * item.costPrice), 0);
+            const discrepancy = Math.abs(calculatedTotal - extractedTotal);
+            const isMatched = discrepancy <= 0.1;
+
+            return (
+              <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-100 flex flex-wrap items-center justify-between gap-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <Layers className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black text-slate-400 block uppercase tracking-wider">Invoice Reconciliation</span>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-xs font-bold text-slate-800">
+                        Calculated Total: <span className="font-mono">₹{calculatedTotal.toFixed(2)}</span>
+                      </span>
+                      <span className="text-slate-350 font-bold">|</span>
+                      <span className="text-xs font-bold text-slate-600">
+                        Extracted Invoice Value: <span className="font-mono">₹{extractedTotal.toFixed(2)}</span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  {isMatched ? (
+                    <div className="flex items-center space-x-1.5 px-3 py-1 bg-green-50 text-green-700 rounded-full text-[10px] font-black border border-green-200">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Reconciliation Matched</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-1.5 px-3 py-1 bg-amber-50 text-amber-800 rounded-full text-[10px] font-black border border-amber-250 animate-pulse">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Discrepancy: <span className="font-mono">₹{discrepancy.toFixed(2)}</span></span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Validation Alerts Block */}
           {errorMsg && (

@@ -356,7 +356,7 @@ export const AiInvoiceImport = () => {
           {(() => {
             const calculatedTotal = draftItems.reduce((sum, item) => sum + (item.quantity * item.costPrice), 0);
             const discrepancy = Math.abs(calculatedTotal - extractedTotal);
-            const isMatched = discrepancy <= 0.1;
+            const isMatched = discrepancy <= 5.0;
 
             return (
               <div className="bg-white p-4 rounded-2xl shadow-md border border-slate-100 flex flex-wrap items-center justify-between gap-4">

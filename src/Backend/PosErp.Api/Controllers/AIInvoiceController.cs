@@ -979,7 +979,7 @@ Do not include markdown formatting or extra text.";
                         hsnWords.Add(word);
                     else if (text.Contains("mrp"))
                         mrpWords.Add(word);
-                    else if (text.Contains("gst") || (text.Contains("rate") && word.BoundingBox.Left < 400 && !prevText.Contains("net") && !nextText.Contains("rate")))
+                    else if (text.Contains("gst") || text.Contains("%"))
                         gstWords.Add(word);
                     else if (text.Contains("qty") || text.Contains("quant"))
                         qtyWords.Add(word);

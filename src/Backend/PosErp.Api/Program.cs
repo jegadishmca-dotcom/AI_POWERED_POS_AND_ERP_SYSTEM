@@ -116,6 +116,10 @@ builder.Services.AddScoped<IFinancialPostingService, FinancialPostingService>();
 builder.Services.AddScoped<IFinancialReportingService, FinancialReportingService>();
 builder.Services.AddScoped<IEInvoiceService, EInvoiceService>();
 builder.Services.AddScoped<IEmailSettingsManager, EmailSettingsManager>();
+builder.Services.AddScoped<PosErp.Application.Features.Finance.Services.IPeriodLockService, PosErp.Application.Features.Finance.Services.PeriodLockService>();
+builder.Services.AddScoped<PosErp.Application.Features.Finance.Services.IDocumentSequenceService, PosErp.Application.Features.Finance.Services.DocumentSequenceService>();
+builder.Services.AddScoped<PosErp.Application.Features.Finance.Services.IApprovalWorkflowService, PosErp.Application.Features.Finance.Services.ApprovalWorkflowService>();
+builder.Services.AddScoped<PosErp.Application.Features.Finance.Services.IAllocationEngine, PosErp.Application.Features.Finance.Services.AllocationEngine>();
 
 // Register Materialized View Periodic Refresher
 builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.StockPositionRefreshService>();

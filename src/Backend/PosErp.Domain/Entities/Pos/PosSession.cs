@@ -7,6 +7,8 @@ public class PosSession
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid TerminalId { get; set; }
     public Guid CashierId { get; set; }
+    public Guid? StoreId { get; set; }
+    public Guid? JournalEntryId { get; set; }
     public DateTime StartTime { get; set; }
     public DateTime? EndTime { get; set; }
     

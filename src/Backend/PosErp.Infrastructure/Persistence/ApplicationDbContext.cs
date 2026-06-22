@@ -68,6 +68,37 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<JournalEntry> JournalEntries => Set<JournalEntry>();
     public DbSet<JournalEntryLine> JournalEntryLines => Set<JournalEntryLine>();
     public DbSet<TaxTransaction> TaxTransactions => Set<TaxTransaction>();
+    public DbSet<Store> Stores => Set<Store>();
+    public DbSet<SupplierLedgerEntry> SupplierLedger => Set<SupplierLedgerEntry>();
+    public DbSet<CustomerLedgerEntry> CustomerLedger => Set<CustomerLedgerEntry>();
+    public DbSet<SupplierPayment> SupplierPayments => Set<SupplierPayment>();
+    public DbSet<SupplierPaymentAllocation> SupplierPaymentAllocations => Set<SupplierPaymentAllocation>();
+    public DbSet<CustomerReceipt> CustomerReceipts => Set<CustomerReceipt>();
+    public DbSet<CustomerReceiptAllocation> CustomerReceiptAllocations => Set<CustomerReceiptAllocation>();
+    public DbSet<BankAccount> BankAccounts => Set<BankAccount>();
+    public DbSet<BankTransaction> BankTransactions => Set<BankTransaction>();
+    public DbSet<PettyCashLedgerEntry> PettyCashLedger => Set<PettyCashLedgerEntry>();
+    public DbSet<DocumentSequence> DocumentSequences => Set<DocumentSequence>();
+    public DbSet<FixedAsset> FixedAssets => Set<FixedAsset>();
+    public DbSet<AssetDepreciationHistory> AssetDepreciationHistories => Set<AssetDepreciationHistory>();
+    public DbSet<CostCenter> CostCenters => Set<CostCenter>();
+    public DbSet<Budget> Budgets => Set<Budget>();
+    public DbSet<FinancialYear> FinancialYears => Set<FinancialYear>();
+    public DbSet<FinancialPeriodLock> FinancialPeriodLocks => Set<FinancialPeriodLock>();
+    public DbSet<InventoryValuationHistory> InventoryValuationHistory => Set<InventoryValuationHistory>();
+    public DbSet<InterStoreTransfer> InterStoreTransfers => Set<InterStoreTransfer>();
+    public DbSet<InterStoreTransferItem> InterStoreTransferItems => Set<InterStoreTransferItem>();
+    public DbSet<PurchaseReturn> PurchaseReturns => Set<PurchaseReturn>();
+    public DbSet<PurchaseReturnItem> PurchaseReturnItems => Set<PurchaseReturnItem>();
+    public DbSet<SalesReturn> SalesReturns => Set<SalesReturn>();
+    public DbSet<SalesReturnItem> SalesReturnItems => Set<SalesReturnItem>();
+    public DbSet<EInvoiceMetadata> EInvoiceMetadata => Set<EInvoiceMetadata>();
+    public DbSet<EWayBillMetadata> EWayBillMetadata => Set<EWayBillMetadata>();
+    public DbSet<ApprovalLimit> ApprovalLimits => Set<ApprovalLimit>();
+    public DbSet<ApprovalRequest> ApprovalRequests => Set<ApprovalRequest>();
+    public DbSet<ApprovalRequestStep> ApprovalRequestSteps => Set<ApprovalRequestStep>();
+    public DbSet<DailyFinanceSummary> DailyFinanceSummaries => Set<DailyFinanceSummary>();
+    public DbSet<SupplierRebate> SupplierRebates => Set<SupplierRebate>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -203,6 +234,56 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         // but the stock_ledger table has no such column — ignore it to prevent EF mapping error
         modelBuilder.Entity<PosErp.Domain.Entities.Inventory.StockLedgerEntry>()
             .Ignore(s => s.Version);
+
+        // Composite Key configuration for CustomerReceiptAllocation referencing Invoices
+        modelBuilder.Entity<PosErp.Domain.Entities.Finance.CustomerReceiptAllocation>()
+            .HasOne<PosErp.Domain.Entities.Pos.Invoice>()
+            .WithMany()
+            .HasForeignKey(cra => new { cra.InvoiceId, cra.InvoiceBusinessDate })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Composite Key configuration for SalesReturn referencing Invoices
+        modelBuilder.Entity<PosErp.Domain.Entities.Finance.SalesReturn>()
+            .HasOne<PosErp.Domain.Entities.Pos.Invoice>()
+            .WithMany()
+            .HasForeignKey(sr => new { sr.InvoiceId, sr.BusinessDate })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Composite Key configuration for EInvoiceMetadata referencing Invoices
+        modelBuilder.Entity<PosErp.Domain.Entities.Finance.EInvoiceMetadata>()
+            .HasOne<PosErp.Domain.Entities.Pos.Invoice>()
+            .WithMany()
+            .HasForeignKey(em => new { em.InvoiceId, em.BusinessDate })
+            .OnDelete(DeleteBehavior.Restrict);
+
+        // Optimistic concurrency protection using PG xmin system column
+        modelBuilder.Entity<Account>()
+            .Property<uint>("Version")
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsRowVersion();
+
+        modelBuilder.Entity<JournalEntry>()
+            .Property<uint>("Version")
+            .HasColumnName("xmin")
+            .HasColumnType("xid")
+            .ValueGeneratedOnAddOrUpdate()
+            .IsRowVersion();
+
+        // Foreign Key configurations for new entities
+        modelBuilder.Entity<JournalEntryLine>()
+            .HasOne<CostCenter>()
+            .WithMany()
+            .HasForeignKey(jl => jl.CostCenterId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<ApprovalRequestStep>()
+            .HasOne(s => s.ApprovalRequest)
+            .WithMany(r => r.Steps)
+            .HasForeignKey(s => s.ApprovalRequestId)
+            .OnDelete(DeleteBehavior.Cascade);
+
         // Map every entity and property to lowercase snake_case to match SQL Schema exactly
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {
@@ -223,6 +304,12 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 else if (snakeTableName == "stock_take_item") snakeTableName = "stock_take_items";
                 else if (snakeTableName == "bin") snakeTableName = "bins";
                 else if (snakeTableName == "gst_hsn_master" || tableName == "GstHsnMaster") snakeTableName = "gst_hsn_master_india";
+                else if (snakeTableName == "asset_depreciation_histories") snakeTableName = "asset_depreciation_history";
+                else if (snakeTableName == "e_invoice_metadata" || snakeTableName == "einvoice_metadata") snakeTableName = "einvoice_metadata";
+                else if (snakeTableName == "e_way_bill_metadata" || snakeTableName == "ewaybill_metadata") snakeTableName = "ewaybill_metadata";
+                else if (snakeTableName == "daily_finance_summaries" || snakeTableName == "daily_finance_summary") snakeTableName = "daily_finance_summary";
+                else if (snakeTableName == "approval_request_steps" || snakeTableName == "approval_request_step") snakeTableName = "approval_request_steps";
+                else if (snakeTableName == "supplier_rebates" || snakeTableName == "supplier_rebate") snakeTableName = "supplier_rebates";
                 
                 entity.SetTableName(snakeTableName);
             }

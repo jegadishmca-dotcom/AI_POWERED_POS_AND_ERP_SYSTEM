@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace PosErp.Domain.Entities.Finance;
@@ -12,6 +12,7 @@ public class Account
     public Guid? ParentAccountId { get; set; } // For hierarchical reporting
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public uint Version { get; set; }
 }
 
 public class JournalEntry
@@ -22,9 +23,24 @@ public class JournalEntry
     public DateTime EntryDate { get; set; }
     public string Description { get; set; } = string.Empty; // e.g., "POS Invoice #12345"
     public string ReferenceDocument { get; set; } = string.Empty; // Source document ID/Number
-    public bool IsPosted { get; set; } = false;
+    
+    // Status can be DRAFT, POSTED, VOID
+    public string Status { get; set; } = "DRAFT";
+    
+    public bool IsPosted 
+    { 
+        get => Status == "POSTED"; 
+        set => Status = value ? "POSTED" : "DRAFT"; 
+    }
+    
+    // Source tracking
+    public string? SourceModule { get; set; }
+    public string? SourceDocumentType { get; set; }
+    public Guid? SourceDocumentId { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public Guid? CreatedBy { get; set; }
+    public uint Version { get; set; }
 
     public ICollection<JournalEntryLine> Lines { get; set; } = new List<JournalEntryLine>();
 }
@@ -37,6 +53,8 @@ public class JournalEntryLine
     public string Description { get; set; } = string.Empty;
     public decimal DebitAmount { get; set; } = 0;
     public decimal CreditAmount { get; set; } = 0;
+    public Guid? StoreId { get; set; }
+    public Guid? CostCenterId { get; set; }
 
     public JournalEntry JournalEntry { get; set; } = null!;
     public Account Account { get; set; } = null!;

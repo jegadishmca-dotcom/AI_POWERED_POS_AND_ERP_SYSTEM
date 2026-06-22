@@ -62,6 +62,37 @@ public interface IApplicationDbContext
     DbSet<JournalEntry> JournalEntries { get; }
     DbSet<JournalEntryLine> JournalEntryLines { get; }
     DbSet<TaxTransaction> TaxTransactions { get; }
+    DbSet<Store> Stores { get; }
+    DbSet<SupplierLedgerEntry> SupplierLedger { get; }
+    DbSet<CustomerLedgerEntry> CustomerLedger { get; }
+    DbSet<SupplierPayment> SupplierPayments { get; }
+    DbSet<SupplierPaymentAllocation> SupplierPaymentAllocations { get; }
+    DbSet<CustomerReceipt> CustomerReceipts { get; }
+    DbSet<CustomerReceiptAllocation> CustomerReceiptAllocations { get; }
+    DbSet<BankAccount> BankAccounts { get; }
+    DbSet<BankTransaction> BankTransactions { get; }
+    DbSet<PettyCashLedgerEntry> PettyCashLedger { get; }
+    DbSet<DocumentSequence> DocumentSequences { get; }
+    DbSet<FixedAsset> FixedAssets { get; }
+    DbSet<AssetDepreciationHistory> AssetDepreciationHistories { get; }
+    DbSet<CostCenter> CostCenters { get; }
+    DbSet<Budget> Budgets { get; }
+    DbSet<FinancialYear> FinancialYears { get; }
+    DbSet<FinancialPeriodLock> FinancialPeriodLocks { get; }
+    DbSet<InventoryValuationHistory> InventoryValuationHistory { get; }
+    DbSet<InterStoreTransfer> InterStoreTransfers { get; }
+    DbSet<InterStoreTransferItem> InterStoreTransferItems { get; }
+    DbSet<PurchaseReturn> PurchaseReturns { get; }
+    DbSet<PurchaseReturnItem> PurchaseReturnItems { get; }
+    DbSet<SalesReturn> SalesReturns { get; }
+    DbSet<SalesReturnItem> SalesReturnItems { get; }
+    DbSet<EInvoiceMetadata> EInvoiceMetadata { get; }
+    DbSet<EWayBillMetadata> EWayBillMetadata { get; }
+    DbSet<ApprovalLimit> ApprovalLimits { get; }
+    DbSet<ApprovalRequest> ApprovalRequests { get; }
+    DbSet<ApprovalRequestStep> ApprovalRequestSteps { get; }
+    DbSet<DailyFinanceSummary> DailyFinanceSummaries { get; }
+    DbSet<SupplierRebate> SupplierRebates { get; }
     
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace PosErp.Domain.Entities.Purchasing;
@@ -94,6 +94,7 @@ public class PurchaseBillHeader
     public decimal TaxAmount { get; set; }
     public decimal TotalAmount { get; set; }
     public string Status { get; set; } = "PENDING_PAYMENT"; 
+    public DateTime? DueDate { get; set; }
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public Guid? CreatedBy { get; set; }

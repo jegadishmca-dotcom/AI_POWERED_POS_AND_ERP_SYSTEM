@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Pos;
+using PosErp.Domain.Entities.Finance;
 using PosErp.Application.Features.Offers.Services;
 using PosErp.Application.Features.Crm.Services;
 using PosErp.Application.Features.Offers.Models;
@@ -92,6 +93,26 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             cartEvaluation = await _offerEngine.EvaluateOffersAsync(cartEvaluation, customer?.Tier?.Name, request.PromoCode, cancellationToken);
 
             decimal totalTender = request.WalletAmountUsed + request.CashAmount + request.UpiAmount + request.CardAmount;
+            if (request.PaymentMode == "CREDIT")
+            {
+                if (customer == null)
+                    throw new Exception("A customer must be selected for credit sales.");
+
+                var currentBalance = await _context.CustomerLedger
+                    .Where(c => c.CustomerId == customer.Id)
+                    .OrderByDescending(c => c.CreatedAt)
+                    .Select(c => c.RunningBalance)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                if (currentBalance + request.NetPayable > customer.CreditLimit)
+                {
+                    throw new Exception($"CREDIT_LIMIT_EXCEEDED: Credit limit exceeded. Limit: {customer.CreditLimit:F2}, Current Balance: {currentBalance:F2}, New Sale: {request.NetPayable:F2}.");
+                }
+
+                // In a credit sale, the remaining amount is charged to credit
+                totalTender += (request.NetPayable - request.WalletAmountUsed);
+            }
+
             // M3: validate against NetPayable (what frontend computed as the final bill amount)
             // Allow a small ₹1 tolerance for rounding edge-cases on split payments
             if (totalTender < request.NetPayable - 1m)
@@ -352,13 +373,25 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             decimal sgst = invoice.TaxAmount - cgst; // ensure CGST+SGST = TaxAmount exactly
             decimal taxableValue = invoice.SubTotal; // SubTotal = sum of post-discount item totals (ex-tax)
 
+            decimal creditSaleAmount = 0;
+            decimal actualCashPaid = 0;
+
+            if (request.PaymentMode == "CREDIT")
+            {
+                creditSaleAmount = invoice.NetPayable - request.WalletAmountUsed;
+                invoice.DueDate = today.AddDays(30); // Default 30 credit days for customer AR
+            }
+            else
+            {
+                actualCashPaid = invoice.NetPayable - request.UpiAmount - request.CardAmount - request.WalletAmountUsed;
+            }
+
             var journalLines = new List<JournalLineDto>();
 
-            // Debits (What we received) — use NetPayable as the total bill amount
-            decimal actualCashPaid = invoice.NetPayable - request.UpiAmount - request.CardAmount - request.WalletAmountUsed;
             if (actualCashPaid > 0) journalLines.Add(new JournalLineDto { AccountCode = "1000", Description = "Cash Tender", Debit = actualCashPaid, Credit = 0 });
             if (request.UpiAmount > 0 || request.CardAmount > 0) journalLines.Add(new JournalLineDto { AccountCode = "1100", Description = "Digital Tender", Debit = request.UpiAmount + request.CardAmount, Credit = 0 });
             if (request.WalletAmountUsed > 0) journalLines.Add(new JournalLineDto { AccountCode = "2100", Description = "Wallet Redemption", Debit = request.WalletAmountUsed, Credit = 0 });
+            if (creditSaleAmount > 0) journalLines.Add(new JournalLineDto { AccountCode = "20200", Description = $"Credit Sale AR for {customer?.Name}", Debit = creditSaleAmount, Credit = 0 });
             
             // Credits (Revenue & Tax Liability)
             // Sales Revenue = SubTotal (post-discount, ex-tax) + any round-off adjustment
@@ -367,9 +400,48 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             if (cgst > 0) journalLines.Add(new JournalLineDto { AccountCode = "2200", Description = "Output CGST", Debit = 0, Credit = cgst });
             if (sgst > 0) journalLines.Add(new JournalLineDto { AccountCode = "2201", Description = "Output SGST", Debit = 0, Credit = sgst });
 
+            // Post to customer ledger if credit sale
+            if (creditSaleAmount > 0 && customer != null)
+            {
+                decimal currentLedgerBal = await _context.CustomerLedger
+                    .Where(c => c.CustomerId == customer.Id)
+                    .OrderByDescending(c => c.CreatedAt)
+                    .Select(c => c.RunningBalance)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                currentLedgerBal += creditSaleAmount;
+
+                var ledgerEntry = new CustomerLedgerEntry
+                {
+                    StoreId = storeId,
+                    CustomerId = customer.Id,
+                    EntryDate = today,
+                    TransactionType = "INVOICE",
+                    ReferenceNumber = invoice.InvoiceNumber,
+                    DebitAmount = creditSaleAmount,
+                    CreditAmount = 0,
+                    RunningBalance = currentLedgerBal,
+                    Description = $"Credit Sale Invoice {invoice.InvoiceNumber}",
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.CustomerLedger.Add(ledgerEntry);
+                await _context.SaveChangesAsync(cancellationToken);
+            }
+
             // Post Journal Entry
-            await _financialPostingService.PostJournalEntryAsync(
+            Guid jeId = await _financialPostingService.PostJournalEntryAsync(
                 null, DateTime.UtcNow, $"POS Invoice {invoice.InvoiceNumber}", $"INV-{invoice.Id}", journalLines, cancellationToken);
+
+            if (creditSaleAmount > 0 && customer != null)
+            {
+                var ledgerEntry = await _context.CustomerLedger
+                    .Where(c => c.CustomerId == customer.Id && c.ReferenceNumber == invoice.InvoiceNumber)
+                    .FirstOrDefaultAsync(cancellationToken);
+                if (ledgerEntry != null)
+                {
+                    ledgerEntry.JournalEntryId = jeId;
+                }
+            }
 
             // Post Dedicated Tax Transaction for GSTR Returns
             await _financialPostingService.RecordGstTransactionAsync(

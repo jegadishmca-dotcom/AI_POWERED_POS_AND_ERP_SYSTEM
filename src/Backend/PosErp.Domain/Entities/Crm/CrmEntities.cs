@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace PosErp.Domain.Entities.Crm;
@@ -35,6 +35,7 @@ public class Customer
     // Denormalized running balances for fast UI, actual truth is in Ledgers
     public decimal RunningWalletBalance { get; set; }
     public decimal RunningLoyaltyPoints { get; set; }
+    public decimal CreditLimit { get; set; } = 0;
     
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

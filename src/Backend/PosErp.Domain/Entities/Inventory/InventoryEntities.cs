@@ -17,6 +17,9 @@ public class ProductBatch
     public decimal Mrp { get; set; }
     public decimal CostPrice { get; set; }
     
+    public decimal AvailableQuantity { get; set; }
+    public string? GrnReference { get; set; }
+    
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     

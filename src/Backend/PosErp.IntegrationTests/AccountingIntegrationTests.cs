@@ -24,6 +24,7 @@ using PosErp.Domain.Entities.Pos;
 using PosErp.Domain.Entities.Purchasing;
 using PosErp.Infrastructure.Identity;
 using PosErp.Infrastructure.Persistence;
+using PosErp.Application.Features.Analytics.Services;
 using Xunit;
 
 namespace PosErp.IntegrationTests;
@@ -761,6 +762,444 @@ public class AccountingIntegrationTests : IDisposable
         Assert.Contains(srcJe.Lines, l => l.Account.AccountCode == "10300" && l.CreditAmount == 2400.00m);
         // Store B: Debit Inventory Asset 10300 (Value: 2400)
         Assert.Contains(destJe.Lines, l => l.Account.AccountCode == "10300" && l.DebitAmount == 2400.00m);
+    }
+
+    [Fact]
+    public async Task Scenario7_Financial_Reporting_And_Reconciliation_Verification()
+    {
+        // 1. Create a Product
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            ProductCode = "TSTPROD-07",
+            Name = "Organic Tea Leaves",
+            TaxSlabId = (await _context.TaxSlabs.FirstAsync()).Id,
+            UnitOfMeasureId = Guid.Parse("a0000000-0000-0000-0000-000000000001"),
+            Mrp = 300.00m,
+            SellingPrice = 270.00m,
+            PurchasePrice = 200.00m,
+            IsWeighable = false,
+            IsActive = true,
+            HasExpiry = true
+        };
+        _context.Products.Add(product);
+        await _context.SaveChangesAsync();
+
+        // 2. Mock a PO, GRN and Purchase Bill
+        var po = new PurchaseOrderHeader
+        {
+            StoreId = _storeId,
+            SupplierId = _supplierId,
+            PoNumber = "PO-2026-0007",
+            PoDate = DateTime.UtcNow.Date,
+            ExpectedDeliveryDate = DateTime.UtcNow.Date.AddDays(7),
+            Status = "APPROVED",
+            TotalAmount = 20000.00m
+        };
+        po.Items.Add(new PurchaseOrderItem
+        {
+            ProductId = product.Id,
+            OrderedQuantity = 100,
+            UnitCost = 200.00m,
+            TotalCost = 20000.00m
+        });
+        _context.PurchaseOrders.Add(po);
+        await _context.SaveChangesAsync();
+
+        var grn = new GRNHeader
+        {
+            StoreId = _storeId,
+            PurchaseOrderHeaderId = po.Id,
+            SupplierId = _supplierId,
+            GrnNumber = "GRN-2026-0007",
+            SupplierInvoiceNumber = "SUPINV-7788",
+            ReceivedDate = DateTime.UtcNow.Date,
+            TotalAmount = 20000.00m,
+            Status = "CONFIRMED"
+        };
+        grn.Items.Add(new GRNItem
+        {
+            ProductId = product.Id,
+            PurchaseOrderItemId = po.Items.First().Id,
+            ReceivedQuantity = 100,
+            AcceptedQuantity = 100,
+            RejectedQuantity = 0,
+            UnitCost = 200.00m,
+            TotalCost = 20000.00m,
+            BatchNumber = "BATCH-TEA-07",
+            ExpiryDate = DateTime.UtcNow.Date.AddYears(1)
+        });
+        _context.GRNHeaders.Add(grn);
+        await _context.SaveChangesAsync();
+
+        var pb = new ProductBatch
+        {
+            StoreId = _storeId,
+            ProductId = product.Id,
+            BatchNumber = "BATCH-TEA-07",
+            ExpiryDate = DateTime.UtcNow.Date.AddYears(1),
+            CostPrice = 200.00m,
+            Mrp = 300.00m,
+            AvailableQuantity = 100,
+            IsActive = true
+        };
+        _context.ProductBatches.Add(pb);
+        await _context.SaveChangesAsync();
+
+        var createBillCmd = new CreatePurchaseBillCommand(
+            _storeId,
+            grn.Id,
+            "BILL-7788",
+            DateTime.UtcNow.Date,
+            _userId
+        );
+        var billId = await _apHandler.Handle(createBillCmd, CancellationToken.None);
+
+        // 3. Mock Inter-Store Transfer (to populate 10900 clearing account)
+        var destStoreId = Guid.NewGuid();
+        var destStore = new Store
+        {
+            Id = destStoreId,
+            StoreCode = "STORE-003",
+            StoreName = "Supermarket Test Branch 3",
+            IsActive = true
+        };
+        _context.Stores.Add(destStore);
+        await _context.SaveChangesAsync();
+
+        var transferCmd = new ProcessInterStoreTransferCommand(
+            _storeId,
+            destStoreId,
+            DateTime.UtcNow.Date,
+            new List<TransferItemInputDto>
+            {
+                new(product.Id, pb.Id, 20) // transfer 20 units
+            },
+            _userId
+        );
+        await _transferHandler.Handle(transferCmd, CancellationToken.None);
+
+        // 4. Instantiate Reporting Service and Verify
+        var repService = new FinancialReportingService(_context);
+        var targetDate = DateTime.UtcNow.Date;
+
+        // A. Balance Sheet Parity
+        var bsStore = await repService.GetBalanceSheetAsync(_storeId, targetDate, CancellationToken.None);
+        Assert.Equal(bsStore.TotalAssets, bsStore.TotalLiabilities + bsStore.TotalEquity);
+
+        var bsCons = await repService.GetBalanceSheetAsync(null, targetDate, CancellationToken.None);
+        Assert.Equal(bsCons.TotalAssets, bsCons.TotalLiabilities + bsCons.TotalEquity);
+
+        // B. Consolidated Reports Eliminate Inter-Store Clearing Balances (10900)
+        Assert.DoesNotContain(bsCons.AssetAccounts, a => a.AccountCode == "10900");
+        Assert.Contains(bsStore.AssetAccounts, a => a.AccountCode == "10900");
+
+        // C. Inventory Valuation Reconciliation (10300 GL Balance vs Valuation Report)
+        var valStore = await repService.GetInventoryValuationAsync(_storeId, targetDate, CancellationToken.None);
+        decimal reportValuation = valStore.Sum(v => v.TotalValuation);
+
+        decimal glInventoryValuation = await _context.JournalEntryLines
+            .Include(l => l.JournalEntry)
+            .Where(l => l.JournalEntry.IsPosted && l.Account.AccountCode == "10300" && l.StoreId == _storeId)
+            .SumAsync(l => l.DebitAmount - l.CreditAmount);
+
+        Assert.Equal(glInventoryValuation, reportValuation); // Reconstructed valuation matches GL balance exactly
+
+        // D. GST Payable Reconciliation (GST Payable GL vs GSTR-3B calculations)
+        var gstReport = await repService.GetGstr3BReportAsync(_storeId, targetDate.AddDays(-30), targetDate, CancellationToken.None);
+        decimal expectedNetGst = (gstReport.OutwardCgst + gstReport.OutwardSgst) - (gstReport.ItcCgst + gstReport.ItcSgst);
+
+        // GL balances: CGST Output (2200/22010), SGST Output (2201/22020), CGST Input (22030), SGST Input (22040)
+        decimal glOutputCgst = await _context.JournalEntryLines
+            .Include(l => l.JournalEntry)
+            .Where(l => l.JournalEntry.IsPosted && (l.Account.AccountCode == "2200" || l.Account.AccountCode == "22010") && l.StoreId == _storeId)
+            .SumAsync(l => l.CreditAmount - l.DebitAmount);
+
+        decimal glOutputSgst = await _context.JournalEntryLines
+            .Include(l => l.JournalEntry)
+            .Where(l => l.JournalEntry.IsPosted && (l.Account.AccountCode == "2201" || l.Account.AccountCode == "22020") && l.StoreId == _storeId)
+            .SumAsync(l => l.CreditAmount - l.DebitAmount);
+
+        decimal glInputCgst = await _context.JournalEntryLines
+            .Include(l => l.JournalEntry)
+            .Where(l => l.JournalEntry.IsPosted && l.Account.AccountCode == "22030" && l.StoreId == _storeId)
+            .SumAsync(l => l.DebitAmount - l.CreditAmount);
+
+        decimal glInputSgst = await _context.JournalEntryLines
+            .Include(l => l.JournalEntry)
+            .Where(l => l.JournalEntry.IsPosted && l.Account.AccountCode == "22040" && l.StoreId == _storeId)
+            .SumAsync(l => l.DebitAmount - l.CreditAmount);
+
+        decimal actualNetGst = (glOutputCgst + glOutputSgst) - (glInputCgst + glInputSgst);
+        Assert.Equal(expectedNetGst, actualNetGst);
+
+        // E. Export validation
+        var csvBytes = PosErp.Api.Helpers.ReportExportHelper.ExportToCsv(valStore);
+        Assert.NotEmpty(csvBytes);
+
+        var excelBytes = PosErp.Api.Helpers.ReportExportHelper.ExportToExcel("Inventory Valuation", "STORE-001", targetDate.ToString("yyyyMMdd"), valStore);
+        Assert.NotEmpty(excelBytes);
+
+        var pdfBytes = PosErp.Api.Helpers.ReportExportHelper.ExportToPdf("Inventory Valuation", "STORE-001", targetDate.ToString("yyyyMMdd"), valStore);
+        Assert.NotEmpty(pdfBytes);
+    }
+
+    [Fact]
+    public async Task Scenario8_Ai_Finance_Analytics_Verification()
+    {
+        // 1. Create a Product and a Batch
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            ProductCode = "TSTPROD-08",
+            Name = "Premium Basmati Rice",
+            TaxSlabId = (await _context.TaxSlabs.FirstAsync()).Id,
+            UnitOfMeasureId = Guid.Parse("a0000000-0000-0000-0000-000000000001"),
+            Mrp = 120.00m,
+            SellingPrice = 110.00m,
+            PurchasePrice = 90.00m,
+            IsWeighable = false,
+            IsActive = true,
+            HasExpiry = true
+        };
+        _context.Products.Add(product);
+        
+        // Seed a store with square footage
+        var store = await _context.Stores.FindAsync(_storeId);
+        if (store != null)
+        {
+            store.SquareFootage = 1500.00m;
+        }
+        await _context.SaveChangesAsync();
+
+        var pb = new ProductBatch
+        {
+            StoreId = _storeId,
+            ProductId = product.Id,
+            Product = product,
+            BatchNumber = "BATCH-RICE-08",
+            ExpiryDate = DateTime.UtcNow.Date.AddDays(15), // expiring in 15 days, critical risk!
+            CostPrice = 90.00m,
+            Mrp = 120.00m,
+            AvailableQuantity = 50,
+            IsActive = true
+        };
+        _context.ProductBatches.Add(pb);
+        await _context.SaveChangesAsync();
+
+        // Seed opening Cash to prevent Cash Constraint from lowering priority score in test
+        var cashAccount = await _context.Accounts.FirstAsync(a => a.AccountCode == "10100");
+        var equityAccount = await _context.Accounts.FirstAsync(a => a.AccountCode == "30000");
+        var cashJe = new JournalEntry
+        {
+            StoreId = _storeId,
+            EntryNumber = "JE-CASH-SEED",
+            EntryDate = DateTime.UtcNow.Date,
+            Description = "Seed opening cash for payment recommendations",
+            Status = "POSTED",
+            CreatedAt = DateTime.UtcNow
+        };
+        cashJe.Lines.Add(new JournalEntryLine
+        {
+            JournalEntry = cashJe,
+            AccountId = cashAccount.Id,
+            Account = cashAccount,
+            DebitAmount = 100000.00m,
+            CreditAmount = 0,
+            StoreId = _storeId,
+            Description = "Debit Cash"
+        });
+        cashJe.Lines.Add(new JournalEntryLine
+        {
+            JournalEntry = cashJe,
+            AccountId = equityAccount.Id,
+            Account = equityAccount,
+            DebitAmount = 0,
+            CreditAmount = 100000.00m,
+            StoreId = _storeId,
+            Description = "Credit Equity"
+        });
+        _context.JournalEntries.Add(cashJe);
+        await _context.SaveChangesAsync();
+
+        // 2. Mock a Purchase Order & Purchase Bill to trigger supplier recommendation
+        var po = new PurchaseOrderHeader
+        {
+            StoreId = _storeId,
+            SupplierId = _supplierId,
+            PoNumber = "PO-2026-0008",
+            PoDate = DateTime.UtcNow.Date,
+            ExpectedDeliveryDate = DateTime.UtcNow.Date.AddDays(7),
+            Status = "APPROVED",
+            TotalAmount = 4500.00m
+        };
+        po.Items.Add(new PurchaseOrderItem
+        {
+            ProductId = product.Id,
+            OrderedQuantity = 50,
+            UnitCost = 90.00m,
+            TotalCost = 4500.00m
+        });
+        _context.PurchaseOrders.Add(po);
+        await _context.SaveChangesAsync();
+
+        var grn = new GRNHeader
+        {
+            StoreId = _storeId,
+            PurchaseOrderHeaderId = po.Id,
+            SupplierId = _supplierId,
+            GrnNumber = "GRN-2026-0008",
+            SupplierInvoiceNumber = "SUPINV-8899",
+            ReceivedDate = DateTime.UtcNow.Date,
+            TotalAmount = 4500.00m,
+            Status = "CONFIRMED"
+        };
+        grn.Items.Add(new GRNItem
+        {
+            ProductId = product.Id,
+            PurchaseOrderItemId = po.Items.First().Id,
+            ReceivedQuantity = 50,
+            AcceptedQuantity = 50,
+            RejectedQuantity = 0,
+            UnitCost = 90.00m,
+            TotalCost = 4500.00m,
+            BatchNumber = "BATCH-RICE-08",
+            ExpiryDate = DateTime.UtcNow.Date.AddDays(15)
+        });
+        _context.GRNHeaders.Add(grn);
+        await _context.SaveChangesAsync();
+
+        var createBillCmd = new CreatePurchaseBillCommand(
+            _storeId,
+            grn.Id,
+            "BILL-8899",
+            DateTime.UtcNow.Date,
+            _userId
+        );
+        var billId = await _apHandler.Handle(createBillCmd, CancellationToken.None);
+
+        // Update bill due date to test recommendation score
+        var bill = await _context.PurchaseBills.FindAsync(billId);
+        bill.DueDate = DateTime.UtcNow.Date.AddDays(1); // due tomorrow!
+        await _context.SaveChangesAsync();
+
+        // 3. Mock a cashier discrepancy (shortage of -600, triggering an anomaly)
+        var session = new PosSession
+        {
+            Id = Guid.NewGuid(),
+            TerminalId = Guid.Parse("00000000-0000-0000-0000-000000000001"),
+            CashierId = _userId,
+            StoreId = _storeId,
+            StartTime = DateTime.UtcNow.AddHours(-2),
+            OpeningFloatCash = 1000.00m,
+            ExpectedClosingCash = 1000.00m,
+            ActualClosingCash = 400.00m, // -600 shortage!
+            Status = "CLOSED",
+            Difference = -600.00m,
+            EndTime = DateTime.UtcNow
+        };
+        _context.PosSessions.Add(session);
+        await _context.SaveChangesAsync();
+
+        // 4. Mock an inventory shrinkage adjustment
+        var shrinkageAdjustment = new StockAdjustment
+        {
+            StoreId = _storeId,
+            AdjustmentNumber = "SHR-2026-0008",
+            Reason = "SHRINKAGE",
+            Status = "POSTED",
+            CreatedAt = DateTime.UtcNow
+        };
+        _context.StockAdjustments.Add(shrinkageAdjustment);
+        
+        // Register the stock ledger entry for shrinkage
+        _context.StockLedger.Add(new StockLedgerEntry
+        {
+            StoreId = _storeId,
+            ProductId = product.Id,
+            BatchId = pb.Id,
+            MovementType = "ADJUSTMENT_OUT",
+            Quantity = -10, // lost 10 units
+            UnitCost = 90.00m,
+            RunningBalance = 40,
+            BusinessDate = DateTime.UtcNow.Date,
+            ReferenceNumber = "SHR-2026-0008",
+            CreatedAt = DateTime.UtcNow
+        });
+        await _context.SaveChangesAsync();
+
+        // 5. Instantiate Analytics Services & Recalculate
+        var repService = new FinancialReportingService(_context);
+        var analyticsService = new AiAnalyticsService(_context, repService);
+        var nlQueryService = new NaturalLanguageQueryService(repService);
+
+        // Recalculate
+        await analyticsService.RecalculateAllAnalyticsAsync(CancellationToken.None);
+
+        // 6. Assert cached items exist and are populated
+        
+        // A. KPIs check
+        var kpis = await _context.AiKpiResults.Where(x => x.StoreId == _storeId).ToListAsync();
+        Assert.NotEmpty(kpis);
+        
+        // Working capital check
+        var wcKpi = kpis.FirstOrDefault(k => k.KpiName == "WORKING_CAPITAL");
+        Assert.NotNull(wcKpi);
+
+        // Sales per square foot
+        var salesSqFt = kpis.FirstOrDefault(k => k.KpiName == "SALES_PER_SQ_FT");
+        Assert.NotNull(salesSqFt);
+
+        // Cashier variance rate
+        var cashierVar = kpis.FirstOrDefault(k => k.KpiName == "CASHIER_VARIANCE_RATE");
+        Assert.NotNull(cashierVar);
+        Assert.True(cashierVar.KpiValue > 0);
+
+        // B. Forecasts check
+        var forecasts = await _context.AiCashFlowForecasts.Where(x => x.StoreId == _storeId).ToListAsync();
+        Assert.Equal(30, forecasts.Count); // Exactly 30 days
+        Assert.True(forecasts.All(f => f.ConfidenceLevel == "HIGH" || f.ConfidenceLevel == "MEDIUM" || f.ConfidenceLevel == "LOW"));
+
+        // C. Recommendations check
+        var recs = await _context.AiSupplierPaymentRecommendations.Where(r => r.PurchaseBillId == billId).ToListAsync();
+        Assert.NotEmpty(recs);
+        var highestRec = recs.OrderByDescending(r => r.PriorityScore).First();
+        Assert.True(highestRec.PriorityScore >= 75); // Due in 1 day should have high priority score
+
+        // Test feedback tracking
+        await analyticsService.SubmitRecommendationFeedbackAsync(highestRec.Id, "ACCEPTED", "Approved for payment tomorrow", _userId, CancellationToken.None);
+        var updatedRec = await _context.AiSupplierPaymentRecommendations.FindAsync(highestRec.Id);
+        Assert.Equal("ACCEPTED", updatedRec.FeedbackStatus);
+        Assert.Equal("Approved for payment tomorrow", updatedRec.FeedbackNotes);
+
+        // D. Anomalies check
+        var anomalies = await _context.AiFinancialAnomalies.Where(a => a.ReferenceId == session.Id).ToListAsync();
+        Assert.NotEmpty(anomalies);
+        var cashierAnomaly = anomalies.First();
+        Assert.Equal("CASHIER_SHORTAGE", cashierAnomaly.AnomalyType);
+        Assert.Equal("WARNING", cashierAnomaly.Severity);
+
+        // Resolve anomaly
+        cashierAnomaly.IsResolved = true;
+        await _context.SaveChangesAsync();
+
+        // E. Expiry Risk Check
+        var expiries = await _context.AiExpiryRiskPredictions.Where(x => x.BatchId == pb.Id).ToListAsync();
+        Assert.NotEmpty(expiries);
+        var riceExpiry = expiries.First();
+        Assert.Equal("CRITICAL", riceExpiry.RiskCategory); // expiring in 15 days is critical
+        Assert.True(riceExpiry.PotentialLoss > 0);
+
+        // F. Alerts check
+        var alerts = await _context.AiAlerts.Where(a => a.StoreId == _storeId).ToListAsync();
+        Assert.NotEmpty(alerts);
+        Assert.Contains(alerts, a => a.AlertType == "EXPIRY" && a.Severity == "CRITICAL");
+
+        // G. Natural Language Query execution check (Read-Only validation)
+        var nlResult = await nlQueryService.ParseAndExecuteQueryAsync("show inventory value as of today", _storeId, CancellationToken.None);
+        Assert.True(nlResult.IsParsedSuccessfully);
+        Assert.Equal("INVENTORY_VALUATION", nlResult.ReportType);
+        Assert.NotEmpty(nlResult.DataRows);
     }
 
     public void Dispose()

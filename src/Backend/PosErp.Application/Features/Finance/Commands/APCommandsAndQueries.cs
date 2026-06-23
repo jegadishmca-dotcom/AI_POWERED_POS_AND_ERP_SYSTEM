@@ -208,7 +208,20 @@ public class APCommandsAndQueriesHandler :
                 JournalEntryId = jeId,
                 CreatedAt = DateTime.UtcNow
             };
+
             _context.SupplierLedger.Add(ledgerEntry);
+            await _postingService.RecordGstTransactionAsync(
+                request.StoreId,
+                "PURCHASE",
+                request.BillNumber,
+                request.BillDate,
+                itemsCost,
+                cgstAmount,
+                sgstAmount,
+                0,
+                null,
+                cancellationToken
+            );
 
             grn.Status = "BILLED";
             await _context.SaveChangesAsync(cancellationToken);

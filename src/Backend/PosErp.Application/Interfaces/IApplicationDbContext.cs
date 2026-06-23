@@ -93,6 +93,14 @@ public interface IApplicationDbContext
     DbSet<ApprovalRequestStep> ApprovalRequestSteps { get; }
     DbSet<DailyFinanceSummary> DailyFinanceSummaries { get; }
     DbSet<SupplierRebate> SupplierRebates { get; }
+    DbSet<AiKpiResult> AiKpiResults { get; }
+    DbSet<AiKpiHistory> AiKpiHistories { get; }
+    DbSet<AiCashFlowForecast> AiCashFlowForecasts { get; }
+    DbSet<AiSupplierPaymentRecommendation> AiSupplierPaymentRecommendations { get; }
+    DbSet<AiFinancialAnomaly> AiFinancialAnomalies { get; }
+    DbSet<AiInventoryShrinkageAnalytic> AiInventoryShrinkageAnalytics { get; }
+    DbSet<AiExpiryRiskPrediction> AiExpiryRiskPredictions { get; }
+    DbSet<AiAlert> AiAlerts { get; }
     
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

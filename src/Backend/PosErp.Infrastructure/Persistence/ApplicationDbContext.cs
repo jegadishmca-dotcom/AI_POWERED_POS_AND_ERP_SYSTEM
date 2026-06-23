@@ -99,6 +99,14 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<ApprovalRequestStep> ApprovalRequestSteps => Set<ApprovalRequestStep>();
     public DbSet<DailyFinanceSummary> DailyFinanceSummaries => Set<DailyFinanceSummary>();
     public DbSet<SupplierRebate> SupplierRebates => Set<SupplierRebate>();
+    public DbSet<AiKpiResult> AiKpiResults => Set<AiKpiResult>();
+    public DbSet<AiKpiHistory> AiKpiHistories => Set<AiKpiHistory>();
+    public DbSet<AiCashFlowForecast> AiCashFlowForecasts => Set<AiCashFlowForecast>();
+    public DbSet<AiSupplierPaymentRecommendation> AiSupplierPaymentRecommendations => Set<AiSupplierPaymentRecommendation>();
+    public DbSet<AiFinancialAnomaly> AiFinancialAnomalies => Set<AiFinancialAnomaly>();
+    public DbSet<AiInventoryShrinkageAnalytic> AiInventoryShrinkageAnalytics => Set<AiInventoryShrinkageAnalytic>();
+    public DbSet<AiExpiryRiskPrediction> AiExpiryRiskPredictions => Set<AiExpiryRiskPrediction>();
+    public DbSet<AiAlert> AiAlerts => Set<AiAlert>();
 
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
@@ -340,6 +348,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 else if (snakeTableName == "daily_finance_summaries" || snakeTableName == "daily_finance_summary") snakeTableName = "daily_finance_summary";
                 else if (snakeTableName == "approval_request_steps" || snakeTableName == "approval_request_step") snakeTableName = "approval_request_steps";
                 else if (snakeTableName == "supplier_rebates" || snakeTableName == "supplier_rebate") snakeTableName = "supplier_rebates";
+                else if (snakeTableName == "ai_kpi_histories") snakeTableName = "ai_kpi_history";
                 
                 entity.SetTableName(snakeTableName);
             }

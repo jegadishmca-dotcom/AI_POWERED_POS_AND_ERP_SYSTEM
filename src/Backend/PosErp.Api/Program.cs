@@ -21,6 +21,8 @@ using PosErp.Application.Features.Finance.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Hangfire;
+using Hangfire.PostgreSql;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -31,6 +33,17 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 
 builder.Services.AddScoped<IApplicationDbContext>(provider => 
     provider.GetRequiredService<ApplicationDbContext>());
+
+// Add Hangfire Services
+builder.Services.AddHangfire(config => config
+    .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)
+    .UseSimpleAssemblyNameTypeSerializer()
+    .UseRecommendedSerializerSettings()
+    .UsePostgreSqlStorage(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddHangfireServer(options =>
+{
+    options.WorkerCount = 2;
+});
 
 // Add Controllers and Swagger
 builder.Services.AddControllers();
@@ -120,6 +133,8 @@ builder.Services.AddScoped<PosErp.Application.Features.Finance.Services.IPeriodL
 builder.Services.AddScoped<PosErp.Application.Features.Finance.Services.IDocumentSequenceService, PosErp.Application.Features.Finance.Services.DocumentSequenceService>();
 builder.Services.AddScoped<PosErp.Application.Features.Finance.Services.IApprovalWorkflowService, PosErp.Application.Features.Finance.Services.ApprovalWorkflowService>();
 builder.Services.AddScoped<PosErp.Application.Features.Finance.Services.IAllocationEngine, PosErp.Application.Features.Finance.Services.AllocationEngine>();
+builder.Services.AddScoped<PosErp.Application.Features.Analytics.Services.IAiAnalyticsService, PosErp.Application.Features.Analytics.Services.AiAnalyticsService>();
+builder.Services.AddScoped<PosErp.Application.Features.Analytics.Services.INaturalLanguageQueryService, PosErp.Application.Features.Analytics.Services.NaturalLanguageQueryService>();
 
 // Register Materialized View Periodic Refresher
 builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.StockPositionRefreshService>();
@@ -172,6 +187,27 @@ app.UseMiddleware<RateLimitingMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<DemoSandboxMiddleware>();
+
+// Configure Hangfire Dashboard
+app.UseHangfireDashboard("/hangfire", new DashboardOptions
+{
+    Authorization = new[] { new PosErp.Api.Infrastructure.HangfireAuthorizationFilter() }
+});
+
+// Schedule background AI jobs
+using (var scope = app.Services.CreateScope())
+{
+    var manager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+    manager.AddOrUpdate<PosErp.Application.Features.Analytics.Services.IAiAnalyticsService>(
+        "ai-daily-full-rebuild",
+        service => service.RecalculateAllAnalyticsAsync(CancellationToken.None),
+        Cron.Daily);
+
+    manager.AddOrUpdate<PosErp.Application.Features.Analytics.Services.IAiAnalyticsService>(
+        "ai-hourly-incremental-refresh",
+        service => service.RecalculateIncrementalAnalyticsAsync(CancellationToken.None),
+        Cron.Hourly);
+}
 
 app.MapControllers();
 app.MapHealthChecks("/health");

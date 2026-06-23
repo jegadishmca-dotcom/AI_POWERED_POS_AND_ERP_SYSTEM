@@ -14,8 +14,9 @@ COPY PosErp.Application/PosErp.Application.csproj  PosErp.Application/
 COPY PosErp.Infrastructure/PosErp.Infrastructure.csproj PosErp.Infrastructure/
 COPY PosErp.Api/PosErp.Api.csproj                  PosErp.Api/
 
-# Restore NuGet packages (cached unless .csproj files change)
-RUN dotnet restore PosErp.sln
+# Restore NuGet packages for API and its dependencies only
+# (PosErp.sln also references IntegrationTests which is not in the Docker build context)
+RUN dotnet restore PosErp.Api/PosErp.Api.csproj
 
 # ── Stage 2: Build & Publish ─────────────────────────────────
 FROM restore AS publish

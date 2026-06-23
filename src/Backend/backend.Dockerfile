@@ -4,7 +4,7 @@
 # =============================================================
 
 # ── Stage 1: Restore ─────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/sdk:8.0-alpine AS restore
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS restore
 WORKDIR /src
 
 # Copy solution and all project files first (layer caching)
@@ -24,7 +24,7 @@ WORKDIR /src
 # Copy full source code
 COPY . .
 
-# Publish Release build — single-layer, trimmed output
+# Publish Release build — single-layer output
 RUN dotnet publish PosErp.Api/PosErp.Api.csproj \
     -c Release \
     -o /app/publish \
@@ -32,11 +32,19 @@ RUN dotnet publish PosErp.Api/PosErp.Api.csproj \
     --no-restore
 
 # ── Stage 3: Runtime ─────────────────────────────────────────
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS final
+# Use standard Debian-based runtime (not Alpine) — required for
+# QuestPDF/SkiaSharp native libs (libstdc++, libgcc, icu-libs)
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 
+# Install native dependencies required by QuestPDF (SkiaSharp) and Npgsql
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libfontconfig1 \
+    libssl3 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Security: run as non-root
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
 USER appuser
 
 # Copy published output

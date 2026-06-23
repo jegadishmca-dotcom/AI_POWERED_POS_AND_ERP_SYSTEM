@@ -144,6 +144,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 TerminalSequence = nextSeq,
                 CustomerId = customer?.Id,
                 BusinessDate = today,
+                StoreId = Guid.Empty,
                 // SubTotal = sum of post-discount line totals (what's printed in the item section)
                 SubTotal = cartEvaluation.Items.Sum(i => i.FinalLineTotal),
                 // DiscountAmount = total discount applied (for reporting purposes)
@@ -314,7 +315,11 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 if (selectedBatchId.HasValue)
                 {
                     var selectedBatch = await _context.ProductBatches.FindAsync(new object[] { selectedBatchId.Value }, cancellationToken);
-                    expiryDate = selectedBatch?.ExpiryDate;
+                    if (selectedBatch != null)
+                    {
+                        expiryDate = selectedBatch.ExpiryDate;
+                        selectedBatch.AvailableQuantity -= item.Quantity;
+                    }
                 }
 
                 // Check if this specific item breached stock level to log override status

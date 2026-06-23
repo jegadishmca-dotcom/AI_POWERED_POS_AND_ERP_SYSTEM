@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
+using PosErp.Domain.Entities.Auth;
 using PosErp.Domain.Entities.Finance;
 using System;
 using System.Threading;
@@ -62,7 +63,22 @@ public class DocumentSequenceService : IDocumentSequenceService
 
             string paddedNumber = sequence.CurrentNumber.ToString().PadLeft(sequence.Padding, '0');
             string suffixStr = string.IsNullOrWhiteSpace(sequence.Suffix) ? "" : $"-{sequence.Suffix}";
-            return $"{sequence.Prefix}-{paddedNumber}{suffixStr}";
+
+            string storeSuffix = "";
+            if (storeId != Guid.Empty && storeId != Guid.Parse("00000000-0000-0000-0000-000000000000"))
+            {
+                var store = await _context.Stores.FirstOrDefaultAsync(s => s.Id == storeId, cancellationToken);
+                if (store != null && !string.IsNullOrWhiteSpace(store.StoreCode))
+                {
+                    storeSuffix = $"-{store.StoreCode}";
+                }
+                else
+                {
+                    storeSuffix = $"-{storeId.ToString().Substring(0, 4)}";
+                }
+            }
+
+            return $"{sequence.Prefix}{storeSuffix}-{paddedNumber}{suffixStr}";
         }
         finally
         {

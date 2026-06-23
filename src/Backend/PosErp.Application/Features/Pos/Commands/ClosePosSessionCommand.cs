@@ -106,6 +106,7 @@ public class ClosePosSessionCommandHandler : IRequestHandler<ClosePosSessionComm
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow
             });
+            await _context.SaveChangesAsync(cancellationToken);
         }
     }
 }

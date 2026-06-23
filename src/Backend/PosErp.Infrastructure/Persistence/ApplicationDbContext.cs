@@ -242,6 +242,24 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasForeignKey(cra => new { cra.InvoiceId, cra.InvoiceBusinessDate })
             .OnDelete(DeleteBehavior.Restrict);
 
+        modelBuilder.Entity<SupplierPaymentAllocation>()
+            .HasOne(i => i.SupplierPayment)
+            .WithMany(p => p.Allocations)
+            .HasForeignKey(i => i.PaymentId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<CustomerReceiptAllocation>()
+            .HasOne(i => i.CustomerReceipt)
+            .WithMany(r => r.Allocations)
+            .HasForeignKey(i => i.ReceiptId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<InterStoreTransferItem>()
+            .HasOne(i => i.ProductBatch)
+            .WithMany()
+            .HasForeignKey(i => i.BatchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Composite Key configuration for SalesReturn referencing Invoices
         modelBuilder.Entity<PosErp.Domain.Entities.Finance.SalesReturn>()
             .HasOne<PosErp.Domain.Entities.Pos.Invoice>()
@@ -284,6 +302,18 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasForeignKey(s => s.ApprovalRequestId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<PurchaseReturnItem>()
+            .HasOne(i => i.ProductBatch)
+            .WithMany()
+            .HasForeignKey(i => i.BatchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<SalesReturnItem>()
+            .HasOne(i => i.ProductBatch)
+            .WithMany()
+            .HasForeignKey(i => i.BatchId)
+            .OnDelete(DeleteBehavior.Restrict);
+
         // Map every entity and property to lowercase snake_case to match SQL Schema exactly
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {
@@ -319,6 +349,14 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 if (entity.ClrType == typeof(PosErp.Domain.Entities.Catalog.Barcode) && property.Name == nameof(PosErp.Domain.Entities.Catalog.Barcode.BarcodeValue))
                 {
                     property.SetColumnName("barcode");
+                }
+                else if (property.Name == "Version" && (entity.ClrType == typeof(Account) || entity.ClrType == typeof(JournalEntry)))
+                {
+                    property.SetColumnName("xmin");
+                }
+                else if (property.Name == "CreatedById")
+                {
+                    property.SetColumnName("created_by");
                 }
                 else
                 {

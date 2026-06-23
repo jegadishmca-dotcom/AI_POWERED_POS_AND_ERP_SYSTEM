@@ -26,7 +26,8 @@ import {
   FileText,
   PieChart,
   BookOpen,
-  CalendarClock
+  CalendarClock,
+  Banknote
 } from 'lucide-react';
 import { useAuthStore } from './features/auth/store/auth.store';
 import { Login } from './features/auth/routes/Login';
@@ -411,22 +412,22 @@ const AppLayout: React.FC = () => {
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <Settings />
             } />
             {/* Finance F1 Routes */}
-            <Route path="/finance/dashboard" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><FinanceDashboard /></ProtectedRoute>} />
-            <Route path="/finance/accounts" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><ChartOfAccounts /></ProtectedRoute>} />
-            <Route path="/finance/journals" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><JournalEntries /></ProtectedRoute>} />
-            <Route path="/finance/trial-balance" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><TrialBalance /></ProtectedRoute>} />
-            <Route path="/finance/profit-and-loss" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><ProfitAndLoss /></ProtectedRoute>} />
-            <Route path="/finance/balance-sheet" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><BalanceSheet /></ProtectedRoute>} />
+            <Route path="/finance/dashboard" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <FinanceDashboard />} />
+            <Route path="/finance/accounts" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <ChartOfAccounts />} />
+            <Route path="/finance/journals" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <JournalEntries />} />
+            <Route path="/finance/trial-balance" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <TrialBalance />} />
+            <Route path="/finance/profit-and-loss" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <ProfitAndLoss />} />
+            <Route path="/finance/balance-sheet" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <BalanceSheet />} />
             
             {/* Finance F2 Routes */}
-            <Route path="/finance/supplier-bills" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><SupplierBills /></ProtectedRoute>} />
-            <Route path="/finance/supplier-payments" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><SupplierPayments /></ProtectedRoute>} />
-            <Route path="/finance/supplier-ledger" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><SupplierLedger /></ProtectedRoute>} />
-            <Route path="/finance/ap-aging" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><APAging /></ProtectedRoute>} />
-            <Route path="/finance/customer-receipts" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><CustomerReceipts /></ProtectedRoute>} />
-            <Route path="/finance/customer-ledger" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><CustomerLedger /></ProtectedRoute>} />
-            <Route path="/finance/ar-aging" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><ARAging /></ProtectedRoute>} />
-            <Route path="/finance/credit-limit" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><CreditLimitMonitoring /></ProtectedRoute>} />
+            <Route path="/finance/supplier-bills" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <SupplierBills />} />
+            <Route path="/finance/supplier-payments" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <SupplierPayments />} />
+            <Route path="/finance/supplier-ledger" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <SupplierLedger />} />
+            <Route path="/finance/ap-aging" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <APAging />} />
+            <Route path="/finance/customer-receipts" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <CustomerReceipts />} />
+            <Route path="/finance/customer-ledger" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <CustomerLedger />} />
+            <Route path="/finance/ar-aging" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <ARAging />} />
+            <Route path="/finance/credit-limit" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <CreditLimitMonitoring />} />
             
             <Route path="/" element={<Navigate to={user?.role === 'Cashier' ? "/pos" : "/finance/dashboard"} replace />} />
             <Route path="*" element={<Navigate to={user?.role === 'Cashier' ? "/pos" : "/finance/dashboard"} replace />} />

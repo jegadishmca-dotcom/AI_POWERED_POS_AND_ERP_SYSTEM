@@ -19,10 +19,12 @@ export const JournalEntries: React.FC = () => {
     queryFn: () => getJournalEntries(storeId || undefined, startDate, endDate)
   });
 
-  const filteredEntries = entries?.filter((entry: any) => 
-    entry.entryNumber.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    entry.description.toLowerCase().includes(searchTerm.toLowerCase())
-  ) || [];
+  const filteredEntries = entries?.filter((entry: any) => {
+    const entryNum = entry.entryNumber || '';
+    const desc = entry.description || '';
+    return entryNum.toLowerCase().includes(searchTerm.toLowerCase()) || 
+           desc.toLowerCase().includes(searchTerm.toLowerCase());
+  }) || [];
 
   return (
     <div className="p-6 max-w-7xl mx-auto">

@@ -7,7 +7,7 @@ export interface Account {
   accountType: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'REVENUE' | 'EXPENSE';
   parentAccountId?: string;
   isActive: boolean;
-  subAccounts?: Account[];
+  children?: Account[];
 }
 
 export const getAccounts = async (onlyActive = true, buildTree = true): Promise<Account[]> => {

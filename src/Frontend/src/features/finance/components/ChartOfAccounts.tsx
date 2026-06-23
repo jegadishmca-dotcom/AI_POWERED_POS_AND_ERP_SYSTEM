@@ -22,11 +22,13 @@ export const ChartOfAccounts: React.FC = () => {
   const renderTree = (nodes: Account[], depth = 0) => {
     if (!nodes) return null;
     return nodes.map(node => {
-      const hasChildren = node.subAccounts && node.subAccounts.length > 0;
+      const hasChildren = node.children && node.children.length > 0;
       const isExpanded = expandedNodes.has(node.id);
       
       // Filter logic: if search term exists, expand all to show matches (simplified here for brevity)
-      if (searchTerm && !node.name.toLowerCase().includes(searchTerm.toLowerCase()) && !node.accountCode.includes(searchTerm)) {
+      const nodeName = node.name || '';
+      const nodeCode = node.accountCode || '';
+      if (searchTerm && !nodeName.toLowerCase().includes(searchTerm.toLowerCase()) && !nodeCode.includes(searchTerm)) {
         if (!hasChildren) return null; // hide leaf if no match
       }
 
@@ -62,7 +64,7 @@ export const ChartOfAccounts: React.FC = () => {
               {node.isActive ? <CheckCircle2 className="w-5 h-5 text-emerald-500 mx-auto" /> : <XCircle className="w-5 h-5 text-slate-300 mx-auto" />}
             </div>
           </div>
-          {hasChildren && (isExpanded || searchTerm) && renderTree(node.subAccounts!, depth + 1)}
+          {hasChildren && (isExpanded || searchTerm) && renderTree(node.children!, depth + 1)}
         </React.Fragment>
       );
     });

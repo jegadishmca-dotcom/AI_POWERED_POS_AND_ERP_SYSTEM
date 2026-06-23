@@ -34,6 +34,9 @@ builder.Services.AddDbContext<ApplicationDbContext>(options =>
 builder.Services.AddScoped<IApplicationDbContext>(provider => 
     provider.GetRequiredService<ApplicationDbContext>());
 
+// Health checks — must be registered before MapHealthChecks("/health") is called
+builder.Services.AddHealthChecks();
+
 // Add Hangfire Services
 builder.Services.AddHangfire(config => config
     .SetDataCompatibilityLevel(CompatibilityLevel.Version_180)

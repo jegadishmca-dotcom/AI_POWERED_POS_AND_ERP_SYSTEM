@@ -470,7 +470,7 @@ export const PosTerminal = () => {
     // --- BACKGROUND SERVER CALCULATION FOR PROMOS ---
     try {
       const payload = {
-        items: items.map(i => ({ productId: i.productId, quantity: i.qty })),
+        items: items.map(i => ({ productId: i.productId, quantity: i.qty === '' ? 0 : Number(i.qty) })),
         promoCode: promoCode,
         customerId: overrideCustomerId !== undefined ? (overrideCustomerId || undefined) : customer?.id
       };
@@ -583,10 +583,11 @@ export const PosTerminal = () => {
     }
   };
 
-  const updateItemQtyExact = (productId: string, newQty: number) => {
+  const updateItemQtyExact = (productId: string, newQty: number | string) => {
     const updatedItems = cart.items.map((item: any) => {
       if (item.productId === productId) {
-        return { ...item, qty: newQty, lineTotal: newQty * item.unitPrice };
+        const qtyNum = newQty === '' ? 0 : Number(newQty);
+        return { ...item, qty: newQty, lineTotal: qtyNum * item.unitPrice };
       }
       return item;
     });
@@ -1102,13 +1103,17 @@ export const PosTerminal = () => {
                           // GAP-05 FIX: enforce integer quantities for non-weighable products
                           step={item.isWeighable ? 'any' : '1'}
                           className="font-black text-lg w-16 text-center border border-slate-200 rounded focus:outline-none focus:border-indigo-500 bg-white"
-                          value={item.qty}
+                          value={item.qty === '' ? '' : item.qty}
                           onChange={(e) => {
+                            if (e.target.value === '') {
+                              updateItemQtyExact(item.productId, '');
+                              return;
+                            }
                             const raw = item.isWeighable
                               ? parseFloat(e.target.value)
                               : parseInt(e.target.value, 10);
                             const val = isNaN(raw) ? 1 : raw;
-                            if (val > 0) {
+                            if (val >= 0) {
                               updateItemQtyExact(item.productId, val);
                             }
                           }}

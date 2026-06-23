@@ -39,6 +39,8 @@ public class DemoSandboxMiddleware
                 path.Equals("/api/pos/create") ||
                 path.Equals("/api/pos/invoice") ||
                 path.Equals("/api/pos/calculate-cart") ||
+                path.StartsWith("/api/pos/invoices/hold") ||
+                path.Equals("/api/pos/invoices/held") ||
                 path.StartsWith("/api/pos/sync") ||
                 path.StartsWith("/api/pos/session/open") ||
                 path.StartsWith("/api/pos/session/close") ||

@@ -23,7 +23,7 @@ public class GetActivePosSessionQueryHandler : IRequestHandler<GetActivePosSessi
     public async Task<PosSession?> Handle(GetActivePosSessionQuery request, CancellationToken cancellationToken)
     {
         return await _context.PosSessions
-            .Where(s => s.TerminalId == request.TerminalId && s.CashierId == request.CashierId && s.Status == "OPEN")
+            .Where(s => s.TerminalId == request.TerminalId && s.Status == "OPEN")
             .OrderByDescending(s => s.StartTime)
             .FirstOrDefaultAsync(cancellationToken);
     }

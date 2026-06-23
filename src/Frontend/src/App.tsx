@@ -20,7 +20,13 @@ import {
   TrendingUp,
   TrendingDown,
   ShieldAlert,
-  Palette
+  Palette,
+  Wallet,
+  Landmark,
+  FileText,
+  PieChart,
+  BookOpen,
+  CalendarClock
 } from 'lucide-react';
 import { useAuthStore } from './features/auth/store/auth.store';
 import { Login } from './features/auth/routes/Login';
@@ -45,6 +51,24 @@ import { AiChat } from './features/ai/routes/AiChat';
 import { AiForecaster } from './features/ai/routes/AiForecaster';
 import { AiMarkdowns } from './features/ai/routes/AiMarkdowns';
 import { LossPreventionDashboard } from './features/analytics/components/LossPreventionDashboard';
+
+// Finance Phase F1
+import { FinanceDashboard } from './features/finance/components/FinanceDashboard';
+import { ChartOfAccounts } from './features/finance/components/ChartOfAccounts';
+import { JournalEntries } from './features/finance/components/JournalEntries';
+import { TrialBalance } from './features/finance/components/TrialBalance';
+import { ProfitAndLoss } from './features/finance/components/ProfitAndLoss';
+import { BalanceSheet } from './features/finance/components/BalanceSheet';
+
+// Finance Phase F2
+import { SupplierBills } from './features/finance/components/SupplierBills';
+import { SupplierPayments } from './features/finance/components/SupplierPayments';
+import { SupplierLedger } from './features/finance/components/SupplierLedger';
+import { APAging } from './features/finance/components/APAging';
+import { CustomerReceipts } from './features/finance/components/CustomerReceipts';
+import { CustomerLedger } from './features/finance/components/CustomerLedger';
+import { ARAging } from './features/finance/components/ARAging';
+import { CreditLimitMonitoring } from './features/finance/components/CreditLimitMonitoring';
 
 const AppLayout: React.FC = () => {
   const { user, clearAuth } = useAuthStore();
@@ -91,6 +115,26 @@ const AppLayout: React.FC = () => {
     { path: '/ai/markdowns', name: 'AI Smart Markdowns', icon: TrendingDown, roles: ['Owner', 'Manager'], category: 'ai' },
     { path: '/ai/invoice-extractor', name: 'AI Invoice Extractor', icon: Sparkles, roles: ['Owner', 'Manager'], category: 'ai' },
     { path: '/ai/loss-prevention', name: 'AI Fraud Detection', icon: ShieldAlert, roles: ['Owner', 'Manager'], category: 'ai' },
+
+    // Finance Phase F1
+    { path: '/finance/dashboard', name: 'Finance Dashboard', icon: PieChart, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/accounts', name: 'Chart of Accounts', icon: Landmark, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/journals', name: 'Journal Entries', icon: FileText, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/trial-balance', name: 'Trial Balance', icon: Wallet, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/profit-and-loss', name: 'Profit & Loss', icon: BarChart3, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/balance-sheet', name: 'Balance Sheet', icon: Landmark, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+
+    // Finance Phase F2 - AP
+    { path: '/finance/supplier-bills', name: 'Supplier Bills (AP)', icon: FileText, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/supplier-payments', name: 'Supplier Payments', icon: Banknote, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/supplier-ledger', name: 'Supplier Ledger', icon: BookOpen, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/ap-aging', name: 'AP Aging', icon: CalendarClock, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+
+    // Finance Phase F2 - AR
+    { path: '/finance/customer-receipts', name: 'Customer Receipts (AR)', icon: Banknote, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/customer-ledger', name: 'Customer Ledger', icon: BookOpen, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/ar-aging', name: 'AR Aging', icon: CalendarClock, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/credit-limit', name: 'Credit Monitoring', icon: ShieldAlert, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
   ];
 
   const filteredNavItems = navItems.filter(item => 
@@ -99,6 +143,7 @@ const AppLayout: React.FC = () => {
 
   const generalItems = filteredNavItems.filter(item => item.category === 'general');
   const aiItems = filteredNavItems.filter(item => item.category === 'ai');
+  const financeItems = filteredNavItems.filter(item => item.category === 'finance');
 
   return (
     <div className="flex h-screen bg-slate-100 dark:bg-slate-900 font-sans transition-colors duration-200 overflow-hidden">
@@ -138,6 +183,33 @@ const AppLayout: React.FC = () => {
               );
             })}
           </div>
+
+          {/* Finance Section */}
+          {financeItems.length > 0 && (
+            <div className="space-y-1">
+              <span className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider block mt-4 mb-2">
+                Finance & Accounting
+              </span>
+              {financeItems.map(item => {
+                const Icon = item.icon;
+                const isActive = location.pathname.startsWith(item.path);
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                      isActive 
+                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                    {item.name}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
 
           {/* AI Co-Pilot Section */}
           {aiItems.length > 0 && (
@@ -338,8 +410,26 @@ const AppLayout: React.FC = () => {
             <Route path="/settings" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <Settings />
             } />
-            <Route path="/" element={<Navigate to={user?.role === 'Cashier' ? "/pos" : "/dashboard"} replace />} />
-            <Route path="*" element={<Navigate to={user?.role === 'Cashier' ? "/pos" : "/dashboard"} replace />} />
+            {/* Finance F1 Routes */}
+            <Route path="/finance/dashboard" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><FinanceDashboard /></ProtectedRoute>} />
+            <Route path="/finance/accounts" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><ChartOfAccounts /></ProtectedRoute>} />
+            <Route path="/finance/journals" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><JournalEntries /></ProtectedRoute>} />
+            <Route path="/finance/trial-balance" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><TrialBalance /></ProtectedRoute>} />
+            <Route path="/finance/profit-and-loss" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><ProfitAndLoss /></ProtectedRoute>} />
+            <Route path="/finance/balance-sheet" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><BalanceSheet /></ProtectedRoute>} />
+            
+            {/* Finance F2 Routes */}
+            <Route path="/finance/supplier-bills" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><SupplierBills /></ProtectedRoute>} />
+            <Route path="/finance/supplier-payments" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><SupplierPayments /></ProtectedRoute>} />
+            <Route path="/finance/supplier-ledger" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><SupplierLedger /></ProtectedRoute>} />
+            <Route path="/finance/ap-aging" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><APAging /></ProtectedRoute>} />
+            <Route path="/finance/customer-receipts" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><CustomerReceipts /></ProtectedRoute>} />
+            <Route path="/finance/customer-ledger" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><CustomerLedger /></ProtectedRoute>} />
+            <Route path="/finance/ar-aging" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><ARAging /></ProtectedRoute>} />
+            <Route path="/finance/credit-limit" element={<ProtectedRoute allowedRoles={['Owner', 'Manager', 'Accountant']}><CreditLimitMonitoring /></ProtectedRoute>} />
+            
+            <Route path="/" element={<Navigate to={user?.role === 'Cashier' ? "/pos" : "/finance/dashboard"} replace />} />
+            <Route path="*" element={<Navigate to={user?.role === 'Cashier' ? "/pos" : "/finance/dashboard"} replace />} />
           </Routes>
         </main>
       </div>

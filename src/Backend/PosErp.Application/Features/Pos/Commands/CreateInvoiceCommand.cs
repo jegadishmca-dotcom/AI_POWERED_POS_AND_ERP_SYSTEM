@@ -13,6 +13,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using PosErp.Application.Features.Inventory.Services;
+using PosErp.Domain.Entities.Crm;
 
 namespace PosErp.Application.Features.Pos.Commands.SyncInvoices;
 
@@ -30,6 +31,7 @@ public record CreateInvoiceCommand(
     decimal NetPayable,
     string PaymentMode,
     List<InvoiceItemDto> Items,
+    decimal PointsRedeemed = 0,
     string? SupervisorOverridePin = null
 ) : IRequest<Guid>;
 
@@ -90,14 +92,17 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 }).ToList()
             };
 
-            cartEvaluation = await _offerEngine.EvaluateOffersAsync(cartEvaluation, customer?.Tier?.Name, request.PromoCode, cancellationToken);
+            bool isBirthday = customer?.Dob.HasValue == true && customer.Dob.Value.Month == DateTime.Today.Month;
+            bool isAnniversary = customer?.Anniversary.HasValue == true && customer.Anniversary.Value.Month == DateTime.Today.Month;
+
+            cartEvaluation = await _offerEngine.EvaluateOffersAsync(cartEvaluation, customer?.Tier?.Name, request.PromoCode, isBirthday, isAnniversary, cancellationToken);
 
             decimal totalTender = request.WalletAmountUsed + request.CashAmount + request.UpiAmount + request.CardAmount;
             if (request.PaymentMode == "CREDIT")
             {
                 if (customer == null)
                     throw new Exception("A customer must be selected for credit sales.");
-
+                    
                 var currentBalance = await _context.CustomerLedger
                     .Where(c => c.CustomerId == customer.Id)
                     .OrderByDescending(c => c.CreatedAt)
@@ -112,6 +117,34 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 // In a credit sale, the remaining amount is charged to credit
                 totalTender += (request.NetPayable - request.WalletAmountUsed);
             }
+
+            // Loyalty Redemption Validation
+            var loyaltyConfig = await _context.LoyaltyProgramConfigs.FirstOrDefaultAsync(cancellationToken);
+            if (request.PointsRedeemed > 0)
+            {
+                if (customer == null) throw new Exception("Customer required for points redemption.");
+                if (customer.MembershipStatus == "Blocked" || customer.MembershipStatus == "Inactive")
+                    throw new Exception("Customer account is not eligible for points redemption.");
+                    
+                if (customer.RunningLoyaltyPoints < request.PointsRedeemed)
+                    throw new Exception("Insufficient points balance.");
+                    
+                if (loyaltyConfig != null)
+                {
+                    // Check max % redemption limit
+                    decimal maxAllowedDiscount = (request.NetPayable * loyaltyConfig.MaxRedemptionPercentagePerInvoice) / 100m;
+                    decimal discountValue = (request.PointsRedeemed / loyaltyConfig.RedeemRatioPoints) * loyaltyConfig.RedeemRatioDiscountAmount;
+                    
+                    if (discountValue > maxAllowedDiscount)
+                        throw new Exception($"Redemption exceeds maximum allowed limit of {loyaltyConfig.MaxRedemptionPercentagePerInvoice}% per invoice.");
+                        
+                    // Check daily max limit (simplified check, real app would sum today's redemptions)
+                    if (request.PointsRedeemed > loyaltyConfig.MaxRedemptionPerDay)
+                        throw new Exception($"Redemption exceeds daily limit of {loyaltyConfig.MaxRedemptionPerDay} points.");
+                }
+            }
+
+
 
             // M3: validate against NetPayable (what frontend computed as the final bill amount)
             // Allow a small ₹1 tolerance for rounding edge-cases on split payments
@@ -218,10 +251,63 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             // but TotalAmount without round-off is used for revenue reporting accuracy.
 
             _context.Invoices.Add(invoice);
+            
+            Guid storeId = Guid.Empty;
+            // Record Offer Usage Logs
+            if (cartEvaluation.AppliedOfferIds.Any())
+            {
+                var distinctAppliedOffers = cartEvaluation.Items
+                    .Where(i => i.AppliedOfferId.HasValue)
+                    .GroupBy(i => new { i.AppliedOfferId, i.AppliedOfferName })
+                    .Select(g => new
+                    {
+                        OfferId = g.Key.AppliedOfferId!.Value,
+                        OfferName = g.Key.AppliedOfferName!,
+                        DiscountAmount = g.Sum(i => i.DiscountAmount)
+                    })
+                    .ToList();
+
+                // Fetch terminal for name
+                var terminal = await _context.Terminals.FindAsync(request.TerminalId);
+                var terminalName = terminal?.Name ?? "Unknown";
+
+                decimal originalCartVal = cartEvaluation.Items.Sum(i => i.LineTotal);
+                decimal finalCartVal = invoice.TotalAmount; // the final amount
+
+                foreach (var applied in distinctAppliedOffers)
+                {
+                    // get version from offer versions
+                    var version = await _context.OfferVersions
+                        .Where(v => v.OfferId == applied.OfferId)
+                        .OrderByDescending(v => v.VersionNumber)
+                        .Select(v => v.VersionNumber)
+                        .FirstOrDefaultAsync();
+
+                    _context.OfferUsageLogs.Add(new Domain.Entities.Offers.OfferUsageLog
+                    {
+                        Id = Guid.NewGuid(),
+                        OfferId = applied.OfferId,
+                        OfferName = applied.OfferName,
+                        OfferVersion = version > 0 ? version : 1,
+                        InvoiceId = invoice.Id,
+                        InvoiceNumber = invoice.InvoiceNumber,
+                        InvoiceDate = invoice.CreatedAt,
+                        CustomerId = invoice.CustomerId,
+                        TerminalId = invoice.TerminalId,
+                        TerminalName = terminalName,
+                        CashierId = invoice.CashierId,
+                        StoreId = storeId,
+                        DiscountAmount = applied.DiscountAmount,
+                        OriginalCartValue = originalCartVal,
+                        FinalCartValue = finalCartVal,
+                        RevenueInfluenced = finalCartVal
+                    });
+                }
+            }
+
             await _context.SaveChangesAsync(cancellationToken); 
 
             // Deduct Stock
-            Guid storeId = Guid.Empty;
             var rules = InventoryRulesManager.GetRules();
 
             if (rules.PreventNegativeStock)
@@ -357,6 +443,28 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
             if (request.WalletAmountUsed > 0 && customer != null)
                 await _walletService.RecordTransactionAsync(customer.Id, null, "SPEND", -request.WalletAmountUsed, finalInvoiceRef, null, cancellationToken);
+
+            if (request.PointsRedeemed > 0 && customer != null)
+            {
+                decimal currentPts = customer.RunningLoyaltyPoints;
+                customer.RunningLoyaltyPoints -= request.PointsRedeemed;
+                customer.LastRedemptionDate = DateTime.UtcNow;
+                
+                var ptsLedger = new LoyaltyLedgerEntry
+                {
+                    CustomerId = customer.Id,
+                    StoreId = Guid.Empty, // Default store for now
+                    TransactionType = "Redeem Points",
+                    PointsEarned = 0,
+                    PointsRedeemed = request.PointsRedeemed,
+                    PreviousBalance = currentPts,
+                    BalanceAfterTransaction = customer.RunningLoyaltyPoints,
+                    InvoiceId = invoice.Id,
+                    ReferenceDocument = finalInvoiceRef,
+                    Remarks = $"Redeemed {request.PointsRedeemed} points during checkout."
+                };
+                _context.LoyaltyLedger.Add(ptsLedger);
+            }
 
             // C6: Loyalty points calculated on NetPayable (actual amount charged)
             // This call is AFTER invoice.TotalAmount is set (post-items-loop), so points are non-zero

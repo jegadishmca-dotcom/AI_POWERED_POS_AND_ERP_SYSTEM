@@ -45,8 +45,8 @@ export const HoldResumeModal = ({ isOpen, onClose, onResume }: any) => {
                          </span>
                        )}
                      </div>
-                     <p className="text-sm text-gray-500">{new Date(inv.businessDate).toLocaleString()}</p>
-                     <p className="text-sm text-gray-700 mt-1">{inv.items.length} items | Total: ₹{inv.totalAmount.toFixed(2)}</p>
+                     <p className="text-sm text-gray-500">{new Date(inv.businessDate || new Date()).toLocaleString()}</p>
+                     <p className="text-sm text-gray-700 mt-1">{(inv.items || []).length} items | Total: ₹{(inv.totalAmount || 0).toFixed(2)}</p>
                   </div>
                   <button onClick={() => handleResume(inv)} className="bg-emerald-600 hover:bg-emerald-700 text-white p-3 rounded-full shadow-lg">
                     <Play fill="white" className="w-5 h-5" />

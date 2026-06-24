@@ -149,7 +149,7 @@ public class AiAlert
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid? StoreId { get; set; }
     public string AlertType { get; set; } = string.Empty; // SHRINKAGE, EXPIRY, ANOMALY, BUDGET_OVERRUN
-    public string Severity { get; set; } = string.Empty; // CRITICAL, WARNING, INFO
+    public string AlertSeverity { get; set; } = string.Empty; // CRITICAL, HIGH, MEDIUM, LOW
     public string Title { get; set; } = string.Empty;
     public string Message { get; set; } = string.Empty;
     public bool IsRead { get; set; } = false;
@@ -163,4 +163,110 @@ public class AiAlert
 
     [ForeignKey("ResolvedBy")]
     public User? ResolvedByUser { get; set; }
+}
+
+public class ExecutiveKpiSnapshot
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public DateTime SnapshotDate { get; set; }
+    public decimal DailySales { get; set; }
+    public decimal DailyProfit { get; set; }
+    public decimal GrossMarginPct { get; set; }
+    public decimal TotalInventoryValue { get; set; }
+    public decimal DeadStockValue { get; set; }
+    public int ActiveLoyaltyMembers { get; set; }
+    public int ActiveCustomers { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class ForecastAccuracySnapshot
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public DateTime SnapshotDate { get; set; }
+    public string ModelVersion { get; set; } = string.Empty;
+    public decimal MeanAbsolutePercentageError { get; set; } // MAPE
+    public decimal MeanAbsoluteError { get; set; } // MAE
+    public decimal RootMeanSquareError { get; set; } // RMSE
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class AiBusinessInsight
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string InsightCategory { get; set; } = string.Empty; // Risk, Opportunity, Observation
+    public string BusinessArea { get; set; } = string.Empty; // Sales, Inventory, Procurement, Loyalty, Finance
+    public string Title { get; set; } = string.Empty;
+    public string Description { get; set; } = string.Empty;
+    
+    public int ImpactScore { get; set; } // 0-100
+    public int ConfidenceScore { get; set; } // 0-100
+    public decimal EstimatedFinancialImpact { get; set; }
+    public string RecommendedAction { get; set; } = string.Empty;
+    
+    // Explainability
+    public string GenerationReasoning { get; set; } = string.Empty;
+    
+    // References
+    public string? ReferenceType { get; set; } // Product, Supplier, Customer
+    public Guid? ReferenceId { get; set; }
+    
+    // Lifecycle Management
+    public string Status { get; set; } = "NEW"; // NEW, ACKNOWLEDGED, IN_PROGRESS, RESOLVED, IGNORED
+    public Guid? AssignedTo { get; set; }
+    public DateTime? ResolvedDate { get; set; }
+    public string? ResolutionNotes { get; set; }
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class AiDemandForecast
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string ForecastType { get; set; } = "PRODUCT"; // PRODUCT, CATEGORY, STORE, SUPPLIER
+    public Guid? ReferenceId { get; set; }
+    public DateTime ForecastDate { get; set; }
+    
+    public int ForecastHorizonDays { get; set; }
+    public string ForecastMethod { get; set; } = string.Empty;
+    
+    public decimal ForecastQuantity { get; set; }
+    public decimal? ActualQuantity { get; set; }
+    public decimal? ForecastError { get; set; }
+    
+    public decimal ConfidenceLevel { get; set; }
+    public string ModelVersion { get; set; } = string.Empty;
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class AiCustomerIntelligence
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid CustomerId { get; set; }
+    public string SegmentType { get; set; } = string.Empty; // VIP, High Value, At Risk, Dormant
+    public decimal ChurnRiskPct { get; set; }
+    public decimal LtvPrediction { get; set; }
+    public string LifetimeValueCategory { get; set; } = string.Empty;
+    
+    public DateTime? PredictedNextPurchaseDate { get; set; }
+    public string ChurnCategory { get; set; } = string.Empty;
+    public string RecommendedAction { get; set; } = string.Empty;
+    
+    public DateTime LastCalculatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class AiStorePerformance
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid StoreId { get; set; }
+    public string MetricName { get; set; } = string.Empty;
+    public decimal MetricValue { get; set; }
+    public decimal BenchmarkValue { get; set; }
+    public decimal Variance { get; set; }
+    
+    public int Rank { get; set; }
+    public string BenchmarkGroup { get; set; } = string.Empty; // Store, Region, Category
+    public decimal Percentile { get; set; }
+    
+    public DateTime CalculatedAt { get; set; } = DateTime.UtcNow;
 }

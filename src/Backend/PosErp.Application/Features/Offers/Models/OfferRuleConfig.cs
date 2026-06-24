@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 
 namespace PosErp.Application.Features.Offers.Models;
@@ -16,6 +16,8 @@ public class OfferConditions
     public List<Guid>? RequiredCategoryIds { get; set; }
     public string? RequiredCustomerTier { get; set; }
     public decimal? MinQuantity { get; set; } // For slab/BOGO
+    public bool IsBirthdayOffer { get; set; } = false;
+    public bool IsAnniversaryOffer { get; set; } = false;
 }
 
 public class OfferReward
@@ -36,6 +38,7 @@ public class CartEvaluationDto
     public decimal FinalTotal { get; set; }
     public string? AppliedPromoCode { get; set; }
     public List<string> AppliedOfferNames { get; set; } = new();
+    public List<Guid> AppliedOfferIds { get; set; } = new();
 }
 
 public class CartItemEvaluationDto
@@ -48,4 +51,5 @@ public class CartItemEvaluationDto
     public decimal DiscountAmount { get; set; }
     public decimal FinalLineTotal { get; set; }
     public string? AppliedOfferName { get; set; }
+    public Guid? AppliedOfferId { get; set; }
 }

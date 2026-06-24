@@ -1,8 +1,10 @@
 using System;
 
+using PosErp.Domain.Entities.Common;
+
 namespace PosErp.Domain.Entities.Auth;
 
-public class Store
+public class Store : ITenantEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public string StoreCode { get; set; } = string.Empty;
@@ -20,4 +22,5 @@ public class Store
     public Guid? UpdatedBy { get; set; }
     public bool IsDeleted { get; set; } = false;
     public DateTime? DeletedAt { get; set; }
+    public Guid TenantId { get; set; }
 }

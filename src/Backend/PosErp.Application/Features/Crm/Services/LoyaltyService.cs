@@ -10,7 +10,7 @@ namespace PosErp.Application.Features.Crm.Services;
 
 public interface ILoyaltyService
 {
-    Task<decimal> RecordPointsAsync(Guid customerId, Guid? storeId, string transactionType, decimal points, string referenceDocument, Guid? userId, CancellationToken cancellationToken);
+    Task<decimal> RecordPointsAsync(Guid customerId, Guid? storeId, string transactionType, decimal pointsEarned, decimal pointsRedeemed, string referenceDocument, string remarks, Guid? invoiceId, Guid? userId, CancellationToken cancellationToken);
     Task CalculateAndAwardPointsForInvoiceAsync(Guid invoiceId, Guid customerId, decimal invoiceTotal, CancellationToken cancellationToken);
 }
 
@@ -23,39 +23,51 @@ public class LoyaltyService : ILoyaltyService
         _context = context;
     }
 
-    public async Task<decimal> RecordPointsAsync(Guid customerId, Guid? storeId, string transactionType, decimal points, string referenceDocument, Guid? userId, CancellationToken cancellationToken)
+    public async Task<decimal> RecordPointsAsync(Guid customerId, Guid? storeId, string transactionType, decimal pointsEarned, decimal pointsRedeemed, string referenceDocument, string remarks, Guid? invoiceId, Guid? userId, CancellationToken cancellationToken)
     {
         var customer = await _context.Customers.FindAsync(new object[] { customerId }, cancellationToken);
         if (customer == null) throw new Exception("Customer not found.");
 
-        var lastEntry = await _context.LoyaltyLedger
-            .Where(l => l.CustomerId == customerId)
-            .OrderByDescending(l => l.CreatedAt)
-            .FirstOrDefaultAsync(cancellationToken);
+        if (customer.MembershipStatus == "Blocked")
+        {
+            if (pointsRedeemed > 0) throw new Exception("Blocked customers cannot redeem points.");
+        }
 
-        decimal currentPoints = lastEntry?.RunningPoints ?? 0;
+        var config = await _context.LoyaltyProgramConfigs.FirstOrDefaultAsync(cancellationToken);
 
-        if (transactionType == "BURN" && currentPoints + points < 0)
+        decimal currentPoints = customer.RunningLoyaltyPoints;
+
+        if (pointsRedeemed > 0 && currentPoints < pointsRedeemed)
         {
             throw new Exception("Insufficient loyalty points.");
         }
 
-        decimal newPoints = currentPoints + points;
+        decimal newPoints = currentPoints + pointsEarned - pointsRedeemed;
 
         var entry = new LoyaltyLedgerEntry
         {
             CustomerId = customerId,
             StoreId = storeId,
-            TransactionType = transactionType, // EARN (+), BURN (-), EXPIRED (-)
-            Points = points,
+            TransactionType = transactionType, // Earn Points, Redeem Points, Manual Adjustment, etc.
+            PointsEarned = pointsEarned,
+            PointsRedeemed = pointsRedeemed,
+            PreviousBalance = currentPoints,
+            BalanceAfterTransaction = newPoints,
             ReferenceDocument = referenceDocument,
-            ExpiryDate = transactionType == "EARN" ? DateTime.SpecifyKind(DateTime.UtcNow.Date.AddDays(365), DateTimeKind.Unspecified) : null,
-            RunningPoints = newPoints,
+            InvoiceId = invoiceId,
+            Remarks = remarks,
+            ExpiryDate = (pointsEarned > 0 && config != null && config.EnablePointExpiry) 
+                         ? DateTime.UtcNow.AddMonths(config.ExpiryMonths) 
+                         : null,
             CreatedBy = userId
         };
 
         _context.LoyaltyLedger.Add(entry);
         customer.RunningLoyaltyPoints = newPoints;
+        customer.LifetimePointsEarned += pointsEarned;
+        
+        if (pointsEarned > 0) customer.LastPointsEarnedDate = DateTime.UtcNow;
+        if (pointsRedeemed > 0) customer.LastRedemptionDate = DateTime.UtcNow;
 
         return newPoints;
     }
@@ -65,8 +77,11 @@ public class LoyaltyService : ILoyaltyService
         var customer = await _context.Customers.Include(c => c.Tier).FirstOrDefaultAsync(c => c.Id == customerId, cancellationToken);
         if (customer == null) return;
 
-        // Base Earn Rate: e.g. 1 point per 100 Rupees
-        decimal basePoints = invoiceTotal / 100m;
+        var config = await _context.LoyaltyProgramConfigs.FirstOrDefaultAsync(cancellationToken);
+        if (config == null) return;
+        
+        decimal earnRatioSpendAmount = config.EarnRatioSpendAmount > 0 ? config.EarnRatioSpendAmount : 100m;
+        decimal basePoints = (invoiceTotal / earnRatioSpendAmount) * config.EarnRatioPoints;
         
         // Apply Tier Multiplier
         decimal multiplier = customer.Tier?.PointsEarnMultiplier ?? 1.0m;
@@ -74,7 +89,26 @@ public class LoyaltyService : ILoyaltyService
 
         if (earnedPoints > 0)
         {
-            await RecordPointsAsync(customerId, null, "EARN", earnedPoints, $"INV-{invoiceId}", null, cancellationToken);
+            await RecordPointsAsync(customerId, null, "Earn Points", earnedPoints, 0, $"INV-{invoiceId}", "Points earned from purchase", invoiceId, null, cancellationToken);
+        }
+        
+        // Auto Tier Evaluation (Upgrade only on checkout)
+        if (config.EnableAutoTierEvaluation)
+        {
+            var tiers = await _context.CustomerTiers.OrderByDescending(t => t.MinimumSpend).ToListAsync(cancellationToken);
+            foreach (var tier in tiers)
+            {
+                if (customer.LifetimeSpend >= tier.MinimumSpend)
+                {
+                    if (customer.CustomerTierId != tier.Id)
+                    {
+                        customer.CustomerTierId = tier.Id;
+                        await RecordPointsAsync(customerId, null, "Tier Upgrade Bonus", 0, 0, "", $"Upgraded to {tier.Name}", null, null, cancellationToken);
+                        // In real system, we'd trigger INotificationService here
+                    }
+                    break;
+                }
+            }
         }
     }
 }

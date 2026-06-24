@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 
 namespace PosErp.Domain.Entities.Offers;
 
@@ -21,5 +21,15 @@ public class Offer
     public DateTime EndDate { get; set; }
     
     public bool IsActive { get; set; } = true;
+    
+    // Multi-Store Support
+    public Guid? StoreId { get; set; } // Null if Global Offer
+    
+    // Audit Trail
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public Guid? CreatedBy { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public Guid? UpdatedBy { get; set; }
+    public Guid? ActivatedBy { get; set; }
+    public Guid? DeactivatedBy { get; set; }
 }

@@ -422,6 +422,8 @@ export const PosTerminal = () => {
     finalTotal: 0,
     appliedOfferNames: []
   });
+  const [suppressOffers, setSuppressOffers] = useState(false);
+  const [pointsRedeemed, setPointsRedeemed] = useState<number>(0);
 
   const recalculateCart = useCallback(async (items: any[], overrideCustomerId?: string | null) => {
     if (items.length === 0) {
@@ -472,7 +474,8 @@ export const PosTerminal = () => {
       const payload = {
         items: items.map(i => ({ productId: i.productId, quantity: i.qty === '' ? 0 : Number(i.qty) })),
         promoCode: promoCode,
-        customerId: overrideCustomerId !== undefined ? (overrideCustomerId || undefined) : customer?.id
+        customerId: overrideCustomerId !== undefined ? (overrideCustomerId || undefined) : customer?.id,
+        suppressOffers: suppressOffers
       };
 
       const data = await calculateCart(payload);
@@ -515,7 +518,12 @@ export const PosTerminal = () => {
     if (cart.items.length > 0) {
       recalculateCart(cart.items);
     }
-  }, [recalculateCart]);
+  }, [recalculateCart, suppressOffers]);
+
+  // If suppressOffers changes, recalculate cart
+  useEffect(() => {
+    recalculateCart(cart.items);
+  }, [suppressOffers]);
 
   const updateItemBatch = (productId: string, batchId: string) => {
     const updatedItems = cart.items.map((item: any) => {
@@ -689,7 +697,15 @@ export const PosTerminal = () => {
 
   const handleResumeCart = (invoice: any) => {
       setCart({
-          items: invoice.items,
+          items: (invoice.items || []).map((i: any) => ({
+             ...i,
+             id: i.id || crypto.randomUUID(),
+             qty: i.qty ?? 0,
+             unitPrice: i.unitPrice ?? 0,
+             lineTotal: i.lineTotal ?? 0,
+             finalLineTotal: i.finalLineTotal ?? 0,
+             discountAmount: i.discountAmount ?? 0
+          })),
           subtotal: 0, 
           totalDiscount: 0,
           taxTotal: 0,
@@ -931,16 +947,45 @@ export const PosTerminal = () => {
           </div>
 
           {customer && (
-            <div className="flex items-center gap-4 bg-white p-2 rounded shadow-sm border border-indigo-200">
-              <div>
-                <p className="font-bold text-slate-800 text-sm">{customer.name} <span className="bg-yellow-100 text-yellow-800 text-xs px-1 rounded ml-1">{customer.tier}</span></p>
-                <p className="text-xs text-gray-500">{customer.phone}</p>
+            <div className="flex items-center gap-4 bg-white p-2 rounded shadow-sm border border-indigo-200 w-full ml-4">
+              <div className="flex-1">
+                <p className="font-bold text-slate-800 text-sm flex items-center">
+                  {customer.name} 
+                  {customer.tier && <span className="bg-yellow-100 text-yellow-800 text-xs px-2 py-0.5 rounded ml-2 font-bold flex items-center shadow-sm"><Award className="w-3 h-3 mr-1"/>{customer.tier}</span>}
+                </p>
+                <p className="text-xs text-gray-500 mt-0.5 font-medium">{customer.phone}</p>
               </div>
-              <div className="text-right border-l pl-3">
-                <p className="text-xs text-gray-600 flex items-center justify-end"><Wallet className="w-3 h-3 mr-1 text-blue-500"/> ₹{customer.walletBalance}</p>
-                <p className="text-xs text-gray-600 flex items-center justify-end"><Award className="w-3 h-3 mr-1 text-orange-500"/> {customer.points} Pts</p>
+              <div className="flex items-center gap-4 border-l pl-4">
+                <div className="text-right">
+                  <p className="text-xs text-gray-500 mb-1">Wallet</p>
+                  <p className="text-sm text-blue-600 font-bold flex items-center justify-end"><Wallet className="w-4 h-4 mr-1"/> ₹{customer.walletBalance}</p>
+                </div>
+                <div className="text-right border-l pl-4">
+                  <p className="text-xs text-gray-500 mb-1">Loyalty</p>
+                  <p className="text-sm text-orange-600 font-bold flex items-center justify-end"><Award className="w-4 h-4 mr-1"/> {customer.points} Pts</p>
+                </div>
+                
+                {customer.points > 0 && (
+                  <button 
+                    onClick={() => {
+                      const pts = prompt(`Available Points: ${customer.points}\nConversion: 10 Points = 1 Rs\n\nEnter points to redeem:`, "0");
+                      if (pts && !isNaN(Number(pts))) {
+                        const numPts = Number(pts);
+                        if (numPts <= customer.points) {
+                          setPointsRedeemed(numPts);
+                        } else {
+                          alert("Insufficient points");
+                        }
+                      }
+                    }}
+                    className="ml-2 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white px-3 py-1.5 rounded text-xs font-bold shadow transition flex items-center"
+                  >
+                    <Tag className="w-3 h-3 mr-1"/> Redeem Pts
+                  </button>
+                )}
+                
+                <button onClick={() => { setCustomer(null); setCustomerQuery(''); setPointsRedeemed(0); }} className="text-gray-400 hover:text-red-500 ml-2 p-1 bg-red-50 hover:bg-red-100 rounded transition"><X className="w-4 h-4"/></button>
               </div>
-              <button onClick={() => { setCustomer(null); setCustomerQuery(''); }} className="text-gray-400 hover:text-red-500 ml-2"><X className="w-5 h-5"/></button>
             </div>
           )}
         </div>
@@ -1178,12 +1223,49 @@ export const PosTerminal = () => {
           </div>
 
           <div className="flex justify-between text-lg mb-2"><span>Subtotal</span><span className="font-bold text-slate-700">₹{cart.subtotal.toFixed(2)}</span></div>
-          <div className="flex justify-between text-lg mb-2 text-emerald-600">
+          <div className="flex justify-between text-lg mb-2 text-emerald-600 group relative">
             <span>Discounts</span>
-            <span className="font-bold">-₹{cart.totalDiscount.toFixed(2)}</span>
+            <div className="flex items-center gap-2">
+              <span className="font-bold cursor-help">-₹{cart.totalDiscount.toFixed(2)}</span>
+            </div>
           </div>
-          {cart.appliedOfferNames.length > 0 && (
-             <div className="text-xs text-emerald-600 mb-2 italic">Applied: {cart.appliedOfferNames.join(', ')}</div>
+          
+          {pointsRedeemed > 0 && (
+            <div className="flex justify-between text-lg mb-2 text-indigo-600">
+              <span>Points Redeemed ({pointsRedeemed})</span>
+              <span className="font-bold">-₹{(pointsRedeemed / 10).toFixed(2)}</span> {/* Assumption: 10 points = 1 Rs. Actual ratio via backend */}
+            </div>
+          )}
+
+          {cart.appliedOfferNames.length > 0 && !suppressOffers && (
+            <div className="bg-emerald-50 text-emerald-700 p-2 rounded-lg text-sm mb-3 shadow-sm border border-emerald-100 flex justify-between items-start">
+              <div>
+                <span className="font-bold block mb-1">Offer(s) Applied:</span>
+                <ul className="space-y-1">
+                  {cart.appliedOfferNames.map((o: string) => (
+                    <li key={o} className="flex items-center gap-1">
+                      <Tag className="w-3 h-3" /> {o}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <button 
+                onClick={() => requestManagerOverride('Remove Offers', () => setSuppressOffers(true))} 
+                className="text-emerald-700 hover:text-emerald-900 bg-emerald-100 hover:bg-emerald-200 p-1.5 rounded text-xs font-bold flex items-center transition-colors"
+                title="Remove Offers (Manager Override)"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+
+          {suppressOffers && (
+            <div className="bg-slate-100 text-slate-600 p-2 rounded-lg text-sm mb-3 flex justify-between items-center border border-slate-200">
+              <span className="italic text-xs">Offers Suppressed</span>
+              <button onClick={() => setSuppressOffers(false)} className="text-xs text-indigo-600 hover:underline font-bold">
+                 Reapply Offers
+              </button>
+            </div>
           )}
           
           <div className="flex justify-between text-lg mb-6"><span>Tax (GST)</span><span>₹{cart.taxTotal.toFixed(2)}</span></div>
@@ -1249,6 +1331,7 @@ export const PosTerminal = () => {
               roundOff: roundOffVal,
               netPayable: netPayableVal,
               paymentMode: paymentModeVal,
+              pointsRedeemed: pointsRedeemed || 0,
               items: cart.items.map((item: any) => ({
                 productId: item.productId,
                 quantity: item.qty,
@@ -1440,8 +1523,25 @@ export const PosTerminal = () => {
         isOpen={isManagerModalOpen}
         onClose={() => setManagerModalOpen(false)}
         actionName={managerAction?.name}
-        onSuccess={(pin?: string) => {
+        onSuccess={async (pin?: string) => {
             setManagerModalOpen(false);
+            try {
+              // Log to backend
+              await fetch('/api/pos/audit/override', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${localStorage.getItem('token')}`
+                },
+                body: JSON.stringify({
+                  action: managerAction?.name || 'Unknown Action',
+                  reason: 'Manager PIN authenticated',
+                  details: `Terminal: ${terminalId}, Cashier: ${cashierId}`
+                })
+              });
+            } catch (err) {
+              console.warn('Failed to audit log manager override', err);
+            }
             managerAction?.callback(pin);
             setManagerAction(null);
         }}

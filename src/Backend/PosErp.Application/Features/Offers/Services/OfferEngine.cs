@@ -14,7 +14,7 @@ namespace PosErp.Application.Features.Offers.Services;
 
 public interface IOfferEngine
 {
-    Task<CartEvaluationDto> EvaluateOffersAsync(CartEvaluationDto cart, string? customerTier, string? promoCode, CancellationToken cancellationToken);
+    Task<CartEvaluationDto> EvaluateOffersAsync(CartEvaluationDto cart, string? customerTier, string? promoCode, bool isBirthday, bool isAnniversary, CancellationToken cancellationToken);
     Task<List<Offer>> GetActiveOffersAsync(CancellationToken cancellationToken);
 }
 
@@ -48,7 +48,7 @@ public class OfferEngine : IOfferEngine
         return offers;
     }
 
-    public async Task<CartEvaluationDto> EvaluateOffersAsync(CartEvaluationDto originalCart, string? customerTier, string? promoCode, CancellationToken cancellationToken)
+    public async Task<CartEvaluationDto> EvaluateOffersAsync(CartEvaluationDto originalCart, string? customerTier, string? promoCode, bool isBirthday, bool isAnniversary, CancellationToken cancellationToken)
     {
         var activeOffers = await GetActiveOffersAsync(cancellationToken);
         
@@ -62,13 +62,13 @@ public class OfferEngine : IOfferEngine
         var exclusiveOffers = applicableOffers.Where(o => o.IsExclusive || !o.IsStackable).ToList();
 
         // 1. Evaluate Stackable first as baseline
-        var bestCart = EvaluateOfferCombination(originalCart, stackableOffers, customerTier, promoCode);
+        var bestCart = EvaluateOfferCombination(originalCart, stackableOffers, customerTier, promoCode, isBirthday, isAnniversary);
 
         // 2. Evaluate each exclusive/non-stackable offer INDIVIDUALLY to find the absolute BEST discount for the customer
         foreach (var exclusive in exclusiveOffers)
         {
             // Evaluate this exclusive offer ON ITS OWN against the original cart
-            var testCart = EvaluateOfferCombination(originalCart, new List<Offer> { exclusive }, customerTier, promoCode);
+            var testCart = EvaluateOfferCombination(originalCart, new List<Offer> { exclusive }, customerTier, promoCode, isBirthday, isAnniversary);
             
             // If this single exclusive offer gives a better discount than all stackable combined, it wins
             if (testCart.TotalDiscount > bestCart.TotalDiscount)
@@ -113,7 +113,7 @@ public class OfferEngine : IOfferEngine
         return bestCart;
     }
 
-    private CartEvaluationDto EvaluateOfferCombination(CartEvaluationDto originalCart, List<Offer> offers, string? customerTier, string? promoCode)
+    private CartEvaluationDto EvaluateOfferCombination(CartEvaluationDto originalCart, List<Offer> offers, string? customerTier, string? promoCode, bool isBirthday, bool isAnniversary)
     {
         // Deep copy the cart to avoid mutating the original during test evaluations
         var cart = new CartEvaluationDto
@@ -140,6 +140,8 @@ public class OfferEngine : IOfferEngine
             
             if (config.Conditions.MinCartValue.HasValue && cart.Subtotal < config.Conditions.MinCartValue) continue;
             if (!string.IsNullOrEmpty(config.Conditions.RequiredCustomerTier) && config.Conditions.RequiredCustomerTier != customerTier) continue;
+            if (config.Conditions.IsBirthdayOffer && !isBirthday) continue;
+            if (config.Conditions.IsAnniversaryOffer && !isAnniversary) continue;
 
             bool offerApplied = false;
 
@@ -164,6 +166,7 @@ public class OfferEngine : IOfferEngine
                         item.DiscountAmount += itemDiscount;
                         item.FinalLineTotal = item.LineTotal - item.DiscountAmount;
                         item.AppliedOfferName = offer.Name;
+                        item.AppliedOfferId = offer.Id;
                         offerApplied = true;
                     }
                 }
@@ -188,6 +191,7 @@ public class OfferEngine : IOfferEngine
                          item.FinalLineTotal = item.LineTotal - item.DiscountAmount;
                          if (item.FinalLineTotal < 0) item.FinalLineTotal = 0;
                          item.AppliedOfferName = offer.Name;
+                         item.AppliedOfferId = offer.Id;
                      }
                      offerApplied = true;
                  }
@@ -196,6 +200,7 @@ public class OfferEngine : IOfferEngine
             if (offerApplied)
             {
                 cart.AppliedOfferNames.Add(offer.Name);
+                cart.AppliedOfferIds.Add(offer.Id);
                 if (offer.PromoCode == promoCode) cart.AppliedPromoCode = promoCode;
             }
         }

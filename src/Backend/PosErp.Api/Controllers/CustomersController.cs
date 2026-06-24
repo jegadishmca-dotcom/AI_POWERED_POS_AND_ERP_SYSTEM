@@ -32,4 +32,14 @@ public class CustomersController : ControllerBase
         var result = await _mediator.Send(command);
         return Ok(result);
     }
+
+    public class MergeRequest { public System.Guid TargetCustomerId { get; set; } }
+
+    [HttpPost("{id}/merge")]
+    [Authorize(Roles = "Owner,Manager")]
+    public async Task<IActionResult> Merge(System.Guid id, [FromBody] MergeRequest req)
+    {
+        var result = await _mediator.Send(new PosErp.Application.Features.Crm.Commands.MergeCustomersCommand(id, req.TargetCustomerId));
+        return Ok(result);
+    }
 }

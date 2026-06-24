@@ -8,11 +8,17 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.EntityFrameworkCore;
 using StackExchange.Redis;
+using Polly;
 using PosErp.Api.Middlewares;
 using PosErp.Application.Interfaces;
+using PosErp.Infrastructure.Services;
+using PosErp.Application.Features.Auth.Interfaces;
 using PosErp.Infrastructure.Persistence;
 using PosErp.Infrastructure.Authentication;
 using PosErp.Infrastructure.Identity;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+using OpenTelemetry.Resources;
 using PosErp.Infrastructure.Printing;
 using PosErp.Application.Features.Inventory.Services;
 using PosErp.Application.Features.Offers.Services;
@@ -29,7 +35,11 @@ var builder = WebApplication.CreateBuilder(args);
 // Add Database Context (PostgreSQL via PgBouncer / direct connection string)
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
-        npgsqlOptions => npgsqlOptions.CommandTimeout(180)));
+        npgsqlOptions => 
+        {
+            npgsqlOptions.CommandTimeout(180);
+            npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null);
+        }));
 
 builder.Services.AddScoped<IApplicationDbContext>(provider => 
     provider.GetRequiredService<ApplicationDbContext>());
@@ -52,10 +62,55 @@ builder.Services.AddHangfireServer(options =>
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddHttpClient();
+
+// Phase 6: Reliability - Polly Circuit Breakers & Retries
+builder.Services.AddHttpClient("ExternalApis")
+    .AddTransientHttpErrorPolicy(policyBuilder => policyBuilder.WaitAndRetryAsync(3, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt))))
+    .AddTransientHttpErrorPolicy(policyBuilder => policyBuilder.CircuitBreakerAsync(5, TimeSpan.FromSeconds(30)));
 
 // Health Checks
-builder.Services.AddHealthChecks();
+var connectionString = builder.Configuration.GetConnectionString("DefaultConnection") ?? "Host=localhost;Database=poserp;Username=postgres;Password=postgres";
+string redisConnStr = builder.Configuration.GetSection("Redis:ConnectionString").Value ?? "localhost:6379";
+builder.Services.AddHealthChecks()
+    .AddNpgSql(connectionString, name: "Database")
+    .AddRedis(redisConnStr, name: "RedisCache")
+    .AddHangfire(options => { options.MinimumAvailableServers = 1; }, name: "Hangfire");
+
+// Phase 6: Monitoring - OpenTelemetry
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource.AddService("PosErp.Api"))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+    )
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddRuntimeInstrumentation()
+    );
+
+// Phase 6: Rate Limiting
+builder.Services.AddRateLimiter(options =>
+{
+    options.AddFixedWindowLimiter("PosApi", opt =>
+    {
+        opt.PermitLimit = 100;
+        opt.Window = TimeSpan.FromSeconds(1);
+    });
+    options.AddFixedWindowLimiter("AiApi", opt =>
+    {
+        opt.PermitLimit = 20;
+        opt.Window = TimeSpan.FromSeconds(1);
+    });
+    options.AddFixedWindowLimiter("AuthApi", opt =>
+    {
+        opt.PermitLimit = 5;
+        opt.Window = TimeSpan.FromSeconds(1);
+    });
+});
+
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<ITenantProvider, TenantProvider>();
 
 // Redis Configuration
 string redisConnectionString = builder.Configuration.GetSection("Redis:ConnectionString").Value ?? "localhost:6379";
@@ -87,6 +142,7 @@ builder.Services.AddScoped<IJwtTokenGenerator, JwtTokenGenerator>();
 builder.Services.AddScoped<IPasswordHasher, PasswordHasher>();
 builder.Services.AddScoped<IPrintService, EscPosPrintService>();
 builder.Services.AddScoped<IEmailService, PosErp.Infrastructure.Services.SmtpEmailService>();
+builder.Services.AddScoped<INotificationService, PosErp.Infrastructure.Services.NotificationService>();
 
 // S1: JWT secret from environment variable (set JWT__Secret on Render / secrets manager).
 // NEVER use the fallback value in Production — startup will throw if it is missing.
@@ -124,6 +180,8 @@ builder.Services.AddAuthentication(options =>
 builder.Services.AddScoped<IStockLedgerService, StockLedgerService>();
 builder.Services.AddScoped<IProductBatchService, ProductBatchService>();
 builder.Services.AddScoped<IOfferEngine, OfferEngine>();
+builder.Services.AddScoped<IOfferExportService, PosErp.Infrastructure.Services.Offers.OffersImportExportService>();
+builder.Services.AddScoped<IOfferImportService, PosErp.Infrastructure.Services.Offers.OffersImportExportService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<ILoyaltyService, LoyaltyService>();
 builder.Services.AddScoped<PosErp.Application.Features.Audit.Services.IAuditLoggingService, PosErp.Application.Features.Audit.Services.AuditLoggingService>();
@@ -138,6 +196,13 @@ builder.Services.AddScoped<PosErp.Application.Features.Finance.Services.IApprova
 builder.Services.AddScoped<PosErp.Application.Features.Finance.Services.IAllocationEngine, PosErp.Application.Features.Finance.Services.AllocationEngine>();
 builder.Services.AddScoped<PosErp.Application.Features.Analytics.Services.IAiAnalyticsService, PosErp.Application.Features.Analytics.Services.AiAnalyticsService>();
 builder.Services.AddScoped<PosErp.Application.Features.Analytics.Services.INaturalLanguageQueryService, PosErp.Application.Features.Analytics.Services.NaturalLanguageQueryService>();
+builder.Services.AddScoped<PosErp.Application.Features.Loyalty.Jobs.ILoyaltyBackgroundJobs, PosErp.Application.Features.Loyalty.Jobs.LoyaltyBackgroundJobs>();
+
+// Phase 5 AI Engines
+builder.Services.AddScoped<PosErp.Application.Features.Ai.Services.IInsightEngine, PosErp.Application.Features.Ai.Services.InsightEngine>();
+builder.Services.AddScoped<PosErp.Application.Features.Ai.Services.IForecastEngine, PosErp.Application.Features.Ai.Services.ForecastEngine>();
+builder.Services.AddScoped<PosErp.Application.Features.Ai.Services.IRecommendationEngine, PosErp.Application.Features.Ai.Services.RecommendationEngine>();
+builder.Services.AddScoped<PosErp.Application.Features.Ai.Jobs.IAiBackgroundJobs, PosErp.Application.Features.Ai.Jobs.AiBackgroundJobs>();
 
 // Register Materialized View Periodic Refresher
 builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.StockPositionRefreshService>();
@@ -187,6 +252,20 @@ app.UseCors("AllowAll");
 app.UseMiddleware<GlobalExceptionMiddleware>();
 app.UseMiddleware<RateLimitingMiddleware>();
 
+app.UseHttpsRedirection();
+
+// Phase 6: Security Headers Middleware
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.Append("X-Frame-Options", "DENY");
+    context.Response.Headers.Append("X-Content-Type-Options", "nosniff");
+    context.Response.Headers.Append("Referrer-Policy", "strict-origin-when-cross-origin");
+    context.Response.Headers.Append("Content-Security-Policy", "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self'");
+    context.Response.Headers.Append("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    await next();
+});
+
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<DemoSandboxMiddleware>();
@@ -210,11 +289,66 @@ using (var scope = app.Services.CreateScope())
         "ai-hourly-incremental-refresh",
         service => service.RecalculateIncrementalAnalyticsAsync(CancellationToken.None),
         Cron.Hourly);
+
+    manager.AddOrUpdate<PosErp.Application.Features.Loyalty.Jobs.ILoyaltyBackgroundJobs>(
+        "loyalty-point-expiration",
+        service => service.ExpirePointsJob(),
+        Cron.Daily(2, 0)); // 02:00 AM
+
+    manager.AddOrUpdate<PosErp.Application.Features.Loyalty.Jobs.ILoyaltyBackgroundJobs>(
+        "loyalty-tier-downgrade",
+        service => service.EvaluateTierDowngradeJob(),
+        Cron.Monthly(1, 1, 0)); // 1st day of month at 01:00 AM
+
+    manager.AddOrUpdate<PosErp.Application.Features.Loyalty.Jobs.ILoyaltyBackgroundJobs>(
+        "loyalty-birthday-bonus",
+        service => service.BirthdayBonusJob(),
+        Cron.Daily(3, 0)); // 03:00 AM
+
+    manager.AddOrUpdate<PosErp.Application.Features.Loyalty.Jobs.ILoyaltyBackgroundJobs>(
+        "loyalty-anniversary-bonus",
+        service => service.AnniversaryBonusJob(),
+        Cron.Daily(3, 30)); // 03:30 AM
+
+    manager.AddOrUpdate<PosErp.Application.Features.Loyalty.Jobs.ILoyaltyBackgroundJobs>(
+        "loyalty-health-maintenance",
+        service => service.LoyaltyMaintenanceJob(),
+        Cron.Weekly(DayOfWeek.Sunday, 4, 0)); // Sunday at 04:00 AM
+
+    // Phase 5 AI Scheduled Jobs
+    manager.AddOrUpdate<PosErp.Application.Features.Ai.Jobs.IAiBackgroundJobs>(
+        "ai-insight-generation",
+        service => service.ExecuteInsightGenerationJobAsync(CancellationToken.None),
+        Cron.Daily(1, 0)); // 01:00 AM
+
+    manager.AddOrUpdate<PosErp.Application.Features.Ai.Jobs.IAiBackgroundJobs>(
+        "ai-forecast-generation",
+        service => service.ExecuteForecastGenerationJobAsync(CancellationToken.None),
+        Cron.Daily(2, 0)); // 02:00 AM
+
+    manager.AddOrUpdate<PosErp.Application.Features.Ai.Jobs.IAiBackgroundJobs>(
+        "ai-customer-intelligence",
+        service => service.ExecuteCustomerIntelligenceJobAsync(CancellationToken.None),
+        Cron.Daily(3, 0)); // 03:00 AM
+
+    manager.AddOrUpdate<PosErp.Application.Features.Ai.Jobs.IAiBackgroundJobs>(
+        "ai-executive-snapshot",
+        service => service.ExecuteExecutiveSnapshotJobAsync(CancellationToken.None),
+        Cron.Daily(23, 0)); // 11:00 PM
+
+    manager.AddOrUpdate<PosErp.Application.Features.Ai.Jobs.IAiBackgroundJobs>(
+        "ai-forecast-accuracy",
+        service => service.ExecuteForecastAccuracyJobAsync(CancellationToken.None),
+        Cron.Daily(4, 0)); // 04:00 AM (after forecast)
+
+    manager.AddOrUpdate<PosErp.Application.Features.Ai.Jobs.IAiBackgroundJobs>(
+        "ai-alert-generation",
+        service => service.ExecuteAlertGenerationJobAsync(CancellationToken.None),
+        Cron.Hourly()); // Hourly
 }
 
 app.MapControllers();
 app.MapHealthChecks("/health");
-app.MapHealthChecks("/api/health");
 
 // Seed Database
 using (var scope = app.Services.CreateScope())

@@ -15,7 +15,8 @@ public record CalculateCartItemDto(Guid ProductId, decimal Quantity);
 public record CalculateCartQuery(
     List<CalculateCartItemDto> Items,
     string? PromoCode,
-    Guid? CustomerId
+    Guid? CustomerId,
+    bool SuppressOffers = false
 ) : IRequest<CartCalculationResultDto>;
 
 public record CartCalculationResultDto(
@@ -83,7 +84,13 @@ public class CalculateCartQueryHandler : IRequestHandler<CalculateCartQuery, Car
         };
 
         // 2. Evaluate promotions dynamically
-        cartEvaluation = await _offerEngine.EvaluateOffersAsync(cartEvaluation, customer?.Tier?.Name, request.PromoCode, cancellationToken);
+        if (!request.SuppressOffers)
+        {
+            bool isBirthday = customer?.Dob.HasValue == true && customer.Dob.Value.Month == DateTime.Today.Month;
+            bool isAnniversary = customer?.Anniversary.HasValue == true && customer.Anniversary.Value.Month == DateTime.Today.Month;
+
+            cartEvaluation = await _offerEngine.EvaluateOffersAsync(cartEvaluation, customer?.Tier?.Name, request.PromoCode, isBirthday, isAnniversary, cancellationToken);
+        }
 
         decimal preDiscountSubtotalExTax = 0;
         decimal totalDiscountExTax = 0;

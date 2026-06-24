@@ -648,7 +648,7 @@ public class AiAnalyticsService : IAiAnalyticsService
             {
                 StoreId = storeId,
                 AlertType = "EXPIRY",
-                Severity = "CRITICAL",
+                AlertSeverity = "CRITICAL",
                 Title = "Critical Batch Expiry Risk",
                 Message = $"Batch {b.BatchNumber} of product '{b.ProductName}' is at critical expiry risk. Projected waste: {b.RemainingQuantity - b.ProjectedSoldQty:F2} units. Potential write-off loss: {b.PotentialLoss:C}.",
                 CreatedAt = DateTime.UtcNow
@@ -666,7 +666,7 @@ public class AiAnalyticsService : IAiAnalyticsService
             {
                 StoreId = storeId,
                 AlertType = "SHRINKAGE",
-                Severity = "WARNING",
+                AlertSeverity = "CRITICAL",
                 Title = "High Inventory Shrinkage Alert",
                 Message = $"Product '{s.ProductName}' recorded significant stock loss: {s.ShrinkageQuantity:F2} units lost with cost value {s.ShrinkageCost:C}. Shrinkage Rate: {s.ShrinkageRatePct:F4}%.",
                 CreatedAt = DateTime.UtcNow
@@ -699,7 +699,7 @@ public class AiAnalyticsService : IAiAnalyticsService
             {
                 StoreId = storeId,
                 AlertType = "ANOMALY",
-                Severity = a.Severity,
+                AlertSeverity = a.Severity,
                 Title = $"Financial Anomaly: {a.AnomalyType}",
                 Message = a.Description,
                 CreatedAt = DateTime.UtcNow
@@ -879,7 +879,7 @@ public class AiAnalyticsService : IAiAnalyticsService
             {
                 Id = a.Id,
                 AlertType = a.AlertType,
-                Severity = a.Severity,
+                Severity = a.AlertSeverity,
                 Title = a.Title,
                 Message = a.Message,
                 CreatedAt = a.CreatedAt

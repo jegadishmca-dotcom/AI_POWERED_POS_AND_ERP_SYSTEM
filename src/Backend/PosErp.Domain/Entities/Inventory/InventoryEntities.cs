@@ -54,6 +54,8 @@ public class StockLedgerEntry
     // For Postgres optimistic concurrency, 'xmin' is usually a hidden system column, 
     // but in EF Core we can map a uint RowVersion to it.
     public uint Version { get; set; } 
+    
+    public Product Product { get; set; } = null!;
 }
 
 public class GoodsReceiptNote
@@ -124,3 +126,103 @@ public class PendingPriceApproval
     public Guid? ActionedBy { get; set; }
 }
 
+public class InventoryLocation
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public string Name { get; set; } = string.Empty;
+    public string LocationType { get; set; } = "STORE"; // STORE, WAREHOUSE, DC
+    public Guid? ParentLocationId { get; set; }
+    public bool IsActive { get; set; } = true;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}
+
+public class ProductStoreInventoryPolicy
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ProductId { get; set; }
+    public Guid InventoryLocationId { get; set; }
+    
+    public decimal MinStockLevel { get; set; }
+    public decimal MaxStockLevel { get; set; }
+    public decimal ReorderPoint { get; set; }
+    public decimal SafetyStock { get; set; }
+    public int LeadTimeDays { get; set; }
+    
+    // Phase 4 Enhancements
+    public decimal EconomicOrderQuantity { get; set; }
+    public int ReorderFrequencyDays { get; set; }
+    public Guid? PreferredSupplierId { get; set; }
+    public int PreferredOrderMultiple { get; set; } = 1;
+    public bool IsAutoReorderEnabled { get; set; }
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? UpdatedAt { get; set; }
+    
+    public Product Product { get; set; } = null!;
+}
+
+public class InventoryForecast
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ProductId { get; set; }
+    public Guid InventoryLocationId { get; set; }
+    
+    public DateTime ForecastDate { get; set; }
+    public string ForecastModelVersion { get; set; } = string.Empty;
+    
+    public decimal HistoricalDemand { get; set; }
+    public decimal PredictedDemand { get; set; }
+    public decimal ConfidencePercentage { get; set; }
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    
+    public Product Product { get; set; } = null!;
+}
+
+public class InventoryAgingSnapshot
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid ProductId { get; set; }
+    public Guid InventoryLocationId { get; set; }
+    public DateTime SnapshotDate { get; set; }
+    
+    public decimal Age0To30 { get; set; }
+    public decimal Age31To60 { get; set; }
+    public decimal Age61To90 { get; set; }
+    public decimal Age91To180 { get; set; }
+    public decimal Age180Plus { get; set; }
+    
+    public Product Product { get; set; } = null!;
+}
+
+public class InventoryAuditEntry
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid InventoryLocationId { get; set; }
+    public Guid ProductId { get; set; }
+    public Guid? BatchId { get; set; }
+    
+    public decimal BeforeQuantity { get; set; }
+    public decimal AfterQuantity { get; set; }
+    public string Reason { get; set; } = string.Empty; // DAMAGE, EXPIRED, SHRINKAGE, CORRECTION
+    
+    public Guid UserId { get; set; }
+    public DateTime Timestamp { get; set; } = DateTime.UtcNow;
+}
+
+public class StockTransferRequest
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid SourceLocationId { get; set; }
+    public Guid DestinationLocationId { get; set; }
+    public Guid ProductId { get; set; }
+    
+    public decimal Quantity { get; set; }
+    public string Status { get; set; } = "PENDING"; // PENDING, APPROVED, IN_TRANSIT, RECEIVED
+    
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public Guid? CreatedBy { get; set; }
+    
+    public DateTime? DispatchedAt { get; set; }
+    public DateTime? ReceivedAt { get; set; }
+}

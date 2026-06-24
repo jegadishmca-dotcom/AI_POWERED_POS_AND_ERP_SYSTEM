@@ -20,7 +20,11 @@ public record ZReportDto(
     decimal CashCollected,
     decimal CardCollected,
     decimal UpiCollected
-);
+)
+{
+    public int VoidCount { get; init; } = 0;
+    public decimal VoidAmount { get; init; } = 0;
+}
 
 public class GetZReportQueryHandler : IRequestHandler<GetZReportQuery, ZReportDto>
 {
@@ -45,14 +49,12 @@ public class GetZReportQueryHandler : IRequestHandler<GetZReportQuery, ZReportDt
                 var end = session.EndTime ?? DateTime.UtcNow;
 
                 query = query.Where(i => i.TerminalId == request.TerminalId 
-                                      && i.CashierId == request.CashierId 
                                       && i.CreatedAt >= start 
-                                      && i.CreatedAt <= end 
-                                      && i.Status == "COMPLETED");
+                                      && i.CreatedAt <= end);
             }
             else
             {
-                query = query.Where(i => i.TerminalId == request.TerminalId && i.BusinessDate == targetDate && i.Status == "COMPLETED");
+                query = query.Where(i => i.TerminalId == request.TerminalId && i.BusinessDate == targetDate);
                 if (request.CashierId.HasValue)
                 {
                     query = query.Where(i => i.CashierId == request.CashierId.Value);
@@ -61,7 +63,7 @@ public class GetZReportQueryHandler : IRequestHandler<GetZReportQuery, ZReportDt
         }
         else
         {
-            query = query.Where(i => i.TerminalId == request.TerminalId && i.BusinessDate == targetDate && i.Status == "COMPLETED");
+            query = query.Where(i => i.TerminalId == request.TerminalId && i.BusinessDate == targetDate);
             if (request.CashierId.HasValue)
             {
                 query = query.Where(i => i.CashierId == request.CashierId.Value);
@@ -73,14 +75,17 @@ public class GetZReportQueryHandler : IRequestHandler<GetZReportQuery, ZReportDt
         return new ZReportDto(
             request.TerminalId,
             request.BusinessDate,
-            invoices.Count,
-            // TotalSales = sum of NetPayable (actual amount charged to customer, matches receipt)
-            invoices.Sum(i => i.NetPayable),
-            invoices.Sum(i => i.TaxAmount),
-            invoices.Sum(i => i.DiscountAmount),
-            invoices.Sum(i => i.CashAmount),
-            invoices.Sum(i => i.CardAmount),
-            invoices.Sum(i => i.UpiAmount)
-        );
+            invoices.Count(i => i.Status == "COMPLETED"),
+            invoices.Where(i => i.Status == "COMPLETED").Sum(i => i.NetPayable),
+            invoices.Where(i => i.Status == "COMPLETED").Sum(i => i.TaxAmount),
+            invoices.Where(i => i.Status == "COMPLETED").Sum(i => i.DiscountAmount),
+            invoices.Where(i => i.Status == "COMPLETED").Sum(i => i.CashAmount),
+            invoices.Where(i => i.Status == "COMPLETED").Sum(i => i.CardAmount),
+            invoices.Where(i => i.Status == "COMPLETED").Sum(i => i.UpiAmount)
+        )
+        {
+            VoidCount = invoices.Count(i => i.Status == "CANCELLED"),
+            VoidAmount = invoices.Where(i => i.Status == "CANCELLED").Sum(i => i.NetPayable)
+        };
     }
 }

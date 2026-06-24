@@ -150,12 +150,32 @@ export const ShiftReport = () => {
             <div className="text-4xl font-black text-slate-800">{reportData?.totalInvoices || 0}</div>
           </div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Gross Sales</h3>
+            <div className="text-4xl font-black text-slate-800">₹{((reportData?.totalSales || 0) + (reportData?.totalDiscount || 0)).toFixed(2)}</div>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Total Discount</h3>
+            <div className="text-4xl font-black text-orange-500">-₹{(reportData?.totalDiscount || 0).toFixed(2)}</div>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Net Sales</h3>
             <div className="text-4xl font-black text-emerald-600">₹{(reportData?.totalSales || 0).toFixed(2)}</div>
           </div>
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
             <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Total Tax (GST)</h3>
             <div className="text-4xl font-black text-rose-500">₹{(reportData?.totalTax || 0).toFixed(2)}</div>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Avg Bill Value</h3>
+            <div className="text-4xl font-black text-indigo-600">₹{(reportData?.totalInvoices ? (reportData.totalSales / reportData.totalInvoices) : 0).toFixed(2)}</div>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Void/Cancelled Bills</h3>
+            <div className="text-4xl font-black text-rose-600">{reportData?.voidCount || 0}</div>
+          </div>
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+            <h3 className="text-sm font-bold text-slate-400 uppercase tracking-wider mb-2">Void Amount</h3>
+            <div className="text-4xl font-black text-rose-600">₹{(reportData?.voidAmount || 0).toFixed(2)}</div>
           </div>
         </div>
 

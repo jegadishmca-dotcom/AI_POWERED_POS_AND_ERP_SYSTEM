@@ -22,17 +22,20 @@ public class PosController : ControllerBase
     private readonly IPrintService _printService;
     private readonly IApplicationDbContext _context;
     private readonly PosErp.Infrastructure.Jobs.DailyReportEmailService _dailyReportEmailService;
+    private readonly PosErp.Application.Features.Audit.Services.IAuditLoggingService _auditLogger;
 
     public PosController(
         IMediator mediator, 
         IPrintService printService, 
         IApplicationDbContext context,
-        PosErp.Infrastructure.Jobs.DailyReportEmailService dailyReportEmailService)
+        PosErp.Infrastructure.Jobs.DailyReportEmailService dailyReportEmailService,
+        PosErp.Application.Features.Audit.Services.IAuditLoggingService auditLogger)
     {
         _mediator = mediator;
         _printService = printService;
         _context = context;
         _dailyReportEmailService = dailyReportEmailService;
+        _auditLogger = auditLogger;
     }
 
     [HttpGet("invoice/{id}")]
@@ -144,6 +147,33 @@ public class PosController : ControllerBase
     public async Task<IActionResult> CalculateCart([FromBody] PosErp.Application.Features.Pos.Queries.CalculateCart.CalculateCartQuery query)
     {
         return Ok(await _mediator.Send(query));
+    }
+
+    public class OverrideAuditRequest
+    {
+        public string Action { get; set; } = string.Empty;
+        public string Reason { get; set; } = string.Empty;
+        public string Details { get; set; } = string.Empty;
+    }
+
+    [HttpPost("audit/override")]
+    public async Task<IActionResult> LogManagerOverride([FromBody] OverrideAuditRequest request)
+    {
+        var claim = User.FindFirst("id")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var userId = Guid.TryParse(claim, out var id) ? id : Guid.Empty;
+        var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "Unknown";
+
+        await _auditLogger.LogActionAsync(
+            userId, 
+            $"Manager Override: {request.Action}", 
+            "POS", 
+            "OVERRIDE", 
+            null, 
+            new { request.Reason, request.Details }, 
+            ip, 
+            default);
+            
+        return Ok();
     }
 
     [HttpGet("session/current")]
@@ -589,6 +619,7 @@ public class PosController : ControllerBase
                     name = ii.ProductName,
                     qty = ii.Quantity,
                     unitPrice = ii.UnitPrice,
+                    lineTotal = ii.Quantity * ii.UnitPrice,
                     discountAmount = ii.DiscountAmount,
                     finalLineTotal = ii.TotalAmount,
                     cgstRate = ii.CgstRate,

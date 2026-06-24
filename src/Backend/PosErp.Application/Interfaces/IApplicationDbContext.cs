@@ -41,6 +41,14 @@ public interface IApplicationDbContext
     DbSet<Warehouse> Warehouses { get; }
     DbSet<PendingPriceApproval> PendingPriceApprovals { get; }
     
+    // Phase 4: Inventory Intelligence
+    DbSet<InventoryLocation> InventoryLocations { get; }
+    DbSet<ProductStoreInventoryPolicy> ProductStoreInventoryPolicies { get; }
+    DbSet<InventoryForecast> InventoryForecasts { get; }
+    DbSet<InventoryAgingSnapshot> InventoryAgingSnapshots { get; }
+    DbSet<InventoryAuditEntry> InventoryAuditEntries { get; }
+    DbSet<StockTransferRequest> StockTransferRequests { get; }
+    
     // Purchasing
     DbSet<PurchaseOrderHeader> PurchaseOrders { get; }
     DbSet<PurchaseOrderItem> PurchaseOrderItems { get; }
@@ -49,13 +57,20 @@ public interface IApplicationDbContext
     DbSet<PurchaseBillHeader> PurchaseBills { get; }
     DbSet<PurchaseBillItem> PurchaseBillItems { get; }
     DbSet<Supplier> Suppliers { get; }
+    DbSet<SupplierScorecard> SupplierScorecards { get; }
     
     // CRM & Offers
     DbSet<Customer> Customers { get; }
     DbSet<CustomerTier> CustomerTiers { get; }
     DbSet<WalletLedgerEntry> WalletLedger { get; }
     DbSet<LoyaltyLedgerEntry> LoyaltyLedger { get; }
+    DbSet<LoyaltyProgramConfig> LoyaltyProgramConfigs { get; }
     DbSet<Offer> Offers { get; }
+    DbSet<OfferUsageLog> OfferUsageLogs { get; }
+    DbSet<OfferVersion> OfferVersions { get; }
+    
+    // Audit
+    DbSet<PosErp.Domain.Entities.Audit.AuditLog> AuditLogs { get; }
     
     // Finance
     DbSet<Account> Accounts { get; }
@@ -101,6 +116,14 @@ public interface IApplicationDbContext
     DbSet<AiInventoryShrinkageAnalytic> AiInventoryShrinkageAnalytics { get; }
     DbSet<AiExpiryRiskPrediction> AiExpiryRiskPredictions { get; }
     DbSet<AiAlert> AiAlerts { get; }
+    
+    // Phase 5 AI Analytics Additions
+    DbSet<ExecutiveKpiSnapshot> ExecutiveKpiSnapshots { get; }
+    DbSet<ForecastAccuracySnapshot> ForecastAccuracySnapshots { get; }
+    DbSet<AiBusinessInsight> AiBusinessInsights { get; }
+    DbSet<AiDemandForecast> AiDemandForecasts { get; }
+    DbSet<AiCustomerIntelligence> AiCustomerIntelligences { get; }
+    DbSet<AiStorePerformance> AiStorePerformances { get; }
     
     Task<int> SaveChangesAsync(CancellationToken cancellationToken);
 }

@@ -52,6 +52,7 @@ import { AiChat } from './features/ai/routes/AiChat';
 import { AiForecaster } from './features/ai/routes/AiForecaster';
 import { AiMarkdowns } from './features/ai/routes/AiMarkdowns';
 import { LossPreventionDashboard } from './features/analytics/components/LossPreventionDashboard';
+import { OffersManager } from './features/offers/components/OffersManager';
 
 // Finance Phase F1
 import { FinanceDashboard } from './features/finance/components/FinanceDashboard';
@@ -136,8 +137,12 @@ const AppLayout: React.FC = () => {
     { path: '/finance/customer-ledger', name: 'Customer Ledger', icon: BookOpen, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
     { path: '/finance/ar-aging', name: 'AR Aging', icon: CalendarClock, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
     { path: '/finance/credit-limit', name: 'Credit Monitoring', icon: ShieldAlert, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    
+    // CRM & Marketing
+    { path: '/offers', name: 'Offers & Promotions', icon: Tag, roles: ['Owner', 'Manager'], category: 'crm' },
   ];
 
+  const userRole = user?.role || 'Staff';
   const filteredNavItems = navItems.filter(item => 
     !user?.role || item.roles.includes(user.role)
   );
@@ -145,6 +150,7 @@ const AppLayout: React.FC = () => {
   const generalItems = filteredNavItems.filter(item => item.category === 'general');
   const aiItems = filteredNavItems.filter(item => item.category === 'ai');
   const financeItems = filteredNavItems.filter(item => item.category === 'finance');
+  const crmItems = filteredNavItems.filter(item => item.category === 'crm');
 
   return (
     <div className="flex h-screen bg-slate-100 dark:bg-slate-900 font-sans transition-colors duration-200 overflow-hidden">
@@ -184,6 +190,33 @@ const AppLayout: React.FC = () => {
               );
             })}
           </div>
+
+          {/* CRM & Marketing Section */}
+          {crmItems.length > 0 && (
+            <div className="space-y-1">
+              <span className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider block mt-4 mb-2">
+                CRM & Marketing
+              </span>
+              {crmItems.map(item => {
+                const Icon = item.icon;
+                const isActive = location.pathname.startsWith(item.path);
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                      isActive 
+                        ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30' 
+                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                    }`}
+                  >
+                    <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                    {item.name}
+                  </Link>
+                );
+              })}
+            </div>
+          )}
 
           {/* Finance Section */}
           {financeItems.length > 0 && (
@@ -410,6 +443,9 @@ const AppLayout: React.FC = () => {
             } />
             <Route path="/settings" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <Settings />
+            } />
+            <Route path="/offers" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <OffersManager />
             } />
             {/* Finance F1 Routes */}
             <Route path="/finance/dashboard" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <FinanceDashboard />} />

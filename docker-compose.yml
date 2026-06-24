@@ -126,7 +126,7 @@ services:
         - VITE_API_URL=${VITE_API_URL:-http://localhost:5000}
     container_name: pos_frontend
     ports:
-      - "3000:80"
+      - "5173:80"
     networks:
       - pos_network
     restart: unless-stopped
@@ -148,7 +148,36 @@ services:
       - pos_backend
       - pos_frontend
 
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: pos_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - pos_network
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: pos_grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-posadmin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+    networks:
+      - pos_network
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
   postgres_data:
   redis_data:
   ollama_data:
+  prometheus_data:
+  grafana_data:

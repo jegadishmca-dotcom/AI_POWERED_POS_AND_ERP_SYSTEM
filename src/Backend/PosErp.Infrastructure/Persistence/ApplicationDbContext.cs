@@ -10,14 +10,20 @@ using PosErp.Domain.Entities.Offers;
 using PosErp.Domain.Entities.Finance;
 using System.Threading;
 using System.Threading.Tasks;
+using PosErp.Domain.Entities.Common;
 
 namespace PosErp.Infrastructure.Persistence;
 
 public class ApplicationDbContext : DbContext, IApplicationDbContext
 {
-    public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options)
+    private readonly ITenantProvider? _tenantProvider;
+
+    public ApplicationDbContext(
+        DbContextOptions<ApplicationDbContext> options,
+        ITenantProvider? tenantProvider = null)
         : base(options)
     {
+        _tenantProvider = tenantProvider;
     }
 
     public DbSet<User> Users => Set<User>();
@@ -47,6 +53,14 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<Warehouse> Warehouses => Set<Warehouse>();
     public DbSet<PendingPriceApproval> PendingPriceApprovals => Set<PendingPriceApproval>();
     
+    // Phase 4: Inventory Intelligence
+    public DbSet<InventoryLocation> InventoryLocations => Set<InventoryLocation>();
+    public DbSet<ProductStoreInventoryPolicy> ProductStoreInventoryPolicies => Set<ProductStoreInventoryPolicy>();
+    public DbSet<InventoryForecast> InventoryForecasts => Set<InventoryForecast>();
+    public DbSet<InventoryAgingSnapshot> InventoryAgingSnapshots => Set<InventoryAgingSnapshot>();
+    public DbSet<InventoryAuditEntry> InventoryAuditEntries => Set<InventoryAuditEntry>();
+    public DbSet<StockTransferRequest> StockTransferRequests => Set<StockTransferRequest>();
+    
     // Purchasing
     public DbSet<PurchaseOrderHeader> PurchaseOrders => Set<PurchaseOrderHeader>();
     public DbSet<PurchaseOrderItem> PurchaseOrderItems => Set<PurchaseOrderItem>();
@@ -55,13 +69,20 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<PurchaseBillHeader> PurchaseBills => Set<PurchaseBillHeader>();
     public DbSet<PurchaseBillItem> PurchaseBillItems => Set<PurchaseBillItem>();
     public DbSet<Supplier> Suppliers => Set<Supplier>();
+    public DbSet<SupplierScorecard> SupplierScorecards => Set<SupplierScorecard>();
     
     // CRM & Offers
     public DbSet<Customer> Customers => Set<Customer>();
     public DbSet<CustomerTier> CustomerTiers => Set<CustomerTier>();
     public DbSet<WalletLedgerEntry> WalletLedger => Set<WalletLedgerEntry>();
     public DbSet<LoyaltyLedgerEntry> LoyaltyLedger => Set<LoyaltyLedgerEntry>();
+    public DbSet<LoyaltyProgramConfig> LoyaltyProgramConfigs => Set<LoyaltyProgramConfig>();
     public DbSet<Offer> Offers => Set<Offer>();
+    public DbSet<OfferUsageLog> OfferUsageLogs => Set<OfferUsageLog>();
+    public DbSet<OfferVersion> OfferVersions => Set<OfferVersion>();
+    
+    // Audit
+    public DbSet<PosErp.Domain.Entities.Audit.AuditLog> AuditLogs => Set<PosErp.Domain.Entities.Audit.AuditLog>();
     
     // Finance
     public DbSet<Account> Accounts => Set<Account>();
@@ -107,7 +128,14 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<AiInventoryShrinkageAnalytic> AiInventoryShrinkageAnalytics => Set<AiInventoryShrinkageAnalytic>();
     public DbSet<AiExpiryRiskPrediction> AiExpiryRiskPredictions => Set<AiExpiryRiskPrediction>();
     public DbSet<AiAlert> AiAlerts => Set<AiAlert>();
-
+    
+    // Phase 5 AI Analytics Additions
+    public DbSet<ExecutiveKpiSnapshot> ExecutiveKpiSnapshots => Set<ExecutiveKpiSnapshot>();
+    public DbSet<ForecastAccuracySnapshot> ForecastAccuracySnapshots => Set<ForecastAccuracySnapshot>();
+    public DbSet<AiBusinessInsight> AiBusinessInsights => Set<AiBusinessInsight>();
+    public DbSet<AiDemandForecast> AiDemandForecasts => Set<AiDemandForecast>();
+    public DbSet<AiCustomerIntelligence> AiCustomerIntelligences => Set<AiCustomerIntelligence>();
+    public DbSet<AiStorePerformance> AiStorePerformances => Set<AiStorePerformance>();
     public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
     {
         return base.SaveChangesAsync(cancellationToken);
@@ -121,9 +149,19 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<Invoice>()
             .HasKey(i => new { i.Id, i.BusinessDate });
 
-        modelBuilder.Entity<Invoice>()
-            .Property(i => i.BusinessDate)
-            .HasColumnType("date");
+        // Phase 6 Multi-Tenant Global Query Filters
+        if (_tenantProvider != null)
+        {
+            modelBuilder.Entity<Store>().HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
+            modelBuilder.Entity<PosErp.Domain.Entities.Audit.AuditLog>().HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
+        }
+
+        if (Database.IsRelational())
+        {
+            modelBuilder.Entity<Invoice>()
+                .Property(i => i.BusinessDate)
+                .HasColumnType("date");
+        }
 
         modelBuilder.Entity<Invoice>()
             .Ignore(i => i.TotalDiscount)
@@ -218,6 +256,21 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasForeignKey(i => i.StockTakeHeaderId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        modelBuilder.Entity<PosErp.Domain.Entities.Inventory.InventoryForecast>()
+            .Property(f => f.ForecastDate)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<PosErp.Domain.Entities.Inventory.InventoryAgingSnapshot>()
+            .Property(s => s.SnapshotDate)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<PosErp.Domain.Entities.Purchasing.SupplierScorecard>()
+            .Property(s => s.ScorecardDate)
+            .HasColumnType("date");
+
+        modelBuilder.Entity<PosErp.Domain.Entities.Purchasing.SupplierScorecard>()
+            .Property(s => s.LastPurchaseDate)
+            .HasColumnType("date");
 
         modelBuilder.Entity<PurchaseBillHeader>()
             .Property(pb => pb.GRNHeaderId)

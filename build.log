@@ -1,0 +1,287 @@
+ Image ai_powered_pos_and_erp_system-pos_backend Building 
+#1 [internal] load local bake definitions
+#1 reading from stdin 660B done
+#1 DONE 0.0s
+
+#2 [internal] load build definition from backend.Dockerfile
+#2 transferring dockerfile: 2.62kB done
+#2 DONE 0.0s
+
+#3 [internal] load metadata for mcr.microsoft.com/dotnet/sdk:8.0
+#3 DONE 0.7s
+
+#4 [internal] load metadata for mcr.microsoft.com/dotnet/aspnet:8.0
+#4 DONE 0.7s
+
+#5 [internal] load .dockerignore
+#5 transferring context: 126B done
+#5 DONE 0.0s
+
+#6 [internal] load build context
+#6 DONE 0.0s
+
+#7 [final 1/5] FROM mcr.microsoft.com/dotnet/aspnet:8.0@sha256:93b366e510c6cd01cee608447014f7d349cb7ff8809fd0f554aa3772e8587b7e
+#7 resolve mcr.microsoft.com/dotnet/aspnet:8.0@sha256:93b366e510c6cd01cee608447014f7d349cb7ff8809fd0f554aa3772e8587b7e 0.1s done
+#7 DONE 0.1s
+
+#8 [final 2/5] WORKDIR /app
+#8 CACHED
+
+#9 [restore 1/8] FROM mcr.microsoft.com/dotnet/sdk:8.0@sha256:d80fdd84f7e18eea12f8e45c52914f1353395009c95c41197178ea19944e6d48
+#9 resolve mcr.microsoft.com/dotnet/sdk:8.0@sha256:d80fdd84f7e18eea12f8e45c52914f1353395009c95c41197178ea19944e6d48 0.1s done
+#9 DONE 0.1s
+
+#10 [restore 2/8] WORKDIR /src
+#10 CACHED
+
+#6 [internal] load build context
+#6 transferring context: 73.54kB 0.2s done
+#6 DONE 0.2s
+
+#11 [restore 3/8] COPY PosErp.sln ./
+#11 DONE 0.1s
+
+#12 [restore 4/8] COPY PosErp.Domain/PosErp.Domain.csproj           PosErp.Domain/
+#12 DONE 0.1s
+
+#13 [final 3/5] RUN apt-get update && apt-get install -y --no-install-recommends     libfontconfig1     libssl3     curl     && rm -rf /var/lib/apt/lists/*
+#13 ...
+
+#14 [restore 5/8] COPY PosErp.Application/PosErp.Application.csproj  PosErp.Application/
+#14 DONE 0.1s
+
+#15 [restore 6/8] COPY PosErp.Infrastructure/PosErp.Infrastructure.csproj PosErp.Infrastructure/
+#15 DONE 0.1s
+
+#16 [restore 7/8] COPY PosErp.Api/PosErp.Api.csproj                  PosErp.Api/
+#16 DONE 0.1s
+
+#13 [final 3/5] RUN apt-get update && apt-get install -y --no-install-recommends     libfontconfig1     libssl3     curl     && rm -rf /var/lib/apt/lists/*
+#13 0.675 Get:1 http://deb.debian.org/debian bookworm InRelease [151 kB]
+#13 1.085 Get:2 http://deb.debian.org/debian bookworm-updates InRelease [55.4 kB]
+#13 1.269 Get:3 http://deb.debian.org/debian-security bookworm-security InRelease [48.0 kB]
+#13 1.493 Get:4 http://deb.debian.org/debian bookworm/main amd64 Packages [8790 kB]
+#13 8.145 Get:5 http://deb.debian.org/debian bookworm-updates/main amd64 Packages [6924 B]
+#13 8.395 Get:6 http://deb.debian.org/debian-security bookworm-security/main amd64 Packages [312 kB]
+#13 9.748 Fetched 9364 kB in 9s (999 kB/s)
+#13 9.748 Reading package lists...
+#13 10.60 Reading package lists...
+#13 ...
+
+#17 [restore 8/8] RUN dotnet restore PosErp.Api/PosErp.Api.csproj
+#17 1.370   Determining projects to restore...
+#17 3.141   Restored /src/PosErp.Domain/PosErp.Domain.csproj (in 163 ms).
+#17 ...
+
+#13 [final 3/5] RUN apt-get update && apt-get install -y --no-install-recommends     libfontconfig1     libssl3     curl     && rm -rf /var/lib/apt/lists/*
+#13 10.60 Reading package lists...
+#13 11.42 Building dependency tree...
+#13 11.60 Reading state information...
+#13 11.85 libssl3 is already the newest version (3.0.20-1~deb12u2).
+#13 11.85 The following additional packages will be installed:
+#13 11.85   fontconfig-config fonts-dejavu-core libbrotli1 libcurl4 libexpat1
+#13 11.85   libfreetype6 libgssapi-krb5-2 libk5crypto3 libkeyutils1 libkrb5-3
+#13 11.85   libkrb5support0 libldap-2.5-0 libnghttp2-14 libpng16-16 libpsl5 librtmp1
+#13 11.86   libsasl2-2 libsasl2-modules-db libssh2-1
+#13 11.86 Suggested packages:
+#13 11.86   krb5-doc krb5-user
+#13 11.86 Recommended packages:
+#13 11.86   krb5-locales libldap-common publicsuffix libsasl2-modules
+#13 12.04 The following NEW packages will be installed:
+#13 12.04   curl fontconfig-config fonts-dejavu-core libbrotli1 libcurl4 libexpat1
+#13 12.04   libfontconfig1 libfreetype6 libgssapi-krb5-2 libk5crypto3 libkeyutils1
+#13 12.04   libkrb5-3 libkrb5support0 libldap-2.5-0 libnghttp2-14 libpng16-16 libpsl5
+#13 12.04   librtmp1 libsasl2-2 libsasl2-modules-db libssh2-1
+#13 12.36 0 upgraded, 21 newly installed, 0 to remove and 0 not upgraded.
+#13 12.36 Need to get 4748 kB of archives.
+#13 12.36 After this operation, 11.7 MB of additional disk space will be used.
+#13 12.36 Get:1 http://deb.debian.org/debian bookworm/main amd64 libbrotli1 amd64 1.0.9-2+b6 [275 kB]
+#13 12.97 Get:2 http://deb.debian.org/debian-security bookworm-security/main amd64 libkrb5support0 amd64 1.20.1-2+deb12u5 [33.2 kB]
+#13 13.05 Get:3 http://deb.debian.org/debian-security bookworm-security/main amd64 libk5crypto3 amd64 1.20.1-2+deb12u5 [79.7 kB]
+#13 13.06 Get:4 http://deb.debian.org/debian bookworm/main amd64 libkeyutils1 amd64 1.6.3-2 [8808 B]
+#13 13.06 Get:5 http://deb.debian.org/debian-security bookworm-security/main amd64 libkrb5-3 amd64 1.20.1-2+deb12u5 [332 kB]
+#13 13.47 Get:6 http://deb.debian.org/debian-security bookworm-security/main amd64 libgssapi-krb5-2 amd64 1.20.1-2+deb12u5 [135 kB]
+#13 13.58 Get:7 http://deb.debian.org/debian bookworm/main amd64 libsasl2-modules-db amd64 2.1.28+dfsg-10 [20.3 kB]
+#13 13.58 Get:8 http://deb.debian.org/debian bookworm/main amd64 libsasl2-2 amd64 2.1.28+dfsg-10 [59.7 kB]
+#13 13.66 Get:9 http://deb.debian.org/debian bookworm/main amd64 libldap-2.5-0 amd64 2.5.13+dfsg-5 [183 kB]
+#13 13.81 Get:10 http://deb.debian.org/debian-security bookworm-security/main amd64 libnghttp2-14 amd64 1.52.0-1+deb12u3 [72.4 kB]
+#13 13.85 Get:11 http://deb.debian.org/debian bookworm/main amd64 libpsl5 amd64 0.21.2-1 [58.7 kB]
+#13 13.90 Get:12 http://deb.debian.org/debian bookworm/main amd64 librtmp1 amd64 2.4+20151223.gitfa8646d.1-2+b2 [60.8 kB]
+#13 14.05 Get:13 http://deb.debian.org/debian bookworm/main amd64 libssh2-1 amd64 1.10.0-3+b1 [179 kB]
+#13 14.18 Get:14 http://deb.debian.org/debian bookworm/main amd64 libcurl4 amd64 7.88.1-10+deb12u14 [392 kB]
+#13 15.05 Get:15 http://deb.debian.org/debian bookworm/main amd64 curl amd64 7.88.1-10+deb12u14 [316 kB]
+#13 15.29 Get:16 http://deb.debian.org/debian bookworm/main amd64 fonts-dejavu-core all 2.37-6 [1068 kB]
+#13 15.97 Get:17 http://deb.debian.org/debian bookworm/main amd64 fontconfig-config amd64 2.14.1-4 [315 kB]
+#13 16.20 Get:18 http://deb.debian.org/debian bookworm/main amd64 libexpat1 amd64 2.5.0-1+deb12u2 [99.9 kB]
+#13 16.22 Get:19 http://deb.debian.org/debian bookworm/main amd64 libpng16-16 amd64 1.6.39-2+deb12u5 [277 kB]
+#13 16.35 Get:20 http://deb.debian.org/debian bookworm/main amd64 libfreetype6 amd64 2.12.1+dfsg-5+deb12u4 [398 kB]
+#13 16.56 Get:21 http://deb.debian.org/debian bookworm/main amd64 libfontconfig1 amd64 2.14.1-4 [386 kB]
+#13 16.89 debconf: delaying package configuration, since apt-utils is not installed
+#13 16.93 Fetched 4748 kB in 5s (1019 kB/s)
+#13 16.97 Selecting previously unselected package libbrotli1:amd64.
+#13 16.97 (Reading database ... (Reading database ... 5%(Reading database ... 10%(Reading database ... 15%(Reading database ... 20%(Reading database ... 25%(Reading database ... 30%(Reading database ... 35%(Reading database ... 40%(Reading database ... 45%(Reading database ... 50%(Reading database ... 55%(Reading database ... 60%(Reading database ... 65%(Reading database ... 70%(Reading database ... 75%(Reading database ... 80%(Reading database ... 85%(Reading database ... 90%(Reading database ... 95%(Reading database ... 100%(Reading database ... 6601 files and directories currently installed.)
+#13 16.99 Preparing to unpack .../00-libbrotli1_1.0.9-2+b6_amd64.deb ...
+#13 17.00 Unpacking libbrotli1:amd64 (1.0.9-2+b6) ...
+#13 17.15 Selecting previously unselected package libkrb5support0:amd64.
+#13 17.16 Preparing to unpack .../01-libkrb5support0_1.20.1-2+deb12u5_amd64.deb ...
+#13 17.16 Unpacking libkrb5support0:amd64 (1.20.1-2+deb12u5) ...
+#13 17.23 Selecting previously unselected package libk5crypto3:amd64.
+#13 17.23 Preparing to unpack .../02-libk5crypto3_1.20.1-2+deb12u5_amd64.deb ...
+#13 17.24 Unpacking libk5crypto3:amd64 (1.20.1-2+deb12u5) ...
+#13 17.32 Selecting previously unselected package libkeyutils1:amd64.
+#13 17.32 Preparing to unpack .../03-libkeyutils1_1.6.3-2_amd64.deb ...
+#13 17.33 Unpacking libkeyutils1:amd64 (1.6.3-2) ...
+#13 17.39 Selecting previously unselected package libkrb5-3:amd64.
+#13 17.39 Preparing to unpack .../04-libkrb5-3_1.20.1-2+deb12u5_amd64.deb ...
+#13 17.40 Unpacking libkrb5-3:amd64 (1.20.1-2+deb12u5) ...
+#13 17.56 Selecting previously unselected package libgssapi-krb5-2:amd64.
+#13 17.56 Preparing to unpack .../05-libgssapi-krb5-2_1.20.1-2+deb12u5_amd64.deb ...
+#13 17.56 Unpacking libgssapi-krb5-2:amd64 (1.20.1-2+deb12u5) ...
+#13 17.65 Selecting previously unselected package libsasl2-modules-db:amd64.
+#13 17.65 Preparing to unpack .../06-libsasl2-modules-db_2.1.28+dfsg-10_amd64.deb ...
+#13 17.66 Unpacking libsasl2-modules-db:amd64 (2.1.28+dfsg-10) ...
+#13 17.72 Selecting previously unselected package libsasl2-2:amd64.
+#13 17.72 Preparing to unpack .../07-libsasl2-2_2.1.28+dfsg-10_amd64.deb ...
+#13 17.73 Unpacking libsasl2-2:amd64 (2.1.28+dfsg-10) ...
+#13 17.80 Selecting previously unselected package libldap-2.5-0:amd64.
+#13 17.81 Preparing to unpack .../08-libldap-2.5-0_2.5.13+dfsg-5_amd64.deb ...
+#13 17.81 Unpacking libldap-2.5-0:amd64 (2.5.13+dfsg-5) ...
+#13 17.93 Selecting previously unselected package libnghttp2-14:amd64.
+#13 17.93 Preparing to unpack .../09-libnghttp2-14_1.52.0-1+deb12u3_amd64.deb ...
+#13 17.94 Unpacking libnghttp2-14:amd64 (1.52.0-1+deb12u3) ...
+#13 18.01 Selecting previously unselected package libpsl5:amd64.
+#13 18.02 Preparing to unpack .../10-libpsl5_0.21.2-1_amd64.deb ...
+#13 18.02 Unpacking libpsl5:amd64 (0.21.2-1) ...
+#13 18.09 Selecting previously unselected package librtmp1:amd64.
+#13 18.10 Preparing to unpack .../11-librtmp1_2.4+20151223.gitfa8646d.1-2+b2_amd64.deb ...
+#13 18.10 Unpacking librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2+b2) ...
+#13 18.14 Selecting previously unselected package libssh2-1:amd64.
+#13 18.14 Preparing to unpack .../12-libssh2-1_1.10.0-3+b1_amd64.deb ...
+#13 18.15 Unpacking libssh2-1:amd64 (1.10.0-3+b1) ...
+#13 18.21 Selecting previously unselected package libcurl4:amd64.
+#13 18.21 Preparing to unpack .../13-libcurl4_7.88.1-10+deb12u14_amd64.deb ...
+#13 18.21 Unpacking libcurl4:amd64 (7.88.1-10+deb12u14) ...
+#13 18.34 Selecting previously unselected package curl.
+#13 18.34 Preparing to unpack .../14-curl_7.88.1-10+deb12u14_amd64.deb ...
+#13 18.35 Unpacking curl (7.88.1-10+deb12u14) ...
+#13 18.46 Selecting previously unselected package fonts-dejavu-core.
+#13 18.47 Preparing to unpack .../15-fonts-dejavu-core_2.37-6_all.deb ...
+#13 18.47 Unpacking fonts-dejavu-core (2.37-6) ...
+#13 18.65 Selecting previously unselected package fontconfig-config.
+#13 18.65 Preparing to unpack .../16-fontconfig-config_2.14.1-4_amd64.deb ...
+#13 18.81 Unpacking fontconfig-config (2.14.1-4) ...
+#13 18.92 Selecting previously unselected package libexpat1:amd64.
+#13 18.92 Preparing to unpack .../17-libexpat1_2.5.0-1+deb12u2_amd64.deb ...
+#13 18.93 Unpacking libexpat1:amd64 (2.5.0-1+deb12u2) ...
+#13 19.01 Selecting previously unselected package libpng16-16:amd64.
+#13 19.02 Preparing to unpack .../18-libpng16-16_1.6.39-2+deb12u5_amd64.deb ...
+#13 19.02 Unpacking libpng16-16:amd64 (1.6.39-2+deb12u5) ...
+#13 19.15 Selecting previously unselected package libfreetype6:amd64.
+#13 19.15 Preparing to unpack .../19-libfreetype6_2.12.1+dfsg-5+deb12u4_amd64.deb ...
+#13 19.16 Unpacking libfreetype6:amd64 (2.12.1+dfsg-5+deb12u4) ...
+#13 19.31 Selecting previously unselected package libfontconfig1:amd64.
+#13 19.31 Preparing to unpack .../20-libfontconfig1_2.14.1-4_amd64.deb ...
+#13 19.32 Unpacking libfontconfig1:amd64 (2.14.1-4) ...
+#13 19.39 Setting up libexpat1:amd64 (2.5.0-1+deb12u2) ...
+#13 19.41 Setting up libkeyutils1:amd64 (1.6.3-2) ...
+#13 19.42 Setting up libpsl5:amd64 (0.21.2-1) ...
+#13 19.44 Setting up libbrotli1:amd64 (1.0.9-2+b6) ...
+#13 19.45 Setting up libnghttp2-14:amd64 (1.52.0-1+deb12u3) ...
+#13 19.46 Setting up libkrb5support0:amd64 (1.20.1-2+deb12u5) ...
+#13 19.48 Setting up libsasl2-modules-db:amd64 (2.1.28+dfsg-10) ...
+#13 19.49 Setting up librtmp1:amd64 (2.4+20151223.gitfa8646d.1-2+b2) ...
+#13 19.50 Setting up libpng16-16:amd64 (1.6.39-2+deb12u5) ...
+#13 19.52 Setting up fonts-dejavu-core (2.37-6) ...
+#13 19.58 Setting up libk5crypto3:amd64 (1.20.1-2+deb12u5) ...
+#13 19.60 Setting up libsasl2-2:amd64 (2.1.28+dfsg-10) ...
+#13 19.61 Setting up libssh2-1:amd64 (1.10.0-3+b1) ...
+#13 19.62 Setting up libkrb5-3:amd64 (1.20.1-2+deb12u5) ...
+#13 19.63 Setting up fontconfig-config (2.14.1-4) ...
+#13 19.78 debconf: unable to initialize frontend: Dialog
+#13 19.78 debconf: (TERM is not set, so the dialog frontend is not usable.)
+#13 19.78 debconf: falling back to frontend: Readline
+#13 19.78 debconf: unable to initialize frontend: Readline
+#13 19.78 debconf: (Can't locate Term/ReadLine.pm in @INC (you may need to install the Term::ReadLine module) (@INC contains: /etc/perl /usr/local/lib/x86_64-linux-gnu/perl/5.36.0 /usr/local/share/perl/5.36.0 /usr/lib/x86_64-linux-gnu/perl5/5.36 /usr/share/perl5 /usr/lib/x86_64-linux-gnu/perl-base /usr/lib/x86_64-linux-gnu/perl/5.36 /usr/share/perl/5.36 /usr/local/lib/site_perl) at /usr/share/perl5/Debconf/FrontEnd/Readline.pm line 7.)
+#13 19.78 debconf: falling back to frontend: Teletype
+#13 20.08 Setting up libldap-2.5-0:amd64 (2.5.13+dfsg-5) ...
+#13 20.09 Setting up libfreetype6:amd64 (2.12.1+dfsg-5+deb12u4) ...
+#13 20.11 Setting up libgssapi-krb5-2:amd64 (1.20.1-2+deb12u5) ...
+#13 20.13 Setting up libcurl4:amd64 (7.88.1-10+deb12u14) ...
+#13 20.14 Setting up curl (7.88.1-10+deb12u14) ...
+#13 20.15 Setting up libfontconfig1:amd64 (2.14.1-4) ...
+#13 20.17 Processing triggers for libc-bin (2.36-9+deb12u14) ...
+#13 DONE 20.3s
+
+#17 [restore 8/8] RUN dotnet restore PosErp.Api/PosErp.Api.csproj
+#17 ...
+
+#18 [final 4/5] RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
+#18 0.452 Adding group `appgroup' (GID 101) ...
+#18 0.494 Done.
+#18 0.617 Adding system user `appuser' (UID 100) ...
+#18 0.617 Adding new user `appuser' (UID 100) with group `appgroup' ...
+#18 0.655 Not creating `/nonexistent'.
+#18 DONE 0.7s
+
+#17 [restore 8/8] RUN dotnet restore PosErp.Api/PosErp.Api.csproj
+#17 193.9   Restored /src/PosErp.Infrastructure/PosErp.Infrastructure.csproj (in 3.18 min).
+#17 193.9   Restored /src/PosErp.Application/PosErp.Application.csproj (in 3.18 min).
+#17 193.9   Restored /src/PosErp.Api/PosErp.Api.csproj (in 3.18 min).
+#17 DONE 194.3s
+
+#19 [publish 1/3] WORKDIR /src
+#19 DONE 0.2s
+
+#20 [publish 2/3] COPY . .
+#20 DONE 0.6s
+
+#21 [publish 3/3] RUN dotnet publish PosErp.Api/PosErp.Api.csproj     -c Release     -o /app/publish     /p:UseAppHost=false     --no-restore
+#21 5.784   PosErp.Domain -> /src/PosErp.Domain/bin/Release/net8.0/PosErp.Domain.dll
+#21 14.49 /src/PosErp.Application/Features/Auth/Commands/Refresh/RefreshTokenCommand.cs(59,28): warning CS8625: Cannot convert null literal to non-nullable reference type. [/src/PosErp.Application/PosErp.Application.csproj]
+#21 14.49 /src/PosErp.Application/Features/Auth/Commands/Login/LoginCommand.cs(56,28): warning CS8625: Cannot convert null literal to non-nullable reference type. [/src/PosErp.Application/PosErp.Application.csproj]
+#21 14.49 /src/PosErp.Application/Features/Auth/Commands/Login/LoginCommand.cs(108,24): warning CS8625: Cannot convert null literal to non-nullable reference type. [/src/PosErp.Application/PosErp.Application.csproj]
+#21 14.49 /src/PosErp.Application/Features/Inventory/Queries/GetNearExpiryAlerts/GetNearExpiryAlertsQuery.cs(45,17): warning CS8629: Nullable value type may be null. [/src/PosErp.Application/PosErp.Application.csproj]
+#21 14.49 /src/PosErp.Application/Features/Inventory/Services/ReorderEngine.cs(45,34): warning CS8602: Dereference of a possibly null reference. [/src/PosErp.Application/PosErp.Application.csproj]
+#21 14.49 /src/PosErp.Application/Features/Inventory/Commands/CreateOrUpdateStockTake/CreateOrUpdateStockTakeCommand.cs(44,20): warning CS8600: Converting null literal or possible null value to non-nullable type. [/src/PosErp.Application/PosErp.Application.csproj]
+#21 14.49 /src/PosErp.Application/Features/Inventory/Queries/GetStockPosition/GetStockPositionQuery.cs(91,74): warning CS8604: Possible null reference argument for parameter 'parameters' in 'IQueryable<StockPositionDto> RelationalDatabaseFacadeExtensions.SqlQueryRaw<StockPositionDto>(DatabaseFacade databaseFacade, string sql, params object[] parameters)'. [/src/PosErp.Application/PosErp.Application.csproj]
+#21 14.49 /src/PosErp.Application/Features/Inventory/Queries/GetStockPosition/GetStockPositionQuery.cs(91,91): warning CS8604: Possible null reference argument for parameter 'parameters' in 'IQueryable<StockPositionDto> RelationalDatabaseFacadeExtensions.SqlQueryRaw<StockPositionDto>(DatabaseFacade databaseFacade, string sql, params object[] parameters)'. [/src/PosErp.Application/PosErp.Application.csproj]
+#21 14.49 /src/PosErp.Application/Features/Inventory/Queries/GetStockPosition/GetStockPositionQuery.cs(91,111): warning CS8604: Possible null reference argument for parameter 'parameters' in 'IQueryable<StockPositionDto> RelationalDatabaseFacadeExtensions.SqlQueryRaw<StockPositionDto>(DatabaseFacade databaseFacade, string sql, params object[] parameters)'. [/src/PosErp.Application/PosErp.Application.csproj]
+#21 14.58   PosErp.Application -> /src/PosErp.Application/bin/Release/net8.0/PosErp.Application.dll
+#21 24.82   PosErp.Infrastructure -> /src/PosErp.Infrastructure/bin/Release/net8.0/PosErp.Infrastructure.dll
+#21 26.05 /src/PosErp.Api/Program.cs(15,40): error CS0234: The type or namespace name 'Interfaces' does not exist in the namespace 'PosErp.Application.Features.Auth' (are you missing an assembly reference?) [/src/PosErp.Api/PosErp.Api.csproj]
+#21 ERROR: process "/bin/sh -c dotnet publish PosErp.Api/PosErp.Api.csproj     -c Release     -o /app/publish     /p:UseAppHost=false     --no-restore" did not complete successfully: exit code: 1
+------
+ > [publish 3/3] RUN dotnet publish PosErp.Api/PosErp.Api.csproj     -c Release     -o /app/publish     /p:UseAppHost=false     --no-restore:
+14.49 /src/PosErp.Application/Features/Auth/Commands/Login/LoginCommand.cs(108,24): warning CS8625: Cannot convert null literal to non-nullable reference type. [/src/PosErp.Application/PosErp.Application.csproj]
+14.49 /src/PosErp.Application/Features/Inventory/Queries/GetNearExpiryAlerts/GetNearExpiryAlertsQuery.cs(45,17): warning CS8629: Nullable value type may be null. [/src/PosErp.Application/PosErp.Application.csproj]
+14.49 /src/PosErp.Application/Features/Inventory/Services/ReorderEngine.cs(45,34): warning CS8602: Dereference of a possibly null reference. [/src/PosErp.Application/PosErp.Application.csproj]
+14.49 /src/PosErp.Application/Features/Inventory/Commands/CreateOrUpdateStockTake/CreateOrUpdateStockTakeCommand.cs(44,20): warning CS8600: Converting null literal or possible null value to non-nullable type. [/src/PosErp.Application/PosErp.Application.csproj]
+14.49 /src/PosErp.Application/Features/Inventory/Queries/GetStockPosition/GetStockPositionQuery.cs(91,74): warning CS8604: Possible null reference argument for parameter 'parameters' in 'IQueryable<StockPositionDto> RelationalDatabaseFacadeExtensions.SqlQueryRaw<StockPositionDto>(DatabaseFacade databaseFacade, string sql, params object[] parameters)'. [/src/PosErp.Application/PosErp.Application.csproj]
+14.49 /src/PosErp.Application/Features/Inventory/Queries/GetStockPosition/GetStockPositionQuery.cs(91,91): warning CS8604: Possible null reference argument for parameter 'parameters' in 'IQueryable<StockPositionDto> RelationalDatabaseFacadeExtensions.SqlQueryRaw<StockPositionDto>(DatabaseFacade databaseFacade, string sql, params object[] parameters)'. [/src/PosErp.Application/PosErp.Application.csproj]
+14.49 /src/PosErp.Application/Features/Inventory/Queries/GetStockPosition/GetStockPositionQuery.cs(91,111): warning CS8604: Possible null reference argument for parameter 'parameters' in 'IQueryable<StockPositionDto> RelationalDatabaseFacadeExtensions.SqlQueryRaw<StockPositionDto>(DatabaseFacade databaseFacade, string sql, params object[] parameters)'. [/src/PosErp.Application/PosErp.Application.csproj]
+14.58   PosErp.Application -> /src/PosErp.Application/bin/Release/net8.0/PosErp.Application.dll
+24.82   PosErp.Infrastructure -> /src/PosErp.Infrastructure/bin/Release/net8.0/PosErp.Infrastructure.dll
+26.05 /src/PosErp.Api/Program.cs(15,40): error CS0234: The type or namespace name 'Interfaces' does not exist in the namespace 'PosErp.Application.Features.Auth' (are you missing an assembly reference?) [/src/PosErp.Api/PosErp.Api.csproj]
+------
+backend.Dockerfile:29
+
+--------------------
+
+  28 |     # Publish Release build — single-layer output
+
+  29 | >>> RUN dotnet publish PosErp.Api/PosErp.Api.csproj \
+
+  30 | >>>     -c Release \
+
+  31 | >>>     -o /app/publish \
+
+  32 | >>>     /p:UseAppHost=false \
+
+  33 | >>>     --no-restore
+
+  34 |     
+
+--------------------
+
+failed to solve: process "/bin/sh -c dotnet publish PosErp.Api/PosErp.Api.csproj     -c Release     -o /app/publish     /p:UseAppHost=false     --no-restore" did not complete successfully: exit code: 1
+

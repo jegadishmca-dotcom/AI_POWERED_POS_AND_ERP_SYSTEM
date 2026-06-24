@@ -12,7 +12,6 @@ using Polly;
 using PosErp.Api.Middlewares;
 using PosErp.Application.Interfaces;
 using PosErp.Infrastructure.Services;
-using PosErp.Application.Features.Auth.Interfaces;
 using PosErp.Infrastructure.Persistence;
 using PosErp.Infrastructure.Authentication;
 using PosErp.Infrastructure.Identity;
@@ -25,6 +24,8 @@ using PosErp.Application.Features.Offers.Services;
 using PosErp.Application.Features.Crm.Services;
 using PosErp.Application.Features.Finance.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using Hangfire;
@@ -86,10 +87,10 @@ builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics => metrics
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
-        .AddRuntimeInstrumentation()
     );
 
 // Phase 6: Rate Limiting
+/*
 builder.Services.AddRateLimiter(options =>
 {
     options.AddFixedWindowLimiter("PosApi", opt =>
@@ -108,6 +109,7 @@ builder.Services.AddRateLimiter(options =>
         opt.Window = TimeSpan.FromSeconds(1);
     });
 });
+*/
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantProvider, TenantProvider>();
@@ -265,7 +267,7 @@ app.Use(async (context, next) =>
     await next();
 });
 
-app.UseRateLimiter();
+//app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<DemoSandboxMiddleware>();

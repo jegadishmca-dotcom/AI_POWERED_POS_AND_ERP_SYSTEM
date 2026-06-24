@@ -27,7 +27,8 @@ import {
   PieChart,
   BookOpen,
   CalendarClock,
-  Banknote
+  Banknote,
+  Tag
 } from 'lucide-react';
 import { useAuthStore } from './features/auth/store/auth.store';
 import { Login } from './features/auth/routes/Login';

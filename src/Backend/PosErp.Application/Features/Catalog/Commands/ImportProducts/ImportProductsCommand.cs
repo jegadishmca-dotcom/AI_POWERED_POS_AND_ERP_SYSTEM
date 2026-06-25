@@ -45,7 +45,7 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                 return new ImportProductResult(0, 0, new List<string> { "CSV file is empty." });
             }
 
-            var headers = headerLine.Split(',').Select(h => h.Trim().ToLower()).ToList();
+            var headers = ParseCsvLine(headerLine).Select(h => h.ToLower()).ToList();
 
             // Find column indices
             int codeIdx = headers.IndexOf("productcode");

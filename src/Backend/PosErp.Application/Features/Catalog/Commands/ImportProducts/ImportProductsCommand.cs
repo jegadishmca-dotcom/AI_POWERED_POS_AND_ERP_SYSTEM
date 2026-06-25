@@ -109,8 +109,11 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                     string? tamilName = tamilNameIdx != -1 && tamilNameIdx < values.Count ? values[tamilNameIdx] : null;
                     string? description = descIdx != -1 && descIdx < values.Count ? values[descIdx] : null;
                     
-                    if (!decimal.TryParse(mrpIdx < values.Count ? values[mrpIdx] : "0", out decimal mrp) ||
-                        !decimal.TryParse(sellingIdx < values.Count ? values[sellingIdx] : "0", out decimal sellingPrice))
+                    string mrpStr = mrpIdx != -1 && mrpIdx < values.Count && !string.IsNullOrWhiteSpace(values[mrpIdx]) ? values[mrpIdx] : "0";
+                    string sellingStr = sellingIdx != -1 && sellingIdx < values.Count && !string.IsNullOrWhiteSpace(values[sellingIdx]) ? values[sellingIdx] : "0";
+
+                    if (!decimal.TryParse(mrpStr, System.Globalization.NumberStyles.Any, null, out decimal mrp) ||
+                        !decimal.TryParse(sellingStr, System.Globalization.NumberStyles.Any, null, out decimal sellingPrice))
                     {
                         errors.Add($"Line {lineNum}: Invalid numeric format for Mrp or SellingPrice.");
                         failed++;
@@ -118,9 +121,9 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                     }
 
                     decimal purchasePrice = 0m;
-                    if (purchaseIdx != -1 && purchaseIdx < values.Count)
+                    if (purchaseIdx != -1 && purchaseIdx < values.Count && !string.IsNullOrWhiteSpace(values[purchaseIdx]))
                     {
-                        decimal.TryParse(values[purchaseIdx], out purchasePrice);
+                        decimal.TryParse(values[purchaseIdx], System.Globalization.NumberStyles.Any, null, out purchasePrice);
                     }
                     if (purchasePrice == 0m)
                     {

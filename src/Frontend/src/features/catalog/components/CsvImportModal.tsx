@@ -1,4 +1,4 @@
-﻿import React, { useState, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import { UploadCloud, X, Loader2, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { importCsv } from '../api/catalog.api';
 import { useQueryClient } from '@tanstack/react-query';
@@ -67,8 +67,8 @@ export const CsvImportModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
               Imported: <strong>{result.totalImported}</strong> | Failed: <strong>{result.totalFailed}</strong>
             </p>
             {result.errors?.length > 0 && (
-              <ul className="mt-2 text-xs text-red-600 dark:text-red-400 max-h-32 overflow-y-auto bg-white/50 p-2 rounded">
-                {result.errors.map((err: string, i: number) => <li key={i}>{err}</li>)}
+              <ul className="mt-2 text-xs text-red-600 dark:text-red-300 max-h-32 overflow-y-auto bg-white/50 dark:bg-black/20 p-2 rounded border border-red-100 dark:border-red-900/30">
+                {result.errors.map((err: string, i: number) => <li key={i} className="mb-1">{err}</li>)}
               </ul>
             )}
           </div>

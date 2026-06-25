@@ -32,10 +32,13 @@ public class ClosePosSessionCommandHandler : IRequestHandler<ClosePosSessionComm
         // BUG-05 FIX: Wrap the entire shift-close operation in a single transaction.
         // Previously, a failure between account creation and session update could leave the
         // session permanently stuck as OPEN (non-atomic operations across SaveChangesAsync calls).
-        await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
-
-        try
+        var strategy = db.Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
+            await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
+
+            try
+            {
             // Calculate expected cash from invoices during this session
             var endTime = DateTime.UtcNow;
             var invoices = await _context.Invoices
@@ -90,6 +93,7 @@ public class ClosePosSessionCommandHandler : IRequestHandler<ClosePosSessionComm
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+        });
     }
 
     private async Task EnsureAccountExistsAsync(string code, string name, string type, CancellationToken cancellationToken)

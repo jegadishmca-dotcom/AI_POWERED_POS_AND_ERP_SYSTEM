@@ -67,9 +67,12 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
     public async Task<Guid> Handle(CreateInvoiceCommand request, CancellationToken cancellationToken)
     {
-        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
-        try
+        var strategy = ((DbContext)_context).Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
+            using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
             var customer = request.CustomerId.HasValue 
                 ? await _context.Customers.Include(c => c.Tier).FirstOrDefaultAsync(c => c.Id == request.CustomerId.Value) 
                 : null;
@@ -571,5 +574,6 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+        });
     }
 }

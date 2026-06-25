@@ -499,9 +499,12 @@ public class PosController : ControllerBase
 
         var businessDate = request.BusinessDate.Date;
 
-        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync();
-        try
+        var strategy = ((DbContext)_context).Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
+            using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync();
+            try
+            {
             var existing = await _context.Invoices
                 .Include(i => i.Items)
                 .FirstOrDefaultAsync(i => i.Id == request.Id && i.BusinessDate == businessDate);
@@ -570,12 +573,13 @@ public class PosController : ControllerBase
 
             return Ok(new { success = true, message = "Invoice held successfully." });
         }
-        catch (Exception ex)
-        {
-            await transaction.RollbackAsync();
-            var innerMsg = ex.InnerException != null ? $" (Inner: {ex.InnerException.Message})" : "";
-            return StatusCode(500, new { message = $"Failed to hold invoice: {ex.Message}{innerMsg}" });
-        }
+            catch (Exception ex)
+            {
+                await transaction.RollbackAsync();
+                var innerMsg = ex.InnerException != null ? $" (Inner: {ex.InnerException.Message})" : "";
+                return StatusCode(500, new { message = $"Failed to hold invoice: {ex.Message}{innerMsg}" });
+            }
+        });
     }
 
     [HttpGet("invoices/held")]

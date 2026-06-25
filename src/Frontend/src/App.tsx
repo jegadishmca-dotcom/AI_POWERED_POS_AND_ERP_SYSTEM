@@ -12,6 +12,7 @@ import {
   MapPin, 
   LogOut, 
   User as UserIcon, 
+  Users,
   Terminal,
   Settings as SettingsIcon,
   BarChart3,
@@ -48,6 +49,8 @@ import { BusinessDateDashboard } from './features/pos/components/BusinessDateDas
 import { Suppliers } from './features/purchasing/routes/Suppliers';
 import { PurchaseOrders } from './features/purchasing/routes/PurchaseOrders';
 import { Settings } from './pages/Settings';
+import { OffersManager } from './features/offers/components/OffersManager';
+import { Customers } from './features/crm/routes/Customers';
 import { AiInvoiceImport } from './features/inventory/components/AiInvoiceImport';
 import { AiChat } from './features/ai/routes/AiChat';
 import { AiForecaster } from './features/ai/routes/AiForecaster';
@@ -140,6 +143,7 @@ const AppLayout: React.FC = () => {
     { path: '/finance/credit-limit', name: 'Credit Monitoring', icon: ShieldAlert, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
     
     // CRM & Marketing
+    { path: '/customers', name: 'CRM Master', icon: Users, roles: ['Owner', 'Manager'], category: 'crm' },
     { path: '/offers', name: 'Offers & Promotions', icon: Tag, roles: ['Owner', 'Manager'], category: 'crm' },
   ];
 
@@ -447,6 +451,9 @@ const AppLayout: React.FC = () => {
             } />
             <Route path="/offers" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <OffersManager />
+            } />
+            <Route path="/customers" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <Customers />
             } />
             {/* Finance F1 Routes */}
             <Route path="/finance/dashboard" element={user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <FinanceDashboard />} />

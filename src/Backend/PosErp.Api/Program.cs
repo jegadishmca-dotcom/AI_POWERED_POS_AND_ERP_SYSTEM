@@ -85,8 +85,10 @@ builder.Services.AddOpenTelemetry()
         .AddHttpClientInstrumentation()
     )
     .WithMetrics(metrics => metrics
+        .AddRuntimeInstrumentation()
         .AddAspNetCoreInstrumentation()
         .AddHttpClientInstrumentation()
+        .AddPrometheusExporter()
     );
 
 // Phase 6: Rate Limiting
@@ -351,6 +353,7 @@ using (var scope = app.Services.CreateScope())
 
 app.MapControllers();
 app.MapHealthChecks("/health");
+app.MapPrometheusScrapingEndpoint();
 
 // Seed Database
 using (var scope = app.Services.CreateScope())

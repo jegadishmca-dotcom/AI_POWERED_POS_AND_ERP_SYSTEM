@@ -230,7 +230,7 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                     if (imported % 500 == 0)
                     {
                         await _context.SaveChangesAsync(cancellationToken);
-                        _context.ChangeTracker.Clear(); // Clear tracking to keep memory low
+                        if (_context is DbContext dbContext) { dbContext.ChangeTracker.Clear(); } // Clear tracking to keep memory low
                         // Re-fetch tax slabs & UOMs since they got detached
                         taxSlabs = await _context.TaxSlabs.Where(t => !t.IsDeleted).ToListAsync(cancellationToken);
                         defaultTaxSlab = taxSlabs.FirstOrDefault();

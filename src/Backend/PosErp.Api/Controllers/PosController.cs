@@ -119,7 +119,7 @@ public class PosController : ControllerBase
     }
 
     [HttpGet("z-report")]
-    [Authorize(Roles = "Manager,Owner")] // Z-Report is Manager/Owner only
+    [Authorize(Roles = "Manager,Owner,Cashier")] // Allow Cashiers to view their shift report
     public async Task<IActionResult> GetZReport([FromQuery] Guid terminalId, [FromQuery] DateTime businessDate, [FromQuery] Guid? cashierId = null, [FromQuery] Guid? sessionId = null)
     {
         return Ok(await _mediator.Send(new GetZReportQuery(terminalId, businessDate, cashierId, sessionId)));

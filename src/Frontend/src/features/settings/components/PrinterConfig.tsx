@@ -182,7 +182,6 @@ export const PrinterConfig: React.FC = () => {
   <title>Print Barcode - Test Label</title>
   <style>
     @page {
-      size: 102mm 22mm;
       margin: 0;
     }
     * {

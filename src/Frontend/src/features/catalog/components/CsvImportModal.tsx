@@ -84,14 +84,18 @@ export const CsvImportModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
         )}
 
         <div className="mt-6 flex justify-end space-x-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900">Cancel</button>
-          <button 
-            onClick={handleUpload}
-            disabled={!file || isUploading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 transition disabled:opacity-50 flex items-center"
-          >
-            {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Upload CSV'}
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900">
+            {result && !result.error && result.totalFailed === 0 ? 'Close' : 'Cancel'}
           </button>
+          {!(result && !result.error && result.totalFailed === 0) && (
+            <button 
+              onClick={handleUpload}
+              disabled={!file || isUploading}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 transition disabled:opacity-50 flex items-center"
+            >
+              {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : 'Upload CSV'}
+            </button>
+          )}
         </div>
       </div>
     </div>

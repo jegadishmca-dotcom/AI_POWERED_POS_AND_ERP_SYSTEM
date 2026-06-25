@@ -128,7 +128,6 @@ export const ProductList = ({
   <title>Print Barcode - ${product.name || ''}</title>
   <style>
     @page {
-      size: 102mm 22mm;
       margin: 0;
     }
     * {

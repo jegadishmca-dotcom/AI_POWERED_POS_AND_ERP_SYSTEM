@@ -499,12 +499,8 @@ public class PosController : ControllerBase
 
         var businessDate = request.BusinessDate.Date;
 
-        var strategy = ((DbContext)_context).Database.CreateExecutionStrategy();
-        return await strategy.ExecuteAsync(async () =>
+        try
         {
-            using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync();
-            try
-            {
             var existing = await _context.Invoices
                 .Include(i => i.Items)
                 .FirstOrDefaultAsync(i => i.Id == request.Id && i.BusinessDate == businessDate);
@@ -513,7 +509,7 @@ public class PosController : ControllerBase
             {
                 _context.InvoiceItems.RemoveRange(existing.Items);
                 _context.Invoices.Remove(existing);
-                await _context.SaveChangesAsync(default);
+                // Do not SaveChanges here, let the final SaveChangesAsync handle everything implicitly
             }
 
             // Generate a unique negative terminal sequence for held invoices to avoid unique constraint violations
@@ -568,21 +564,19 @@ public class PosController : ControllerBase
             }
 
             _context.Invoices.Add(invoice);
-            await _context.SaveChangesAsync(default);
-            await transaction.CommitAsync();
+            await _context.SaveChangesAsync(default); // Implicit transaction covers both Removes and Adds
 
             return Ok(new { success = true, message = "Invoice held successfully." });
         }
-            catch (Exception ex)
-            {
-                await transaction.RollbackAsync();
-                var innerMsg = ex.InnerException != null ? $" (Inner: {ex.InnerException.Message})" : "";
-                return StatusCode(500, new { message = $"Failed to hold invoice: {ex.Message}{innerMsg}" });
-            }
-        });
+        catch (Exception ex)
+        {
+            var innerMsg = ex.InnerException != null ? $" (Inner: {ex.InnerException.Message})" : "";
+            return StatusCode(500, new { message = $"Failed to hold invoice: {ex.Message}{innerMsg}" });
+        }
     }
 
     [HttpGet("invoices/held")]
+    [ResponseCache(NoStore = true, Location = ResponseCacheLocation.None)]
     public async Task<IActionResult> GetHeldInvoices()
     {
         var invoices = await _context.Invoices
@@ -635,6 +629,13 @@ public class PosController : ControllerBase
         }
 
         return Ok(result);
+    }
+
+    [HttpGet("invoices/debug")]
+    public async Task<IActionResult> DebugInvoices()
+    {
+        var raw = await _context.Invoices.Where(i => i.Status == "HOLD").Select(i => new { i.Id, i.Status, i.IsDeleted, i.InvoiceNumber, i.BusinessDate }).ToListAsync();
+        return Ok(raw);
     }
 
     [HttpDelete("invoices/hold/{id}")]

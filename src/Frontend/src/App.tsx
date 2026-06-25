@@ -56,7 +56,6 @@ import { AiChat } from './features/ai/routes/AiChat';
 import { AiForecaster } from './features/ai/routes/AiForecaster';
 import { AiMarkdowns } from './features/ai/routes/AiMarkdowns';
 import { LossPreventionDashboard } from './features/analytics/components/LossPreventionDashboard';
-import { OffersManager } from './features/offers/components/OffersManager';
 
 // Finance Phase F1
 import { FinanceDashboard } from './features/finance/components/FinanceDashboard';

@@ -1193,7 +1193,7 @@ public class AccountingIntegrationTests : IDisposable
         // F. Alerts check
         var alerts = await _context.AiAlerts.Where(a => a.StoreId == _storeId).ToListAsync();
         Assert.NotEmpty(alerts);
-        Assert.Contains(alerts, a => a.AlertType == "EXPIRY" && a.Severity == "CRITICAL");
+        Assert.Contains(alerts, a => a.AlertType == "EXPIRY" && a.AlertSeverity == "CRITICAL");
 
         // G. Natural Language Query execution check (Read-Only validation)
         var nlResult = await nlQueryService.ParseAndExecuteQueryAsync("show inventory value as of today", _storeId, CancellationToken.None);

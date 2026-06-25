@@ -23,69 +23,73 @@ public class ApproveStockTakeCommandHandler : IRequestHandler<ApproveStockTakeCo
 
     public async Task<bool> Handle(ApproveStockTakeCommand request, CancellationToken cancellationToken)
     {
-        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
-        try
+        var strategy = ((DbContext)_context).Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            // Note: Uses DbSet mapped in DbContext
-            // For scaffold, assume context.Set<StockTakeHeader>()
-            var take = await _context.StockTakeHeaders
-                .Include(t => t.Items)
-                .FirstOrDefaultAsync(t => t.Id == request.StockTakeId, cancellationToken);
-                
-            if (take == null || take.Status != "REVIEW") throw new Exception("Stock Take not ready for approval.");
-
-            take.Status = "APPROVED";
-            take.ApprovedBy = request.ApproverId;
-
-            foreach (var item in take.Items)
+            using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                if (item.VarianceQuantity == 0) continue;
+                // Note: Uses DbSet mapped in DbContext
+                // For scaffold, assume context.Set<StockTakeHeader>()
+                var take = await _context.StockTakeHeaders
+                    .Include(t => t.Items)
+                    .FirstOrDefaultAsync(t => t.Id == request.StockTakeId, cancellationToken);
+                    
+                if (take == null || take.Status != "REVIEW") throw new Exception("Stock Take not ready for approval.");
 
-                // Fetch actual cost price for audit-compliant valuation
-                decimal cost = 0;
-                if (item.BatchId.HasValue)
+                take.Status = "APPROVED";
+                take.ApprovedBy = request.ApproverId;
+
+                foreach (var item in take.Items)
                 {
-                    var batch = await _context.ProductBatches.FindAsync(new object[] { item.BatchId.Value }, cancellationToken);
-                    cost = batch?.CostPrice ?? 0;
-                }
-                if (cost == 0)
-                {
-                    var product = await _context.Products.FindAsync(new object[] { item.ProductId }, cancellationToken);
-                    cost = product?.PurchasePrice ?? (product != null ? product.SellingPrice * 0.7m : 0);
+                    if (item.VarianceQuantity == 0) continue;
+
+                    // Fetch actual cost price for audit-compliant valuation
+                    decimal cost = 0;
+                    if (item.BatchId.HasValue)
+                    {
+                        var batch = await _context.ProductBatches.FindAsync(new object[] { item.BatchId.Value }, cancellationToken);
+                        cost = batch?.CostPrice ?? 0;
+                    }
+                    if (cost == 0)
+                    {
+                        var product = await _context.Products.FindAsync(new object[] { item.ProductId }, cancellationToken);
+                        cost = product?.PurchasePrice ?? (product != null ? product.SellingPrice * 0.7m : 0);
+                    }
+
+                    // Create Auto-Adjustment for variance
+                    await _stockLedgerService.RecordMovementAsync(
+                        storeId: take.StoreId ?? Guid.Empty,
+                        warehouseId: null,
+                        terminalId: null,
+                        businessDate: DateTime.UtcNow,
+                        productId: item.ProductId,
+                        batchId: item.BatchId,
+                        movementType: "ADJ", // Automated variance correction
+                        quantity: item.VarianceQuantity, // Will be negative if missing stock
+                        unitCost: cost,
+                        expiryDate: null,
+                        referenceDocId: take.Id,
+                        referenceNumber: $"TAKE-VAR-{take.TakeNumber}",
+                        userId: request.ApproverId,
+                        cancellationToken: cancellationToken
+                    );
                 }
 
-                // Create Auto-Adjustment for variance
-                await _stockLedgerService.RecordMovementAsync(
-                    storeId: take.StoreId ?? Guid.Empty,
-                    warehouseId: null,
-                    terminalId: null,
-                    businessDate: DateTime.UtcNow,
-                    productId: item.ProductId,
-                    batchId: item.BatchId,
-                    movementType: "ADJ", // Automated variance correction
-                    quantity: item.VarianceQuantity, // Will be negative if missing stock
-                    unitCost: cost,
-                    expiryDate: null,
-                    referenceDocId: take.Id,
-                    referenceNumber: $"TAKE-VAR-{take.TakeNumber}",
-                    userId: request.ApproverId,
-                    cancellationToken: cancellationToken
-                );
+                await _context.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return true;
             }
-
-            await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return true;
-        }
-        catch (DbUpdateConcurrencyException ex)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw new Exception("Concurrency conflict. Please retry.", ex);
-        }
-        catch (Exception)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw new Exception("Concurrency conflict. Please retry.", ex);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 }

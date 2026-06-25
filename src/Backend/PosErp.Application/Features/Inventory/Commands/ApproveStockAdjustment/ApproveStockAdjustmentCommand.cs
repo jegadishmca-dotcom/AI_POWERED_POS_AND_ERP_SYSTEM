@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Application.Features.Inventory.Services;
@@ -23,53 +23,64 @@ public class ApproveStockAdjustmentCommandHandler : IRequestHandler<ApproveStock
 
     public async Task<bool> Handle(ApproveStockAdjustmentCommand request, CancellationToken cancellationToken)
     {
-        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
-        try
+        var strategy = ((DbContext)_context).Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var adj = await _context.StockAdjustments
-                .Include(a => a.Items)
-                .FirstOrDefaultAsync(a => a.Id == request.AdjustmentId, cancellationToken);
-                
-            if (adj == null || adj.Status != "PENDING") throw new Exception("Invalid or already processed Adjustment.");
-
-            adj.Status = "APPROVED";
-            adj.ApprovedBy = request.ApproverId;
-
-            foreach(var item in adj.Items)
+            using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                if (item.AdjustedQuantity == 0) continue;
+                var adj = await _context.StockAdjustments
+                    .Include(a => a.Items)
+                    .FirstOrDefaultAsync(a => a.Id == request.AdjustmentId, cancellationToken);
+                    
+                if (adj == null || adj.Status != "PENDING") throw new Exception("Invalid or already processed Adjustment.");
 
-                await _stockLedgerService.RecordMovementAsync(
-                    storeId: adj.StoreId ?? Guid.Empty,
-                    warehouseId: null,
-                    terminalId: null,
-                    businessDate: DateTime.UtcNow,
-                    productId: item.ProductId,
-                    batchId: item.BatchId,
-                    movementType: "ADJ", // Key movement type
-                    quantity: item.AdjustedQuantity, // Can be -ve or +ve
-                    unitCost: item.UnitCost,
-                    expiryDate: null,
-                    referenceDocId: adj.Id,
-                    referenceNumber: adj.AdjustmentNumber,
-                    userId: request.ApproverId,
-                    cancellationToken: cancellationToken
-                );
+                adj.Status = "APPROVED";
+                adj.ApprovedBy = request.ApproverId;
+
+                foreach(var item in adj.Items)
+                {
+                    if (item.AdjustedQuantity == 0) continue;
+
+                    decimal cost = 0;
+                    if (item.BatchId.HasValue)
+                    {
+                        var batch = await _context.ProductBatches.FindAsync(new object[] { item.BatchId.Value }, cancellationToken);
+                        cost = batch?.CostPrice ?? 0;
+                    }
+
+                    await _stockLedgerService.RecordMovementAsync(
+                        storeId: adj.StoreId ?? Guid.Empty,
+                        warehouseId: null,
+                        terminalId: null,
+                        businessDate: DateTime.UtcNow,
+                        productId: item.ProductId,
+                        batchId: item.BatchId,
+                        movementType: "ADJ",
+                        quantity: item.AdjustedQuantity, 
+                        unitCost: cost,
+                        expiryDate: null,
+                        referenceDocId: adj.Id,
+                        referenceNumber: adj.AdjustmentNumber,
+                        userId: request.ApproverId,
+                        cancellationToken: cancellationToken
+                    );
+                }
+
+                await _context.SaveChangesAsync(cancellationToken);
+                await transaction.CommitAsync(cancellationToken);
+                return true;
             }
-
-            await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
-            return true;
-        }
-        catch (DbUpdateConcurrencyException ex)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw new Exception("Concurrency conflict. Please retry.", ex);
-        }
-        catch (Exception)
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw new Exception("Concurrency conflict. Please retry.", ex);
+            }
+            catch (Exception)
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 }

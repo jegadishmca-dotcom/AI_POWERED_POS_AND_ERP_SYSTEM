@@ -58,6 +58,7 @@ public class DemoSandboxMiddleware
                  path.StartsWith("/api/settings/terminals") || 
                  path.StartsWith("/api/settings/users") || 
                  path.StartsWith("/api/settings/email") || 
+                 path.StartsWith("/api/settings/inventory-rules") || 
                  path.StartsWith("/api/inventory")) && 
                 (HttpMethods.IsPost(method) || HttpMethods.IsPut(method)))
             {

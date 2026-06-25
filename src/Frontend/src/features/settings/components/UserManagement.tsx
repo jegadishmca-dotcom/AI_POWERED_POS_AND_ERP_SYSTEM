@@ -192,6 +192,10 @@ export const UserManagement: React.FC = () => {
         <button
           onClick={() => {
             setActionError(null);
+            setUsername('');
+            setFullName('');
+            setPassword('');
+            setConfirmPassword('');
             setShowAddModal(true);
           }}
           className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5"

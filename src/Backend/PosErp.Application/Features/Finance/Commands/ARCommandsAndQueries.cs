@@ -53,10 +53,47 @@ public class CustomerAgingDto
     public decimal Overdue90Plus { get; set; }
 }
 
+public record GetCustomerReceiptsQuery(Guid StoreId) : IRequest<List<CustomerReceiptDto>>;
+
+public class CustomerReceiptDto
+{
+    public Guid Id { get; set; }
+    public Guid StoreId { get; set; }
+    public Guid CustomerId { get; set; }
+    public string CustomerName { get; set; } = string.Empty;
+    public DateTime ReceiptDate { get; set; }
+    public string ReceiptNumber { get; set; } = string.Empty;
+    public string PaymentMode { get; set; } = string.Empty;
+    public string? ReferenceNumber { get; set; }
+    public decimal Amount { get; set; }
+    public Guid? JournalEntryId { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public record GetCreditMonitoringQuery(Guid StoreId) : IRequest<List<CreditMonitoringDto>>;
+
+public class CreditMonitoringDto
+{
+    public Guid CustomerId { get; set; }
+    public string CustomerName { get; set; } = string.Empty;
+    public decimal CreditLimit { get; set; }
+    public decimal Outstanding { get; set; }
+    public decimal AvailableCredit { get; set; }
+    public decimal UtilizationPercentage { get; set; }
+    public int OverdueDays { get; set; }
+    public string RiskLevel { get; set; } = "LOW";
+    public DateTime? LastPaymentDate { get; set; }
+    public string Status { get; set; } = "Active";
+}
+
 public class ARCommandsAndQueriesHandler :
     IRequestHandler<ProcessCustomerReceiptCommand, Guid>,
     IRequestHandler<GetCustomerLedgerQuery, List<CustomerLedgerDto>>,
-    IRequestHandler<GetCustomerAgingReportQuery, List<CustomerAgingDto>>
+    IRequestHandler<GetCustomerAgingReportQuery, List<CustomerAgingDto>>,
+    IRequestHandler<GetCustomerReceiptsQuery, List<CustomerReceiptDto>>,
+    IRequestHandler<GetCreditMonitoringQuery, List<CreditMonitoringDto>>
 {
     private readonly IApplicationDbContext _context;
     private readonly IFinancialPostingService _postingService;
@@ -110,10 +147,13 @@ public class ARCommandsAndQueriesHandler :
             // Let's use 20200 'Customer Wallet Liabilities' or similar, or define a general customer receivable GL code 20000.
             // Looking at COA: ('20000', 'Current Liabilities'), ('2100', 'Customer Wallet Deposits') (Wait, in seed it was 2100, and in 12_Seed it is 20200 'Customer Wallet Liabilities')
             // Let's use '20200' as Customer Receivable/Deposits.
+            string digitalAccountCode = await ResolveAccountCodeAsync("ASSET", "Current", "10200", cancellationToken);
+            string arAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", "20200", cancellationToken);
+
             var lines = new List<JournalLineDto>
             {
-                new() { AccountCode = "10200", Description = $"Customer receipt {recNumber}", Debit = request.Amount, Credit = 0 },
-                new() { AccountCode = "20200", Description = $"Customer account credit {customer.Name}", Debit = 0, Credit = request.Amount }
+                new() { AccountCode = digitalAccountCode, Description = $"Customer receipt {recNumber}", Debit = request.Amount, Credit = 0 },
+                new() { AccountCode = arAccountCode, Description = $"Customer account credit {customer.Name}", Debit = 0, Credit = request.Amount }
             };
 
             Guid jeId = await _postingService.PostJournalEntryWithUserAsync(
@@ -265,5 +305,111 @@ public class ARCommandsAndQueriesHandler :
         }
 
         return customerMap.Values.ToList();
+    }
+
+    public async Task<List<CustomerReceiptDto>> Handle(GetCustomerReceiptsQuery request, CancellationToken cancellationToken)
+    {
+        return await (from r in _context.CustomerReceipts
+                      join c in _context.Customers on r.CustomerId equals c.Id
+                      where r.StoreId == request.StoreId
+                      orderby r.ReceiptDate descending, r.CreatedAt descending
+                      select new CustomerReceiptDto
+                      {
+                          Id = r.Id,
+                          StoreId = r.StoreId,
+                          CustomerId = r.CustomerId,
+                          CustomerName = c.Name,
+                          ReceiptDate = r.ReceiptDate,
+                          ReceiptNumber = r.ReceiptNumber,
+                          PaymentMode = r.PaymentMode,
+                          ReferenceNumber = r.ReferenceNumber,
+                          Amount = r.Amount,
+                          JournalEntryId = r.JournalEntryId,
+                          Status = r.Status,
+                          Notes = r.Notes,
+                          CreatedAt = r.CreatedAt
+                      })
+                      .AsNoTracking()
+                      .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<CreditMonitoringDto>> Handle(GetCreditMonitoringQuery request, CancellationToken cancellationToken)
+    {
+        var customers = await _context.Customers
+            .AsNoTracking()
+            .ToListAsync(cancellationToken);
+
+        var list = new List<CreditMonitoringDto>();
+
+        foreach (var customer in customers)
+        {
+            // Outstanding from CustomerLedger
+            decimal outstanding = await _context.CustomerLedger
+                .Where(c => c.CustomerId == customer.Id && c.StoreId == request.StoreId)
+                .OrderByDescending(c => c.CreatedAt)
+                .Select(c => c.RunningBalance)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            decimal availableCredit = Math.Max(0, customer.CreditLimit - outstanding);
+            decimal utilization = customer.CreditLimit > 0 ? (outstanding / customer.CreditLimit) * 100 : 0;
+
+            // Risk Level
+            string risk = "LOW";
+            if (outstanding > customer.CreditLimit && customer.CreditLimit > 0) risk = "EXCEEDED";
+            else if (utilization > 80) risk = "HIGH";
+            else if (utilization > 50) risk = "MEDIUM";
+
+            // Overdue Days from unpaid credit invoices
+            int maxOverdue = 0;
+            var unpaidInvoices = await _context.Invoices
+                .Where(i => i.CustomerId == customer.Id && i.StoreId == request.StoreId && i.PaymentMode == "CREDIT" && i.Status != "PAID" && i.Status != "CANCELLED")
+                .Select(i => new { i.BusinessDate, i.DueDate })
+                .ToListAsync(cancellationToken);
+
+            foreach (var inv in unpaidInvoices)
+            {
+                DateTime dueDate = inv.DueDate ?? inv.BusinessDate.AddDays(30);
+                if (DateTime.Today > dueDate)
+                {
+                    int diff = (DateTime.Today - dueDate).Days;
+                    if (diff > maxOverdue) maxOverdue = diff;
+                }
+            }
+
+            // Last Payment Date
+            DateTime? lastPayDate = await _context.CustomerReceipts
+                .Where(r => r.CustomerId == customer.Id && r.StoreId == request.StoreId && r.Status == "POSTED")
+                .OrderByDescending(r => r.ReceiptDate)
+                .Select(r => (DateTime?)r.ReceiptDate)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            list.Add(new CreditMonitoringDto
+            {
+                CustomerId = customer.Id,
+                CustomerName = customer.Name,
+                CreditLimit = customer.CreditLimit,
+                Outstanding = outstanding,
+                AvailableCredit = availableCredit,
+                UtilizationPercentage = Math.Round(utilization, 2),
+                OverdueDays = maxOverdue,
+                RiskLevel = risk,
+                LastPaymentDate = lastPayDate,
+                Status = customer.MembershipStatus == "Blocked" ? "Blocked" : "Active"
+            });
+        }
+
+        return list;
+    }
+
+    private async Task<string> ResolveAccountCodeAsync(string accountType, string namePattern, string fallbackCode, CancellationToken cancellationToken)
+    {
+        var account = await _context.Accounts
+            .Where(a => a.IsActive && a.AccountType == accountType)
+            .ToListAsync(cancellationToken);
+
+        var matched = account.FirstOrDefault(a => a.Name.Contains(namePattern, StringComparison.OrdinalIgnoreCase))
+                   ?? account.FirstOrDefault(a => a.AccountCode == fallbackCode);
+
+        return matched?.AccountCode ?? fallbackCode;
     }
 }

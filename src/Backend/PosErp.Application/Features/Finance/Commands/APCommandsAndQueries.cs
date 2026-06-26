@@ -63,11 +63,51 @@ public class SupplierAgingDto
     public decimal Overdue90Plus { get; set; }
 }
 
+public record GetPurchaseBillsQuery(Guid StoreId) : IRequest<List<PurchaseBillDto>>;
+
+public class PurchaseBillDto
+{
+    public Guid Id { get; set; }
+    public Guid? StoreId { get; set; }
+    public Guid SupplierId { get; set; }
+    public string SupplierName { get; set; } = string.Empty;
+    public Guid GRNHeaderId { get; set; }
+    public string BillNumber { get; set; } = string.Empty;
+    public DateTime BillDate { get; set; }
+    public decimal SubTotal { get; set; }
+    public decimal TaxAmount { get; set; }
+    public decimal TotalAmount { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public DateTime? DueDate { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
+public record GetSupplierPaymentsQuery(Guid StoreId) : IRequest<List<SupplierPaymentDto>>;
+
+public class SupplierPaymentDto
+{
+    public Guid Id { get; set; }
+    public Guid StoreId { get; set; }
+    public Guid SupplierId { get; set; }
+    public string SupplierName { get; set; } = string.Empty;
+    public DateTime PaymentDate { get; set; }
+    public string PaymentNumber { get; set; } = string.Empty;
+    public string PaymentMode { get; set; } = string.Empty;
+    public string? ReferenceNumber { get; set; }
+    public decimal Amount { get; set; }
+    public Guid? JournalEntryId { get; set; }
+    public string Status { get; set; } = string.Empty;
+    public string? Notes { get; set; }
+    public DateTime CreatedAt { get; set; }
+}
+
 public class APCommandsAndQueriesHandler :
     IRequestHandler<CreatePurchaseBillCommand, Guid>,
     IRequestHandler<ProcessSupplierPaymentCommand, Guid>,
     IRequestHandler<GetSupplierLedgerQuery, List<SupplierLedgerDto>>,
-    IRequestHandler<GetSupplierAgingReportQuery, List<SupplierAgingDto>>
+    IRequestHandler<GetSupplierAgingReportQuery, List<SupplierAgingDto>>,
+    IRequestHandler<GetPurchaseBillsQuery, List<PurchaseBillDto>>,
+    IRequestHandler<GetSupplierPaymentsQuery, List<SupplierPaymentDto>>
 {
     private readonly IApplicationDbContext _context;
     private readonly IFinancialPostingService _postingService;
@@ -163,12 +203,17 @@ public class APCommandsAndQueriesHandler :
             // Debit Input CGST (cgstAmount)
             // Debit Input SGST (sgstAmount)
             // Credit Accounts Payable - Vendors (TotalAmount)
+            string inventoryAccountCode = await ResolveAccountCodeAsync("ASSET", "Inventory", "10300", cancellationToken);
+            string inputCgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input CGST", "22030", cancellationToken);
+            string inputSgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input SGST", "22040", cancellationToken);
+            string apAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Accounts Payable", "20100", cancellationToken);
+
             var lines = new List<JournalLineDto>
             {
-                new() { AccountCode = "10300", Description = $"Inventory addition from GRN {grn.GrnNumber}", Debit = itemsCost, Credit = 0 },
-                new() { AccountCode = "22030", Description = $"Input CGST on Bill {request.BillNumber}", Debit = cgstAmount, Credit = 0 },
-                new() { AccountCode = "22040", Description = $"Input SGST on Bill {request.BillNumber}", Debit = sgstAmount, Credit = 0 },
-                new() { AccountCode = "20100", Description = $"Accounts Payable vendor {supplier.Name}", Debit = 0, Credit = totalAmount }
+                new() { AccountCode = inventoryAccountCode, Description = $"Inventory addition from GRN {grn.GrnNumber}", Debit = itemsCost, Credit = 0 },
+                new() { AccountCode = inputCgstAccountCode, Description = $"Input CGST on Bill {request.BillNumber}", Debit = cgstAmount, Credit = 0 },
+                new() { AccountCode = inputSgstAccountCode, Description = $"Input SGST on Bill {request.BillNumber}", Debit = sgstAmount, Credit = 0 },
+                new() { AccountCode = apAccountCode, Description = $"Accounts Payable vendor {supplier.Name}", Debit = 0, Credit = totalAmount }
             };
 
             Guid jeId = await _postingService.PostJournalEntryWithUserAsync(
@@ -299,10 +344,13 @@ public class APCommandsAndQueriesHandler :
         var supplier = await _context.Suppliers.FindAsync(new object[] { payment.SupplierId }, cancellationToken);
 
         // Journal: Debit Accounts Payable - Vendors, Credit Bank Account (10200)
+        string apAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Accounts Payable", "20100", cancellationToken);
+        string digitalAccountCode = await ResolveAccountCodeAsync("ASSET", "Current", "10200", cancellationToken);
+
         var lines = new List<JournalLineDto>
         {
-            new() { AccountCode = "20100", Description = $"Supplier payment to {supplier?.Name ?? "Vendor"}", Debit = payment.Amount, Credit = 0 },
-            new() { AccountCode = "10200", Description = $"Bank payout for payment {payment.PaymentNumber}", Debit = 0, Credit = payment.Amount }
+            new() { AccountCode = apAccountCode, Description = $"Supplier payment to {supplier?.Name ?? "Vendor"}", Debit = payment.Amount, Credit = 0 },
+            new() { AccountCode = digitalAccountCode, Description = $"Bank payout for payment {payment.PaymentNumber}", Debit = 0, Credit = payment.Amount }
         };
 
         Guid jeId = await _postingService.PostJournalEntryWithUserAsync(
@@ -438,5 +486,69 @@ public class APCommandsAndQueriesHandler :
         }
 
         return supplierMap.Values.ToList();
+    }
+
+    public async Task<List<PurchaseBillDto>> Handle(GetPurchaseBillsQuery request, CancellationToken cancellationToken)
+    {
+        return await (from b in _context.PurchaseBills
+                      join s in _context.Suppliers on b.SupplierId equals s.Id
+                      where b.StoreId == request.StoreId
+                      orderby b.BillDate descending, b.CreatedAt descending
+                      select new PurchaseBillDto
+                      {
+                          Id = b.Id,
+                          StoreId = b.StoreId,
+                          SupplierId = b.SupplierId,
+                          SupplierName = s.Name,
+                          GRNHeaderId = b.GRNHeaderId,
+                          BillNumber = b.BillNumber,
+                          BillDate = b.BillDate,
+                          SubTotal = b.SubTotal,
+                          TaxAmount = b.TaxAmount,
+                          TotalAmount = b.TotalAmount,
+                          Status = b.Status,
+                          DueDate = b.DueDate,
+                          CreatedAt = b.CreatedAt
+                      })
+                      .AsNoTracking()
+                      .ToListAsync(cancellationToken);
+    }
+
+    public async Task<List<SupplierPaymentDto>> Handle(GetSupplierPaymentsQuery request, CancellationToken cancellationToken)
+    {
+        return await (from p in _context.SupplierPayments
+                      join s in _context.Suppliers on p.SupplierId equals s.Id
+                      where p.StoreId == request.StoreId
+                      orderby p.PaymentDate descending, p.CreatedAt descending
+                      select new SupplierPaymentDto
+                      {
+                          Id = p.Id,
+                          StoreId = p.StoreId,
+                          SupplierId = p.SupplierId,
+                          SupplierName = s.Name,
+                          PaymentDate = p.PaymentDate,
+                          PaymentNumber = p.PaymentNumber,
+                          PaymentMode = p.PaymentMode,
+                          ReferenceNumber = p.ReferenceNumber,
+                          Amount = p.Amount,
+                          JournalEntryId = p.JournalEntryId,
+                          Status = p.Status,
+                          Notes = p.Notes,
+                          CreatedAt = p.CreatedAt
+                      })
+                      .AsNoTracking()
+                      .ToListAsync(cancellationToken);
+    }
+
+    private async Task<string> ResolveAccountCodeAsync(string accountType, string namePattern, string fallbackCode, CancellationToken cancellationToken)
+    {
+        var account = await _context.Accounts
+            .Where(a => a.IsActive && a.AccountType == accountType)
+            .ToListAsync(cancellationToken);
+
+        var matched = account.FirstOrDefault(a => a.Name.Contains(namePattern, StringComparison.OrdinalIgnoreCase))
+                   ?? account.FirstOrDefault(a => a.AccountCode == fallbackCode);
+
+        return matched?.AccountCode ?? fallbackCode;
     }
 }

@@ -75,3 +75,113 @@ export const getJournalEntries = async (storeId?: string, startDate?: string, en
   const response = await api.get('/api/journalentries', { params });
   return Array.isArray(response.data) ? response.data : [];
 };
+
+export interface PurchaseBill {
+  id: string;
+  storeId: string;
+  supplierId: string;
+  supplierName: string;
+  grnHeaderId?: string;
+  billNumber: string;
+  billDate: string;
+  subTotal: number;
+  taxAmount: number;
+  totalAmount: number;
+  status: string;
+  dueDate?: string;
+  createdAt: string;
+}
+
+export interface SupplierPayment {
+  id: string;
+  storeId: string;
+  supplierId: string;
+  supplierName: string;
+  paymentNumber: string;
+  paymentDate: string;
+  paymentMode: string;
+  referenceNumber?: string;
+  amount: number;
+  notes?: string;
+  status: string;
+  createdAt: string;
+}
+
+export interface CustomerReceipt {
+  id: string;
+  storeId: string;
+  customerId: string;
+  customerName: string;
+  receiptNumber: string;
+  receiptDate: string;
+  paymentMode: string;
+  referenceNumber?: string;
+  amount: number;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface CreditMonitoring {
+  customerId: string;
+  customerName: string;
+  phone: string;
+  creditLimit: number;
+  outstandingBalance: number;
+  availableCredit: number;
+  utilizationPercentage: number;
+  overdueDays: number;
+  riskLevel: 'SAFE' | 'WARNING' | 'CRITICAL';
+  lastPaymentDate?: string;
+  isBlocked: boolean;
+}
+
+export interface FinanceDashboardData {
+  cashBalance: number;
+  bankBalance: number;
+  inventoryValue: number;
+  accountsReceivable: number;
+  accountsPayable: number;
+  gstInput: number;
+  gstOutput: number;
+  gstPayable: number;
+  workingCapital: number;
+  profit: number;
+  salesToday: number;
+  purchasesToday: number;
+}
+
+export const getSupplierBills = async (storeId?: string): Promise<PurchaseBill[]> => {
+  const params: any = {};
+  if (storeId) params.storeId = storeId;
+  const response = await api.get('/api/accountspayable/bills', { params });
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+export const getSupplierPayments = async (storeId?: string): Promise<SupplierPayment[]> => {
+  const params: any = {};
+  if (storeId) params.storeId = storeId;
+  const response = await api.get('/api/accountspayable/payments', { params });
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+export const getCustomerReceipts = async (storeId?: string): Promise<CustomerReceipt[]> => {
+  const params: any = {};
+  if (storeId) params.storeId = storeId;
+  const response = await api.get('/api/accountsreceivable/receipts', { params });
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+export const getCreditMonitoring = async (storeId?: string): Promise<CreditMonitoring[]> => {
+  const params: any = {};
+  if (storeId) params.storeId = storeId;
+  const response = await api.get('/api/accountsreceivable/credit-monitoring', { params });
+  return Array.isArray(response.data) ? response.data : [];
+};
+
+export const getFinanceDashboard = async (storeId?: string): Promise<FinanceDashboardData> => {
+  const params: any = {};
+  if (storeId) params.storeId = storeId;
+  const response = await api.get('/api/finance/dashboard', { params });
+  return response.data;
+};
+

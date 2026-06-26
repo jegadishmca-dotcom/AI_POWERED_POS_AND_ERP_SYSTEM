@@ -179,16 +179,21 @@ public class ReturnCommandsHandler :
             decimal cgstReversal = Math.Round(totalTax / 2m, 2);
             decimal sgstReversal = totalTax - cgstReversal;
 
+            string apAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Accounts Payable", "20100", cancellationToken);
+            string inventoryAccountCode = await ResolveAccountCodeAsync("ASSET", "Inventory", "10300", cancellationToken);
+            string inputCgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input CGST", "22030", cancellationToken);
+            string inputSgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input SGST", "22040", cancellationToken);
+
             var journalLines = new List<JournalLineDto>
             {
-                new() { AccountCode = "20100", Description = $"Purchase Return {returnNo}", Debit = totalAmount, Credit = 0 },
-                new() { AccountCode = "10300", Description = $"Inventory reversal for return {returnNo}", Debit = 0, Credit = totalSubTotal }
+                new() { AccountCode = apAccountCode, Description = $"Purchase Return {returnNo}", Debit = totalAmount, Credit = 0 },
+                new() { AccountCode = inventoryAccountCode, Description = $"Inventory reversal for return {returnNo}", Debit = 0, Credit = totalSubTotal }
             };
 
             if (cgstReversal > 0)
-                journalLines.Add(new() { AccountCode = "22030", Description = $"Input CGST Reversal for return {returnNo}", Debit = 0, Credit = cgstReversal });
+                journalLines.Add(new() { AccountCode = inputCgstAccountCode, Description = $"Input CGST Reversal for return {returnNo}", Debit = 0, Credit = cgstReversal });
             if (sgstReversal > 0)
-                journalLines.Add(new() { AccountCode = "22040", Description = $"Input SGST Reversal for return {returnNo}", Debit = 0, Credit = sgstReversal });
+                journalLines.Add(new() { AccountCode = inputSgstAccountCode, Description = $"Input SGST Reversal for return {returnNo}", Debit = 0, Credit = sgstReversal });
 
             Guid jeId = await _postingService.PostJournalEntryWithUserAsync(
                 request.StoreId,
@@ -373,28 +378,44 @@ public class ReturnCommandsHandler :
             decimal cgstReversal = Math.Round(totalTax / 2m, 2);
             decimal sgstReversal = totalTax - cgstReversal;
 
-            string refundAccount = "1000"; // default Cash
-            if (request.RefundMode == "UPI") refundAccount = "1100"; // Bank Account
-            else if (request.RefundMode == "CREDIT_NOTE") refundAccount = "20200"; // Customer Account
+            string resolvedRefundAccountCode = "10100";
+            if (request.RefundMode == "UPI")
+            {
+                resolvedRefundAccountCode = await ResolveAccountCodeAsync("ASSET", "Current", "10200", cancellationToken);
+            }
+            else if (request.RefundMode == "CREDIT_NOTE")
+            {
+                resolvedRefundAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", "20200", cancellationToken);
+            }
+            else
+            {
+                resolvedRefundAccountCode = await ResolveAccountCodeAsync("ASSET", "Cash", "10100", cancellationToken);
+            }
+
+            string salesAccountCode = await ResolveAccountCodeAsync("REVENUE", "Sales Revenue", "4000", cancellationToken);
+            string outputCgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Output CGST", "22010", cancellationToken);
+            string outputSgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Output SGST", "22020", cancellationToken);
+            string inventoryAccountCode = await ResolveAccountCodeAsync("ASSET", "Inventory Asset", "10300", cancellationToken);
+            string cogsAccountCode = await ResolveAccountCodeAsync("EXPENSE", "Cost of Goods Sold", "5000", cancellationToken);
 
             var journalLines = new List<JournalLineDto>
             {
-                new() { AccountCode = "4000", Description = $"Sales Return revenue reversal {returnNo}", Debit = totalSubTotal, Credit = 0 },
-                new() { AccountCode = refundAccount, Description = $"Refund for return {returnNo}", Debit = 0, Credit = totalAmount }
+                new() { AccountCode = salesAccountCode, Description = $"Sales Return revenue reversal {returnNo}", Debit = totalSubTotal, Credit = 0 },
+                new() { AccountCode = resolvedRefundAccountCode, Description = $"Refund for return {returnNo}", Debit = 0, Credit = totalAmount }
             };
 
             if (cgstReversal > 0)
-                journalLines.Add(new() { AccountCode = "2200", Description = $"Output CGST Reversal for return {returnNo}", Debit = cgstReversal, Credit = 0 });
+                journalLines.Add(new() { AccountCode = outputCgstAccountCode, Description = $"Output CGST Reversal for return {returnNo}", Debit = cgstReversal, Credit = 0 });
             if (sgstReversal > 0)
-                journalLines.Add(new() { AccountCode = "2201", Description = $"Output SGST Reversal for return {returnNo}", Debit = sgstReversal, Credit = 0 });
+                journalLines.Add(new() { AccountCode = outputSgstAccountCode, Description = $"Output SGST Reversal for return {returnNo}", Debit = sgstReversal, Credit = 0 });
 
             // 2. COGS & Inventory Reversal:
             // Debit Inventory Asset 10300 (totalCostReversal)
             // Credit COGS 5000 (totalCostReversal)
             if (totalCostReversal > 0)
             {
-                journalLines.Add(new() { AccountCode = "10300", Description = $"Inventory restock from return {returnNo}", Debit = totalCostReversal, Credit = 0 });
-                journalLines.Add(new() { AccountCode = "5000", Description = $"COGS reversal for return {returnNo}", Debit = 0, Credit = totalCostReversal });
+                journalLines.Add(new() { AccountCode = inventoryAccountCode, Description = $"Inventory restock from return {returnNo}", Debit = totalCostReversal, Credit = 0 });
+                journalLines.Add(new() { AccountCode = cogsAccountCode, Description = $"COGS reversal for return {returnNo}", Debit = 0, Credit = totalCostReversal });
             }
 
             Guid jeId = await _postingService.PostJournalEntryWithUserAsync(
@@ -469,5 +490,18 @@ public class ReturnCommandsHandler :
             await transaction.RollbackAsync(cancellationToken);
             throw;
         }
+    }
+
+    private async Task<string> ResolveAccountCodeAsync(string accountType, string namePattern, string fallbackCode, CancellationToken cancellationToken)
+    {
+        var account = await _context.Accounts
+            .Where(a => a.IsActive && a.AccountType == accountType)
+            .ToListAsync(cancellationToken);
+
+        var matched = account.FirstOrDefault(a => a.Name.Equals(namePattern, StringComparison.OrdinalIgnoreCase))
+                   ?? account.FirstOrDefault(a => a.Name.Contains(namePattern, StringComparison.OrdinalIgnoreCase))
+                   ?? account.FirstOrDefault(a => a.AccountCode == fallbackCode);
+
+        return matched?.AccountCode ?? fallbackCode;
     }
 }

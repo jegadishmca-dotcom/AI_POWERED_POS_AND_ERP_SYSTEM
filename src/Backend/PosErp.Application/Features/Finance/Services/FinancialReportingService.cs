@@ -375,10 +375,11 @@ public class FinancialReportingService : IFinancialReportingService
     private async Task<List<AccountBalanceDto>> GetRawBalancesAsync(Guid? storeId, DateTime endDate, CancellationToken cancellationToken)
     {
         Guid checkStoreId = storeId ?? Guid.Empty;
+        var utcEndDate = DateTime.SpecifyKind(endDate.Date, DateTimeKind.Utc);
         var query = _context.JournalEntryLines
             .Include(l => l.Account)
             .Include(l => l.JournalEntry)
-            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate <= endDate.Date);
+            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate <= utcEndDate);
 
         if (storeId.HasValue)
         {
@@ -437,10 +438,12 @@ public class FinancialReportingService : IFinancialReportingService
     public async Task<ProfitAndLossDto> GetProfitAndLossAsync(Guid? storeId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken)
     {
         Guid checkStoreId = storeId ?? Guid.Empty;
+        var utcStartDate = DateTime.SpecifyKind(startDate.Date, DateTimeKind.Utc);
+        var utcEndDate = DateTime.SpecifyKind(endDate.Date, DateTimeKind.Utc);
         var query = _context.JournalEntryLines
             .Include(l => l.Account)
             .Include(l => l.JournalEntry)
-            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate >= startDate.Date && l.JournalEntry.EntryDate <= endDate.Date)
+            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate >= utcStartDate && l.JournalEntry.EntryDate <= utcEndDate)
             .Where(l => l.Account.AccountType == "REVENUE" || l.Account.AccountType == "EXPENSE");
 
         if (storeId.HasValue)
@@ -583,10 +586,13 @@ public class FinancialReportingService : IFinancialReportingService
             .Select(a => a.Id)
             .ToListAsync(cancellationToken);
 
+        var utcStartDate = DateTime.SpecifyKind(startDate.Date, DateTimeKind.Utc);
+        var utcEndDate = DateTime.SpecifyKind(endDate.Date, DateTimeKind.Utc);
+
         // 1. Beginning Cash Balance
         var openingQuery = _context.JournalEntryLines
             .Include(l => l.JournalEntry)
-            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate < startDate.Date && cashBankAccounts.Contains(l.AccountId));
+            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate < utcStartDate && cashBankAccounts.Contains(l.AccountId));
 
         if (storeId.HasValue)
         {
@@ -597,7 +603,7 @@ public class FinancialReportingService : IFinancialReportingService
         // 2. Ending Cash Balance
         var endingQuery = _context.JournalEntryLines
             .Include(l => l.JournalEntry)
-            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate <= endDate.Date && cashBankAccounts.Contains(l.AccountId));
+            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate <= utcEndDate && cashBankAccounts.Contains(l.AccountId));
 
         if (storeId.HasValue)
         {
@@ -610,7 +616,7 @@ public class FinancialReportingService : IFinancialReportingService
             .Include(l => l.JournalEntry)
             .ThenInclude(e => e.Lines)
             .ThenInclude(ln => ln.Account)
-            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate >= startDate.Date && l.JournalEntry.EntryDate <= endDate.Date && cashBankAccounts.Contains(l.AccountId));
+            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate >= utcStartDate && l.JournalEntry.EntryDate <= utcEndDate && cashBankAccounts.Contains(l.AccountId));
 
         if (storeId.HasValue)
         {
@@ -680,10 +686,12 @@ public class FinancialReportingService : IFinancialReportingService
     public async Task<GeneralLedgerReportDto> GetGeneralLedgerReportAsync(Guid? storeId, DateTime startDate, DateTime endDate, CancellationToken cancellationToken)
     {
         Guid checkStoreId = storeId ?? Guid.Empty;
+        var utcStartDate = DateTime.SpecifyKind(startDate.Date, DateTimeKind.Utc);
+        var utcEndDate = DateTime.SpecifyKind(endDate.Date, DateTimeKind.Utc);
         var query = _context.JournalEntries
             .Include(e => e.Lines)
                 .ThenInclude(l => l.Account)
-            .Where(e => e.IsPosted && e.EntryDate >= startDate.Date && e.EntryDate <= endDate.Date);
+            .Where(e => e.IsPosted && e.EntryDate >= utcStartDate && e.EntryDate <= utcEndDate);
 
         if (storeId.HasValue)
         {
@@ -738,10 +746,13 @@ public class FinancialReportingService : IFinancialReportingService
             throw new InvalidOperationException($"Account code {accountCode} not found.");
         }
 
+        var utcStartDate = DateTime.SpecifyKind(startDate.Date, DateTimeKind.Utc);
+        var utcEndDate = DateTime.SpecifyKind(endDate.Date, DateTimeKind.Utc);
+
         // Calculate opening balance
         var opQuery = _context.JournalEntryLines
             .Include(l => l.JournalEntry)
-            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate < startDate.Date && l.AccountId == account.Id);
+            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate < utcStartDate && l.AccountId == account.Id);
 
         if (storeId.HasValue)
         {
@@ -760,7 +771,7 @@ public class FinancialReportingService : IFinancialReportingService
         // Fetch lines in range
         var linesQuery = _context.JournalEntryLines
             .Include(l => l.JournalEntry)
-            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate >= startDate.Date && l.JournalEntry.EntryDate <= endDate.Date && l.AccountId == account.Id);
+            .Where(l => l.JournalEntry.IsPosted && l.JournalEntry.EntryDate >= utcStartDate && l.JournalEntry.EntryDate <= utcEndDate && l.AccountId == account.Id);
 
         if (storeId.HasValue)
         {

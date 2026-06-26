@@ -26,6 +26,8 @@ export class LoginPage {
 
   async goto() {
     await this.page.goto('/');
+    await this.demoAdminButton.waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.waitForTimeout(2000);
   }
 
   async selectPosCashier() {

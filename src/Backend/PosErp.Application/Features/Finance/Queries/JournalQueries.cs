@@ -116,12 +116,14 @@ public class JournalQueriesHandler :
 
         if (request.StartDate.HasValue)
         {
-            query = query.Where(e => e.EntryDate >= request.StartDate.Value.Date);
+            var startUtc = DateTime.SpecifyKind(request.StartDate.Value.Date, DateTimeKind.Utc);
+            query = query.Where(e => e.EntryDate >= startUtc);
         }
 
         if (request.EndDate.HasValue)
         {
-            query = query.Where(e => e.EntryDate <= request.EndDate.Value.Date);
+            var endUtc = DateTime.SpecifyKind(request.EndDate.Value.Date, DateTimeKind.Utc);
+            query = query.Where(e => e.EntryDate <= endUtc);
         }
 
         if (!string.IsNullOrEmpty(request.Status))

@@ -8,9 +8,10 @@ export class InventoryPage {
 
   constructor(page: Page) {
     this.page = page;
-    this.searchInput = page.getByPlaceholder(/search inventory|product/i).first();
-    this.productList = page.locator('table, .inventory-list').first();
-    this.batchDetailsButton = page.locator('button', { hasText: /Batches|Details/i }).first();
+    // StockPositionReport.tsx actual placeholder: "Search Product Code or Name..."
+    this.searchInput = page.getByPlaceholder(/Search Product|Product Code/i).first();
+    this.productList = page.locator('table, .inventory-list, .stock-list').first();
+    this.batchDetailsButton = page.locator('button', { hasText: /Batches|Details|Batch/i }).first();
   }
 
   async goto() {

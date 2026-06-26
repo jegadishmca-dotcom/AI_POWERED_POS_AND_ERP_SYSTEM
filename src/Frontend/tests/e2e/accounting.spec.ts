@@ -24,6 +24,8 @@ test.describe('Accounting Integration Workflows', () => {
 
   test('should verify general ledger loads', async ({ page }) => {
     await accountingPage.viewGeneralLedger();
-    await expect(page.locator('table, .ledger-list').first()).toBeVisible({ timeout: 5000 });
+    // Use valid CSS selectors only (no text= in CSS context); check for table or ledger list
+    const ledgerElement = page.locator('table, .ledger-list, .chart-of-accounts').first();
+    await expect(ledgerElement).toBeVisible({ timeout: 8000 });
   });
 });

@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using System;
@@ -24,15 +24,18 @@ public class SearchCustomersQueryHandler : IRequestHandler<SearchCustomersQuery,
 
     public async Task<List<CustomerDto>> Handle(SearchCustomersQuery request, CancellationToken cancellationToken)
     {
-        if (string.IsNullOrWhiteSpace(request.Query) || request.Query.Length < 3) return new List<CustomerDto>();
+        var q = _context.Customers.Include(c => c.Tier).AsQueryable();
 
-        return await _context.Customers
-            .Include(c => c.Tier)
-            .Where(c => c.Phone.Contains(request.Query) || c.Name.ToLower().Contains(request.Query.ToLower()))
+        if (!string.IsNullOrWhiteSpace(request.Query))
+        {
+            q = q.Where(c => c.Phone.Contains(request.Query) || c.Name.ToLower().Contains(request.Query.ToLower()));
+        }
+
+        return await q
             .Select(c => new CustomerDto(
                 c.Id, c.Phone, c.Name, c.RunningWalletBalance, c.RunningLoyaltyPoints, c.Tier != null ? c.Tier.Name : "Base"
             ))
-            .Take(10)
+            .Take(20)
             .ToListAsync(cancellationToken);
     }
 }

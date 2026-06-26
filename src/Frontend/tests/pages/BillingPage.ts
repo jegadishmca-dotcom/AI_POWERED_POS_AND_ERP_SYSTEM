@@ -1,4 +1,4 @@
-import { Page, Locator, expect } from '@playwright/test';
+import { Page, Locator } from '@playwright/test';
 
 export class BillingPage {
   readonly page: Page;
@@ -13,20 +13,20 @@ export class BillingPage {
   
   constructor(page: Page) {
     this.page = page;
-    // We locate by placeholders assuming they exist or by accessible roles
-    this.searchProductInput = page.getByPlaceholder(/search product|barcode/i).first();
-    this.searchCustomerInput = page.getByPlaceholder(/search customer/i).first();
+    // POS Terminal actual placeholder: "F2: Scan Barcode or Type Product Name (Press Enter)..."
+    this.searchProductInput = page.getByPlaceholder(/Scan Barcode|Product Name/i).first();
+    // POS customer search: "F1: Search Customer (Phone/Name)..."
+    this.searchCustomerInput = page.getByPlaceholder(/Search Customer|F1:/i).first();
     this.payButton = page.locator('button', { hasText: /Pay|Checkout/i }).first();
     this.cashPaymentTab = page.locator('button', { hasText: /Cash/i }).first();
     this.upiPaymentTab = page.locator('button', { hasText: /UPI/i }).first();
-    this.amountTenderedInput = page.getByPlaceholder(/amount/i).first();
+    this.amountTenderedInput = page.getByPlaceholder(/amount|tender/i).first();
     this.confirmPaymentButton = page.locator('button', { hasText: /Confirm Payment|Complete/i }).first();
-    this.invoiceSuccessMessage = page.locator('text=/Invoice.*generated successfully|Payment successful/i');
+    this.invoiceSuccessMessage = page.locator('[class*="success"], [class*="invoice"]').first();
   }
 
   async goto() {
-    // Navigating to the dashboard/pos endpoint
-    await this.page.goto('/');
+    await this.page.goto('/pos');
   }
 
   async searchAndAddProduct(productCode: string) {

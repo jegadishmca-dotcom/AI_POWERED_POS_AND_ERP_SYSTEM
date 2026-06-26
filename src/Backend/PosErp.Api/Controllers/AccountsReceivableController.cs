@@ -12,7 +12,7 @@ namespace PosErp.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Roles = "Admin,Manager,Owner")]
 public class AccountsReceivableController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -75,6 +75,22 @@ public class AccountsReceivableController : ControllerBase
     public async Task<IActionResult> GetAging([FromQuery] Guid storeId, [FromQuery] DateTime asOfDate)
     {
         var result = await _mediator.Send(new GetCustomerAgingReportQuery(storeId, asOfDate));
+        return Ok(result);
+    }
+
+    [HttpGet("receipts")]
+    public async Task<IActionResult> GetReceipts([FromQuery] Guid? storeId)
+    {
+        var activeStoreId = storeId ?? Guid.Parse("00000000-0000-0000-0000-000000000000");
+        var result = await _mediator.Send(new GetCustomerReceiptsQuery(activeStoreId));
+        return Ok(result);
+    }
+
+    [HttpGet("credit-monitoring")]
+    public async Task<IActionResult> GetCreditMonitoring([FromQuery] Guid? storeId)
+    {
+        var activeStoreId = storeId ?? Guid.Parse("00000000-0000-0000-0000-000000000000");
+        var result = await _mediator.Send(new GetCreditMonitoringQuery(activeStoreId));
         return Ok(result);
     }
 }

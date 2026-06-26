@@ -504,17 +504,26 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
             var journalLines = new List<JournalLineDto>();
 
-            if (actualCashPaid > 0) journalLines.Add(new JournalLineDto { AccountCode = "1000", Description = "Cash Tender", Debit = actualCashPaid, Credit = 0 });
-            if (request.UpiAmount > 0 || request.CardAmount > 0) journalLines.Add(new JournalLineDto { AccountCode = "1100", Description = "Digital Tender", Debit = request.UpiAmount + request.CardAmount, Credit = 0 });
-            if (request.WalletAmountUsed > 0) journalLines.Add(new JournalLineDto { AccountCode = "2100", Description = "Wallet Redemption", Debit = request.WalletAmountUsed, Credit = 0 });
-            if (creditSaleAmount > 0) journalLines.Add(new JournalLineDto { AccountCode = "20200", Description = $"Credit Sale AR for {customer?.Name}", Debit = creditSaleAmount, Credit = 0 });
+            // Resolve account codes dynamically
+            string cashAccountCode = await ResolveAccountCodeAsync("ASSET", "Cash", "10100", cancellationToken);
+            string digitalAccountCode = await ResolveAccountCodeAsync("ASSET", "Current", "10200", cancellationToken);
+            string walletAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", "20200", cancellationToken);
+            string arAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", "20200", cancellationToken);
+            string salesAccountCode = await ResolveAccountCodeAsync("REVENUE", "Sales", "40100", cancellationToken);
+            string outputCgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Output CGST", "22010", cancellationToken);
+            string outputSgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Output SGST", "22020", cancellationToken);
+
+            if (actualCashPaid > 0) journalLines.Add(new JournalLineDto { AccountCode = cashAccountCode, Description = "Cash Tender", Debit = actualCashPaid, Credit = 0 });
+            if (request.UpiAmount > 0 || request.CardAmount > 0) journalLines.Add(new JournalLineDto { AccountCode = digitalAccountCode, Description = "Digital Tender", Debit = request.UpiAmount + request.CardAmount, Credit = 0 });
+            if (request.WalletAmountUsed > 0) journalLines.Add(new JournalLineDto { AccountCode = walletAccountCode, Description = "Wallet Redemption", Debit = request.WalletAmountUsed, Credit = 0 });
+            if (creditSaleAmount > 0) journalLines.Add(new JournalLineDto { AccountCode = arAccountCode, Description = $"Credit Sale AR for {customer?.Name}", Debit = creditSaleAmount, Credit = 0 });
             
             // Credits (Revenue & Tax Liability)
             // Sales Revenue = SubTotal (post-discount, ex-tax) + any round-off adjustment
             decimal revenueCredit = taxableValue + invoice.RoundOff;
-            journalLines.Add(new JournalLineDto { AccountCode = "4000", Description = "Sales Revenue", Debit = 0, Credit = revenueCredit });
-            if (cgst > 0) journalLines.Add(new JournalLineDto { AccountCode = "2200", Description = "Output CGST", Debit = 0, Credit = cgst });
-            if (sgst > 0) journalLines.Add(new JournalLineDto { AccountCode = "2201", Description = "Output SGST", Debit = 0, Credit = sgst });
+            journalLines.Add(new JournalLineDto { AccountCode = salesAccountCode, Description = "Sales Revenue", Debit = 0, Credit = revenueCredit });
+            if (cgst > 0) journalLines.Add(new JournalLineDto { AccountCode = outputCgstAccountCode, Description = "Output CGST", Debit = 0, Credit = cgst });
+            if (sgst > 0) journalLines.Add(new JournalLineDto { AccountCode = outputSgstAccountCode, Description = "Output SGST", Debit = 0, Credit = sgst });
 
             // Post to customer ledger if credit sale
             if (creditSaleAmount > 0 && customer != null)
@@ -575,5 +584,17 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             throw;
         }
         });
+    }
+
+    private async Task<string> ResolveAccountCodeAsync(string accountType, string namePattern, string fallbackCode, CancellationToken cancellationToken)
+    {
+        var account = await _context.Accounts
+            .Where(a => a.IsActive && a.AccountType == accountType)
+            .ToListAsync(cancellationToken);
+
+        var matched = account.FirstOrDefault(a => a.Name.Contains(namePattern, StringComparison.OrdinalIgnoreCase))
+                   ?? account.FirstOrDefault(a => a.AccountCode == fallbackCode);
+
+        return matched?.AccountCode ?? fallbackCode;
     }
 }

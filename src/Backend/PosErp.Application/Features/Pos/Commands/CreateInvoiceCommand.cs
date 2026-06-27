@@ -504,6 +504,14 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
             var journalLines = new List<JournalLineDto>();
 
+            // GUARD: Skip journal posting entirely for zero-value invoices.
+            // This can occur when all items have ₹0 selling price, or when offers
+            // reduce the total to zero. Posting a zero-value journal would fail the
+            // debit/credit balance check with "Journal entry amount must be greater than zero."
+            bool shouldPostJournal = invoice.NetPayable > 0;
+
+            if (shouldPostJournal)
+            {
             // Resolve account codes dynamically
             string cashAccountCode = await ResolveAccountCodeAsync("ASSET", "Cash", "10100", cancellationToken);
             string digitalAccountCode = await ResolveAccountCodeAsync("ASSET", "Current", "10200", cancellationToken);
@@ -521,9 +529,10 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             // Credits (Revenue & Tax Liability)
             // Sales Revenue = SubTotal (post-discount, ex-tax) + any round-off adjustment
             decimal revenueCredit = taxableValue + invoice.RoundOff;
-            journalLines.Add(new JournalLineDto { AccountCode = salesAccountCode, Description = "Sales Revenue", Debit = 0, Credit = revenueCredit });
+            if (revenueCredit > 0) journalLines.Add(new JournalLineDto { AccountCode = salesAccountCode, Description = "Sales Revenue", Debit = 0, Credit = revenueCredit });
             if (cgst > 0) journalLines.Add(new JournalLineDto { AccountCode = outputCgstAccountCode, Description = "Output CGST", Debit = 0, Credit = cgst });
             if (sgst > 0) journalLines.Add(new JournalLineDto { AccountCode = outputSgstAccountCode, Description = "Output SGST", Debit = 0, Credit = sgst });
+            } // end shouldPostJournal
 
             // Post to customer ledger if credit sale
             if (creditSaleAmount > 0 && customer != null)
@@ -553,11 +562,15 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 await _context.SaveChangesAsync(cancellationToken);
             }
 
-            // Post Journal Entry
-            Guid jeId = await _financialPostingService.PostJournalEntryAsync(
-                null, DateTime.UtcNow, $"POS Invoice {invoice.InvoiceNumber}", $"INV-{invoice.Id}", journalLines, cancellationToken);
+            // Post Journal Entry (only if there are lines to post i.e. non-zero invoice)
+            Guid jeId = Guid.Empty;
+            if (journalLines.Count > 0)
+            {
+                jeId = await _financialPostingService.PostJournalEntryAsync(
+                    null, DateTime.UtcNow, $"POS Invoice {invoice.InvoiceNumber}", $"INV-{invoice.Id}", journalLines, cancellationToken);
+            }
 
-            if (creditSaleAmount > 0 && customer != null)
+            if (creditSaleAmount > 0 && customer != null && jeId != Guid.Empty)
             {
                 var ledgerEntry = await _context.CustomerLedger
                     .Where(c => c.CustomerId == customer.Id && c.ReferenceNumber == invoice.InvoiceNumber)
@@ -568,9 +581,10 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 }
             }
 
-            // Post Dedicated Tax Transaction for GSTR Returns
-            await _financialPostingService.RecordGstTransactionAsync(
-                null, "SALE", invoice.InvoiceNumber, DateTime.UtcNow, taxableValue, totalCgst, totalSgst, totalCess, null, cancellationToken);
+            // Post Dedicated Tax Transaction for GSTR Returns (only for non-zero invoices)
+            if (shouldPostJournal)
+                await _financialPostingService.RecordGstTransactionAsync(
+                    null, "SALE", invoice.InvoiceNumber, DateTime.UtcNow, taxableValue, totalCgst, totalSgst, totalCess, null, cancellationToken);
 
             // Flush ALL pending EF changes (loyalty ledger, wallet, financial lines) before committing the transaction
             await _context.SaveChangesAsync(cancellationToken);

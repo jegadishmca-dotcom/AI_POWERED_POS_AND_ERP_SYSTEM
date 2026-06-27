@@ -50,6 +50,11 @@ public class OffersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateOffer([FromBody] Offer offer, CancellationToken cancellationToken)
     {
+        // Normalize DateTimes to UTC to satisfy PostgreSQL 'timestamp with time zone' requirement.
+        // The frontend sends datetime-local values which have DateTimeKind=Unspecified.
+        offer.StartDate = DateTime.SpecifyKind(offer.StartDate, DateTimeKind.Utc);
+        offer.EndDate   = DateTime.SpecifyKind(offer.EndDate,   DateTimeKind.Utc);
+
         // Validation
         if (offer.EndDate < offer.StartDate) return BadRequest("End date cannot be before start date.");
         
@@ -83,6 +88,10 @@ public class OffersController : ControllerBase
     {
         var offer = await _context.Offers.FindAsync(new object[] { id }, cancellationToken);
         if (offer == null) return NotFound();
+
+        // Normalize DateTimes to UTC to satisfy PostgreSQL 'timestamp with time zone' requirement.
+        updatedOffer.StartDate = DateTime.SpecifyKind(updatedOffer.StartDate, DateTimeKind.Utc);
+        updatedOffer.EndDate   = DateTime.SpecifyKind(updatedOffer.EndDate,   DateTimeKind.Utc);
 
         // Validation
         if (updatedOffer.EndDate < updatedOffer.StartDate) return BadRequest("End date cannot be before start date.");

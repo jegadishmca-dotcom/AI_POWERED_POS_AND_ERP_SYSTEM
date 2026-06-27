@@ -638,7 +638,7 @@ export const PosTerminal = () => {
     onF1Search: () => customerInputRef.current?.focus(),
     onF2Product: () => productInputRef.current?.focus(),
     onF11Payment: () => {
-      if (cart.items.length > 0) setPaymentModalOpen(true);
+      if (cart.items.length > 0 && cart.finalTotal > 0) setPaymentModalOpen(true);
     },
     onF9Park: () => {
       handleHoldCart();
@@ -1277,9 +1277,19 @@ export const PosTerminal = () => {
           {/* Payment Methods */}
           <div className="mt-4">
             <button 
-              disabled={cart.items.length === 0}
+              disabled={cart.items.length === 0 || cart.finalTotal <= 0}
               className="w-full bg-emerald-600 text-white p-4 rounded-lg font-black text-2xl shadow-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors mb-4" 
-              onClick={() => setPaymentModalOpen(true)}
+              onClick={() => {
+                if (cart.items.length === 0) {
+                  alert('Cart is empty. Please add items before proceeding to payment.');
+                  return;
+                }
+                if (cart.finalTotal <= 0) {
+                  alert('Invoice total is ₹0.00. Cannot process a zero-value transaction. Please check item prices or remove offers that reduce the total to zero.');
+                  return;
+                }
+                setPaymentModalOpen(true);
+              }}
             >
               <CreditCard className="w-8 h-8 mr-3" /> PAYMENT (F11)
             </button>

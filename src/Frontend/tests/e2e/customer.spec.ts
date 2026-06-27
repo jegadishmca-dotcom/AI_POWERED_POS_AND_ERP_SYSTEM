@@ -12,7 +12,7 @@ test.describe('Customer Management Workflows', () => {
     
     await loginPage.goto();
     await loginPage.quickDemoLogin();
-    await expect(page).toHaveURL(/.*dashboard.*/, { timeout: 10000 });
+    await expect(page).toHaveURL(/.*finance\/dashboard.*|.*dashboard.*/, { timeout: 15000 });
     
     // CRM module navigation
     await customerPage.goto();

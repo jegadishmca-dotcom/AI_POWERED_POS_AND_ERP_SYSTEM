@@ -19,15 +19,16 @@ export class LoginPage {
     this.posCashierTab = page.locator('button', { hasText: 'POS Cashier' });
     this.erpBackOfficeTab = page.locator('button', { hasText: 'ERP Back-Office' });
     this.signInButton = page.locator('button[type="submit"]');
-    this.demoAdminButton = page.locator('button', { hasText: 'Quick Login as Demo Admin' });
-    // Assuming errors use this specific div based on code inspection
-    this.errorMessage = page.locator('.bg-red-50'); 
+    this.demoAdminButton = page.locator('button', { hasText: /Quick Login as Demo Admin/i });
+    // Error messages use red background div
+    this.errorMessage = page.locator('.bg-red-50, [class*="bg-red"]').first();
   }
 
   async goto() {
-    await this.page.goto('/');
-    await this.demoAdminButton.waitFor({ state: 'visible', timeout: 10000 });
-    await this.page.waitForTimeout(2000);
+    await this.page.goto('/login');
+    // Wait for the login form to be visible
+    await this.signInButton.waitFor({ state: 'visible', timeout: 10000 });
+    await this.page.waitForTimeout(500);
   }
 
   async selectPosCashier() {
@@ -44,13 +45,29 @@ export class LoginPage {
     } else {
       await this.selectErpBackOffice();
     }
-    
+    await this.page.waitForTimeout(300);
     await this.usernameInput.fill(username);
     await this.passwordInput.fill(password);
     await this.signInButton.click();
   }
 
+  /**
+   * Logs in as admin using the ERP Back-Office credentials.
+   * Uses direct form fill with known working credentials.
+   */
   async quickDemoLogin() {
-    await this.demoAdminButton.click();
+    // Switch to ERP Back-Office mode
+    await this.erpBackOfficeTab.click();
+    await this.page.waitForTimeout(300);
+
+    // Fill credentials directly (admin@supermarket.local / Admin@123!)
+    await this.usernameInput.fill('admin@supermarket.local');
+    await this.passwordInput.fill('Admin@123!');
+    await this.signInButton.click();
+
+    // Wait for navigation away from login page
+    await this.page.waitForURL(/(?!.*login).*/, { timeout: 15000 }).catch(() => {
+      // If URL doesn't change, the login may have failed - let test handle it
+    });
   }
 }

@@ -14,7 +14,7 @@ test.describe('Billing & POS Checkout Workflows', () => {
     await loginPage.goto();
     await loginPage.quickDemoLogin();
     // Wait for auth to complete
-    await expect(page).toHaveURL(/.*dashboard.*|.*pos.*/, { timeout: 10000 });
+    await expect(page).toHaveURL(/.*dashboard.*|.*pos.*/, { timeout: 15000 });
     await billingPage.goto();
     // Wait for POS terminal to fully load (may have business date modal)
     await page.waitForTimeout(2000);

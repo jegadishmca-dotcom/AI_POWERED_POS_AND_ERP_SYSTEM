@@ -14,14 +14,19 @@ export class AccountingPage {
   }
 
   async goto() {
-    await this.page.goto('/finance');
+    await this.page.goto('/finance/dashboard');
+    await this.page.waitForTimeout(1000);
   }
 
   async viewJournalEntries() {
-    await this.journalTab.click();
+    // Navigate directly to avoid sidebar link DOM detach issues
+    await this.page.goto('/finance/journals');
+    await this.page.waitForTimeout(1500);
   }
 
   async viewGeneralLedger() {
-    await this.ledgerTab.click();
+    // Navigate directly to avoid sidebar link DOM detach issues
+    await this.page.goto('/finance/accounts');
+    await this.page.waitForTimeout(1500);
   }
 }

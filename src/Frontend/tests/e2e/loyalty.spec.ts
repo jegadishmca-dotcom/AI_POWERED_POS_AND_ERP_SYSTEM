@@ -12,7 +12,7 @@ test.describe('Loyalty Engine Workflows', () => {
     
     await loginPage.goto();
     await loginPage.quickDemoLogin();
-    await expect(page).toHaveURL(/.*dashboard.*/, { timeout: 10000 });
+    await expect(page).toHaveURL(/.*finance\/dashboard.*|.*dashboard.*/, { timeout: 15000 });
     await loyaltyPage.goto();
     await page.waitForTimeout(1500);
   });

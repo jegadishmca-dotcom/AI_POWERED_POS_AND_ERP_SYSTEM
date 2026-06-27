@@ -33,7 +33,7 @@ public class LoyaltyService : ILoyaltyService
             if (pointsRedeemed > 0) throw new Exception("Blocked customers cannot redeem points.");
         }
 
-        var config = await _context.LoyaltyProgramConfigs.FirstOrDefaultAsync(cancellationToken);
+        var config = await _context.LoyaltyProgramConfigs.FirstOrDefaultAsync(cancellationToken) ?? new LoyaltyProgramConfig();
 
         decimal currentPoints = customer.RunningLoyaltyPoints;
 
@@ -77,8 +77,7 @@ public class LoyaltyService : ILoyaltyService
         var customer = await _context.Customers.Include(c => c.Tier).FirstOrDefaultAsync(c => c.Id == customerId, cancellationToken);
         if (customer == null) return;
 
-        var config = await _context.LoyaltyProgramConfigs.FirstOrDefaultAsync(cancellationToken);
-        if (config == null) return;
+        var config = await _context.LoyaltyProgramConfigs.FirstOrDefaultAsync(cancellationToken) ?? new LoyaltyProgramConfig();
         
         decimal earnRatioSpendAmount = config.EarnRatioSpendAmount > 0 ? config.EarnRatioSpendAmount : 100m;
         decimal basePoints = (invoiceTotal / earnRatioSpendAmount) * config.EarnRatioPoints;

@@ -122,7 +122,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             }
 
             // Loyalty Redemption Validation
-            var loyaltyConfig = await _context.LoyaltyProgramConfigs.FirstOrDefaultAsync(cancellationToken);
+            var loyaltyConfig = await _context.LoyaltyProgramConfigs.FirstOrDefaultAsync(cancellationToken) ?? new LoyaltyProgramConfig();
             if (request.PointsRedeemed > 0)
             {
                 if (customer == null) throw new Exception("Customer required for points redemption.");
@@ -132,19 +132,16 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 if (customer.RunningLoyaltyPoints < request.PointsRedeemed)
                     throw new Exception("Insufficient points balance.");
                     
-                if (loyaltyConfig != null)
-                {
-                    // Check max % redemption limit
-                    decimal maxAllowedDiscount = (request.NetPayable * loyaltyConfig.MaxRedemptionPercentagePerInvoice) / 100m;
-                    decimal discountValue = (request.PointsRedeemed / loyaltyConfig.RedeemRatioPoints) * loyaltyConfig.RedeemRatioDiscountAmount;
+                // Check max % redemption limit
+                decimal maxAllowedDiscount = (request.NetPayable * loyaltyConfig.MaxRedemptionPercentagePerInvoice) / 100m;
+                decimal discountValue = (request.PointsRedeemed / loyaltyConfig.RedeemRatioPoints) * loyaltyConfig.RedeemRatioDiscountAmount;
+                
+                if (discountValue > maxAllowedDiscount)
+                    throw new Exception($"Redemption exceeds maximum allowed limit of {loyaltyConfig.MaxRedemptionPercentagePerInvoice}% per invoice.");
                     
-                    if (discountValue > maxAllowedDiscount)
-                        throw new Exception($"Redemption exceeds maximum allowed limit of {loyaltyConfig.MaxRedemptionPercentagePerInvoice}% per invoice.");
-                        
-                    // Check daily max limit (simplified check, real app would sum today's redemptions)
-                    if (request.PointsRedeemed > loyaltyConfig.MaxRedemptionPerDay)
-                        throw new Exception($"Redemption exceeds daily limit of {loyaltyConfig.MaxRedemptionPerDay} points.");
-                }
+                // Check daily max limit (simplified check, real app would sum today's redemptions)
+                if (request.PointsRedeemed > loyaltyConfig.MaxRedemptionPerDay)
+                    throw new Exception($"Redemption exceeds daily limit of {loyaltyConfig.MaxRedemptionPerDay} points.");
             }
 
 

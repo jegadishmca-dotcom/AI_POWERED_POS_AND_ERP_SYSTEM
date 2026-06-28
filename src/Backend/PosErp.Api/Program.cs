@@ -31,6 +31,7 @@ using System.Text;
 using Hangfire;
 using Hangfire.PostgreSql;
 
+AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 var builder = WebApplication.CreateBuilder(args);
 
 // Add Database Context (PostgreSQL via PgBouncer / direct connection string)

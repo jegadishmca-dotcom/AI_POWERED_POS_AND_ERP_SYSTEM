@@ -92,7 +92,14 @@ public class LoyaltyLedgerEntry
     public decimal PointsEarned { get; set; }
     public decimal PointsRedeemed { get; set; }
     public decimal BalanceAfterTransaction { get; set; }
-    
+
+    // Maps to loyalty_ledger.points (NOT NULL) — net point change for this transaction
+    // = PointsEarned - PointsRedeemed (positive for earn, negative for redeem)
+    public decimal Points { get; set; }
+
+    // Maps to loyalty_ledger.running_points (NOT NULL) — cumulative balance after this entry
+    public decimal RunningPoints { get; set; }
+
     public Guid? InvoiceId { get; set; }
     public string ReferenceDocument { get; set; } = string.Empty; // Invoice No
     public string Remarks { get; set; } = string.Empty;

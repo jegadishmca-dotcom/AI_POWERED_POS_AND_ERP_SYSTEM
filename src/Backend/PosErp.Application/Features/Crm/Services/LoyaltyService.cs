@@ -53,6 +53,8 @@ public class LoyaltyService : ILoyaltyService
             PointsRedeemed = pointsRedeemed,
             PreviousBalance = currentPoints,
             BalanceAfterTransaction = newPoints,
+            Points = pointsEarned - pointsRedeemed,   // NET change: satisfies loyalty_ledger.points NOT NULL
+            RunningPoints = newPoints,                  // cumulative balance: satisfies loyalty_ledger.running_points NOT NULL
             ReferenceDocument = referenceDocument,
             InvoiceId = invoiceId,
             Remarks = remarks,

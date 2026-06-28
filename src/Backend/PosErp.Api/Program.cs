@@ -209,6 +209,9 @@ builder.Services.AddScoped<PosErp.Application.Features.Ai.Services.IForecastEngi
 builder.Services.AddScoped<PosErp.Application.Features.Ai.Services.IRecommendationEngine, PosErp.Application.Features.Ai.Services.RecommendationEngine>();
 builder.Services.AddScoped<PosErp.Application.Features.Ai.Jobs.IAiBackgroundJobs, PosErp.Application.Features.Ai.Jobs.AiBackgroundJobs>();
 
+// Procurement Recommendation Engine (was missing from DI — caused 500 on /api/procurement/recommendations)
+builder.Services.AddScoped<PosErp.Application.Features.Inventory.Services.IPurchaseRecommendationEngine, PosErp.Application.Features.Inventory.Services.PurchaseRecommendationEngine>();
+
 // Register Materialized View Periodic Refresher
 builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.StockPositionRefreshService>();
 builder.Services.AddSingleton<PosErp.Infrastructure.Jobs.DailyReportEmailService>();

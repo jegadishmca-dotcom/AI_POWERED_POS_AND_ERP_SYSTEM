@@ -49,6 +49,10 @@ NAVIGATION_TYPE_KEYWORDS = [
     "ActionedByUser", "ResolvedByUser",
     "Batch", "GlAccount", "CostCenter",
     "AccumulatedDeprAccount", "AssetAccount", "DepreciationExpenseAccount",
+    # Compound entity type names that appear as navigation property types
+    "CustomerTier", "InterStoreTransfer", "TaxSlabDetail",
+    "ProductCategory", "ProductBrand", "UnitOfMeasure",
+    "LoyaltyProgramConfig", "PosTerminal",
 ]
 
 # Known COLUMN NAME OVERRIDES from ApplicationDbContext.HasColumnName() calls.

@@ -296,6 +296,12 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<PosErp.Domain.Entities.Inventory.StockLedgerEntry>()
             .Ignore(s => s.Version);
 
+        // Offer.RulesJson is stored as JSONB in PostgreSQL — must explicitly map the column type
+        // Otherwise EF Core defaults to 'text' and PostgreSQL throws: column "rules_json" is of type jsonb but expression is of type text
+        modelBuilder.Entity<PosErp.Domain.Entities.Offers.Offer>()
+            .Property(o => o.RulesJson)
+            .HasColumnType("jsonb");
+
         // Composite Key configuration for CustomerReceiptAllocation referencing Invoices
         modelBuilder.Entity<PosErp.Domain.Entities.Finance.CustomerReceiptAllocation>()
             .HasOne<PosErp.Domain.Entities.Pos.Invoice>()

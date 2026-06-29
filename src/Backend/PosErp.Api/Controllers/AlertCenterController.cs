@@ -36,6 +36,7 @@ public class AlertCenterController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAlerts([FromQuery] string? severity, [FromQuery] bool includeResolved = false)
     {
+        return Content("ENTERED GETALERTS", "text/plain");
         try
         {
             var query = _context.AiAlerts.AsQueryable();

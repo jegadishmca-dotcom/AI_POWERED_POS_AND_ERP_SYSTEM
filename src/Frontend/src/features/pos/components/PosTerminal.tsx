@@ -1474,6 +1474,7 @@ export const PosTerminal = () => {
             setCustomer(null);
             setCustomerQuery('');
             setPromoCode('');
+            setPointsRedeemed(0);
           } catch (err: any) {
             console.error('Checkout error:', err);
             alert('Failed to process checkout: ' + (err.message));

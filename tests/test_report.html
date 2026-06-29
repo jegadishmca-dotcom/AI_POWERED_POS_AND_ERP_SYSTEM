@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>ERP Test Report — 2026-06-29 10:28:07</title>
+<html><head><meta charset="UTF-8"><title>ERP Test Report — 2026-06-29 13:11:46</title>
 <style>
   body {font-family:Inter,sans-serif;background:#0f172a;color:#e2e8f0;padding:2rem;}
   h1 {color:#f8fafc;font-size:1.8rem;} h2{color:#94a3b8;font-size:1.1rem;margin-top:2rem;}
-  .badge {display:inline-block;padding:6px 18px;border-radius:9999px;font-weight:700;font-size:1.1rem;color:#fff;background:#ef4444;}
+  .badge {display:inline-block;padding:6px 18px;border-radius:9999px;font-weight:700;font-size:1.1rem;color:#fff;background:#22c55e;}
   table {width:100%;border-collapse:collapse;margin-top:1rem;}
   th {background:#1e293b;color:#94a3b8;padding:10px 14px;text-align:left;font-size:.85rem;letter-spacing:.05em;}
   td {padding:10px 14px;border-bottom:1px solid #1e293b;font-size:.9rem;vertical-align:top;}
@@ -13,11 +13,11 @@
 </style></head>
 <body>
 <h1>Apple Supermarket ERP — Automated Test Report</h1>
-<p style="color:#64748b">Generated: 2026-06-29 10:28:07 | Runtime: 13.5s</p>
-<p><span class="badge">4 ISSUE(S) FOUND</span></p>
+<p style="color:#64748b">Generated: 2026-06-29 13:11:46 | Runtime: 14.1s</p>
+<p><span class="badge">ALL PASSED</span></p>
 <div>
-  <div class="stat"><div class="stat-val" style="color:#22c55e">228</div><div class="stat-lbl">PASSED</div></div>
-  <div class="stat"><div class="stat-val" style="color:#ef4444">4</div><div class="stat-lbl">FAILED</div></div>
+  <div class="stat"><div class="stat-val" style="color:#22c55e">263</div><div class="stat-lbl">PASSED</div></div>
+  <div class="stat"><div class="stat-val" style="color:#ef4444">0</div><div class="stat-lbl">FAILED</div></div>
 </div>
 <h2>Layer Results</h2>
 <table><thead><tr><th>Layer</th><th>Status</th><th>Passed</th><th>Failed</th><th>Warnings</th><th>Time</th><th>Issues</th></tr></thead>
@@ -28,35 +28,35 @@
             <td style="color:#22c55e">86</td>
             <td style="color:#6b7280">0</td>
             <td style="color:#6b7280">0</td>
-            <td>1.9s</td>
+            <td>2.0s</td>
             <td><ul style="margin:0;padding-left:16px"><li style="color:#22c55e">None</li></ul></td>
         </tr>
         <tr>
             <td><b>Layer 2: API Smoke Tests</b></td>
-            <td style="color:#ef4444;font-weight:bold">FAIL</td>
-            <td style="color:#22c55e">46</td>
-            <td style="color:#ef4444">2</td>
+            <td style="color:#22c55e;font-weight:bold">PASS</td>
+            <td style="color:#22c55e">48</td>
             <td style="color:#6b7280">0</td>
-            <td>5.1s</td>
-            <td><ul style="margin:0;padding-left:16px"><li style="color:#ef4444">{"statusCode":500,"message":"42703: column a.actioned_by_id does not exist\n\nPOSITION: 29"}</li><li style="color:#ef4444"></li></ul></td>
+            <td style="color:#6b7280">0</td>
+            <td>4.6s</td>
+            <td><ul style="margin:0;padding-left:16px"><li style="color:#22c55e">None</li></ul></td>
         </tr>
         <tr>
             <td><b>Layer 3: Business Workflows</b></td>
-            <td style="color:#ef4444;font-weight:bold">FAIL</td>
-            <td style="color:#22c55e">3</td>
-            <td style="color:#ef4444">2</td>
+            <td style="color:#22c55e;font-weight:bold">PASS</td>
+            <td style="color:#22c55e">5</td>
             <td style="color:#6b7280">0</td>
-            <td>6.4s</td>
-            <td><ul style="margin:0;padding-left:16px"><li style="color:#ef4444">Loyalty points not awarded after sale</li><li style="color:#ef4444">Sales return: 500</li></ul></td>
+            <td style="color:#6b7280">0</td>
+            <td>7.2s</td>
+            <td><ul style="margin:0;padding-left:16px"><li style="color:#22c55e">None</li></ul></td>
         </tr>
         <tr>
             <td><b>Layer 4: Accounting Integrity</b></td>
             <td style="color:#22c55e;font-weight:bold">PASS</td>
-            <td style="color:#22c55e">93</td>
+            <td style="color:#22c55e">124</td>
             <td style="color:#6b7280">0</td>
             <td style="color:#6b7280">0</td>
             <td>0.2s</td>
             <td><ul style="margin:0;padding-left:16px"><li style="color:#22c55e">None</li></ul></td>
         </tr></tbody></table>
-<h2>All Issues (Action Required)</h2><table><thead><tr><th>#</th><th>Layer</th><th>Issue</th></tr></thead><tbody><tr><td>1</td><td>Layer 2: API Smoke Tests</td><td style='color:#ef4444'>{"statusCode":500,"message":"42703: column a.actioned_by_id does not exist\n\nPOSITION: 29"}</td></tr><tr><td>2</td><td>Layer 2: API Smoke Tests</td><td style='color:#ef4444'></td></tr><tr><td>3</td><td>Layer 3: Business Workflows</td><td style='color:#ef4444'>Loyalty points not awarded after sale</td></tr><tr><td>4</td><td>Layer 3: Business Workflows</td><td style='color:#ef4444'>Sales return: 500</td></tr></tbody></table>
+
 </body></html>

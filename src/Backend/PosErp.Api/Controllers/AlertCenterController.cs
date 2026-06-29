@@ -17,6 +17,22 @@ public class AlertCenterController : ControllerBase
         _context = context;
     }
 
+    [HttpGet("debug")]
+    [AllowAnonymous]
+    public async Task<IActionResult> GetAlertsDebug()
+    {
+        try
+        {
+            var query = _context.AiAlerts.AsQueryable();
+            var alerts = await query.ToListAsync();
+            return Ok(alerts);
+        }
+        catch (Exception ex)
+        {
+            return Content(ex.ToString(), "text/plain");
+        }
+    }
+
     [HttpGet]
     public async Task<IActionResult> GetAlerts([FromQuery] string? severity, [FromQuery] bool includeResolved = false)
     {

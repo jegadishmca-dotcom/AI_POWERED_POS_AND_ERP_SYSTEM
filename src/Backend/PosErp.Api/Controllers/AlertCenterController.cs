@@ -20,34 +20,42 @@ public class AlertCenterController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAlerts([FromQuery] string? severity, [FromQuery] bool includeResolved = false)
     {
-        var query = _context.AiAlerts.AsQueryable();
-
-        if (!includeResolved)
+        try
         {
-            query = query.Where(a => a.ResolvedAt == null);
-        }
+            var query = _context.AiAlerts.AsQueryable();
 
-        if (!string.IsNullOrEmpty(severity))
+            if (!includeResolved)
+            {
+                query = query.Where(a => a.ResolvedAt == null);
+            }
+
+            if (!string.IsNullOrEmpty(severity))
+            {
+                query = query.Where(a => a.AlertSeverity == severity);
+            }
+
+            var alerts = await query
+                .OrderByDescending(a => a.CreatedAt)
+                .Select(a => new {
+                    a.Id,
+                    a.StoreId,
+                    a.AlertType,
+                    a.AlertSeverity,
+                    a.Title,
+                    a.Message,
+                    a.IsRead,
+                    a.CreatedAt,
+                    a.ResolvedAt,
+                    a.ResolvedBy
+                })
+                .ToListAsync();
+            var jsonString = System.Text.Json.JsonSerializer.Serialize(alerts);
+            return Content(jsonString, "application/json");
+        }
+        catch (Exception ex)
         {
-            query = query.Where(a => a.AlertSeverity == severity);
+            return StatusCode(500, new { Error = ex.Message, Inner = ex.InnerException?.Message, StackTrace = ex.StackTrace });
         }
-
-        var alerts = await query
-            .OrderByDescending(a => a.CreatedAt)
-            .Select(a => new {
-                a.Id,
-                a.StoreId,
-                a.AlertType,
-                a.AlertSeverity,
-                a.Title,
-                a.Message,
-                a.IsRead,
-                a.CreatedAt,
-                a.ResolvedAt,
-                a.ResolvedBy
-            })
-            .ToListAsync();
-        return Ok(alerts);
     }
 
     [HttpPut("{id}/acknowledge")]

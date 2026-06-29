@@ -25,7 +25,7 @@ public record ProcessPurchaseReturnCommand(
 
 public record PurchaseReturnItemInputDto(
     Guid ProductId,
-    Guid BatchId,
+    Guid? BatchId,
     decimal Quantity
 );
 
@@ -40,7 +40,7 @@ public record ProcessSalesReturnCommand(
 
 public record SalesReturnItemInputDto(
     Guid ProductId,
-    Guid BatchId,
+    Guid? BatchId,
     decimal Quantity
 );
 
@@ -101,10 +101,23 @@ public class ReturnCommandsHandler :
                     .FirstOrDefaultAsync(p => p.Id == item.ProductId, cancellationToken);
                 if (product == null) throw new InvalidOperationException($"Product with ID {item.ProductId} not found.");
 
-                var batch = await _context.ProductBatches.FindAsync(new object[] { item.BatchId }, cancellationToken);
-                if (batch == null) throw new InvalidOperationException($"Product batch with ID {item.BatchId} not found.");
+                ProductBatch? batch = null;
+                if (item.BatchId.HasValue && item.BatchId.Value != Guid.Empty)
+                {
+                    batch = await _context.ProductBatches.FindAsync(new object[] { item.BatchId.Value }, cancellationToken);
+                    if (batch == null) throw new InvalidOperationException($"Product batch with ID {item.BatchId} not found.");
+                }
+                else
+                {
+                    batch = await _context.ProductBatches
+                        .Where(b => b.ProductId == item.ProductId)
+                        .OrderByDescending(b => b.CreatedAt)
+                        .FirstOrDefaultAsync(cancellationToken);
+                    
+                    if (batch == null) throw new InvalidOperationException($"No batch found for Product ID {item.ProductId}. Returns require a batch to deduct from.");
+                }
 
-                // Validate stock
+                // Make sure we have enough physical stock in this batch to return
                 if (batch.AvailableQuantity < item.Quantity)
                 {
                     throw new InvalidOperationException($"Insufficient batch quantity for return. Available: {batch.AvailableQuantity}, Requested: {item.Quantity}");
@@ -134,7 +147,7 @@ public class ReturnCommandsHandler :
                 purchaseReturn.Items.Add(new PurchaseReturnItem
                 {
                     ProductId = item.ProductId,
-                    BatchId = item.BatchId,
+                    BatchId = batch.Id,
                     Quantity = item.Quantity,
                     UnitCost = unitCost,
                     TaxAmount = lineTax,
@@ -309,8 +322,22 @@ public class ReturnCommandsHandler :
                     .FirstOrDefaultAsync(p => p.Id == item.ProductId, cancellationToken);
                 if (product == null) throw new InvalidOperationException($"Product with ID {item.ProductId} not found.");
 
-                var batch = await _context.ProductBatches.FindAsync(new object[] { item.BatchId }, cancellationToken);
-                if (batch == null) throw new InvalidOperationException($"Product batch with ID {item.BatchId} not found.");
+                ProductBatch? batch = null;
+                if (item.BatchId.HasValue && item.BatchId.Value != Guid.Empty)
+                {
+                    batch = await _context.ProductBatches.FindAsync(new object[] { item.BatchId.Value }, cancellationToken);
+                    if (batch == null) throw new InvalidOperationException($"Product batch with ID {item.BatchId} not found.");
+                }
+                else
+                {
+                    // If no specific batch provided, find any available batch for restock
+                    batch = await _context.ProductBatches
+                        .Where(b => b.ProductId == item.ProductId)
+                        .OrderByDescending(b => b.CreatedAt)
+                        .FirstOrDefaultAsync(cancellationToken);
+                    
+                    if (batch == null) throw new InvalidOperationException($"No batch found for Product ID {item.ProductId}. Returns require a batch to restock.");
+                }
 
                 // Validate original quantities
                 if (invItem.Quantity < item.Quantity)
@@ -334,7 +361,7 @@ public class ReturnCommandsHandler :
                 salesReturn.Items.Add(new SalesReturnItem
                 {
                     ProductId = item.ProductId,
-                    BatchId = item.BatchId,
+                    BatchId = batch.Id,
                     Quantity = item.Quantity,
                     UnitPrice = invItem.UnitPrice,
                     TaxAmount = lineTax,

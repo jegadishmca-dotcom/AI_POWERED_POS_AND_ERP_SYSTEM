@@ -49,12 +49,11 @@ public class AlertCenterController : ControllerBase
                     a.ResolvedBy
                 })
                 .ToListAsync();
-            var jsonString = System.Text.Json.JsonSerializer.Serialize(alerts);
-            return Content(jsonString, "application/json");
+            return Ok(alerts);
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { Error = ex.Message, Inner = ex.InnerException?.Message, StackTrace = ex.StackTrace });
+            return StatusCode(500, ex.ToString());
         }
     }
 

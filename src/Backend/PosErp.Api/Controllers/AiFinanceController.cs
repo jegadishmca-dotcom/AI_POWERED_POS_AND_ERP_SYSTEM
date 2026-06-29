@@ -148,8 +148,8 @@ public class AiFinanceController : ControllerBase
         return Ok(expiries);
     }
 
-    [HttpGet("alerts")]
-    public async Task<IActionResult> GetAlerts([FromQuery] Guid? storeId, CancellationToken cancellationToken)
+    [HttpGet("finance-alerts")]
+    public async Task<IActionResult> GetFinanceAlerts([FromQuery] Guid? storeId, CancellationToken cancellationToken)
     {
         var alerts = await _context.AiAlerts
             .AsNoTracking()

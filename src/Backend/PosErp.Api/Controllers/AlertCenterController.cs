@@ -32,7 +32,21 @@ public class AlertCenterController : ControllerBase
             query = query.Where(a => a.AlertSeverity == severity);
         }
 
-        var alerts = await query.OrderByDescending(a => a.CreatedAt).ToListAsync();
+        var alerts = await query
+            .OrderByDescending(a => a.CreatedAt)
+            .Select(a => new {
+                a.Id,
+                a.StoreId,
+                a.AlertType,
+                a.AlertSeverity,
+                a.Title,
+                a.Message,
+                a.IsRead,
+                a.CreatedAt,
+                a.ResolvedAt,
+                a.ResolvedBy
+            })
+            .ToListAsync();
         return Ok(alerts);
     }
 

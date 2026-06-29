@@ -459,6 +459,8 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                     PointsRedeemed = request.PointsRedeemed,
                     PreviousBalance = currentPts,
                     BalanceAfterTransaction = customer.RunningLoyaltyPoints,
+                    Points = 0 - request.PointsRedeemed,           // NET change (negative for redemption)
+                    RunningPoints = customer.RunningLoyaltyPoints,  // cumulative balance after redemption
                     InvoiceId = invoice.Id,
                     ReferenceDocument = finalInvoiceRef,
                     Remarks = $"Redeemed {request.PointsRedeemed} points during checkout."

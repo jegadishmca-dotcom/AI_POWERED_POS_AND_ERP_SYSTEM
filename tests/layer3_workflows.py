@@ -521,43 +521,52 @@ def workflow_5_sales_return(session: dict, conn) -> dict:
         fail(f"Step 1: Original sale FAILED — {r.status_code}: {r.text[:200]}")
         return {"passed": False, "issues": [f"Original sale failed: {r.text[:200]}"]}
     inv_id = str(r.json())
-    ok(f"Step 1: Original invoice created — {inv_num}")
+    ok(f"Step 1: Original invoice created — {inv_num} | ID={inv_id}")
     time.sleep(1)
 
     # Step 2: Get stock before return
     cur.execute("SELECT current_stock FROM products WHERE id = %s;", (prod_id,))
     stock_before = float(cur.fetchone()[0])
 
-    # Step 3: Create sales return
+    # Step 3: Get the invoice's business_date from DB to build proper return payload
+    cur.execute("SELECT business_date FROM invoices WHERE id = %s;", (inv_id,))
+    biz_date_row = cur.fetchone()
+    from datetime import datetime, timezone
+    return_date = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # The SalesReturnItemInputDto requires: ProductId, BatchId, Quantity
+    # BatchId can be empty GUID if no batch tracking
+    empty_batch = "00000000-0000-0000-0000-000000000000"
+
+    # Step 3: Create sales return via POST /api/accountsreceivable/returns
     return_payload = {
-        "originalInvoiceId": inv_id,
-        "reason": "Automated test return",
-        "returnItems": [{"productId": prod_id, "quantity": 1, "unitPrice": price}]
+        "storeId": "00000000-0000-0000-0000-000000000000",
+        "invoiceId": inv_id,
+        "returnDate": return_date,
+        "refundMode": "CASH",
+        "items": [{"productId": prod_id, "batchId": empty_batch, "quantity": 1}]
     }
-    r2 = api("POST", "/api/pos/sales-return", token, return_payload)
-    if r2.status_code not in [200, 201]:
-        # Try alternative endpoint
-        r2 = api("POST", "/api/inventory/sales-return", token, return_payload)
+    r2 = api("POST", "/api/accountsreceivable/returns", token, return_payload)
 
     if r2.status_code in [200, 201]:
-        ok(f"Step 2: Sales return created successfully")
+        ok(f"Step 3: Sales return created successfully")
         time.sleep(1)
         # Step 4: Verify stock restored
         cur.execute("SELECT current_stock FROM products WHERE id = %s;", (prod_id,))
         stock_after = float(cur.fetchone()[0])
         if stock_after > stock_before:
-            ok(f"Step 3: Stock restored — Before={stock_before} After={stock_after}")
+            ok(f"Step 4: Stock restored — Before={stock_before} After={stock_after}")
         else:
-            warn(f"Step 3: Stock may not be fully restored — Before={stock_before} After={stock_after}")
+            warn(f"Step 4: Stock may not be fully restored — Before={stock_before} After={stock_after}")
     else:
-        warn(f"Step 2: Sales return endpoint returned {r2.status_code} — may not be implemented yet")
-        warn(f"        {r2.text[:150]}")
+        fail(f"Step 3: Sales return failed — {r2.status_code}: {r2.text[:200]}")
         issues.append(f"Sales return: {r2.status_code}")
 
     passed = len(issues) == 0
     if passed: ok("WORKFLOW 5: COMPLETE — ALL STEPS PASSED")
     else: fail(f"WORKFLOW 5: COMPLETED WITH WARNINGS — {len(issues)} issue(s)")
     return {"passed": passed, "issues": issues}
+
 
 
 # ─────────────────────────────────────────────────────────────────────────────

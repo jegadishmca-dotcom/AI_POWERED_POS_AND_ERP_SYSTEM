@@ -456,6 +456,26 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
                 {
                     property.SetColumnName("created_by");
                 }
+                else if (property.Name == "ActionedById")
+                {
+                    property.SetColumnName("actioned_by");
+                }
+                else if (property.Name == "RequestedById")
+                {
+                    property.SetColumnName("requested_by");
+                }
+                else if (property.Name == "ClosedById")
+                {
+                    property.SetColumnName("closed_by");
+                }
+                else if (property.Name == "LockedById")
+                {
+                    property.SetColumnName("locked_by");
+                }
+                else if (property.Name == "ApprovedById")
+                {
+                    property.SetColumnName("approved_by");
+                }
                 else
                 {
                     entity.FindProperty(property.Name)?.SetColumnName(ToSnakeCase(property.Name));

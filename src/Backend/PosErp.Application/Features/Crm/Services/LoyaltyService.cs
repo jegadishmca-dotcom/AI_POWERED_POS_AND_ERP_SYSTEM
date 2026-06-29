@@ -96,6 +96,9 @@ public class LoyaltyService : ILoyaltyService
         // Auto Tier Evaluation (Upgrade only on checkout)
         if (config.EnableAutoTierEvaluation)
         {
+            // Reload customer to get the latest RunningLoyaltyPoints after earning
+            await _context.Entry(customer).ReloadAsync(cancellationToken);
+            
             var tiers = await _context.CustomerTiers.OrderByDescending(t => t.MinimumSpend).ToListAsync(cancellationToken);
             foreach (var tier in tiers)
             {
@@ -104,12 +107,27 @@ public class LoyaltyService : ILoyaltyService
                     if (customer.CustomerTierId != tier.Id)
                     {
                         customer.CustomerTierId = tier.Id;
-                        await RecordPointsAsync(customerId, null, "Tier Upgrade Bonus", 0, 0, "", $"Upgraded to {tier.Name}", null, null, cancellationToken);
-                        // In real system, we'd trigger INotificationService here
+                        // Record tier upgrade as a ledger note (0 points earned/redeemed)
+                        // Don't call RecordPointsAsync to avoid overwriting RunningLoyaltyPoints
+                        var tierEntry = new LoyaltyLedgerEntry
+                        {
+                            CustomerId = customerId,
+                            TransactionType = "Tier Upgrade Bonus",
+                            PointsEarned = 0,
+                            PointsRedeemed = 0,
+                            PreviousBalance = customer.RunningLoyaltyPoints,
+                            BalanceAfterTransaction = customer.RunningLoyaltyPoints,
+                            Points = 0,
+                            RunningPoints = customer.RunningLoyaltyPoints,
+                            ReferenceDocument = "",
+                            Remarks = $"Upgraded to {tier.Name}"
+                        };
+                        _context.LoyaltyLedger.Add(tierEntry);
                     }
                     break;
                 }
             }
         }
+
     }
 }

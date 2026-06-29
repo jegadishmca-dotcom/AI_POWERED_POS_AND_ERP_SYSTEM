@@ -67,10 +67,13 @@ public class ReturnCommandsHandler :
 
     public async Task<Guid> Handle(ProcessPurchaseReturnCommand request, CancellationToken cancellationToken)
     {
-        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
-        try
+        var strategy = ((DbContext)_context).Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var supplier = await _context.Suppliers.FindAsync(new object[] { request.SupplierId }, cancellationToken);
+            using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var supplier = await _context.Suppliers.FindAsync(new object[] { request.SupplierId }, cancellationToken);
             if (supplier == null) throw new InvalidOperationException("Supplier not found.");
 
             string returnNo = await _sequenceService.GenerateNextNumberAsync(request.StoreId, "PURCHASE_RETURN", cancellationToken);
@@ -254,20 +257,24 @@ public class ReturnCommandsHandler :
             await transaction.CommitAsync(cancellationToken);
 
             return purchaseReturn.Id;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 
     public async Task<Guid> Handle(ProcessSalesReturnCommand request, CancellationToken cancellationToken)
     {
-        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
-        try
+        var strategy = ((DbContext)_context).Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var invoice = await _context.Invoices
+            using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var invoice = await _context.Invoices
                 .Include(i => i.Items)
                 .FirstOrDefaultAsync(i => i.Id == request.InvoiceId, cancellationToken);
             if (invoice == null) throw new InvalidOperationException("Invoice not found.");
@@ -484,12 +491,13 @@ public class ReturnCommandsHandler :
             await transaction.CommitAsync(cancellationToken);
 
             return salesReturn.Id;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 
     private async Task<string> ResolveAccountCodeAsync(string accountType, string namePattern, string fallbackCode, CancellationToken cancellationToken)

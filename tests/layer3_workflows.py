@@ -440,6 +440,9 @@ def workflow_4_loyalty_points(session: dict, conn) -> dict:
     prod_id, prod_name, price, _ = prod
 
     inv_num = f"WF4-LOYALTY-{uuid.uuid4().hex[:6].upper()}"
+    qty = max(1, int(150 / price) + 1)
+    net_payable = round(price * qty, 2)
+    
     r2 = api("POST", "/api/pos/create", token, {
         "invoiceNumber": inv_num,
         "terminalId": session["terminalId"],
@@ -447,17 +450,17 @@ def workflow_4_loyalty_points(session: dict, conn) -> dict:
         "customerId": cust_id,
         "promoCode": None,
         "walletAmountUsed": 0.0,
-        "cashAmount": round(price + 50),
+        "cashAmount": round(net_payable + 50),
         "upiAmount": 0.0, "cardAmount": 0.0, "roundOff": 0.0,
-        "netPayable": price,
+        "netPayable": net_payable,
         "paymentMode": "CASH",
         "pointsRedeemed": 0, "supervisorOverridePin": None,
-        "items": [{"productId": prod_id, "quantity": 1, "unitPrice": price, "batchId": None}]
+        "items": [{"productId": prod_id, "quantity": qty, "unitPrice": price, "batchId": None}]
     })
     if r2.status_code not in [200, 201]:
         fail(f"Step 3: Sale FAILED — {r2.status_code}: {r2.text[:200]}")
         return {"passed": False, "issues": [f"Sale failed: {r2.text[:200]}"]}
-    ok(f"Step 3: Sale ₹{price} completed for customer")
+    ok(f"Step 3: Sale ₹{net_payable} completed for customer")
 
     time.sleep(1)
 

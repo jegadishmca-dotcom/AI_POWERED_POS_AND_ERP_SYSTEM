@@ -81,6 +81,9 @@ public class LoyaltyService : ILoyaltyService
 
         var config = await _context.LoyaltyProgramConfigs.FirstOrDefaultAsync(cancellationToken) ?? new LoyaltyProgramConfig();
         
+        // Update Lifetime Spend
+        customer.LifetimeSpend += invoiceTotal;
+        
         decimal earnRatioSpendAmount = config.EarnRatioSpendAmount > 0 ? config.EarnRatioSpendAmount : 100m;
         decimal basePoints = (invoiceTotal / earnRatioSpendAmount) * config.EarnRatioPoints;
         

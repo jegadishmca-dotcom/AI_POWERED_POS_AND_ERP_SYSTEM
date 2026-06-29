@@ -369,6 +369,36 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
             .HasForeignKey(s => s.ApprovalRequestId)
             .OnDelete(DeleteBehavior.Cascade);
 
+        // Map 'XXXXById' properties to 'XXXX_by' database columns
+        modelBuilder.Entity<ApprovalRequest>()
+            .Property(e => e.RequestedById)
+            .HasColumnName("requested_by");
+
+        modelBuilder.Entity<ApprovalRequest>()
+            .Property(e => e.ActionedById)
+            .HasColumnName("actioned_by");
+
+        modelBuilder.Entity<ApprovalRequestStep>()
+            .Property(e => e.ActionedById)
+            .HasColumnName("actioned_by");
+
+        modelBuilder.Entity<FinancialYear>()
+            .Property(e => e.ClosedById)
+            .HasColumnName("closed_by");
+
+        modelBuilder.Entity<FinancialPeriodLock>()
+            .Property(e => e.LockedById)
+            .HasColumnName("locked_by");
+
+        modelBuilder.Entity<PettyCashLedgerEntry>()
+            .Property(e => e.ApprovedById)
+            .HasColumnName("approved_by");
+
+        modelBuilder.Entity<InterStoreTransfer>()
+            .Property(e => e.CreatedById)
+            .HasColumnName("created_by");
+
+
         modelBuilder.Entity<PurchaseReturnItem>()
             .HasOne(i => i.ProductBatch)
             .WithMany()

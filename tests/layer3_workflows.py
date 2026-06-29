@@ -41,6 +41,43 @@ def api(method, path, token, body=None, timeout=20):
 def db():
     return psycopg2.connect(**DB_CONFIG)
 
+def ensure_business_date_open(session: dict):
+    """Ensure a business date is OPEN for today. POS requires this before any invoice can be created."""
+    token = session["token"]
+    user_id = session["userId"]
+
+    # Check if a business date is already open
+    r = api("GET", "/api/pos/business-date/active", token)
+    if r.status_code == 200:
+        data = r.json()
+        if data.get("isOpen", False):
+            info(f"Business date already open: {data.get('businessDate', 'unknown')}")
+            return True
+
+    # Open today's business date
+    from datetime import datetime, timezone
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    payload = {
+        "businessDate": today,
+        "openedBy": user_id,
+    }
+    r = api("POST", "/api/pos/business-date/open", token, payload)
+    if r.status_code == 200:
+        ok(f"Business date opened for {today}")
+        return True
+    else:
+        # If date was already used, try tomorrow
+        from datetime import timedelta
+        tomorrow = (datetime.now(timezone.utc) + timedelta(days=1)).strftime("%Y-%m-%d")
+        payload["businessDate"] = tomorrow
+        r2 = api("POST", "/api/pos/business-date/open", token, payload)
+        if r2.status_code == 200:
+            ok(f"Business date opened for {tomorrow}")
+            return True
+        else:
+            warn(f"Could not open business date: {r.text[:200]} / {r2.text[:200]}")
+            return False
+
 def get_instock_product(conn, min_gst=0.0):
     """Return (id, name, price, gst_rate) for an in-stock product."""
     cur = conn.cursor()
@@ -538,6 +575,11 @@ def run() -> dict:
         return {"total": 5, "passed": 0, "failed": 1, "issues": [{"workflow": "Login", "error": str(e)}]}
 
     conn = db()
+
+    # POS requires a business date to be OPEN before any invoices can be created
+    section("PRE-FLIGHT: Ensuring Business Date is Open")
+    ensure_business_date_open(session)
+
     results = {"total": 5, "passed": 0, "failed": 0, "issues": []}
 
     workflows = [

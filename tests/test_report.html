@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html><head><meta charset="UTF-8"><title>ERP Test Report — 2026-06-28 22:20:39</title>
+<html><head><meta charset="UTF-8"><title>ERP Test Report — 2026-06-29 10:00:40</title>
 <style>
   body {font-family:Inter,sans-serif;background:#0f172a;color:#e2e8f0;padding:2rem;}
   h1 {color:#f8fafc;font-size:1.8rem;} h2{color:#94a3b8;font-size:1.1rem;margin-top:2rem;}
@@ -13,32 +13,32 @@
 </style></head>
 <body>
 <h1>Apple Supermarket ERP — Automated Test Report</h1>
-<p style="color:#64748b">Generated: 2026-06-28 22:20:39 | Runtime: 71.7s</p>
-<p><span class="badge">13 ISSUE(S) FOUND</span></p>
+<p style="color:#64748b">Generated: 2026-06-29 10:00:40 | Runtime: 12.4s</p>
+<p><span class="badge">6 ISSUE(S) FOUND</span></p>
 <div>
-  <div class="stat"><div class="stat-val" style="color:#22c55e">203</div><div class="stat-lbl">PASSED</div></div>
-  <div class="stat"><div class="stat-val" style="color:#ef4444">13</div><div class="stat-lbl">FAILED</div></div>
+  <div class="stat"><div class="stat-val" style="color:#22c55e">214</div><div class="stat-lbl">PASSED</div></div>
+  <div class="stat"><div class="stat-val" style="color:#ef4444">6</div><div class="stat-lbl">FAILED</div></div>
 </div>
 <h2>Layer Results</h2>
 <table><thead><tr><th>Layer</th><th>Status</th><th>Passed</th><th>Failed</th><th>Warnings</th><th>Time</th><th>Issues</th></tr></thead>
 <tbody>
         <tr>
             <td><b>Layer 1: Schema Scanner</b></td>
-            <td style="color:#ef4444;font-weight:bold">FAIL</td>
-            <td style="color:#22c55e">84</td>
-            <td style="color:#ef4444">2</td>
+            <td style="color:#22c55e;font-weight:bold">PASS</td>
+            <td style="color:#22c55e">86</td>
             <td style="color:#6b7280">0</td>
-            <td>1.2s</td>
-            <td><ul style="margin:0;padding-left:16px"><li style="color:#ef4444">{'class': 'Customer', 'table': 'customers', 'missing': ['Tier → tier']}</li><li style="color:#ef4444">{'class': 'InterStoreTransferItem', 'table': 'inter_store_transfer_items', 'missing': ['Transfer → transfer']}</li></ul></td>
+            <td style="color:#6b7280">0</td>
+            <td>2.8s</td>
+            <td><ul style="margin:0;padding-left:16px"><li style="color:#22c55e">None</li></ul></td>
         </tr>
         <tr>
             <td><b>Layer 2: API Smoke Tests</b></td>
             <td style="color:#ef4444;font-weight:bold">FAIL</td>
-            <td style="color:#22c55e">42</td>
-            <td style="color:#ef4444">7</td>
+            <td style="color:#22c55e">46</td>
+            <td style="color:#ef4444">2</td>
             <td style="color:#6b7280">0</td>
-            <td>53.3s</td>
-            <td><ul style="margin:0;padding-left:16px"><li style="color:#ef4444">Route not found</li><li style="color:#ef4444">Route not found</li><li style="color:#ef4444">Route not found</li><li style="color:#ef4444">Route not found</li><li style="color:#ef4444">Route not found</li><li style="color:#ef4444">Route not found</li><li style="color:#ef4444">{"statusCode":500,"message":"Unable to resolve service for type \u0027PosErp.Application.Features.Inventory.Services.IPu</li></ul></td>
+            <td>8.1s</td>
+            <td><ul style="margin:0;padding-left:16px"><li style="color:#ef4444">{"statusCode":500,"message":"42703: column a.actioned_by_id does not exist\n\nPOSITION: 29"}</li><li style="color:#ef4444"></li></ul></td>
         </tr>
         <tr>
             <td><b>Layer 3: Business Workflows</b></td>
@@ -46,17 +46,17 @@
             <td style="color:#22c55e">1</td>
             <td style="color:#ef4444">4</td>
             <td style="color:#6b7280">0</td>
-            <td>17.0s</td>
-            <td><ul style="margin:0;padding-left:16px"><li style="color:#ef4444">Cannot fetch created customer</li><li style="color:#ef4444">Customer search endpoint failed</li><li style="color:#ef4444">Offer creation failed: {"statusCode":500,"message":"An error occurred while saving the entity changes. See the inner exc</li><li style="color:#ef4444">Sale failed: {"statusCode":500,"message":"An error occurred while saving the entity changes. See the inner exception for</li><li style="color:#ef4444">Sales return: 404</li></ul></td>
+            <td>1.4s</td>
+            <td><ul style="margin:0;padding-left:16px"><li style="color:#ef4444">Invoice creation failed: {"statusCode":500,"message":"No active business date is open. Please open a business date befor</li><li style="color:#ef4444">Invoice with promo failed: {"statusCode":500,"message":"No active business date is open. Please open a business date bef</li><li style="color:#ef4444">Sale failed: {"statusCode":500,"message":"No active business date is open. Please open a business date before recording </li><li style="color:#ef4444">Original sale failed: {"statusCode":500,"message":"No active business date is open. Please open a business date before r</li></ul></td>
         </tr>
         <tr>
             <td><b>Layer 4: Accounting Integrity</b></td>
             <td style="color:#22c55e;font-weight:bold">PASS</td>
-            <td style="color:#22c55e">76</td>
+            <td style="color:#22c55e">81</td>
             <td style="color:#6b7280">0</td>
             <td style="color:#6b7280">0</td>
             <td>0.1s</td>
             <td><ul style="margin:0;padding-left:16px"><li style="color:#22c55e">None</li></ul></td>
         </tr></tbody></table>
-<h2>All Issues (Action Required)</h2><table><thead><tr><th>#</th><th>Layer</th><th>Issue</th></tr></thead><tbody><tr><td>1</td><td>Layer 1: Schema Scanner</td><td style='color:#ef4444'>{'layer': 'Layer 1: Schema Scanner', 'class': 'Customer', 'table': 'customers', 'missing': ['Tier → tier']}</td></tr><tr><td>2</td><td>Layer 1: Schema Scanner</td><td style='color:#ef4444'>{'layer': 'Layer 1: Schema Scanner', 'class': 'InterStoreTransferItem', 'table': 'inter_store_transfer_items', 'missing': ['Transfer → transfer']}</td></tr><tr><td>3</td><td>Layer 2: API Smoke Tests</td><td style='color:#ef4444'>Route not found</td></tr><tr><td>4</td><td>Layer 2: API Smoke Tests</td><td style='color:#ef4444'>Route not found</td></tr><tr><td>5</td><td>Layer 2: API Smoke Tests</td><td style='color:#ef4444'>Route not found</td></tr><tr><td>6</td><td>Layer 2: API Smoke Tests</td><td style='color:#ef4444'>Route not found</td></tr><tr><td>7</td><td>Layer 2: API Smoke Tests</td><td style='color:#ef4444'>Route not found</td></tr><tr><td>8</td><td>Layer 2: API Smoke Tests</td><td style='color:#ef4444'>Route not found</td></tr><tr><td>9</td><td>Layer 2: API Smoke Tests</td><td style='color:#ef4444'>{"statusCode":500,"message":"Unable to resolve service for type \u0027PosErp.Application.Features.Inventory.Services.IPurchaseRecommendationEngine\u00</td></tr><tr><td>10</td><td>Layer 3: Business Workflows</td><td style='color:#ef4444'>Cannot fetch created customer</td></tr><tr><td>11</td><td>Layer 3: Business Workflows</td><td style='color:#ef4444'>Customer search endpoint failed</td></tr><tr><td>12</td><td>Layer 3: Business Workflows</td><td style='color:#ef4444'>Offer creation failed: {"statusCode":500,"message":"An error occurred while saving the entity changes. See the inner exception for details. 42804: col</td></tr><tr><td>13</td><td>Layer 3: Business Workflows</td><td style='color:#ef4444'>Sale failed: {"statusCode":500,"message":"An error occurred while saving the entity changes. See the inner exception for details. 23502: null value in</td></tr><tr><td>14</td><td>Layer 3: Business Workflows</td><td style='color:#ef4444'>Sales return: 404</td></tr></tbody></table>
+<h2>All Issues (Action Required)</h2><table><thead><tr><th>#</th><th>Layer</th><th>Issue</th></tr></thead><tbody><tr><td>1</td><td>Layer 2: API Smoke Tests</td><td style='color:#ef4444'>{"statusCode":500,"message":"42703: column a.actioned_by_id does not exist\n\nPOSITION: 29"}</td></tr><tr><td>2</td><td>Layer 2: API Smoke Tests</td><td style='color:#ef4444'></td></tr><tr><td>3</td><td>Layer 3: Business Workflows</td><td style='color:#ef4444'>Invoice creation failed: {"statusCode":500,"message":"No active business date is open. Please open a business date before recording transactions."}</td></tr><tr><td>4</td><td>Layer 3: Business Workflows</td><td style='color:#ef4444'>Invoice with promo failed: {"statusCode":500,"message":"No active business date is open. Please open a business date before recording transactions."}</td></tr><tr><td>5</td><td>Layer 3: Business Workflows</td><td style='color:#ef4444'>Sale failed: {"statusCode":500,"message":"No active business date is open. Please open a business date before recording transactions."}</td></tr><tr><td>6</td><td>Layer 3: Business Workflows</td><td style='color:#ef4444'>Original sale failed: {"statusCode":500,"message":"No active business date is open. Please open a business date before recording transactions."}</td></tr></tbody></table>
 </body></html>

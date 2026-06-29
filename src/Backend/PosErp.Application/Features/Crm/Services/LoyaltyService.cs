@@ -96,9 +96,6 @@ public class LoyaltyService : ILoyaltyService
         // Auto Tier Evaluation (Upgrade only on checkout)
         if (config.EnableAutoTierEvaluation)
         {
-            // Reload customer to get the latest RunningLoyaltyPoints after earning
-            await _context.Entry(customer).ReloadAsync(cancellationToken);
-            
             var tiers = await _context.CustomerTiers.OrderByDescending(t => t.MinimumSpend).ToListAsync(cancellationToken);
             foreach (var tier in tiers)
             {

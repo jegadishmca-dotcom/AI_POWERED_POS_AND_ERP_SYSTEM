@@ -424,6 +424,8 @@ export const PosTerminal = () => {
   });
   const [suppressOffers, setSuppressOffers] = useState(false);
   const [pointsRedeemed, setPointsRedeemed] = useState<number>(0);
+  const pointsDiscount = pointsRedeemed > 0 ? (pointsRedeemed / 10) : 0;
+  const finalBillTotal = Math.max(0, cart.finalTotal - pointsDiscount);
 
   const recalculateCart = useCallback(async (items: any[], overrideCustomerId?: string | null) => {
     if (items.length === 0) {
@@ -1271,13 +1273,13 @@ export const PosTerminal = () => {
           <div className="flex justify-between text-lg mb-6"><span>Tax (GST)</span><span>₹{cart.taxTotal.toFixed(2)}</span></div>
           
           <div className="flex justify-between text-4xl font-black text-indigo-700 mb-8 border-t pt-4">
-            <span>Total</span><span>₹{cart.finalTotal.toFixed(2)}</span>
+            <span>Total</span><span>₹{finalBillTotal.toFixed(2)}</span>
           </div>
 
           {/* Payment Methods */}
           <div className="mt-4">
             <button 
-              disabled={cart.items.length === 0 || cart.finalTotal <= 0}
+              disabled={cart.items.length === 0 || finalBillTotal < 0}
               className="w-full bg-emerald-600 text-white p-4 rounded-lg font-black text-2xl shadow-lg hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center transition-colors mb-4" 
               onClick={() => {
                 if (cart.items.length === 0) {
@@ -1314,15 +1316,15 @@ export const PosTerminal = () => {
       <PaymentModal 
         isOpen={isPaymentModalOpen} 
         onClose={() => !isProcessing && setPaymentModalOpen(false)} 
-        cartTotal={cart.finalTotal}
+        cartTotal={finalBillTotal}
         isProcessing={isProcessing}
         customer={customer}
         onCompletePayment={async (tenders: any) => {
           try {
             setIsProcessing(true);
             // Generate dynamic invoice payload matching CreateInvoiceCommand
-            const roundOffVal = +(Math.round(cart.finalTotal) - cart.finalTotal).toFixed(2);
-            const netPayableVal = Math.round(cart.finalTotal);
+            const roundOffVal = +(Math.round(finalBillTotal) - finalBillTotal).toFixed(2);
+            const netPayableVal = Math.round(finalBillTotal);
             const paymentModeVal = tenders.cash > 0 && (tenders.upi > 0 || tenders.card > 0) ? 'SPLIT'
                                  : tenders.cash > 0 ? 'CASH'
                                  : tenders.upi > 0  ? 'UPI'
@@ -1352,8 +1354,8 @@ export const PosTerminal = () => {
 
             // 1. Calculate offline loyalty estimation
             const oldLoyaltyPoints = customer ? (customer.points || 0) : 0;
-            let offlineLoyaltyEarned = customer ? Math.floor(cart.finalTotal / 100) : 0;
-            let offlineLoyaltyBalance = oldLoyaltyPoints + offlineLoyaltyEarned;
+            let offlineLoyaltyEarned = customer ? Math.floor(finalBillTotal / 100) : 0;
+            let offlineLoyaltyBalance = oldLoyaltyPoints + offlineLoyaltyEarned - pointsRedeemed;
 
             // 2. Construct the FULL invoice object for local storage and printing
             const invoiceId = crypto.randomUUID();
@@ -1380,6 +1382,7 @@ export const PosTerminal = () => {
               roundOff: roundOffVal,
               netPayable: netPayableVal,
               paymentMode: paymentModeVal,
+              pointsRedeemed: payload.pointsRedeemed,
               status: 'COMPLETED',
               items: cart.items.map((item: any) => ({
                 id: item.id || crypto.randomUUID(),

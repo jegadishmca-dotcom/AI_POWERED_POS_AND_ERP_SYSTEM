@@ -24,7 +24,8 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
     if (!invoice) return null;
 
     // ── Totals ────────────────────────────────────────────────────────────────
-    const { rounded: netPayable, diff: roundOffAmt } = roundNearest(invoice.totalAmount);
+    const netPayable = safe(invoice.netPayable);
+    const roundOffAmt = safe(invoice.roundOff);
     const tenderCash   = safe(invoice.cashAmount);
     const tenderUpi    = safe(invoice.upiAmount);
     const tenderCard   = safe(invoice.cardAmount);
@@ -169,6 +170,9 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
           ) : null}
           {totalCessAmount > 0 && (
             <div style={S.row}><span>GST CESS</span><span>+{fmt(totalCessAmount)}</span></div>
+          )}
+          {safe(invoice.pointsRedeemed) > 0 && (
+            <div style={S.row}><span>Points Redeemed ({safe(invoice.pointsRedeemed)})</span><span>-{fmt(safe(invoice.pointsRedeemed) / 10)}</span></div>
           )}
           {roundOffAmt !== 0 && (
             <div style={S.row}><span>Round Off</span><span>{roundOffAmt > 0 ? '+' : ''}{fmt(roundOffAmt)}</span></div>

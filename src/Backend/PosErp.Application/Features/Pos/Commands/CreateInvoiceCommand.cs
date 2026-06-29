@@ -525,6 +525,16 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             if (request.WalletAmountUsed > 0) journalLines.Add(new JournalLineDto { AccountCode = walletAccountCode, Description = "Wallet Redemption", Debit = request.WalletAmountUsed, Credit = 0 });
             if (creditSaleAmount > 0) journalLines.Add(new JournalLineDto { AccountCode = arAccountCode, Description = $"Credit Sale AR for {customer?.Name}", Debit = creditSaleAmount, Credit = 0 });
             
+            if (request.PointsRedeemed > 0)
+            {
+                decimal pointsDiscount = (request.PointsRedeemed / loyaltyConfig.RedeemRatioPoints) * loyaltyConfig.RedeemRatioDiscountAmount;
+                if (pointsDiscount > 0)
+                {
+                    string loyaltyAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", "20200", cancellationToken);
+                    journalLines.Add(new JournalLineDto { AccountCode = loyaltyAccountCode, Description = "Loyalty Points Redemption", Debit = pointsDiscount, Credit = 0 });
+                }
+            }
+            
             // Credits (Revenue & Tax Liability)
             // Sales Revenue = SubTotal (post-discount, ex-tax) + any round-off adjustment
             decimal revenueCredit = taxableValue + invoice.RoundOff;

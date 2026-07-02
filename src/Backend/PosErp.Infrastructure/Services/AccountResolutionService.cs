@@ -19,7 +19,8 @@ public class AccountResolutionService : IAccountResolutionService
     public async Task<string> ResolveAccountCodeAsync(string accountType, string namePattern, string fallbackCode, CancellationToken cancellationToken)
     {
         var accounts = await _context.Accounts
-            .Where(a => a.IsActive && a.AccountType == accountType)
+            .Where(a => a.IsActive && a.AccountType == accountType &&
+                        !_context.Accounts.Any(sub => sub.ParentAccountId == a.Id && sub.IsActive))
             .OrderByDescending(a => a.AccountCode.Length)
             .ThenBy(a => a.AccountCode)
             .ToListAsync(cancellationToken);

@@ -255,7 +255,7 @@ public class F37_OfflineSyncWalletLoyaltyTests : IDisposable
 
         // Verify split debits
         var cashLine = journalEntry.Lines.FirstOrDefault(l => l.Account?.AccountCode == "10100");
-        var upiLine = journalEntry.Lines.FirstOrDefault(l => l.Account?.AccountCode == "10000");
+        var upiLine = journalEntry.Lines.FirstOrDefault(l => l.Account?.AccountCode == "10200");
         if (cashLine == null || upiLine == null)
         {
             var linesDetail = string.Join(", ", journalEntry.Lines.Select(l => $"{l.Account?.AccountCode ?? "null"}(dr={l.DebitAmount},cr={l.CreditAmount})"));

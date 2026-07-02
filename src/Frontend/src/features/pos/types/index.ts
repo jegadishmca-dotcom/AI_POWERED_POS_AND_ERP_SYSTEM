@@ -23,6 +23,16 @@ export interface Invoice {
   roundOff: number;
   netPayable: number;
   paymentMode: string;
+  customerId?: string;
+  customerName?: string;
+  customerPhone?: string;
+  cashAmount?: number;
+  upiAmount?: number;
+  cardAmount?: number;
+  walletAmountUsed?: number;
+  pointsRedeemed?: number;
+  loyaltyPointsEarned?: number;
+  loyaltyPointsBalance?: number;
   status: 'PENDING' | 'COMPLETED' | 'HOLD';
   items: CartItem[];
   customer?: {

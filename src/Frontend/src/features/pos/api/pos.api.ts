@@ -17,7 +17,12 @@ export interface CreateInvoicePayload {
   }>;
 }
 
-export const createInvoice = async (payload: CreateInvoicePayload): Promise<string> => {
+export interface CreateInvoiceResponse {
+  invoiceId: string;
+  invoiceNumber: string;
+}
+
+export const createInvoice = async (payload: CreateInvoicePayload): Promise<CreateInvoiceResponse> => {
   const { data } = await api.post('/api/pos/create', payload);
   return data;
 };

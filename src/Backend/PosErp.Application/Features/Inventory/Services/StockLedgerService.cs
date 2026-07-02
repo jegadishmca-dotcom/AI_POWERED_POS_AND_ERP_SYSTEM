@@ -83,6 +83,21 @@ public class StockLedgerService : IStockLedgerService
             decimal currentBalance = lastEntry?.RunningBalance ?? 0;
             decimal newBalance = currentBalance + quantity;
 
+            if (newBalance < 0 && movementType == "SALE" && rules.PreventNegativeStock)
+            {
+                var productName = await _context.Products
+                    .Where(p => p.Id == productId)
+                    .Select(p => p.Name)
+                    .FirstOrDefaultAsync(cancellationToken) ?? "Unknown Product";
+                throw new InvalidOperationException($"INSUFFICIENT_STOCK: Item '{productName}' is out of stock. Available: {currentBalance}, Requested: {-quantity}. Scan a supervisor PIN to override.");
+            }
+
+            string finalMovementType = movementType;
+            if (movementType == "SALE" || movementType == "SALE_OVERRIDE")
+            {
+                finalMovementType = (movementType == "SALE_OVERRIDE" && newBalance < 0) ? "SALE_OVERRIDE" : "SALE";
+            }
+
             var finalExpiryDate = expiryDate;
             if (!finalExpiryDate.HasValue && batchId.HasValue)
             {
@@ -99,7 +114,7 @@ public class StockLedgerService : IStockLedgerService
                 BusinessDate = businessDate,
                 ProductId = productId,
                 BatchId = batchId,
-                MovementType = movementType,
+                MovementType = finalMovementType,
                 Quantity = quantity,
                 UnitCost = unitCost,
                 ExpiryDate = finalExpiryDate,

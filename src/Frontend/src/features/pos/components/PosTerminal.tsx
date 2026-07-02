@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert, Printer, Clock, Maximize, Minimize, Mic, MicOff, Unlock } from 'lucide-react';
+import { Search, ShoppingCart, User, Plus, X, CreditCard, Wallet, Award, Tag, Trash2, PlusCircle, MinusCircle, Hand, ShieldAlert, Printer, Clock, Maximize, Minimize, Mic, MicOff, Unlock, RotateCcw } from 'lucide-react';
 import { CustomerRegistrationModal } from '../../crm/components/CustomerRegistrationModal';
 import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
@@ -15,6 +15,9 @@ import { ManagerPinModal } from './modals/ManagerPinModal';
 import { ReprintModal } from './modals/ReprintModal';
 import { OpenShiftModal } from './modals/OpenShiftModal';
 import { CloseShiftModal } from './modals/CloseShiftModal';
+import { SalesReturnModal } from './modals/SalesReturnModal';
+import { CancelInvoiceModal } from './modals/CancelInvoiceModal';
+import { CANCELLATION_ALLOWED_ROLES } from '../constants/roles';
 import { posDb } from '../db/pos.db';
 import { useAuthStore } from '../../auth/store/auth.store';
 import { syncInvoices } from '../api/pos.sync';
@@ -33,6 +36,8 @@ export const PosTerminal = () => {
   const [isHoldModalOpen, setHoldModalOpen] = useState(false);
   const [isReprintModalOpen, setReprintModalOpen] = useState(false);
   const [isManagerModalOpen, setManagerModalOpen] = useState(false);
+  const [isReturnModalOpen, setReturnModalOpen] = useState(false);
+  const [isCancelModalOpen, setCancelModalOpen] = useState(false);
   const [managerAction, setManagerAction] = useState<any>(null);
   const customerInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
@@ -44,6 +49,7 @@ export const PosTerminal = () => {
   const [isOpenShiftModalOpen, setOpenShiftModalOpen] = useState(false);
   const [isCloseShiftModalOpen, setCloseShiftModalOpen] = useState(false);
   const { user } = useAuthStore();
+  const isAuthorizedToCancel = !!(user?.role && CANCELLATION_ALLOWED_ROLES.includes(user.role));
   const terminalId = localStorage.getItem('pos_terminal_id') || '00000000-0000-0000-0000-000000000001';
   const cashierId = user?.id || '00000000-0000-0000-0000-000000000001';
 
@@ -645,7 +651,11 @@ export const PosTerminal = () => {
     onF9Park: () => {
       handleHoldCart();
     },
-    onF10Reprint: () => setReprintModalOpen(true)
+    onF10Reprint: () => setReprintModalOpen(true),
+    onF8Return: () => setReturnModalOpen(true),
+    onF7Cancel: () => {
+      if (isAuthorizedToCancel) setCancelModalOpen(true);
+    }
   });
 
   const handleHoldCart = async () => {
@@ -1296,6 +1306,22 @@ export const PosTerminal = () => {
               <CreditCard className="w-8 h-8 mr-3" /> PAYMENT (F11)
             </button>
             <div className="flex gap-3">
+               {isAuthorizedToCancel && (
+                 <button 
+                   onClick={() => setCancelModalOpen(true)} 
+                   className="flex-1 bg-red-700 hover:bg-red-800 text-white p-3.5 rounded-xl shadow-md flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-bold"
+                 >
+                   <ShieldAlert className="w-5 h-5 text-red-200" />
+                   <span>F7: Cancel</span>
+                 </button>
+               )}
+               <button 
+                 onClick={() => setReturnModalOpen(true)} 
+                 className="flex-1 bg-rose-700 hover:bg-rose-800 text-white p-3.5 rounded-xl shadow-md flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-bold"
+               >
+                 <RotateCcw className="w-5 h-5" />
+                 <span>F8: Return</span>
+               </button>
                <button 
                  onClick={handleHoldCart} 
                  className="flex-1 bg-amber-600 hover:bg-amber-700 text-white p-3.5 rounded-xl shadow-md flex flex-col items-center justify-center gap-1.5 transition-all active:scale-95 text-xs font-bold"
@@ -1369,6 +1395,7 @@ export const PosTerminal = () => {
               cashierName: user?.fullName || user?.username || 'Cashier',
               customerName: customer?.name || undefined,
               customerPhone: customer?.phone || undefined,
+              customerId: customer?.id || undefined,
               loyaltyPointsEarned: offlineLoyaltyEarned,
               loyaltyPointsBalance: offlineLoyaltyBalance,
               subTotal: cart.subtotal,
@@ -1420,7 +1447,9 @@ export const PosTerminal = () => {
             };
 
             try {
-              await createInvoice(payload);
+              const response = await createInvoice(payload);
+              fullInvoice.id = response.invoiceId;
+              fullInvoice.invoiceNumber = response.invoiceNumber;
               // Re-fetch customer to get updated loyalty balance from backend.
               // Only update if the backend returned a HIGHER balance than our offline
               // estimate (guards against a race condition where the DB hasn't flushed yet).
@@ -1446,7 +1475,9 @@ export const PosTerminal = () => {
                 if (pin !== null && pin.trim() !== "") {
                   try {
                     const retryPayload = { ...payload, supervisorOverridePin: pin };
-                    await createInvoice(retryPayload);
+                    const retryResponse = await createInvoice(retryPayload);
+                    fullInvoice.id = retryResponse.invoiceId;
+                    fullInvoice.invoiceNumber = retryResponse.invoiceNumber;
                   } catch (retryErr: any) {
                     const retryErrorText = retryErr?.response?.data?.message || retryErr?.response?.data?.detailed || retryErr?.response?.data?.Detailed || retryErr?.response?.data?.Message || retryErr?.message || "Invalid PIN.";
                     alert("Override Failed: " + retryErrorText);
@@ -1570,6 +1601,19 @@ export const PosTerminal = () => {
         isOpen={isCloseShiftModalOpen}
         onClose={() => setCloseShiftModalOpen(false)}
         onCloseShift={handleCloseShift}
+      />
+
+      <SalesReturnModal
+        isOpen={isReturnModalOpen}
+        onClose={() => setReturnModalOpen(false)}
+        user={user}
+        requestManagerOverride={requestManagerOverride}
+      />
+
+      <CancelInvoiceModal
+        isOpen={isCancelModalOpen}
+        onClose={() => setCancelModalOpen(false)}
+        user={user}
       />
 
     </div>

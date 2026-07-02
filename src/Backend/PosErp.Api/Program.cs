@@ -116,6 +116,7 @@ builder.Services.AddRateLimiter(options =>
 
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITenantProvider, TenantProvider>();
+builder.Services.AddScoped<PosErp.Application.Interfaces.IAccountResolutionService, PosErp.Infrastructure.Services.AccountResolutionService>();
 
 // Redis Configuration
 string redisConnectionString = builder.Configuration.GetSection("Redis:ConnectionString").Value ?? "localhost:6379";

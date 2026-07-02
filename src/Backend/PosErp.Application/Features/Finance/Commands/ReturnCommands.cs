@@ -35,13 +35,15 @@ public record ProcessSalesReturnCommand(
     DateTime ReturnDate,
     string RefundMode, // CASH, UPI, CREDIT_NOTE
     List<SalesReturnItemInputDto> Items,
-    Guid UserId
+    Guid UserId,
+    string? ManagerOverridePin = null
 ) : IRequest<Guid>;
 
 public record SalesReturnItemInputDto(
     Guid ProductId,
     Guid? BatchId,
-    decimal Quantity
+    decimal Quantity,
+    Guid? ItemId = null
 );
 
 public class ReturnCommandsHandler :
@@ -52,17 +54,20 @@ public class ReturnCommandsHandler :
     private readonly IFinancialPostingService _postingService;
     private readonly IDocumentSequenceService _sequenceService;
     private readonly IStockLedgerService _stockLedgerService;
+    private readonly IPasswordHasher _passwordHasher;
 
     public ReturnCommandsHandler(
         IApplicationDbContext context,
         IFinancialPostingService postingService,
         IDocumentSequenceService sequenceService,
-        IStockLedgerService stockLedgerService)
+        IStockLedgerService stockLedgerService,
+        IPasswordHasher passwordHasher)
     {
         _context = context;
         _postingService = postingService;
         _sequenceService = sequenceService;
         _stockLedgerService = stockLedgerService;
+        _passwordHasher = passwordHasher;
     }
 
     public async Task<Guid> Handle(ProcessPurchaseReturnCommand request, CancellationToken cancellationToken)
@@ -287,6 +292,50 @@ public class ReturnCommandsHandler :
             using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
             try
             {
+                // Authorize caller or Manager Override PIN
+                var callerUser = await _context.Users
+                    .Join(_context.Roles,
+                        u => u.RoleId,
+                        r => r.Id,
+                        (u, r) => new { User = u, Role = r })
+                    .FirstOrDefaultAsync(x => x.User.Id == request.UserId, cancellationToken);
+
+                bool isAutoAuthorized = callerUser != null && 
+                    (callerUser.Role.Name == "Manager" || callerUser.Role.Name == "Owner" || callerUser.Role.Name == "Supervisor");
+
+                if (!isAutoAuthorized)
+                {
+                    if (string.IsNullOrWhiteSpace(request.ManagerOverridePin))
+                    {
+                        throw new UnauthorizedAccessException("Manager or Owner authorization is required to process a sales return.");
+                    }
+
+                    // Verify manager PIN
+                    var usersWithPin = await _context.Users
+                        .Join(_context.Roles,
+                            u => u.RoleId,
+                            r => r.Id,
+                            (u, r) => new { User = u, Role = r })
+                        .Where(x => x.User.IsActive && !x.User.IsDeleted && x.User.PinHash != null &&
+                            (x.Role.Name == "Supervisor" || x.Role.Name == "Manager" || x.Role.Name == "Owner"))
+                        .Select(x => x.User)
+                        .ToListAsync(cancellationToken);
+
+                    bool pinVerified = false;
+                    foreach (var user in usersWithPin)
+                    {
+                        if (_passwordHasher.VerifyPassword(request.ManagerOverridePin, user.PinHash!))
+                        {
+                            pinVerified = true;
+                            break;
+                        }
+                    }
+
+                    if (!pinVerified)
+                    {
+                        throw new UnauthorizedAccessException("Invalid Manager Override PIN. Access denied.");
+                    }
+                }
                 var invoice = await _context.Invoices
                 .Include(i => i.Items)
                 .FirstOrDefaultAsync(i => i.Id == request.InvoiceId, cancellationToken);
@@ -314,8 +363,10 @@ public class ReturnCommandsHandler :
 
             foreach (var item in request.Items)
             {
-                var invItem = invoice.Items.FirstOrDefault(ii => ii.ProductId == item.ProductId);
-                if (invItem == null) throw new InvalidOperationException($"Product with ID {item.ProductId} was not found on original invoice.");
+                var invItem = item.ItemId.HasValue
+                    ? invoice.Items.FirstOrDefault(ii => ii.Id == item.ItemId.Value)
+                    : invoice.Items.FirstOrDefault(ii => ii.ProductId == item.ProductId);
+                if (invItem == null) throw new InvalidOperationException($"Invoice item was not found on original invoice.");
 
                 var product = await _context.Products
                     .Include(p => p.TaxSlab)
@@ -333,10 +384,12 @@ public class ReturnCommandsHandler :
                     // If no specific batch provided, find any available batch for restock
                     batch = await _context.ProductBatches
                         .Where(b => b.ProductId == item.ProductId)
-                        .OrderByDescending(b => b.CreatedAt)
+                        .OrderBy(b => b.CreatedAt)
                         .FirstOrDefaultAsync(cancellationToken);
                     
-                    if (batch == null) throw new InvalidOperationException($"No batch found for Product ID {item.ProductId}. Returns require a batch to restock.");
+                    if (batch == null)
+                        throw new InvalidOperationException(
+                            $"BATCH_NOT_FOUND: No batch found for product {item.ProductId}. Return rejected.");
                 }
 
                 // Validate original quantities
@@ -531,6 +584,8 @@ public class ReturnCommandsHandler :
     {
         var account = await _context.Accounts
             .Where(a => a.IsActive && a.AccountType == accountType)
+            .OrderByDescending(a => a.AccountCode.Length)
+            .ThenBy(a => a.AccountCode)
             .ToListAsync(cancellationToken);
 
         var matched = account.FirstOrDefault(a => a.Name.Equals(namePattern, StringComparison.OrdinalIgnoreCase))

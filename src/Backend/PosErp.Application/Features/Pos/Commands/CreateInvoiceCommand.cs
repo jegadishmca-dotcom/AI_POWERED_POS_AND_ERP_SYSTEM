@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Pos;
 using PosErp.Domain.Entities.Finance;
@@ -33,11 +34,12 @@ public record CreateInvoiceCommand(
     List<InvoiceItemDto> Items,
     decimal PointsRedeemed = 0,
     string? SupervisorOverridePin = null
-) : IRequest<Guid>;
+) : IRequest<CreateInvoiceResponse>;
 
 public record InvoiceItemDto(Guid ProductId, decimal Quantity, decimal UnitPrice, Guid? BatchId);
+public record CreateInvoiceResponse(Guid InvoiceId, string InvoiceNumber);
 
-public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand, Guid>
+public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand, CreateInvoiceResponse>
 {
     private readonly IApplicationDbContext _context;
     private readonly IOfferEngine _offerEngine;
@@ -46,6 +48,8 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
     private readonly IFinancialPostingService _financialPostingService;
     private readonly PosErp.Application.Features.Inventory.Services.IStockLedgerService _stockLedgerService;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IAccountResolutionService _accountResolutionService;
+    private readonly ILogger<CreateInvoiceCommandHandler>? _logger;
 
     public CreateInvoiceCommandHandler(
         IApplicationDbContext context, 
@@ -54,7 +58,9 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
         ILoyaltyService loyaltyService,
         IFinancialPostingService financialPostingService,
         PosErp.Application.Features.Inventory.Services.IStockLedgerService stockLedgerService,
-        IPasswordHasher passwordHasher)
+        IPasswordHasher passwordHasher,
+        IAccountResolutionService accountResolutionService,
+        ILogger<CreateInvoiceCommandHandler>? logger = null)
     {
         _context = context;
         _offerEngine = offerEngine;
@@ -63,9 +69,11 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
         _financialPostingService = financialPostingService;
         _stockLedgerService = stockLedgerService;
         _passwordHasher = passwordHasher;
+        _accountResolutionService = accountResolutionService;
+        _logger = logger;
     }
 
-    public async Task<Guid> Handle(CreateInvoiceCommand request, CancellationToken cancellationToken)
+    public async Task<CreateInvoiceResponse> Handle(CreateInvoiceCommand request, CancellationToken cancellationToken)
     {
         var strategy = ((DbContext)_context).Database.CreateExecutionStrategy();
         return await strategy.ExecuteAsync(async () =>
@@ -76,6 +84,17 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             var customer = request.CustomerId.HasValue 
                 ? await _context.Customers.Include(c => c.Tier).FirstOrDefaultAsync(c => c.Id == request.CustomerId.Value) 
                 : null;
+
+            // Retrieve the current active business date
+            var activeDateSession = await _context.StoreBusinessDates
+                .FirstOrDefaultAsync(d => d.StoreId == Guid.Empty && d.Status == "OPEN", cancellationToken);
+
+            if (activeDateSession == null)
+            {
+                throw new Exception("No active business date is open. Please open a business date before recording transactions.");
+            }
+
+            var today = activeDateSession.BusinessDate;
 
             var productIds = request.Items.Select(i => i.ProductId).ToList();
             var productsInfo = await _context.Products
@@ -138,10 +157,28 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 
                 if (discountValue > maxAllowedDiscount)
                     throw new Exception($"Redemption exceeds maximum allowed limit of {loyaltyConfig.MaxRedemptionPercentagePerInvoice}% per invoice.");
-                    
-                // Check daily max limit (simplified check, real app would sum today's redemptions)
-                if (request.PointsRedeemed > loyaltyConfig.MaxRedemptionPerDay)
-                    throw new Exception($"Redemption exceeds daily limit of {loyaltyConfig.MaxRedemptionPerDay} points.");
+
+                // Acquire FOR UPDATE lock on customer row to protect against concurrent checkout race conditions
+                await ((DbContext)_context).Database.ExecuteSqlRawAsync(
+                    "SELECT 1 FROM customers WHERE id = {0} FOR UPDATE", 
+                    new object[] { customer.Id }, 
+                    cancellationToken);
+
+                // Sum all points redeemed today via explicit join
+                decimal todayRedeemed = await (
+                    from l in _context.LoyaltyLedger
+                    join i in _context.Invoices on l.InvoiceId equals i.Id
+                    where l.CustomerId == customer.Id 
+                       && l.TransactionType == "Redeem Points" 
+                       && i.BusinessDate == today
+                    select l.PointsRedeemed
+                ).SumAsync(cancellationToken);
+
+                // Check cumulative daily limit and throw typed business exception
+                if (todayRedeemed + request.PointsRedeemed > loyaltyConfig.MaxRedemptionPerDay)
+                {
+                    throw new InvalidOperationException($"DAILY_REDEMPTION_LIMIT_EXCEEDED: Redemption exceeds daily limit of {loyaltyConfig.MaxRedemptionPerDay} points. Cumulative redemption today: {todayRedeemed + request.PointsRedeemed} points.");
+                }
             }
 
 
@@ -151,27 +188,29 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             if (totalTender < request.NetPayable - 1m)
                 throw new Exception($"Total tender (₹{totalTender:F2}) is less than the invoice amount (₹{request.NetPayable:F2}).");
 
-            // Retrieve the current active business date
-            var activeDateSession = await _context.StoreBusinessDates
-                .FirstOrDefaultAsync(d => d.StoreId == Guid.Empty && d.Status == "OPEN", cancellationToken);
+            // Acquire FOR UPDATE lock on the terminal row to serialize sequence generation on this terminal
+            await ((DbContext)_context).Database.ExecuteSqlRawAsync(
+                "SELECT 1 FROM terminals WHERE id = {0} FOR UPDATE", 
+                new object[] { request.TerminalId }, 
+                cancellationToken);
 
-            if (activeDateSession == null)
-            {
-                throw new Exception("No active business date is open. Please open a business date before recording transactions.");
-            }
+            var terminal = await _context.Terminals.FindAsync(new object[] { request.TerminalId }, cancellationToken);
+            if (terminal == null)
+                throw new Exception($"Terminal with ID {request.TerminalId} not found.");
 
-            var today = activeDateSession.BusinessDate;
             var lastSeq = await _context.Invoices
                 .Where(i => i.TerminalId == request.TerminalId && i.BusinessDate == today)
                 .Select(i => (int?)i.TerminalSequence)
                 .MaxAsync(cancellationToken) ?? 0;
             var nextSeq = lastSeq + 1;
 
+            string generatedInvoiceNumber = $"INV-{terminal.TerminalCode}-{today:yyyyMMdd}-{nextSeq:D4}";
+
             var invoiceId = Guid.NewGuid();
             var invoice = new Invoice
             {
                 Id = invoiceId,
-                InvoiceNumber = request.InvoiceNumber,
+                InvoiceNumber = generatedInvoiceNumber,
                 TerminalId = request.TerminalId,
                 CashierId = request.CashierId,
                 TerminalSequence = nextSeq,
@@ -268,7 +307,6 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                     .ToList();
 
                 // Fetch terminal for name
-                var terminal = await _context.Terminals.FindAsync(request.TerminalId);
                 var terminalName = terminal?.Name ?? "Unknown";
 
                 decimal originalCartVal = cartEvaluation.Items.Sum(i => i.LineTotal);
@@ -305,54 +343,32 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 }
             }
 
-            await _context.SaveChangesAsync(cancellationToken); 
-
-            // Deduct Stock
-            var rules = InventoryRulesManager.GetRules();
-
-            if (rules.PreventNegativeStock)
+            await _context.SaveChangesAsync(cancellationToken);
+            // Verify supervisor override PIN if provided
+            bool overrideApproved = false;
+            if (!string.IsNullOrWhiteSpace(request.SupervisorOverridePin))
             {
-                foreach (var item in cartEvaluation.Items)
+                var usersWithPin = await _context.Users
+                    .Join(_context.Roles,
+                        u => u.RoleId,
+                        r => r.Id,
+                        (u, r) => new { User = u, Role = r })
+                    .Where(x => x.User.IsActive && !x.User.IsDeleted && x.User.PinHash != null &&
+                        (x.Role.Name == "Supervisor" || x.Role.Name == "Manager" || x.Role.Name == "Owner"))
+                    .Select(x => x.User)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var user in usersWithPin)
                 {
-                    var product = productsInfo.TryGetValue(item.ProductId, out var p) ? p : null;
-                    var productName = product?.Name ?? "Unknown Product";
-
-                    var availableStock = await _context.StockLedger
-                        .Where(sl => sl.ProductId == item.ProductId && sl.StoreId == storeId)
-                        .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
-
-                    if (availableStock < item.Quantity)
+                    if (_passwordHasher.VerifyPassword(request.SupervisorOverridePin, user.PinHash!))
                     {
-                        bool overrideApproved = false;
-                        if (!string.IsNullOrWhiteSpace(request.SupervisorOverridePin))
-                        {
-                            var usersWithPin = await _context.Users
-                                .Join(_context.Roles,
-                                    u => u.RoleId,
-                                    r => r.Id,
-                                    (u, r) => new { User = u, Role = r })
-                                .Where(x => x.User.IsActive && !x.User.IsDeleted && x.User.PinHash != null &&
-                                    (x.Role.Name == "Supervisor" || x.Role.Name == "Manager" || x.Role.Name == "Owner"))
-                                .Select(x => x.User)
-                                .ToListAsync(cancellationToken);
-
-                            foreach (var user in usersWithPin)
-                            {
-                                if (_passwordHasher.VerifyPassword(request.SupervisorOverridePin, user.PinHash!))
-                                {
-                                    overrideApproved = true;
-                                    break;
-                                }
-                            }
-                        }
-
-                        if (!overrideApproved)
-                        {
-                            throw new Exception($"INSUFFICIENT_STOCK: Item '{productName}' is out of stock. Available: {availableStock}, Requested: {item.Quantity}. Scan a supervisor PIN to override.");
-                        }
+                        overrideApproved = true;
+                        break;
                     }
                 }
             }
+
+
 
             foreach (var item in cartEvaluation.Items)
             {
@@ -408,12 +424,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                     }
                 }
 
-                // Check if this specific item breached stock level to log override status
-                var itemStock = await _context.StockLedger
-                    .Where(sl => sl.ProductId == item.ProductId && sl.StoreId == storeId)
-                    .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
-
-                string movementTypeVal = (rules.PreventNegativeStock && itemStock < item.Quantity) ? "SALE_OVERRIDE" : "SALE";
+                string movementTypeVal = overrideApproved ? "SALE_OVERRIDE" : "SALE";
 
                 string invoiceRef = invoice.InvoiceNumber.StartsWith("INV-", StringComparison.OrdinalIgnoreCase)
                     ? invoice.InvoiceNumber
@@ -444,8 +455,11 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             if (request.WalletAmountUsed > 0 && customer != null)
                 await _walletService.RecordTransactionAsync(customer.Id, null, "SPEND", -request.WalletAmountUsed, finalInvoiceRef, null, cancellationToken);
 
+            decimal pointsDiscount = 0m;
             if (request.PointsRedeemed > 0 && customer != null)
             {
+                pointsDiscount = Math.Round((request.PointsRedeemed / loyaltyConfig.RedeemRatioPoints) * loyaltyConfig.RedeemRatioDiscountAmount, 2, MidpointRounding.AwayFromZero);
+                
                 decimal currentPts = customer.RunningLoyaltyPoints;
                 customer.RunningLoyaltyPoints -= request.PointsRedeemed;
                 customer.LastRedemptionDate = DateTime.UtcNow;
@@ -468,7 +482,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 _context.LoyaltyLedger.Add(ptsLedger);
             }
 
-            // C6: Loyalty points calculated on NetPayable (actual amount charged)
+            // C6: Loyalty points calculated on NetPayable minus points redemption discount (cash paid basis)
             // This call is AFTER invoice.TotalAmount is set (post-items-loop), so points are non-zero
             if (customer != null)
                 await _loyaltyService.CalculateAndAwardPointsForInvoiceAsync(invoice.Id, customer.Id, invoice.NetPayable, cancellationToken);
@@ -512,27 +526,47 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             if (shouldPostJournal)
             {
             // Resolve account codes dynamically
-            string cashAccountCode = await ResolveAccountCodeAsync("ASSET", "Cash", "10100", cancellationToken);
-            string digitalAccountCode = await ResolveAccountCodeAsync("ASSET", "Current", "10200", cancellationToken);
-            string walletAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", "20200", cancellationToken);
-            string arAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", "20200", cancellationToken);
-            string salesAccountCode = await ResolveAccountCodeAsync("REVENUE", "Sales", "40100", cancellationToken);
-            string outputCgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Output CGST", "22010", cancellationToken);
-            string outputSgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Output SGST", "22020", cancellationToken);
+            string cashAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("ASSET", "Cash", "10100", cancellationToken);
+            string digitalAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("ASSET", "Current", "10200", cancellationToken);
+            string walletAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("LIABILITY", "Wallet", "20200", cancellationToken);
+            string arAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("ASSET", "Receivable", "10400", cancellationToken);
+            string salesAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("REVENUE", "Sales", "40100", cancellationToken);
+            string outputCgstAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("LIABILITY", "Output CGST", "22010", cancellationToken);
+            string outputSgstAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("LIABILITY", "Output SGST", "22020", cancellationToken);
+            string inventoryAssetAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("ASSET", "Inventory Asset", "10300", cancellationToken);
+            string cogsAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("EXPENSE", "Cost of Goods Sold", "50100", cancellationToken);
+
+            decimal totalCogs = 0;
+            foreach (var item in cartEvaluation.Items)
+            {
+                if (productsInfo.TryGetValue(item.ProductId, out var product))
+                {
+                    if (product.PurchasePrice > 0)
+                    {
+                        totalCogs += item.Quantity * product.PurchasePrice;
+                    }
+                    else
+                    {
+                        _logger?.LogWarning("Skipping COGS calculation for Product {ProductId} ({ProductName}) because purchase price is 0 or less.", item.ProductId, product.Name);
+                    }
+                }
+            }
 
             if (actualCashPaid > 0) journalLines.Add(new JournalLineDto { AccountCode = cashAccountCode, Description = "Cash Tender", Debit = actualCashPaid, Credit = 0 });
             if (request.UpiAmount > 0 || request.CardAmount > 0) journalLines.Add(new JournalLineDto { AccountCode = digitalAccountCode, Description = "Digital Tender", Debit = request.UpiAmount + request.CardAmount, Credit = 0 });
             if (request.WalletAmountUsed > 0) journalLines.Add(new JournalLineDto { AccountCode = walletAccountCode, Description = "Wallet Redemption", Debit = request.WalletAmountUsed, Credit = 0 });
             if (creditSaleAmount > 0) journalLines.Add(new JournalLineDto { AccountCode = arAccountCode, Description = $"Credit Sale AR for {customer?.Name}", Debit = creditSaleAmount, Credit = 0 });
             
-            if (request.PointsRedeemed > 0)
+            if (pointsDiscount > 0)
             {
-                decimal pointsDiscount = (request.PointsRedeemed / loyaltyConfig.RedeemRatioPoints) * loyaltyConfig.RedeemRatioDiscountAmount;
-                if (pointsDiscount > 0)
-                {
-                    string loyaltyAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", "20200", cancellationToken);
-                    journalLines.Add(new JournalLineDto { AccountCode = loyaltyAccountCode, Description = "Loyalty Points Redemption", Debit = pointsDiscount, Credit = 0 });
-                }
+                string loyaltyAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("LIABILITY", "Loyalty Points", "20300", cancellationToken);
+                journalLines.Add(new JournalLineDto { AccountCode = loyaltyAccountCode, Description = "Loyalty Points Redemption", Debit = pointsDiscount, Credit = 0 });
+            }
+
+            if (totalCogs > 0)
+            {
+                journalLines.Add(new JournalLineDto { AccountCode = cogsAccountCode, Description = "Cost of Goods Sold", Debit = totalCogs, Credit = 0 });
+                journalLines.Add(new JournalLineDto { AccountCode = inventoryAssetAccountCode, Description = "Inventory Asset Reduction", Debit = 0, Credit = totalCogs });
             }
             
             // Credits (Revenue & Tax Liability)
@@ -599,7 +633,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             await _context.SaveChangesAsync(cancellationToken);
 
             await transaction.CommitAsync(cancellationToken);
-            return invoice.Id;
+            return new CreateInvoiceResponse(invoice.Id, invoice.InvoiceNumber);
         }
         catch (Exception)
         {
@@ -607,17 +641,5 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             throw;
         }
         });
-    }
-
-    private async Task<string> ResolveAccountCodeAsync(string accountType, string namePattern, string fallbackCode, CancellationToken cancellationToken)
-    {
-        var account = await _context.Accounts
-            .Where(a => a.IsActive && a.AccountType == accountType)
-            .ToListAsync(cancellationToken);
-
-        var matched = account.FirstOrDefault(a => a.Name.Contains(namePattern, StringComparison.OrdinalIgnoreCase))
-                   ?? account.FirstOrDefault(a => a.AccountCode == fallbackCode);
-
-        return matched?.AccountCode ?? fallbackCode;
     }
 }

@@ -12,7 +12,7 @@ namespace PosErp.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Admin,Manager,Owner")]
+[Authorize(Roles = "Admin,Manager,Owner,Supervisor,Cashier")]
 public class AccountsReceivableController : ControllerBase
 {
     private readonly IMediator _mediator;
@@ -57,7 +57,8 @@ public class AccountsReceivableController : ControllerBase
             request.ReturnDate,
             request.RefundMode,
             request.Items,
-            userId
+            userId,
+            request.ManagerOverridePin
         );
 
         var id = await _mediator.Send(command);
@@ -115,4 +116,5 @@ public class ProcessSalesReturnRequest
     public DateTime ReturnDate { get; set; }
     public string RefundMode { get; set; } = string.Empty; // CASH, UPI, CREDIT_NOTE
     public List<SalesReturnItemInputDto> Items { get; set; } = new();
+    public string? ManagerOverridePin { get; set; }
 }

@@ -232,6 +232,8 @@ public class ConfirmGRNCommandHandler : IRequestHandler<ConfirmGRNCommand, bool>
     {
         var account = await _context.Accounts
             .Where(a => a.IsActive && a.AccountType == accountType)
+            .OrderByDescending(a => a.AccountCode.Length)
+            .ThenBy(a => a.AccountCode)
             .ToListAsync(cancellationToken);
 
         var matched = account.FirstOrDefault(a => a.Name.Contains(namePattern, StringComparison.OrdinalIgnoreCase))

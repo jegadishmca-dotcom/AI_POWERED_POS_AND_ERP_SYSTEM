@@ -3,12 +3,14 @@ import { useEffect } from 'react';
 type PosShortcuts = {
   onF1Search?: () => void;
   onF2Product?: () => void;
-    onF11Payment?: () => void;
+  onF11Payment?: () => void;
   onF9Park?: () => void;
   onF10Reprint?: () => void;
+  onF8Return?: () => void;
+  onF7Cancel?: () => void;
 };
 
-export const usePosKeyboardShortcuts = ({ onF1Search, onF2Product, onF11Payment, onF9Park, onF10Reprint }: PosShortcuts) => {
+export const usePosKeyboardShortcuts = ({ onF1Search, onF2Product, onF11Payment, onF9Park, onF10Reprint, onF8Return, onF7Cancel }: PosShortcuts) => {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       switch (e.key) {
@@ -32,10 +34,18 @@ export const usePosKeyboardShortcuts = ({ onF1Search, onF2Product, onF11Payment,
           e.preventDefault();
           onF10Reprint?.();
           break;
+        case 'F8':
+          e.preventDefault();
+          onF8Return?.();
+          break;
+        case 'F7':
+          e.preventDefault();
+          onF7Cancel?.();
+          break;
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [onF1Search, onF2Product, onF11Payment, onF9Park, onF10Reprint]);
+  }, [onF1Search, onF2Product, onF11Payment, onF9Park, onF10Reprint, onF8Return, onF7Cancel]);
 };

@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
+using PosErp.Application.Features.Crm.Services;
 using PosErp.Application.Features.Finance.Services;
 using PosErp.Domain.Entities.Finance;
 using System;
@@ -99,17 +100,20 @@ public class ARCommandsAndQueriesHandler :
     private readonly IFinancialPostingService _postingService;
     private readonly IDocumentSequenceService _sequenceService;
     private readonly IAllocationEngine _allocationEngine;
+    private readonly IWalletService _walletService;
 
     public ARCommandsAndQueriesHandler(
         IApplicationDbContext context,
         IFinancialPostingService postingService,
         IDocumentSequenceService sequenceService,
-        IAllocationEngine allocationEngine)
+        IAllocationEngine allocationEngine,
+        IWalletService walletService)
     {
         _context = context;
         _postingService = postingService;
         _sequenceService = sequenceService;
         _allocationEngine = allocationEngine;
+        _walletService = walletService;
     }
 
     public async Task<Guid> Handle(ProcessCustomerReceiptCommand request, CancellationToken cancellationToken)
@@ -147,12 +151,20 @@ public class ARCommandsAndQueriesHandler :
             // Let's use 20200 'Customer Wallet Liabilities' or similar, or define a general customer receivable GL code 20000.
             // Looking at COA: ('20000', 'Current Liabilities'), ('2100', 'Customer Wallet Deposits') (Wait, in seed it was 2100, and in 12_Seed it is 20200 'Customer Wallet Liabilities')
             // Let's use '20200' as Customer Receivable/Deposits.
-            string digitalAccountCode = await ResolveAccountCodeAsync("ASSET", "Current", "10200", cancellationToken);
+            string debitAccountCode;
+            if (request.PaymentMode == "CASH")
+            {
+                debitAccountCode = await ResolveAccountCodeAsync("ASSET", "Cash", "10100", cancellationToken);
+            }
+            else
+            {
+                debitAccountCode = await ResolveAccountCodeAsync("ASSET", "Current A/C", "10200", cancellationToken);
+            }
             string arAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", "20200", cancellationToken);
 
             var lines = new List<JournalLineDto>
             {
-                new() { AccountCode = digitalAccountCode, Description = $"Customer receipt {recNumber}", Debit = request.Amount, Credit = 0 },
+                new() { AccountCode = debitAccountCode, Description = $"Customer receipt {recNumber}", Debit = request.Amount, Credit = 0 },
                 new() { AccountCode = arAccountCode, Description = $"Customer account credit {customer.Name}", Debit = 0, Credit = request.Amount }
             };
 
@@ -197,8 +209,8 @@ public class ARCommandsAndQueriesHandler :
             };
             _context.CustomerLedger.Add(ledgerEntry);
 
-            // Update customer wallet balance if applicable
-            customer.RunningWalletBalance += request.Amount;
+            // Update customer wallet balance and record ledger entry via WalletService
+            await _walletService.RecordTransactionAsync(customer.Id, request.StoreId, "TOPUP", request.Amount, recNumber, request.UserId, cancellationToken);
 
             await _context.SaveChangesAsync(cancellationToken);
 
@@ -405,6 +417,8 @@ public class ARCommandsAndQueriesHandler :
     {
         var account = await _context.Accounts
             .Where(a => a.IsActive && a.AccountType == accountType)
+            .OrderByDescending(a => a.AccountCode.Length)
+            .ThenBy(a => a.AccountCode)
             .ToListAsync(cancellationToken);
 
         var matched = account.FirstOrDefault(a => a.Name.Contains(namePattern, StringComparison.OrdinalIgnoreCase))

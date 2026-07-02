@@ -45,6 +45,12 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     details TEXT
 );
 
+-- Ensure columns exist if table was already created by migration 14
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS user_name TEXT;
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS entity_type TEXT NOT NULL DEFAULT '';
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS timestamp TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW();
+ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS details TEXT;
+
 CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_entity ON audit_logs(entity_type, entity_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user ON audit_logs(user_id);

@@ -55,6 +55,7 @@ public class AccountingIntegrationTests : IDisposable
     private readonly ClosePosSessionCommandHandler _closeSessionHandler;
     private readonly ReturnCommandsHandler _returnHandler;
     private readonly TransferCommandsHandler _transferHandler;
+    private readonly CancelInvoiceCommandHandler _cancelInvoiceHandler;
 
     private readonly Guid _storeId;
     private readonly Guid _supplierId;
@@ -77,12 +78,15 @@ public class AccountingIntegrationTests : IDisposable
         _loyaltyService = new LoyaltyService(_context);
         _offerEngine = new OfferEngine(_context, _memoryCache);
 
+        var accountRes = new PosErp.Infrastructure.Services.AccountResolutionService(_context);
+
         _apHandler = new APCommandsAndQueriesHandler(_context, _postingService, _sequenceService, _allocationEngine, _approvalService);
-        _arHandler = new ARCommandsAndQueriesHandler(_context, _postingService, _sequenceService, _allocationEngine);
-        _invoiceHandler = new CreateInvoiceCommandHandler(_context, _offerEngine, _walletService, _loyaltyService, _postingService, _stockLedgerService, _passwordHasher);
+        _arHandler = new ARCommandsAndQueriesHandler(_context, _postingService, _sequenceService, _allocationEngine, _walletService);
+        _invoiceHandler = new CreateInvoiceCommandHandler(_context, _offerEngine, _walletService, _loyaltyService, _postingService, _stockLedgerService, _passwordHasher, accountRes);
         _closeSessionHandler = new ClosePosSessionCommandHandler(_context, _postingService);
-        _returnHandler = new ReturnCommandsHandler(_context, _postingService, _sequenceService, _stockLedgerService);
+        _returnHandler = new ReturnCommandsHandler(_context, _postingService, _sequenceService, _stockLedgerService, _passwordHasher);
         _transferHandler = new TransferCommandsHandler(_context, _postingService, _sequenceService, _stockLedgerService);
+        _cancelInvoiceHandler = new CancelInvoiceCommandHandler(_context, _postingService, _stockLedgerService, _walletService, _loyaltyService, _periodLockService);
 
         // Seed test store, supplier, customer, and business date
         _storeId = Guid.NewGuid();
@@ -95,7 +99,7 @@ public class AccountingIntegrationTests : IDisposable
 
     private static ApplicationDbContext GetDbContext()
     {
-        var hosts = new[] { "10.26.198.140", "192.168.29.64", "localhost", "127.0.0.1" };
+        var hosts = new[] { "192.168.1.5", "10.26.198.140", "localhost", "127.0.0.1" };
         string chosenHost = "localhost";
         
         foreach (var host in hosts)
@@ -209,6 +213,15 @@ public class AccountingIntegrationTests : IDisposable
             IsActive = true
         };
         _context.Stores.Add(store);
+
+        // 1.5. Terminals
+        _context.Terminals.Add(new Terminal
+        {
+            Id = _storeId,
+            TerminalCode = "POSTEST2",
+            Name = "Cancel Test Terminal",
+            IsActive = true
+        });
 
         // 2. User & Roles
         var ownerRole = await _context.Roles.FirstOrDefaultAsync(r => r.Name == "Owner") 
@@ -510,7 +523,7 @@ public class AccountingIntegrationTests : IDisposable
             itemsValid
         );
 
-        var invoiceId = await _invoiceHandler.Handle(validCmd, CancellationToken.None);
+        var invoiceId = (await _invoiceHandler.Handle(validCmd, CancellationToken.None)).InvoiceId;
         var invoice = await _context.Invoices.FindAsync(invoiceId, DateTime.UtcNow.Date);
         Assert.NotNull(invoice);
 
@@ -542,6 +555,30 @@ public class AccountingIntegrationTests : IDisposable
         var arLine = arAging.FirstOrDefault(c => c.CustomerId == _customerId);
         Assert.NotNull(arLine);
         Assert.Equal(700.00m, arLine.TotalOutstanding); // ₹900 - ₹200 = ₹700 outstanding
+
+        // Verify customer wallet balance was updated
+        var customerAfterReceipt = await _context.Customers.FindAsync(_customerId);
+        Assert.Equal(200.00m, customerAfterReceipt!.RunningWalletBalance);
+
+        // Verify WalletLedger entry was created for TOPUP
+        var walletEntry = await _context.WalletLedger
+            .FirstOrDefaultAsync(w => w.CustomerId == _customerId && w.TransactionType == "TOPUP");
+        Assert.NotNull(walletEntry);
+        Assert.Equal(200.00m, walletEntry.Amount);
+        Assert.Equal(200.00m, walletEntry.RunningBalance);
+
+        var receipt = await _context.CustomerReceipts.FindAsync(receiptId);
+        Assert.NotNull(receipt);
+        Assert.Equal(receipt!.ReceiptNumber, walletEntry!.ReferenceDocument);
+
+        // Verify journal entry debited digital account 10200
+        var je = await _context.JournalEntries
+            .Include(j => j.Lines)
+                .ThenInclude(l => l.Account)
+            .FirstOrDefaultAsync(j => j.Id == receipt.JournalEntryId);
+        Assert.NotNull(je);
+        var debitLine = je.Lines.FirstOrDefault(l => l.DebitAmount > 0);
+        Assert.Equal("10200", debitLine!.Account.AccountCode);
 
         // 5. Scenario 3: Sales Return
         var returnCmd = new ProcessSalesReturnCommand(
@@ -1200,6 +1237,212 @@ public class AccountingIntegrationTests : IDisposable
         Assert.True(nlResult.IsParsedSuccessfully);
         Assert.Equal("INVENTORY_VALUATION", nlResult.ReportType);
         Assert.NotEmpty(nlResult.DataRows);
+    }
+
+    [Fact]
+    public async Task Scenario9_Wallet_TopUp_Cash_Journal_Correctness()
+    {
+        // ── Arrange ───────────────────────────────────────────────────────────
+        // Use the seeded _customerId and _storeId.
+        // We will execute a cash customer receipt (wallet top-up).
+        var cashReceiptCmd = new ProcessCustomerReceiptCommand(
+            _storeId,
+            _customerId,
+            DateTime.UtcNow.Date,
+            "CASH",
+            "CSH-TXN-01",
+            350.00m,
+            "Cash wallet top-up",
+            "AUTO_FIFO",
+            null,
+            _userId
+        );
+
+        // ── Act ───────────────────────────────────────────────────────────────
+        var receiptId = await _arHandler.Handle(cashReceiptCmd, CancellationToken.None);
+
+        // ── Assert ────────────────────────────────────────────────────────────
+        var receipt = await _context.CustomerReceipts.FindAsync(receiptId);
+        Assert.NotNull(receipt);
+        Assert.Equal(350.00m, receipt.Amount);
+
+        // A. Verify customer running wallet balance was updated
+        var customer = await _context.Customers.FindAsync(_customerId);
+        Assert.True(customer!.RunningWalletBalance >= 350.00m);
+
+        // B. Verify WalletLedger entry was created
+        var walletEntry = await _context.WalletLedger
+            .FirstOrDefaultAsync(w => w.CustomerId == _customerId && w.ReferenceDocument == receipt.ReceiptNumber && w.TransactionType == "TOPUP");
+        Assert.NotNull(walletEntry);
+        Assert.Equal(350.00m, walletEntry.Amount);
+
+        // C. Verify dynamic GL account resolution and posting correctness
+        var refDoc = receipt.ReceiptNumber;
+        var journalEntry = await _context.JournalEntries
+            .Include(j => j.Lines)
+            .ThenInclude(l => l.Account)
+            .FirstOrDefaultAsync(j => j.ReferenceDocument == refDoc);
+
+        Assert.NotNull(journalEntry);
+        Assert.True(journalEntry.Lines.Count >= 2);
+
+        // CASH top-up must debit Cash Account 10100
+        var debitLine = journalEntry.Lines.FirstOrDefault(l => l.DebitAmount > 0);
+        var creditLine = journalEntry.Lines.FirstOrDefault(l => l.CreditAmount > 0);
+
+        Assert.NotNull(debitLine);
+        Assert.NotNull(creditLine);
+
+        Assert.Equal("10100", debitLine.Account.AccountCode); // Main Cash Register (ASSET)
+        Assert.Equal("20200", creditLine.Account.AccountCode); // Customer Wallet Liabilities (LIABILITY)
+
+        Assert.Equal(350.00m, debitLine.DebitAmount);
+        Assert.Equal(350.00m, creditLine.CreditAmount);
+
+        // Verify total debits equal total credits
+        decimal totalDebits = journalEntry.Lines.Sum(l => l.DebitAmount);
+        decimal totalCredits = journalEntry.Lines.Sum(l => l.CreditAmount);
+        Assert.Equal(totalDebits, totalCredits);
+    }
+
+    [Fact]
+    public async Task Scenario10_Invoice_Cancellation_Correctness()
+    {
+        // 1. Arrange
+        // Ensure Loyalty Program Config is seeded
+        var loyaltyConfig = await _context.LoyaltyProgramConfigs.FirstOrDefaultAsync();
+        if (loyaltyConfig == null)
+        {
+            loyaltyConfig = new LoyaltyProgramConfig
+            {
+                EarnRatioSpendAmount = 100.00m,
+                EarnRatioPoints = 1.00m, // 1 point per 100 Rs spend
+                RedeemRatioPoints = 1.00m,
+                RedeemRatioDiscountAmount = 1.00m,
+                MaxRedemptionPerDay = 100
+            };
+            _context.LoyaltyProgramConfigs.Add(loyaltyConfig);
+            await _context.SaveChangesAsync();
+        }
+
+        // Create a unique Product
+        var product = new Product
+        {
+            Id = Guid.NewGuid(),
+            ProductCode = "TSTPROD-CAN",
+            Name = "Cancellation Test Product",
+            TaxSlabId = (await _context.TaxSlabs.FirstAsync()).Id,
+            UnitOfMeasureId = Guid.Parse("a0000000-0000-0000-0000-000000000001"),
+            Mrp = 200.00m,
+            SellingPrice = 180.00m,
+            PurchasePrice = 120.00m,
+            IsWeighable = false,
+            IsActive = true,
+            HasExpiry = false
+        };
+        _context.Products.Add(product);
+
+        // Create a ProductBatch with seeded stock
+        var batch = new ProductBatch
+        {
+            StoreId = _storeId,
+            ProductId = product.Id,
+            BatchNumber = "BATCH-CAN-01",
+            CostPrice = 120.00m,
+            Mrp = 200.00m,
+            AvailableQuantity = 10,
+            IsActive = true
+        };
+        _context.ProductBatches.Add(batch);
+        await _context.SaveChangesAsync();
+
+        // 2. Act: Run a Sale (Invoice)
+        // Sale of 5 units of our product.
+        // Total price: 5 * 180 = 900.
+        // Net payable: 900.
+        // Points earned: 900 / 100 = 9 points.
+        var items = new List<InvoiceItemDto>
+        {
+            new(product.Id, 5, 180.00m, batch.Id)
+        };
+
+        var saleCmd = new CreateInvoiceCommand(
+            "INV-CAN-001",
+            _storeId, // Store ID
+            _userId,
+            _customerId,
+            null,
+            0,
+            900.00m,
+            0,
+            0,
+            0,
+            900.00m,
+            "CASH",
+            items
+        );
+
+        var invoiceId = (await _invoiceHandler.Handle(saleCmd, CancellationToken.None)).InvoiceId;
+
+        // Verify the sale deducted stock
+        var seededBatch = await _context.ProductBatches.FindAsync(batch.Id);
+        Assert.Equal(5, seededBatch!.AvailableQuantity); // 10 - 5 = 5 available
+
+        // Verify loyalty points earned
+        var seededCustomer = await _context.Customers.FindAsync(_customerId);
+        decimal preCancelLoyaltyPoints = seededCustomer!.RunningLoyaltyPoints;
+        Assert.True(preCancelLoyaltyPoints > 0, "Customer should have earned loyalty points from checkout.");
+
+        // 3. Act: Cancel the Invoice
+        var cancelCmd = new CancelInvoiceCommand(invoiceId, _userId);
+        var cancelResult = await _cancelInvoiceHandler.Handle(cancelCmd, CancellationToken.None);
+
+        Assert.True(cancelResult);
+
+        // 4. Assert
+        var cancelledInvoice = await _context.Invoices.FindAsync(invoiceId, DateTime.UtcNow.Date);
+        Assert.NotNull(cancelledInvoice);
+        Assert.Equal("CANCELLED", cancelledInvoice.Status);
+
+        // (b) Verify stock ledger has a SALE_CANCEL entry and batch.AvailableQuantity is restored
+        var restoredBatch = await _context.ProductBatches.FindAsync(batch.Id);
+        Assert.Equal(10, restoredBatch!.AvailableQuantity); // Restored back to 10
+
+        var cancelStockEntry = await _context.StockLedger
+            .FirstOrDefaultAsync(s => s.ReferenceDocumentId == invoiceId && s.MovementType == "SALE_CANCEL");
+        Assert.NotNull(cancelStockEntry);
+        Assert.Equal(5, cancelStockEntry.Quantity); // Positive 5 quantity
+
+        // (c) Verify reversal journal entry debits == credits
+        var originalJournal = await _context.JournalEntries
+            .FirstOrDefaultAsync(j => j.ReferenceDocument == $"INV-{invoiceId}");
+        Assert.NotNull(originalJournal);
+
+        var reversalJournal = await _context.JournalEntries
+            .Include(j => j.Lines)
+            .FirstOrDefaultAsync(j => j.ReferenceDocument == $"CAN-{cancelledInvoice.InvoiceNumber}");
+        Assert.NotNull(reversalJournal);
+        
+        decimal totalDebits = reversalJournal.Lines.Sum(l => l.DebitAmount);
+        decimal totalCredits = reversalJournal.Lines.Sum(l => l.CreditAmount);
+        Assert.Equal(totalDebits, totalCredits);
+        Assert.True(totalDebits > 0);
+
+        // Verify swapped amounts matching the original lines
+        // Original Cash Line: Debit = 900. Reversal Cash Line: Credit = 900.
+        var originalCashLine = originalJournal.Lines.FirstOrDefault(l => l.DebitAmount == 900);
+        var reversalCashLine = reversalJournal.Lines.FirstOrDefault(l => l.CreditAmount == 900 && l.AccountId == originalCashLine?.AccountId);
+        Assert.NotNull(reversalCashLine);
+
+        // (d) If loyalty was earned, RunningLoyaltyPoints is reduced
+        var finalCustomer = await _context.Customers.FindAsync(_customerId);
+        decimal expectedPoints = preCancelLoyaltyPoints - 9m; // original earned
+        Assert.Equal(expectedPoints, finalCustomer!.RunningLoyaltyPoints);
+
+        var cancelLoyaltyEntry = await _context.LoyaltyLedger
+            .FirstOrDefaultAsync(l => l.InvoiceId == invoiceId && l.TransactionType == "Cancel Earned Points");
+        Assert.NotNull(cancelLoyaltyEntry);
+        Assert.Equal(-9m, cancelLoyaltyEntry.Points);
     }
 
     public void Dispose()

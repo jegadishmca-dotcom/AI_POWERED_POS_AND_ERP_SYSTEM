@@ -38,6 +38,79 @@ public class PosController : ControllerBase
         _auditLogger = auditLogger;
     }
 
+    [HttpGet("invoice/number/{invoiceNumber}")]
+    public async Task<IActionResult> GetInvoiceByNumber(string invoiceNumber, CancellationToken cancellationToken)
+    {
+        var data = await (from inv in _context.Invoices.Include(i => i.Items)
+                          join cashier in _context.Users on inv.CashierId equals cashier.Id into cashiers
+                          from c in cashiers.DefaultIfEmpty()
+                          join terminal in _context.Terminals on inv.TerminalId equals terminal.Id into terminals
+                          from t in terminals.DefaultIfEmpty()
+                          join cust in _context.Customers on inv.CustomerId equals cust.Id into customers
+                          from cu in customers.DefaultIfEmpty()
+                          where inv.InvoiceNumber == invoiceNumber
+                          select new {
+                              Invoice = inv,
+                              CashierName = c != null ? c.FullName : "Cashier",
+                              TerminalCode = t != null ? t.TerminalCode : "POS-01",
+                              CustomerName = cu != null ? cu.Name : "",
+                              CustomerPhone = cu != null ? cu.Phone : ""
+                          })
+                          .FirstOrDefaultAsync(cancellationToken);
+
+        if (data == null)
+        {
+            return NotFound("Invoice not found.");
+        }
+
+        var invoice = data.Invoice;
+
+        return Ok(new
+        {
+            invoice.Id,
+            invoice.StoreId,
+            invoice.BusinessDate,
+            invoice.InvoiceNumber,
+            invoice.TerminalId,
+            TerminalCode = data.TerminalCode,
+            invoice.CashierId,
+            CashierName = data.CashierName,
+            invoice.CustomerId,
+            CustomerName = data.CustomerName,
+            CustomerPhone = data.CustomerPhone,
+            invoice.SubTotal,
+            invoice.DiscountAmount,
+            invoice.TaxAmount,
+            invoice.TotalAmount,
+            invoice.RoundOff,
+            invoice.NetPayable,
+            invoice.Status,
+            invoice.PaymentMode,
+            invoice.CashAmount,
+            invoice.UpiAmount,
+            invoice.CardAmount,
+            invoice.WalletAmount,
+            invoice.CreatedAt,
+            Items = invoice.Items.Select(item => new
+            {
+                item.Id,
+                item.ProductId,
+                item.Barcode,
+                item.ProductName,
+                item.Quantity,
+                item.UnitPrice,
+                item.DiscountAmount,
+                item.CgstRate,
+                item.CgstAmount,
+                item.SgstRate,
+                item.SgstAmount,
+                item.CessRate,
+                item.CessAmount,
+                item.TotalAmount
+            })
+        });
+    }
+
     [HttpGet("invoice/{id}")]
     public async Task<IActionResult> GetInvoice(Guid id)
     {
@@ -631,11 +704,18 @@ public class PosController : ControllerBase
         return Ok(result);
     }
 
-    [HttpGet("invoices/debug")]
-    public async Task<IActionResult> DebugInvoices()
+    [HttpPost("invoice/{id}/cancel")]
+    [Authorize(Roles = "Admin,Manager,Owner,Supervisor")]
+    public async Task<IActionResult> CancelInvoice(Guid id)
     {
-        var raw = await _context.Invoices.Where(i => i.Status == "HOLD").Select(i => new { i.Id, i.Status, i.IsDeleted, i.InvoiceNumber, i.BusinessDate }).ToListAsync();
-        return Ok(raw);
+        var callerIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value 
+            ?? User.FindFirst("sub")?.Value;
+
+        if (!Guid.TryParse(callerIdStr, out var userId))
+            return Unauthorized("A valid login session is required.");
+
+        var success = await _mediator.Send(new PosErp.Application.Features.Pos.Commands.CancelInvoiceCommand(id, userId));
+        return Ok(new { success });
     }
 
     [HttpDelete("invoices/hold/{id}")]

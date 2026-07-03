@@ -103,7 +103,7 @@ services:
       # LiveConnection and UatConnection MUST be explicit — do NOT let ConnectionStringProvider
       # derive them by appending _live/_uat suffixes. LIVE = posdb_live, UAT = posdb_uat (created on demand).
       - ConnectionStrings__LiveConnection=Host=pgbouncer;Port=5432;Database=posdb_live;Username=posadmin;Password=pospassword;Pooling=true;
-      - ConnectionStrings__UatConnection=Host=pgbouncer;Port=5432;Database=posdb_uat;Username=posadmin;Password=pospassword;Pooling=true;
+      - ConnectionStrings__UatConnection=Host=postgres;Port=5432;Database=posdb_uat;Username=posadmin;Password=pospassword;Pooling=true;
       # Persist operation_mode.json (LIVE/UAT state + token_version) across container restarts
       - SYSTEM_CONFIG_DIR=/app/config
       - Redis__ConnectionString=pos_redis:6379,abortConnect=false

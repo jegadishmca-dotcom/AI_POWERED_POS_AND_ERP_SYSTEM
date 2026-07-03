@@ -63,10 +63,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Security: run as non-root
 RUN addgroup --system appgroup && adduser --system --ingroup appgroup appuser
-USER appuser
 
 # Copy published output
 COPY --from=publish /app/publish .
+
+# Create config directory and ensure appuser has full write permissions
+RUN mkdir -p /app/config && chown -R appuser:appgroup /app && chmod -R 775 /app
+
+USER appuser
 
 # ASP.NET Core 8 defaults to port 8080 in containers
 ENV ASPNETCORE_URLS=http://+:8080

@@ -591,10 +591,15 @@ Do not include markdown formatting or extra text.";
             }
         }
 
-        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
+        var strategy = ((DbContext)_context).Database.CreateExecutionStrategy();
         try
         {
-            var taxSlabs = await _context.TaxSlabs.Where(t => !t.IsDeleted).ToListAsync(cancellationToken);
+            return await strategy.ExecuteAsync(async () =>
+            {
+                using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
+                try
+                {
+                    var taxSlabs = await _context.TaxSlabs.Where(t => !t.IsDeleted).ToListAsync(cancellationToken);
             var defaultTaxSlab = taxSlabs.FirstOrDefault(s => s.IgstRate == 18.0m) ?? taxSlabs.FirstOrDefault();
             if (defaultTaxSlab == null)
             {
@@ -850,15 +855,21 @@ Do not include markdown formatting or extra text.";
                 );
             }
 
-            // Save StockAdjustments, StockAdjustmentItems, and StockLedgerEntries
-            await _context.SaveChangesAsync(cancellationToken);
-            await transaction.CommitAsync(cancellationToken);
+                    // Save StockAdjustments, StockAdjustmentItems, and StockLedgerEntries
+                    await _context.SaveChangesAsync(cancellationToken);
+                    await transaction.CommitAsync(cancellationToken);
 
-            return Ok(new { success = true, adjustmentId = adjustment.Id, adjustmentNumber = adjustment.AdjustmentNumber });
+                    return (IActionResult)Ok(new { success = true, adjustmentId = adjustment.Id, adjustmentNumber = adjustment.AdjustmentNumber });
+                }
+                catch
+                {
+                    await transaction.RollbackAsync(cancellationToken);
+                    throw;
+                }
+            });
         }
         catch (DbUpdateConcurrencyException ex)
         {
-            await transaction.RollbackAsync(cancellationToken);
             var detailsList = new List<string>();
             foreach (var entry in ex.Entries)
             {
@@ -872,7 +883,6 @@ Do not include markdown formatting or extra text.";
         }
         catch (Exception ex)
         {
-            await transaction.RollbackAsync(cancellationToken);
             return BadRequest(new { message = ex.Message });
         }
     }

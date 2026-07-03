@@ -135,10 +135,13 @@ public class APCommandsAndQueriesHandler :
 
     public async Task<Guid> Handle(CreatePurchaseBillCommand request, CancellationToken cancellationToken)
     {
-        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
-        try
+        var strategy = ((DbContext)_context).Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var grn = await _context.GRNHeaders
+            using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var grn = await _context.GRNHeaders
                 .Include(g => g.Items)
                 .FirstOrDefaultAsync(g => g.Id == request.GRNHeaderId, cancellationToken);
 
@@ -272,25 +275,29 @@ public class APCommandsAndQueriesHandler :
                 cancellationToken
             );
 
-            grn.Status = "BILLED";
-            await _context.SaveChangesAsync(cancellationToken);
+                grn.Status = "BILLED";
+                await _context.SaveChangesAsync(cancellationToken);
 
-            await transaction.CommitAsync(cancellationToken);
-            return bill.Id;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+                await transaction.CommitAsync(cancellationToken);
+                return bill.Id;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 
     public async Task<Guid> Handle(ProcessSupplierPaymentCommand request, CancellationToken cancellationToken)
     {
-        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
-        try
+        var strategy = ((DbContext)_context).Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var supplier = await _context.Suppliers.FindAsync(new object[] { request.SupplierId }, cancellationToken);
+            using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
+            try
+            {
+                var supplier = await _context.Suppliers.FindAsync(new object[] { request.SupplierId }, cancellationToken);
             if (supplier == null) throw new InvalidOperationException("Supplier not found.");
 
             // Generate Payment Sequence Number
@@ -330,17 +337,18 @@ public class APCommandsAndQueriesHandler :
 
             await _context.SaveChangesAsync(cancellationToken);
 
-            // Run allocations
-            await _allocationEngine.AllocateSupplierPaymentAsync(payment.Id, request.AllocationMode, request.ManualAllocations, cancellationToken);
+                // Run allocations
+                await _allocationEngine.AllocateSupplierPaymentAsync(payment.Id, request.AllocationMode, request.ManualAllocations, cancellationToken);
 
-            await transaction.CommitAsync(cancellationToken);
-            return payment.Id;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+                await transaction.CommitAsync(cancellationToken);
+                return payment.Id;
+            }
+            catch
+            {
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
+            }
+        });
     }
 
     private async Task<Guid> PostPaymentGLAndLedgerAsync(SupplierPayment payment, Guid userId, CancellationToken cancellationToken)

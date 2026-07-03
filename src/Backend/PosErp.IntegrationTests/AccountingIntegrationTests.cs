@@ -196,7 +196,10 @@ public class AccountingIntegrationTests : IDisposable
         }
 
         var options = new DbContextOptionsBuilder<ApplicationDbContext>()
-            .UseNpgsql(testConnStr)
+            .UseNpgsql(testConnStr, npgsqlOptions =>
+            {
+                npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null);
+            })
             .Options;
 
         return new ApplicationDbContext(options);

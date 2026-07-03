@@ -128,7 +128,10 @@ public static class IntegrationTestDbFactory
 
         return new ApplicationDbContext(
             new DbContextOptionsBuilder<ApplicationDbContext>()
-                .UseNpgsql(testConn)
+                .UseNpgsql(testConn, npgsqlOptions =>
+                {
+                    npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null);
+                })
                 .Options);
     }
 
@@ -142,7 +145,10 @@ public static class IntegrationTestDbFactory
         var testConn = ConnStr(host, DbName);
         return new ApplicationDbContext(
             new DbContextOptionsBuilder<ApplicationDbContext>()
-                .UseNpgsql(testConn)
+                .UseNpgsql(testConn, npgsqlOptions =>
+                {
+                    npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null);
+                })
                 .Options);
     }
 

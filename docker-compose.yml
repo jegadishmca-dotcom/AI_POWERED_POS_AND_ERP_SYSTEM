@@ -97,7 +97,16 @@ services:
     container_name: pos_backend
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
+      - SystemConfig__DeploymentMode=SelfHosted
+      # DefaultConnection is used for migrations, Hangfire, and system startup
       - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
+      # LiveConnection and UatConnection MUST be explicit — do NOT let ConnectionStringProvider
+      # derive them by appending _live/_uat (posdb_live doesn't exist on this server).
+      # In Self-hosted mode, LIVE = the real production posdb. UAT is created on demand by RefreshUatFromLiveSnapshotAsync.
+      - ConnectionStrings__LiveConnection=Host=pgbouncer;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
+      - ConnectionStrings__UatConnection=Host=pgbouncer;Port=5432;Database=posdb_uat;Username=posadmin;Password=pospassword;Pooling=true;
+      # Persist operation_mode.json (LIVE/UAT state + token_version) across container restarts
+      - SYSTEM_CONFIG_DIR=/app/config
       - Redis__ConnectionString=pos_redis:6379,abortConnect=false
       - JWT__Secret=UatDeploymentSecretKey_ReplaceInRealProduction_MinLength64Chars1234567890ABCD
       - EmailSettings__SmtpServer=smtp.gmail.com
@@ -105,6 +114,8 @@ services:
       - EmailSettings__SenderEmail=fortabletuse999@gmail.com
       - EmailSettings__SenderPassword=brtb rhbq voqh xhyg
       - EmailSettings__RecipientEmail=jegadishmca@gmail.com
+    volumes:
+      - pos_config:/app/config
     ports:
       - "5000:8080"
     networks:
@@ -117,6 +128,7 @@ services:
       redis:
         condition: service_healthy
     restart: unless-stopped
+
 
   pos_frontend:
     build:
@@ -181,3 +193,4 @@ volumes:
   ollama_data:
   prometheus_data:
   grafana_data:
+  pos_config:

@@ -122,113 +122,117 @@ public class ARCommandsAndQueriesHandler :
 
     public async Task<Guid> Handle(ProcessCustomerReceiptCommand request, CancellationToken cancellationToken)
     {
-        using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
-        try
+        var strategy = ((DbContext)_context).Database.CreateExecutionStrategy();
+        return await strategy.ExecuteAsync(async () =>
         {
-            var customer = await _context.Customers.FindAsync(new object[] { request.CustomerId }, cancellationToken);
-            if (customer == null) throw new InvalidOperationException("Customer not found.");
-
-            // Generate sequence number for receipt
-            string recNumber = await _sequenceService.GenerateNextNumberAsync(request.StoreId, "CUSTOMER_RECEIPT", cancellationToken);
-
-            var receipt = new CustomerReceipt
+            using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
+            try
             {
-                StoreId = request.StoreId,
-                CustomerId = request.CustomerId,
-                ReceiptDate = request.ReceiptDate.Date,
-                ReceiptNumber = recNumber,
-                PaymentMode = request.PaymentMode,
-                ReferenceNumber = request.ReferenceNumber,
-                Amount = request.Amount,
-                Status = "POSTED",
-                Notes = request.Notes,
-                CreatedAt = DateTime.UtcNow
-            };
+                var customer = await _context.Customers.FindAsync(new object[] { request.CustomerId }, cancellationToken);
+                if (customer == null) throw new InvalidOperationException("Customer not found.");
 
-            _context.CustomerReceipts.Add(receipt);
-            await _context.SaveChangesAsync(cancellationToken);
+                // Generate sequence number for receipt
+                string recNumber = await _sequenceService.GenerateNextNumberAsync(request.StoreId, "CUSTOMER_RECEIPT", cancellationToken);
 
-            // Post double-entry journal entry:
-            // Debit Bank Account 10200 (or Cash)
-            // Credit Customer Ledger Entry 21100 (Deposits / Accounts Receivable)
-            // Note: AR standard GL account is typically 20000 / 20200 (Receivables / Deposits).
-            // Let's use 20200 'Customer Wallet Liabilities' or similar, or define a general customer receivable GL code 20000.
-            // Looking at COA: ('20000', 'Current Liabilities'), ('2100', 'Customer Wallet Deposits') (Wait, in seed it was 2100, and in 12_Seed it is 20200 'Customer Wallet Liabilities')
-            // Let's use '20200' as Customer Receivable/Deposits.
-            string debitAccountCode;
-            if (request.PaymentMode == "CASH")
-            {
-                debitAccountCode = await ResolveAccountCodeAsync("ASSET", "Cash", _configuration?["Finance:AccountDefaults:Cash"] ?? "10100", cancellationToken);
+                var receipt = new CustomerReceipt
+                {
+                    StoreId = request.StoreId,
+                    CustomerId = request.CustomerId,
+                    ReceiptDate = request.ReceiptDate.Date,
+                    ReceiptNumber = recNumber,
+                    PaymentMode = request.PaymentMode,
+                    ReferenceNumber = request.ReferenceNumber,
+                    Amount = request.Amount,
+                    Status = "POSTED",
+                    Notes = request.Notes,
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                _context.CustomerReceipts.Add(receipt);
+                await _context.SaveChangesAsync(cancellationToken);
+
+                // Post double-entry journal entry:
+                // Debit Bank Account 10200 (or Cash)
+                // Credit Customer Ledger Entry 21100 (Deposits / Accounts Receivable)
+                // Note: AR standard GL account is typically 20000 / 20200 (Receivables / Deposits).
+                // Let's use 20200 'Customer Wallet Liabilities' or similar, or define a general customer receivable GL code 20000.
+                // Looking at COA: ('20000', 'Current Liabilities'), ('2100', 'Customer Wallet Deposits') (Wait, in seed it was 2100, and in 12_Seed it is 20200 'Customer Wallet Liabilities')
+                // Let's use '20200' as Customer Receivable/Deposits.
+                string debitAccountCode;
+                if (request.PaymentMode == "CASH")
+                {
+                    debitAccountCode = await ResolveAccountCodeAsync("ASSET", "Cash", _configuration?["Finance:AccountDefaults:Cash"] ?? "10100", cancellationToken);
+                }
+                else
+                {
+                    debitAccountCode = await ResolveAccountCodeAsync("ASSET", "Current A/C", _configuration?["Finance:AccountDefaults:DigitalBank"] ?? "10200", cancellationToken);
+                }
+                string arAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", _configuration?["Finance:AccountDefaults:WalletLiability"] ?? "20200", cancellationToken);
+
+                var lines = new List<JournalLineDto>
+                {
+                    new() { AccountCode = debitAccountCode, Description = $"Customer receipt {recNumber}", Debit = request.Amount, Credit = 0 },
+                    new() { AccountCode = arAccountCode, Description = $"Customer account credit {customer.Name}", Debit = 0, Credit = request.Amount }
+                };
+
+                Guid jeId = await _postingService.PostJournalEntryWithUserAsync(
+                    request.StoreId,
+                    request.ReceiptDate,
+                    $"Customer receipt {recNumber} from {customer.Name}",
+                    recNumber,
+                    lines,
+                    request.UserId,
+                    isDraft: false,
+                    cancellationToken,
+                    sourceModule: "FINANCE",
+                    sourceDocType: "CUSTOMER_RECEIPT",
+                    sourceDocId: receipt.Id
+                );
+
+                receipt.JournalEntryId = jeId;
+
+                // Update customer sub-ledger (Credit customer, reduces outstanding receivables)
+                decimal runningBalance = await _context.CustomerLedger
+                    .Where(c => c.CustomerId == request.CustomerId && c.StoreId == request.StoreId)
+                    .OrderByDescending(c => c.CreatedAt)
+                    .Select(c => c.RunningBalance)
+                    .FirstOrDefaultAsync(cancellationToken);
+
+                runningBalance -= request.Amount; // Credit decreases customer receivable balance
+
+                var ledgerEntry = new CustomerLedgerEntry
+                {
+                    StoreId = request.StoreId,
+                    CustomerId = request.CustomerId,
+                    EntryDate = request.ReceiptDate.Date,
+                    TransactionType = "RECEIPT",
+                    ReferenceNumber = recNumber,
+                    DebitAmount = 0,
+                    CreditAmount = request.Amount,
+                    RunningBalance = runningBalance,
+                    Description = $"Receipt {recNumber} posted",
+                    JournalEntryId = jeId,
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.CustomerLedger.Add(ledgerEntry);
+
+                // Update customer wallet balance and record ledger entry via WalletService
+                await _walletService.RecordTransactionAsync(customer.Id, request.StoreId, "TOPUP", request.Amount, recNumber, request.UserId, cancellationToken);
+
+                await _context.SaveChangesAsync(cancellationToken);
+
+                // Run allocations
+                await _allocationEngine.AllocateCustomerReceiptAsync(receipt.Id, request.AllocationMode, request.ManualAllocations, cancellationToken);
+
+                await transaction.CommitAsync(cancellationToken);
+                return receipt.Id;
             }
-            else
+            catch
             {
-                debitAccountCode = await ResolveAccountCodeAsync("ASSET", "Current A/C", _configuration?["Finance:AccountDefaults:DigitalBank"] ?? "10200", cancellationToken);
+                await transaction.RollbackAsync(cancellationToken);
+                throw;
             }
-            string arAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", _configuration?["Finance:AccountDefaults:WalletLiability"] ?? "20200", cancellationToken);
-
-            var lines = new List<JournalLineDto>
-            {
-                new() { AccountCode = debitAccountCode, Description = $"Customer receipt {recNumber}", Debit = request.Amount, Credit = 0 },
-                new() { AccountCode = arAccountCode, Description = $"Customer account credit {customer.Name}", Debit = 0, Credit = request.Amount }
-            };
-
-            Guid jeId = await _postingService.PostJournalEntryWithUserAsync(
-                request.StoreId,
-                request.ReceiptDate,
-                $"Customer receipt {recNumber} from {customer.Name}",
-                recNumber,
-                lines,
-                request.UserId,
-                isDraft: false,
-                cancellationToken,
-                sourceModule: "FINANCE",
-                sourceDocType: "CUSTOMER_RECEIPT",
-                sourceDocId: receipt.Id
-            );
-
-            receipt.JournalEntryId = jeId;
-
-            // Update customer sub-ledger (Credit customer, reduces outstanding receivables)
-            decimal runningBalance = await _context.CustomerLedger
-                .Where(c => c.CustomerId == request.CustomerId && c.StoreId == request.StoreId)
-                .OrderByDescending(c => c.CreatedAt)
-                .Select(c => c.RunningBalance)
-                .FirstOrDefaultAsync(cancellationToken);
-
-            runningBalance -= request.Amount; // Credit decreases customer receivable balance
-
-            var ledgerEntry = new CustomerLedgerEntry
-            {
-                StoreId = request.StoreId,
-                CustomerId = request.CustomerId,
-                EntryDate = request.ReceiptDate.Date,
-                TransactionType = "RECEIPT",
-                ReferenceNumber = recNumber,
-                DebitAmount = 0,
-                CreditAmount = request.Amount,
-                RunningBalance = runningBalance,
-                Description = $"Receipt {recNumber} posted",
-                JournalEntryId = jeId,
-                CreatedAt = DateTime.UtcNow
-            };
-            _context.CustomerLedger.Add(ledgerEntry);
-
-            // Update customer wallet balance and record ledger entry via WalletService
-            await _walletService.RecordTransactionAsync(customer.Id, request.StoreId, "TOPUP", request.Amount, recNumber, request.UserId, cancellationToken);
-
-            await _context.SaveChangesAsync(cancellationToken);
-
-            // Run allocations
-            await _allocationEngine.AllocateCustomerReceiptAsync(receipt.Id, request.AllocationMode, request.ManualAllocations, cancellationToken);
-
-            await transaction.CommitAsync(cancellationToken);
-            return receipt.Id;
-        }
-        catch
-        {
-            await transaction.RollbackAsync(cancellationToken);
-            throw;
-        }
+        });
     }
 
     public async Task<List<CustomerLedgerDto>> Handle(GetCustomerLedgerQuery request, CancellationToken cancellationToken)

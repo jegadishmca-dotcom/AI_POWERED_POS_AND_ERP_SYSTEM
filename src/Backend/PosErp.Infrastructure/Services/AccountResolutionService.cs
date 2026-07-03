@@ -20,6 +20,7 @@ public class AccountResolutionService : IAccountResolutionService
     {
         var accounts = await _context.Accounts
             .Where(a => a.IsActive && a.AccountType == accountType &&
+                        !IAccountResolutionService.LegacyExcludedCodes.Contains(a.AccountCode) &&
                         !_context.Accounts.Any(sub => sub.ParentAccountId == a.Id && sub.IsActive))
             .OrderByDescending(a => a.AccountCode.Length)
             .ThenBy(a => a.AccountCode)

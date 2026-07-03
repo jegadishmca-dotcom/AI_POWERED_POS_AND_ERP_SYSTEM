@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 
 namespace PosErp.Application.Features.Finance.Commands;
 
@@ -101,19 +102,22 @@ public class ARCommandsAndQueriesHandler :
     private readonly IDocumentSequenceService _sequenceService;
     private readonly IAllocationEngine _allocationEngine;
     private readonly IWalletService _walletService;
+    private readonly IConfiguration _configuration;
 
     public ARCommandsAndQueriesHandler(
         IApplicationDbContext context,
         IFinancialPostingService postingService,
         IDocumentSequenceService sequenceService,
         IAllocationEngine allocationEngine,
-        IWalletService walletService)
+        IWalletService walletService,
+        IConfiguration? configuration = null)
     {
         _context = context;
         _postingService = postingService;
         _sequenceService = sequenceService;
         _allocationEngine = allocationEngine;
         _walletService = walletService;
+        _configuration = configuration;
     }
 
     public async Task<Guid> Handle(ProcessCustomerReceiptCommand request, CancellationToken cancellationToken)
@@ -154,13 +158,13 @@ public class ARCommandsAndQueriesHandler :
             string debitAccountCode;
             if (request.PaymentMode == "CASH")
             {
-                debitAccountCode = await ResolveAccountCodeAsync("ASSET", "Cash", "10100", cancellationToken);
+                debitAccountCode = await ResolveAccountCodeAsync("ASSET", "Cash", _configuration?["Finance:AccountDefaults:Cash"] ?? "10100", cancellationToken);
             }
             else
             {
-                debitAccountCode = await ResolveAccountCodeAsync("ASSET", "Current A/C", "10200", cancellationToken);
+                debitAccountCode = await ResolveAccountCodeAsync("ASSET", "Current A/C", _configuration?["Finance:AccountDefaults:DigitalBank"] ?? "10200", cancellationToken);
             }
-            string arAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", "20200", cancellationToken);
+            string arAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", _configuration?["Finance:AccountDefaults:WalletLiability"] ?? "20200", cancellationToken);
 
             var lines = new List<JournalLineDto>
             {
@@ -417,6 +421,7 @@ public class ARCommandsAndQueriesHandler :
     {
         var account = await _context.Accounts
             .Where(a => a.IsActive && a.AccountType == accountType &&
+                        !IAccountResolutionService.LegacyExcludedCodes.Contains(a.AccountCode) &&
                         !_context.Accounts.Any(sub => sub.ParentAccountId == a.Id && sub.IsActive))
             .OrderByDescending(a => a.AccountCode.Length)
             .ThenBy(a => a.AccountCode)

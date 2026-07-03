@@ -15,6 +15,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using PosErp.Application.Features.Inventory.Services;
 using PosErp.Domain.Entities.Crm;
+using Microsoft.Extensions.Configuration;
 
 namespace PosErp.Application.Features.Pos.Commands.SyncInvoices;
 
@@ -50,6 +51,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
     private readonly IPasswordHasher _passwordHasher;
     private readonly IAccountResolutionService _accountResolutionService;
     private readonly ILogger<CreateInvoiceCommandHandler>? _logger;
+    private readonly IConfiguration _configuration;
 
     public CreateInvoiceCommandHandler(
         IApplicationDbContext context, 
@@ -60,7 +62,8 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
         PosErp.Application.Features.Inventory.Services.IStockLedgerService stockLedgerService,
         IPasswordHasher passwordHasher,
         IAccountResolutionService accountResolutionService,
-        ILogger<CreateInvoiceCommandHandler>? logger = null)
+        ILogger<CreateInvoiceCommandHandler>? logger = null,
+        IConfiguration? configuration = null)
     {
         _context = context;
         _offerEngine = offerEngine;
@@ -71,6 +74,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
         _passwordHasher = passwordHasher;
         _accountResolutionService = accountResolutionService;
         _logger = logger;
+        _configuration = configuration;
     }
 
     public async Task<CreateInvoiceResponse> Handle(CreateInvoiceCommand request, CancellationToken cancellationToken)
@@ -526,15 +530,15 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             if (shouldPostJournal)
             {
             // Resolve account codes dynamically
-            string cashAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("ASSET", "Cash", "10100", cancellationToken);
-            string digitalAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("ASSET", "Current", "10200", cancellationToken);
-            string walletAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("LIABILITY", "Wallet", "20200", cancellationToken);
-            string arAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("ASSET", "Receivable", "10400", cancellationToken);
-            string salesAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("REVENUE", "Sales", "40100", cancellationToken);
-            string outputCgstAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("LIABILITY", "Output CGST", "22010", cancellationToken);
-            string outputSgstAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("LIABILITY", "Output SGST", "22020", cancellationToken);
-            string inventoryAssetAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("ASSET", "Inventory Asset", "10300", cancellationToken);
-            string cogsAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("EXPENSE", "Cost of Goods Sold", "50100", cancellationToken);
+            string cashAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("ASSET", "Cash", _configuration?["Finance:AccountDefaults:Cash"] ?? "10100", cancellationToken);
+            string digitalAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("ASSET", "Current", _configuration?["Finance:AccountDefaults:DigitalBank"] ?? "10200", cancellationToken);
+            string walletAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("LIABILITY", "Wallet", _configuration?["Finance:AccountDefaults:WalletLiability"] ?? "20200", cancellationToken);
+            string arAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("ASSET", "Receivable", _configuration?["Finance:AccountDefaults:AccountsReceivable"] ?? "10400", cancellationToken);
+            string salesAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("REVENUE", "Sales", _configuration?["Finance:AccountDefaults:SalesRevenue"] ?? "40100", cancellationToken);
+            string outputCgstAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("LIABILITY", "Output CGST", _configuration?["Finance:AccountDefaults:OutputCGST"] ?? "22010", cancellationToken);
+            string outputSgstAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("LIABILITY", "Output SGST", _configuration?["Finance:AccountDefaults:OutputSGST"] ?? "22020", cancellationToken);
+            string inventoryAssetAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("ASSET", "Inventory Asset", _configuration?["Finance:AccountDefaults:Inventory"] ?? "10300", cancellationToken);
+            string cogsAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("EXPENSE", "Cost of Goods Sold", _configuration?["Finance:AccountDefaults:Cogs"] ?? "50100", cancellationToken);
 
             decimal totalCogs = 0;
             foreach (var item in cartEvaluation.Items)
@@ -559,7 +563,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             
             if (pointsDiscount > 0)
             {
-                string loyaltyAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("LIABILITY", "Loyalty Points", "20300", cancellationToken);
+                string loyaltyAccountCode = await _accountResolutionService.ResolveAccountCodeAsync("LIABILITY", "Loyalty Points", _configuration?["Finance:AccountDefaults:LoyaltyPoints"] ?? "20300", cancellationToken);
                 journalLines.Add(new JournalLineDto { AccountCode = loyaltyAccountCode, Description = "Loyalty Points Redemption", Debit = pointsDiscount, Credit = 0 });
             }
 

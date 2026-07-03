@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 
 namespace PosErp.Application.Features.Finance.Commands;
 
@@ -55,19 +56,22 @@ public class ReturnCommandsHandler :
     private readonly IDocumentSequenceService _sequenceService;
     private readonly IStockLedgerService _stockLedgerService;
     private readonly IPasswordHasher _passwordHasher;
+    private readonly IConfiguration _configuration;
 
     public ReturnCommandsHandler(
         IApplicationDbContext context,
         IFinancialPostingService postingService,
         IDocumentSequenceService sequenceService,
         IStockLedgerService stockLedgerService,
-        IPasswordHasher passwordHasher)
+        IPasswordHasher passwordHasher,
+        IConfiguration? configuration = null)
     {
         _context = context;
         _postingService = postingService;
         _sequenceService = sequenceService;
         _stockLedgerService = stockLedgerService;
         _passwordHasher = passwordHasher;
+        _configuration = configuration;
     }
 
     public async Task<Guid> Handle(ProcessPurchaseReturnCommand request, CancellationToken cancellationToken)
@@ -200,10 +204,10 @@ public class ReturnCommandsHandler :
             decimal cgstReversal = Math.Round(totalTax / 2m, 2);
             decimal sgstReversal = totalTax - cgstReversal;
 
-            string apAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Accounts Payable", "20100", cancellationToken);
-            string inventoryAccountCode = await ResolveAccountCodeAsync("ASSET", "Inventory", "10300", cancellationToken);
-            string inputCgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input CGST", "22030", cancellationToken);
-            string inputSgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input SGST", "22040", cancellationToken);
+            string apAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Accounts Payable", _configuration?["Finance:AccountDefaults:AccountsPayable"] ?? "20100", cancellationToken);
+            string inventoryAccountCode = await ResolveAccountCodeAsync("ASSET", "Inventory", _configuration?["Finance:AccountDefaults:Inventory"] ?? "10300", cancellationToken);
+            string inputCgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input CGST", _configuration?["Finance:AccountDefaults:InputCGST"] ?? "22030", cancellationToken);
+            string inputSgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input SGST", _configuration?["Finance:AccountDefaults:InputSGST"] ?? "22040", cancellationToken);
 
             var journalLines = new List<JournalLineDto>
             {
@@ -468,22 +472,22 @@ public class ReturnCommandsHandler :
             string resolvedRefundAccountCode = "10100";
             if (request.RefundMode == "UPI")
             {
-                resolvedRefundAccountCode = await ResolveAccountCodeAsync("ASSET", "Current", "10200", cancellationToken);
+                resolvedRefundAccountCode = await ResolveAccountCodeAsync("ASSET", "Current", _configuration?["Finance:AccountDefaults:DigitalBank"] ?? "10200", cancellationToken);
             }
             else if (request.RefundMode == "CREDIT_NOTE")
             {
-                resolvedRefundAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", "20200", cancellationToken);
+                resolvedRefundAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", _configuration?["Finance:AccountDefaults:WalletLiability"] ?? "20200", cancellationToken);
             }
             else
             {
-                resolvedRefundAccountCode = await ResolveAccountCodeAsync("ASSET", "Cash", "10100", cancellationToken);
+                resolvedRefundAccountCode = await ResolveAccountCodeAsync("ASSET", "Cash", _configuration?["Finance:AccountDefaults:Cash"] ?? "10100", cancellationToken);
             }
 
-            string salesAccountCode = await ResolveAccountCodeAsync("REVENUE", "Sales Revenue", "4000", cancellationToken);
-            string outputCgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Output CGST", "22010", cancellationToken);
-            string outputSgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Output SGST", "22020", cancellationToken);
-            string inventoryAccountCode = await ResolveAccountCodeAsync("ASSET", "Inventory Asset", "10300", cancellationToken);
-            string cogsAccountCode = await ResolveAccountCodeAsync("EXPENSE", "Cost of Goods Sold", "5000", cancellationToken);
+            string salesAccountCode = await ResolveAccountCodeAsync("REVENUE", "Sales Revenue", _configuration?["Finance:AccountDefaults:SalesRevenue"] ?? "40100", cancellationToken);
+            string outputCgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Output CGST", _configuration?["Finance:AccountDefaults:OutputCGST"] ?? "22010", cancellationToken);
+            string outputSgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Output SGST", _configuration?["Finance:AccountDefaults:OutputSGST"] ?? "22020", cancellationToken);
+            string inventoryAccountCode = await ResolveAccountCodeAsync("ASSET", "Inventory Asset", _configuration?["Finance:AccountDefaults:Inventory"] ?? "10300", cancellationToken);
+            string cogsAccountCode = await ResolveAccountCodeAsync("EXPENSE", "Cost of Goods Sold", _configuration?["Finance:AccountDefaults:Cogs"] ?? "50100", cancellationToken);
 
             var journalLines = new List<JournalLineDto>
             {
@@ -584,6 +588,7 @@ public class ReturnCommandsHandler :
     {
         var account = await _context.Accounts
             .Where(a => a.IsActive && a.AccountType == accountType &&
+                        !IAccountResolutionService.LegacyExcludedCodes.Contains(a.AccountCode) &&
                         !_context.Accounts.Any(sub => sub.ParentAccountId == a.Id && sub.IsActive))
             .OrderByDescending(a => a.AccountCode.Length)
             .ThenBy(a => a.AccountCode)

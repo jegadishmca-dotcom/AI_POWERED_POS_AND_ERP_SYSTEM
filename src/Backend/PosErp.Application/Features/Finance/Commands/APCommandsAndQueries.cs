@@ -10,6 +10,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Configuration;
 
 namespace PosErp.Application.Features.Finance.Commands;
 
@@ -114,19 +115,22 @@ public class APCommandsAndQueriesHandler :
     private readonly IDocumentSequenceService _sequenceService;
     private readonly IAllocationEngine _allocationEngine;
     private readonly IApprovalWorkflowService _approvalService;
+    private readonly IConfiguration _configuration;
 
     public APCommandsAndQueriesHandler(
         IApplicationDbContext context,
         IFinancialPostingService postingService,
         IDocumentSequenceService sequenceService,
         IAllocationEngine allocationEngine,
-        IApprovalWorkflowService approvalService)
+        IApprovalWorkflowService approvalService,
+        IConfiguration? configuration = null)
     {
         _context = context;
         _postingService = postingService;
         _sequenceService = sequenceService;
         _allocationEngine = allocationEngine;
         _approvalService = approvalService;
+        _configuration = configuration;
     }
 
     public async Task<Guid> Handle(CreatePurchaseBillCommand request, CancellationToken cancellationToken)
@@ -203,10 +207,10 @@ public class APCommandsAndQueriesHandler :
             // Debit Input CGST (cgstAmount)
             // Debit Input SGST (sgstAmount)
             // Credit Accounts Payable - Vendors (TotalAmount)
-            string inventoryAccountCode = await ResolveAccountCodeAsync("ASSET", "Inventory", "10300", cancellationToken);
-            string inputCgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input CGST", "22030", cancellationToken);
-            string inputSgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input SGST", "22040", cancellationToken);
-            string apAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Accounts Payable", "20100", cancellationToken);
+            string inventoryAccountCode = await ResolveAccountCodeAsync("ASSET", "Inventory", _configuration?["Finance:AccountDefaults:Inventory"] ?? "10300", cancellationToken);
+            string inputCgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input CGST", _configuration?["Finance:AccountDefaults:InputCGST"] ?? "22030", cancellationToken);
+            string inputSgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input SGST", _configuration?["Finance:AccountDefaults:InputSGST"] ?? "22040", cancellationToken);
+            string apAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Accounts Payable", _configuration?["Finance:AccountDefaults:AccountsPayable"] ?? "20100", cancellationToken);
 
             var lines = new List<JournalLineDto>
             {
@@ -344,8 +348,8 @@ public class APCommandsAndQueriesHandler :
         var supplier = await _context.Suppliers.FindAsync(new object[] { payment.SupplierId }, cancellationToken);
 
         // Journal: Debit Accounts Payable - Vendors, Credit Bank Account (10200)
-        string apAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Accounts Payable", "20100", cancellationToken);
-        string digitalAccountCode = await ResolveAccountCodeAsync("ASSET", "Current", "10200", cancellationToken);
+        string apAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Accounts Payable", _configuration?["Finance:AccountDefaults:AccountsPayable"] ?? "20100", cancellationToken);
+        string digitalAccountCode = await ResolveAccountCodeAsync("ASSET", "Current", _configuration?["Finance:AccountDefaults:DigitalBank"] ?? "10200", cancellationToken);
 
         var lines = new List<JournalLineDto>
         {
@@ -544,6 +548,7 @@ public class APCommandsAndQueriesHandler :
     {
         var account = await _context.Accounts
             .Where(a => a.IsActive && a.AccountType == accountType &&
+                        !IAccountResolutionService.LegacyExcludedCodes.Contains(a.AccountCode) &&
                         !_context.Accounts.Any(sub => sub.ParentAccountId == a.Id && sub.IsActive))
             .OrderByDescending(a => a.AccountCode.Length)
             .ThenBy(a => a.AccountCode)

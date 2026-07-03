@@ -608,9 +608,9 @@ public class AccountingIntegrationTests : IDisposable
                 .ThenInclude(l => l.Account)
             .FirstOrDefaultAsync(j => j.SourceDocumentId == salesReturnId && j.SourceDocumentType == "SALES_RETURN");
         Assert.NotNull(returnJe);
-        Assert.True(returnJe.Lines.Any(l => l.Account.AccountCode == "4000" && l.DebitAmount > 0)); // Sales Revenue Debit
+        Assert.True(returnJe.Lines.Any(l => l.Account.AccountCode == "40100" && l.DebitAmount > 0)); // Sales Revenue Debit
         Assert.True(returnJe.Lines.Any(l => l.Account.AccountCode == "10300" && l.DebitAmount > 0)); // Inventory restock Debit
-        Assert.True(returnJe.Lines.Any(l => l.Account.AccountCode == "5000" && l.CreditAmount > 0)); // COGS Credit
+        Assert.True(returnJe.Lines.Any(l => l.Account.AccountCode == "50100" && l.CreditAmount > 0)); // COGS Credit
     }
 
     [Fact]

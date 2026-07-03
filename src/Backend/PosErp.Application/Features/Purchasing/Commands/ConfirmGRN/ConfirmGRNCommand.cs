@@ -12,6 +12,7 @@ using PosErp.Application.Features.Finance.Services;
 using PosErp.Domain.Entities.Finance;
 using System.Text.RegularExpressions;
 using System.Collections.Generic;
+using Microsoft.Extensions.Configuration;
 
 namespace PosErp.Application.Features.Purchasing.Commands.ConfirmGRN;
 
@@ -23,17 +24,20 @@ public class ConfirmGRNCommandHandler : IRequestHandler<ConfirmGRNCommand, bool>
     private readonly IStockLedgerService _stockLedgerService;
     private readonly IProductBatchService _batchService;
     private readonly IFinancialPostingService _financialPostingService;
+    private readonly IConfiguration _configuration;
 
     public ConfirmGRNCommandHandler(
         IApplicationDbContext context, 
         IStockLedgerService stockLedgerService, 
         IProductBatchService batchService,
-        IFinancialPostingService financialPostingService)
+        IFinancialPostingService financialPostingService,
+        IConfiguration? configuration = null)
     {
         _context = context;
         _stockLedgerService = stockLedgerService;
         _batchService = batchService;
         _financialPostingService = financialPostingService;
+        _configuration = configuration;
     }
 
     public async Task<bool> Handle(ConfirmGRNCommand request, CancellationToken cancellationToken)
@@ -157,10 +161,10 @@ public class ConfirmGRNCommandHandler : IRequestHandler<ConfirmGRNCommand, bool>
                 await _context.SaveChangesAsync(cancellationToken);
 
                 // Post double-entry journal entry:
-                string inventoryAccountCode = await ResolveAccountCodeAsync("ASSET", "Inventory", "10300", cancellationToken);
-                string inputCgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input CGST", "22030", cancellationToken);
-                string inputSgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input SGST", "22040", cancellationToken);
-                string apAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Accounts Payable", "20100", cancellationToken);
+                string inventoryAccountCode = await ResolveAccountCodeAsync("ASSET", "Inventory", _configuration?["Finance:AccountDefaults:Inventory"] ?? "10300", cancellationToken);
+                string inputCgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input CGST", _configuration?["Finance:AccountDefaults:InputCGST"] ?? "22030", cancellationToken);
+                string inputSgstAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Input SGST", _configuration?["Finance:AccountDefaults:InputSGST"] ?? "22040", cancellationToken);
+                string apAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Accounts Payable", _configuration?["Finance:AccountDefaults:AccountsPayable"] ?? "20100", cancellationToken);
 
                 var lines = new List<JournalLineDto>
                 {
@@ -232,6 +236,7 @@ public class ConfirmGRNCommandHandler : IRequestHandler<ConfirmGRNCommand, bool>
     {
         var account = await _context.Accounts
             .Where(a => a.IsActive && a.AccountType == accountType &&
+                        !IAccountResolutionService.LegacyExcludedCodes.Contains(a.AccountCode) &&
                         !_context.Accounts.Any(sub => sub.ParentAccountId == a.Id && sub.IsActive))
             .OrderByDescending(a => a.AccountCode.Length)
             .ThenBy(a => a.AccountCode)

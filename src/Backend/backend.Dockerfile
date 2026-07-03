@@ -39,14 +39,26 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 
 # Install native dependencies required by QuestPDF (SkiaSharp), Npgsql, and health check.
-# postgresql-client is version-pinned to match the Postgres server (currently 16).
+# postgresql-client-16 is pinned to match the Postgres server version.
 # It provides pg_dump and pg_restore required by RefreshUatFromLiveSnapshotAsync.
-# If you upgrade Postgres, update this version to match.
+# postgresql-client-16 is NOT in Debian Bookworm's default repos — we must add the
+# official PostgreSQL PGDG apt repository first.
+# If you upgrade Postgres, update the client version number in both places below.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libfontconfig1 \
-    libssl3 \
+    gnupg \
     curl \
-    postgresql-client-16 \
+    lsb-release \
+    ca-certificates \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+       | gpg --dearmor -o /usr/share/keyrings/postgresql-archive-keyring.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/postgresql-archive-keyring.gpg] \
+       https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+       > /etc/apt/sources.list.d/postgresql.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+       libfontconfig1 \
+       libssl3 \
+       postgresql-client-16 \
     && rm -rf /var/lib/apt/lists/*
 
 # Security: run as non-root

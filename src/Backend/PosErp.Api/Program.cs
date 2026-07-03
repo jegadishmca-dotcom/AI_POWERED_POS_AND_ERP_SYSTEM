@@ -37,7 +37,8 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add Connection String Provider, Provisioning, & Safety Interceptor services
 builder.Services.AddMemoryCache();
-builder.Services.AddScoped<IConnectionStringProvider, PosErp.Infrastructure.Services.ConnectionStringProvider>();
+builder.Services.AddScoped<PosErp.Infrastructure.Services.ConnectionStringProvider>();
+builder.Services.AddScoped<IConnectionStringProvider>(provider => provider.GetRequiredService<PosErp.Infrastructure.Services.ConnectionStringProvider>());
 builder.Services.AddScoped<PosErp.Infrastructure.Persistence.DbSafetyInterceptor>();
 builder.Services.AddScoped<IDatabaseProvisioningService, PosErp.Infrastructure.Services.DatabaseProvisioningService>();
 

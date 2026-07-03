@@ -30,21 +30,36 @@ using System.Threading.RateLimiting;
 using System.Text;
 using Hangfire;
 using Hangfire.PostgreSql;
+using Microsoft.Extensions.Caching.Memory;
 
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 var builder = WebApplication.CreateBuilder(args);
 
+// Add Connection String Provider, Provisioning, & Safety Interceptor services
+builder.Services.AddMemoryCache();
+builder.Services.AddScoped<IConnectionStringProvider, PosErp.Infrastructure.Services.ConnectionStringProvider>();
+builder.Services.AddScoped<PosErp.Infrastructure.Persistence.DbSafetyInterceptor>();
+builder.Services.AddScoped<IDatabaseProvisioningService, PosErp.Infrastructure.Services.DatabaseProvisioningService>();
+
 // Add Database Context (PostgreSQL via PgBouncer / direct connection string)
-builder.Services.AddDbContext<ApplicationDbContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
+builder.Services.AddDbContext<ApplicationDbContext>((serviceProvider, options) =>
+{
+    var connectionStringProvider = serviceProvider.GetRequiredService<IConnectionStringProvider>();
+    var safetyInterceptor = serviceProvider.GetRequiredService<PosErp.Infrastructure.Persistence.DbSafetyInterceptor>();
+    
+    options.UseNpgsql(connectionStringProvider.GetConnectionString(),
         npgsqlOptions => 
         {
             npgsqlOptions.CommandTimeout(180);
             npgsqlOptions.EnableRetryOnFailure(3, TimeSpan.FromSeconds(5), null);
-        }));
+        });
+        
+    options.AddInterceptors(safetyInterceptor);
+});
 
 builder.Services.AddScoped<IApplicationDbContext>(provider => 
     provider.GetRequiredService<ApplicationDbContext>());
+
 
 // Health checks — must be registered before MapHealthChecks("/health") is called
 builder.Services.AddHealthChecks();
@@ -179,6 +194,77 @@ builder.Services.AddAuthentication(options =>
         ValidAudience = "PosErpClient",
         IssuerSigningKey = new SymmetricSecurityKey(key),
         ClockSkew = TimeSpan.Zero
+    };
+    options.Events = new JwtBearerEvents
+    {
+        OnTokenValidated = async context =>
+        {
+            var config = context.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
+            var connProvider = context.HttpContext.RequestServices.GetRequiredService<IConnectionStringProvider>();
+            var tenantProvider = context.HttpContext.RequestServices.GetRequiredService<ITenantProvider>();
+            var memoryCache = context.HttpContext.RequestServices.GetRequiredService<IMemoryCache>();
+
+            var tokenVersionClaim = context.Principal?.FindFirst("token_version")?.Value;
+            if (string.IsNullOrEmpty(tokenVersionClaim))
+            {
+                context.Fail("Missing token version claim.");
+                return;
+            }
+
+            var deploymentMode = config["SystemConfig:DeploymentMode"] ?? "SelfHosted";
+            var cacheKey = string.Equals(deploymentMode, "SaaS", StringComparison.OrdinalIgnoreCase)
+                ? $"token_ver_{tenantProvider.TenantId}"
+                : "token_ver_selfhosted";
+
+            if (!memoryCache.TryGetValue(cacheKey, out int currentVersion))
+            {
+                currentVersion = 1;
+
+                if (string.Equals(deploymentMode, "SaaS", StringComparison.OrdinalIgnoreCase))
+                {
+                    var platformConn = config.GetConnectionString("DefaultConnection") 
+                        ?? "Host=localhost;Database=poserp;Username=postgres;Password=postgres";
+                    try
+                    {
+                        await using var conn = new Npgsql.NpgsqlConnection(platformConn);
+                        await conn.OpenAsync();
+                        await using var cmd = conn.CreateCommand();
+                        cmd.CommandText = "SELECT token_version FROM tenant_environments WHERE tenant_id = @p0";
+                        var p = cmd.CreateParameter();
+                        p.ParameterName = "@p0";
+                        p.Value = tenantProvider.TenantId;
+                        cmd.Parameters.Add(p);
+                        var res = await cmd.ExecuteScalarAsync();
+                        if (res != null && res != DBNull.Value)
+                        {
+                            currentVersion = Convert.ToInt32(res);
+                        }
+                    }
+                    catch
+                    {
+                        // Fail-safe default
+                    }
+                }
+                else
+                {
+                    var connProviderImpl = connProvider as PosErp.Infrastructure.Services.ConnectionStringProvider;
+                    if (connProviderImpl != null)
+                    {
+                        currentVersion = connProviderImpl.GetSelfHostedTokenVersion();
+                    }
+                }
+
+                memoryCache.Set(cacheKey, currentVersion, new MemoryCacheEntryOptions
+                {
+                    AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(10)
+                });
+            }
+
+            if (tokenVersionClaim != currentVersion.ToString())
+            {
+                context.Fail("Token version mismatch. Session invalidated due to environment toggle.");
+            }
+        }
     };
 });
 
@@ -378,6 +464,26 @@ using (var scope = app.Services.CreateScope())
                 applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
             );
         ");
+
+        // Create tenant_environments platform table if not exists (for SaaS mode)
+        await context.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS tenant_environments (
+                tenant_id UUID PRIMARY KEY,
+                active_mode VARCHAR(50) NOT NULL DEFAULT 'LIVE',
+                live_connection_string TEXT NOT NULL,
+                uat_connection_string TEXT NOT NULL,
+                token_version INT NOT NULL DEFAULT 1,
+                updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+        ");
+
+        // Ensure token_version column is present if table already exists
+        await context.Database.ExecuteSqlRawAsync(@"
+            ALTER TABLE tenant_environments ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 1;
+        ");
+
+        // Perform environment and tenant safety assertion
+        await VerifyDatabaseMetadataAsync(context, services);
 
         var connection = context.Database.GetDbConnection();
         var wasOpen = connection.State == System.Data.ConnectionState.Open;
@@ -615,6 +721,19 @@ using (var scope = app.Services.CreateScope())
             context.Roles.Add(managerRole);
             await context.SaveChangesAsync();
         }
+
+        var developerRole = await context.Roles.FirstOrDefaultAsync(r => r.Name == "Developer");
+        if (developerRole == null)
+        {
+            developerRole = new PosErp.Domain.Entities.Auth.Role
+            {
+                Id = Guid.Parse("00000000-0000-0000-0000-000000000005"),
+                Name = "Developer",
+                Description = "System Developer / Operations Admin"
+            };
+            context.Roles.Add(developerRole);
+            await context.SaveChangesAsync();
+        }
         
         var passwordHasher = services.GetRequiredService<IPasswordHasher>();
         bool usersChanged = false;
@@ -644,6 +763,25 @@ using (var scope = app.Services.CreateScope())
                 usersChanged = true;
                 Console.WriteLine("[PIN] Default override PIN set for admin user. Please change it via Settings.");
             }
+        }
+
+        // Seed Developer User
+        if (!await context.Users.AnyAsync(u => u.Username == "developer@supermarket.local"))
+        {
+            var configuration = services.GetRequiredService<IConfiguration>();
+            var devPasswordHash = configuration["SystemConfig:DeveloperPasswordHash"];
+            var devUser = new PosErp.Domain.Entities.Auth.User
+            {
+                Username = "developer@supermarket.local",
+                PasswordHash = !string.IsNullOrEmpty(devPasswordHash) ? devPasswordHash : "", // Empty/disabled if not configured in environment
+                PinHash = null, // No default PIN seeded for Developer
+                FullName = "System Developer",
+                RoleId = developerRole.Id,
+                IsActive = !string.IsNullOrEmpty(devPasswordHash) // Active only if password hash is configured
+            };
+            context.Users.Add(devUser);
+            usersChanged = true;
+            Console.WriteLine("[DEV] Developer user seeded (disabled by default unless SystemConfig:DeveloperPasswordHash is configured).");
         }
         
         // Seed Demo Sandbox User
@@ -952,5 +1090,103 @@ using (var scope = app.Services.CreateScope())
         if (ex.InnerException != null) Console.WriteLine($"Inner: {ex.InnerException.Message}");
     }
 }
+
+async Task VerifyDatabaseMetadataAsync(ApplicationDbContext context, IServiceProvider services)
+{
+    var configuration = services.GetRequiredService<IConfiguration>();
+    var tenantProvider = services.GetRequiredService<ITenantProvider>();
+    
+    var deploymentMode = configuration["SystemConfig:DeploymentMode"] ?? "SelfHosted";
+    
+    string expectedMode;
+    Guid expectedTenantId = Guid.Empty;
+
+    if (string.Equals(deploymentMode, "SaaS", StringComparison.OrdinalIgnoreCase))
+    {
+        // In SaaS mode, the startup checks verify the platform/management database, 
+        // request-level checks are handled dynamically.
+        return;
+    }
+    else
+    {
+        // Self-hosted: read active mode from operation_mode.json
+        var connStrProvider = services.GetRequiredService<IConnectionStringProvider>() as PosErp.Infrastructure.Services.ConnectionStringProvider;
+        expectedMode = connStrProvider?.GetSelfHostedActiveMode() ?? "LIVE";
+    }
+
+    // Verify the database metadata
+    var connection = context.Database.GetDbConnection();
+    var wasOpen = connection.State == System.Data.ConnectionState.Open;
+    if (!wasOpen) await connection.OpenAsync();
+
+    string actualDbName = connection.Database;
+    
+    // Assert database name matches expected mode suffix (physical safeguard)
+    if (string.Equals(expectedMode, "UAT", StringComparison.OrdinalIgnoreCase))
+    {
+        if (!actualDbName.EndsWith("_uat", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new InvalidOperationException(
+                $"[FATAL SAFETY ASSERTION FAILED] Connected database '{actualDbName}' does not match expected environment mode 'UAT'. " +
+                $"Connection aborted to prevent data corruption.");
+        }
+    }
+    else
+    {
+        var isLiveDb = actualDbName.EndsWith("_live", StringComparison.OrdinalIgnoreCase);
+        var isDevDbFallback = actualDbName.Equals("posdb", StringComparison.OrdinalIgnoreCase) || 
+                              actualDbName.Equals("poserp", StringComparison.OrdinalIgnoreCase);
+        var isDevelopment = string.Equals(
+            Environment.GetEnvironmentVariable("ASPNETCORE_ENVIRONMENT") ?? "Development", 
+            "Development", 
+            StringComparison.OrdinalIgnoreCase);
+
+        if (!isLiveDb && (!isDevelopment || !isDevDbFallback))
+        {
+            throw new InvalidOperationException(
+                $"[FATAL SAFETY ASSERTION FAILED] Connected database '{actualDbName}' does not match expected environment mode 'LIVE' (must end with '_live' in Production). " +
+                $"Connection aborted to prevent data corruption.");
+        }
+    }
+
+    // Query database_metadata table if it exists
+    bool tableExists = false;
+    using (var cmd = connection.CreateCommand())
+    {
+        cmd.CommandText = "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'database_metadata')";
+        tableExists = (bool)(await cmd.ExecuteScalarAsync() ?? false);
+    }
+
+    if (tableExists)
+    {
+        using (var cmd = connection.CreateCommand())
+        {
+            cmd.CommandText = "SELECT database_name, environment_mode, tenant_id FROM database_metadata LIMIT 1";
+            using (var reader = await cmd.ExecuteReaderAsync())
+            {
+                if (reader.Read())
+                {
+                    var dbName = reader.GetString(0);
+                    var envMode = reader.GetString(1);
+                    var tenantId = reader.GetGuid(2);
+
+                    if (!string.Equals(envMode, expectedMode, StringComparison.OrdinalIgnoreCase))
+                    {
+                        throw new InvalidOperationException(
+                            $"[FATAL SAFETY ASSERTION FAILED] Database metadata mode '{envMode}' does not match expected mode '{expectedMode}'.");
+                    }
+                    }
+                }
+            }
+        }
+
+        if (!wasOpen) await connection.CloseAsync();
+    }
+// Startup check: verify pg_dump and pg_restore binaries are available.
+// These are required by RefreshUatFromLiveSnapshotAsync (recurring UAT refresh).
+// Fails loudly here so the container is rejected at boot rather than discovering
+// missing postgresql-client tools only when a UAT refresh is first attempted.
+// Ensure postgresql-client (version-matched to Postgres server) is in the Dockerfile.
+PosErp.Infrastructure.Services.DatabaseProvisioningService.AssertPgClientToolsAvailable();
 
 app.Run();

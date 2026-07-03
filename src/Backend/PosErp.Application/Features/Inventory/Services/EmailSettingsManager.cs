@@ -23,6 +23,7 @@ public class EmailSettings
     public string PostmarkToken { get; set; } = "";
     public string ResendApiKey { get; set; } = "";
     public int ExpiryAlertThresholdDays { get; set; } = 30; // L2 FIX: configurable threshold
+    public string DeveloperAlertEmail { get; set; } = "";
 }
 
 public interface IEmailSettingsManager
@@ -111,7 +112,7 @@ public class EmailSettingsManager : IEmailSettingsManager
 
             using (var cmd = conn.CreateCommand())
             {
-                cmd.CommandText = "SELECT smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes, delivery_method, mailgun_domain, mailgun_api_key, postmark_token, resend_api_key, expiry_alert_threshold_days FROM email_settings WHERE id = 'global'";
+                cmd.CommandText = "SELECT smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes, delivery_method, mailgun_domain, mailgun_api_key, postmark_token, resend_api_key, expiry_alert_threshold_days, developer_alert_email FROM email_settings WHERE id = 'global'";
                 using (var reader = cmd.ExecuteReader())
                 {
                     if (reader.Read())
@@ -134,11 +135,12 @@ public class EmailSettingsManager : IEmailSettingsManager
                         
                         var encryptedPmToken = reader.IsDBNull(10) ? "" : reader.GetString(10);
                         settings.PostmarkToken = Decrypt(encryptedPmToken);
-
+ 
                         var encryptedRsKey = reader.IsDBNull(11) ? "" : reader.GetString(11);
                         settings.ResendApiKey = Decrypt(encryptedRsKey);
-
+ 
                         settings.ExpiryAlertThresholdDays = reader.IsDBNull(12) ? 30 : reader.GetInt32(12);
+                        settings.DeveloperAlertEmail = reader.IsDBNull(13) ? "" : reader.GetString(13);
                     }
                 }
             }
@@ -166,8 +168,8 @@ public class EmailSettingsManager : IEmailSettingsManager
             using (var cmd = conn.CreateCommand())
             {
                 cmd.CommandText = @"
-                    INSERT INTO email_settings (id, smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes, delivery_method, mailgun_domain, mailgun_api_key, postmark_token, resend_api_key, expiry_alert_threshold_days)
-                    VALUES ('global', @smtp_server, @smtp_port, @sender_email, @sender_password, @recipient_email, @enable_ssl, @trigger_interval_minutes, @delivery_method, @mailgun_domain, @mailgun_api_key, @postmark_token, @resend_api_key, @expiry_alert_threshold_days)
+                    INSERT INTO email_settings (id, smtp_server, smtp_port, sender_email, sender_password, recipient_email, enable_ssl, trigger_interval_minutes, delivery_method, mailgun_domain, mailgun_api_key, postmark_token, resend_api_key, expiry_alert_threshold_days, developer_alert_email)
+                    VALUES ('global', @smtp_server, @smtp_port, @sender_email, @sender_password, @recipient_email, @enable_ssl, @trigger_interval_minutes, @delivery_method, @mailgun_domain, @mailgun_api_key, @postmark_token, @resend_api_key, @expiry_alert_threshold_days, @developer_alert_email)
                     ON CONFLICT (id) DO UPDATE SET
                         smtp_server = EXCLUDED.smtp_server,
                         smtp_port = EXCLUDED.smtp_port,
@@ -181,7 +183,8 @@ public class EmailSettingsManager : IEmailSettingsManager
                         mailgun_api_key = EXCLUDED.mailgun_api_key,
                         postmark_token = EXCLUDED.postmark_token,
                         resend_api_key = EXCLUDED.resend_api_key,
-                        expiry_alert_threshold_days = EXCLUDED.expiry_alert_threshold_days;";
+                        expiry_alert_threshold_days = EXCLUDED.expiry_alert_threshold_days,
+                        developer_alert_email = EXCLUDED.developer_alert_email;";
 
                 var pSmtpServer = cmd.CreateParameter();
                 pSmtpServer.ParameterName = "@smtp_server";
@@ -247,6 +250,11 @@ public class EmailSettingsManager : IEmailSettingsManager
                 pExpiryThreshold.ParameterName = "@expiry_alert_threshold_days";
                 pExpiryThreshold.Value = settings.ExpiryAlertThresholdDays;
                 cmd.Parameters.Add(pExpiryThreshold);
+ 
+                var pDeveloperEmail = cmd.CreateParameter();
+                pDeveloperEmail.ParameterName = "@developer_alert_email";
+                pDeveloperEmail.Value = settings.DeveloperAlertEmail ?? "";
+                cmd.Parameters.Add(pDeveloperEmail);
 
                 cmd.ExecuteNonQuery();
             }

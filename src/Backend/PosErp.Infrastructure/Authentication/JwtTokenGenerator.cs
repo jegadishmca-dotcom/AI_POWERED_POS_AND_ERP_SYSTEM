@@ -7,20 +7,27 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Auth;
+using PosErp.Infrastructure.Services;
 
 namespace PosErp.Infrastructure.Authentication;
 
 public class JwtTokenGenerator : IJwtTokenGenerator
 {
-    // S1 FIX: Secret read from IConfiguration (environment variable JWT__Secret on Render).
-    // The hardcoded fallback string is only used in Development when no env var is set.
-    // In Production, Program.cs throws at startup if JWT__Secret is missing.
     private readonly string _secret;
+    private readonly IConfiguration _configuration;
+    private readonly IConnectionStringProvider _connectionStringProvider;
+    private readonly ITenantProvider _tenantProvider;
     private const string Issuer = "PosErp";
     private const string Audience = "PosErpClient";
 
-    public JwtTokenGenerator(IConfiguration configuration)
+    public JwtTokenGenerator(
+        IConfiguration configuration,
+        IConnectionStringProvider connectionStringProvider,
+        ITenantProvider tenantProvider)
     {
+        _configuration = configuration;
+        _connectionStringProvider = connectionStringProvider;
+        _tenantProvider = tenantProvider;
         _secret = configuration["JWT__Secret"]
             ?? configuration["JWT:Secret"]
             ?? "DevOnlyFallbackKey_ReplaceWithEnvVarInProduction_MinLength64Chars1234567890ABCD";
@@ -28,6 +35,45 @@ public class JwtTokenGenerator : IJwtTokenGenerator
 
     public string GenerateToken(User user, string roleName)
     {
+        var deploymentMode = _configuration["SystemConfig:DeploymentMode"] ?? "SelfHosted";
+        int tokenVersion = 1;
+
+        if (string.Equals(deploymentMode, "SaaS", StringComparison.OrdinalIgnoreCase))
+        {
+            // SaaS: fetch from Platform DB tenant_environments table
+            var platformConn = _configuration.GetConnectionString("DefaultConnection") 
+                ?? "Host=localhost;Database=poserp;Username=postgres;Password=postgres";
+            try
+            {
+                using var conn = new Npgsql.NpgsqlConnection(platformConn);
+                conn.Open();
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = "SELECT token_version FROM tenant_environments WHERE tenant_id = @p0";
+                var p = cmd.CreateParameter();
+                p.ParameterName = "@p0";
+                p.Value = _tenantProvider.TenantId;
+                cmd.Parameters.Add(p);
+                var res = cmd.ExecuteScalar();
+                if (res != null && res != DBNull.Value)
+                {
+                    tokenVersion = Convert.ToInt32(res);
+                }
+            }
+            catch
+            {
+                // Fallback
+            }
+        }
+        else
+        {
+            // Self-hosted: fetch from operation_mode.json
+            var connProvider = _connectionStringProvider as ConnectionStringProvider;
+            if (connProvider != null)
+            {
+                tokenVersion = connProvider.GetSelfHostedTokenVersion();
+            }
+        }
+
         var claims = new[]
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
@@ -35,7 +81,8 @@ public class JwtTokenGenerator : IJwtTokenGenerator
             new Claim(ClaimTypes.Role, roleName),
             new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()), // Added for Claims.User.FindFirst()
             new Claim("store_id", user.StoreId?.ToString() ?? string.Empty),
-            new Claim("full_name", user.FullName)
+            new Claim("full_name", user.FullName),
+            new Claim("token_version", tokenVersion.ToString()) // Token version claim for invalidation
         };
 
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_secret));

@@ -8,23 +8,25 @@ import { Settings as SettingsIcon, Network, Printer, Monitor, Users, ShieldCheck
 import { useAuthStore } from '../features/auth/store/auth.store';
 import { InventorySafeguards } from '../features/settings/components/InventorySafeguards';
 import { EmailConfig } from '../features/settings/components/EmailConfig';
+import { EnvironmentConfig } from '../features/settings/components/EnvironmentConfig';
 
-type SettingsTab = 'connection' | 'printers' | 'terminals' | 'users' | 'security' | 'inventoryRules' | 'emailSetup';
+type SettingsTab = 'connection' | 'printers' | 'terminals' | 'users' | 'security' | 'inventoryRules' | 'emailSetup' | 'environment';
 
 export const Settings: React.FC = () => {
   const { user } = useAuthStore();
-  const isOwner = user?.role === 'Owner' || user?.role === 'Manager';
+  const isOwner = user?.role === 'Owner' || user?.role === 'Manager' || user?.role === 'Developer';
   const [activeTab, setActiveTab] = useState<SettingsTab>('connection');
 
   // Non-owners (cashiers) can only edit their local printer settings
   const tabs: { id: SettingsTab; label: string; icon: React.ReactNode; roles: string[] }[] = [
-    { id: 'connection', label: 'Connection Setup', icon: <Network className="w-4 h-4" />, roles: ['Owner', 'Manager'] },
-    { id: 'printers', label: 'Printers Configuration', icon: <Printer className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Cashier', 'Supervisor'] },
-    { id: 'terminals', label: 'POS Terminals', icon: <Monitor className="w-4 h-4" />, roles: ['Owner', 'Manager'] },
-    { id: 'users', label: 'Staff Accounts', icon: <Users className="w-4 h-4" />, roles: ['Owner', 'Manager'] },
-    { id: 'inventoryRules', label: 'Inventory Rules', icon: <Database className="w-4 h-4" />, roles: ['Owner', 'Manager'] },
-    { id: 'emailSetup', label: 'Email Setup', icon: <Mail className="w-4 h-4" />, roles: ['Owner', 'Manager'] },
-    { id: 'security', label: 'Security PIN', icon: <ShieldCheck className="w-4 h-4" />, roles: ['Owner', 'Manager'] },
+    { id: 'connection', label: 'Connection Setup', icon: <Network className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
+    { id: 'printers', label: 'Printers Configuration', icon: <Printer className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Cashier', 'Supervisor', 'Developer'] },
+    { id: 'terminals', label: 'POS Terminals', icon: <Monitor className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
+    { id: 'users', label: 'Staff Accounts', icon: <Users className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
+    { id: 'inventoryRules', label: 'Inventory Rules', icon: <Database className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
+    { id: 'emailSetup', label: 'Email Setup', icon: <Mail className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
+    { id: 'environment', label: 'Environment Mode', icon: <Database className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
+    { id: 'security', label: 'Security PIN', icon: <ShieldCheck className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
   ];
 
   // Adjust active tab if the logged-in user role is restricted from the default tab
@@ -71,6 +73,7 @@ export const Settings: React.FC = () => {
           {currentTab === 'users' && <UserManagement />}
           {currentTab === 'inventoryRules' && <InventorySafeguards />}
           {currentTab === 'emailSetup' && <EmailConfig />}
+          {currentTab === 'environment' && <EnvironmentConfig />}
           {currentTab === 'security' && (
             <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm max-w-xl">
               <h3 className="font-bold text-slate-800 mb-2">POS Security PIN</h3>

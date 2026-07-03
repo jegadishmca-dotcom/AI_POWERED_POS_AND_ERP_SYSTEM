@@ -25,6 +25,7 @@ export const EmailConfig: React.FC = () => {
   // Shared Fields
   const [senderEmail, setSenderEmail] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
+  const [developerAlertEmail, setDeveloperAlertEmail] = useState('');
   const [triggerIntervalMinutes, setTriggerIntervalMinutes] = useState(0);
 
   // UI States
@@ -57,6 +58,7 @@ export const EmailConfig: React.FC = () => {
       setSenderPassword(res.data.senderPassword || '');
       
       setRecipientEmail(res.data.recipientEmail || 'jegadishmca@gmail.com');
+      setDeveloperAlertEmail(res.data.developerAlertEmail || '');
       setEnableSsl(res.data.enableSsl !== false);
       setTriggerIntervalMinutes(res.data.triggerIntervalMinutes || 0);
 
@@ -89,6 +91,7 @@ export const EmailConfig: React.FC = () => {
         senderEmail,
         senderPassword,
         recipientEmail,
+        developerAlertEmail,
         enableSsl,
         triggerIntervalMinutes: Number(triggerIntervalMinutes),
         mailgunDomain,
@@ -122,6 +125,7 @@ export const EmailConfig: React.FC = () => {
         senderEmail,
         senderPassword,
         recipientEmail,
+        developerAlertEmail,
         enableSsl,
         triggerIntervalMinutes: Number(triggerIntervalMinutes),
         mailgunDomain,
@@ -457,6 +461,23 @@ export const EmailConfig: React.FC = () => {
               />
               <p className="text-[10px] text-slate-400 font-medium">
                 This is the target inbox where daily reports and system alerts are sent. Separate multiple emails with a comma.
+              </p>
+            </div>
+ 
+            {/* Developer Alert Email */}
+            <div className="space-y-1">
+              <label className="text-xs font-black text-slate-500 uppercase">
+                Developer Alert Email
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. dev-alerts@supermarket.local"
+                value={developerAlertEmail}
+                onChange={(e) => setDeveloperAlertEmail(e.target.value)}
+                className="w-full px-4 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+              <p className="text-[10px] text-slate-400 font-medium">
+                This is the target inbox where critical developer system notifications, environment switch requests, and audit alarms are sent.
               </p>
             </div>
 

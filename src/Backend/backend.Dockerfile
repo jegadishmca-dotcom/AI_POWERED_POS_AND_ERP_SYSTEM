@@ -38,11 +38,15 @@ RUN dotnet publish PosErp.Api/PosErp.Api.csproj \
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
 
-# Install native dependencies required by QuestPDF (SkiaSharp), Npgsql, and health check
+# Install native dependencies required by QuestPDF (SkiaSharp), Npgsql, and health check.
+# postgresql-client is version-pinned to match the Postgres server (currently 16).
+# It provides pg_dump and pg_restore required by RefreshUatFromLiveSnapshotAsync.
+# If you upgrade Postgres, update this version to match.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     libfontconfig1 \
     libssl3 \
     curl \
+    postgresql-client-16 \
     && rm -rf /var/lib/apt/lists/*
 
 # Security: run as non-root

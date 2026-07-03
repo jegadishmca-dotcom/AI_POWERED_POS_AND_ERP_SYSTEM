@@ -1,0 +1,1 @@
+ALTER TABLE database_metadata ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 1;

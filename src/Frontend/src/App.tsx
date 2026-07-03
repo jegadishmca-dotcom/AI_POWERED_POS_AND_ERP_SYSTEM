@@ -32,6 +32,7 @@ import {
   Tag
 } from 'lucide-react';
 import { useAuthStore } from './features/auth/store/auth.store';
+import { api } from './utils/api';
 import { Login } from './features/auth/routes/Login';
 import { ProtectedRoute } from './features/auth/components/ProtectedRoute';
 import { Dashboard } from './features/analytics/components/Dashboard';
@@ -84,6 +85,22 @@ const AppLayout: React.FC = () => {
     return localStorage.getItem('erp_theme') || 'blue';
   });
   const [showThemeDropdown, setShowThemeDropdown] = React.useState(false);
+
+  const [isUat, setIsUat] = React.useState(false);
+  const [tenantName, setTenantName] = React.useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (user) {
+      api.get('/api/environment/mode')
+        .then(res => {
+          setIsUat(!!res.data.isUat);
+          setTenantName(res.data.tenantName || null);
+        })
+        .catch(err => {
+          console.error("Failed to load environment status", err);
+        });
+    }
+  }, [user, location.pathname]);
 
   React.useEffect(() => {
     const root = document.documentElement;
@@ -306,6 +323,12 @@ const AppLayout: React.FC = () => {
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Flashing UAT safety banner */}
+        {isUat && (
+          <div className="bg-amber-500 text-slate-950 text-center py-1.5 px-4 text-[11px] font-extrabold uppercase tracking-widest animate-pulse border-b border-amber-600 shadow-sm z-30 select-none">
+            ⚠️ WARNING: OPERATING IN UAT SANDBOX ENVIRONMENT {tenantName ? `— ${tenantName.toUpperCase()}` : ''} — NO TRANSACTION WILL POST TO LIVE LEDGER ⚠️
+          </div>
+        )}
         {/* Top Header */}
         <header className="h-16 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between px-8 shadow-sm transition-colors duration-200">
           <div className="flex items-center gap-4">
@@ -382,6 +405,11 @@ const AppLayout: React.FC = () => {
               <span className="text-xs font-black tracking-wider uppercase bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 px-2.5 py-1 rounded">
                 Terminal {localStorage.getItem('pos_terminal_code') || '01'}
               </span>
+              {isUat && (
+                <span className="text-xs font-black tracking-wider uppercase bg-amber-100 text-amber-800 px-2.5 py-1 rounded shadow-sm border border-amber-200 animate-pulse">
+                  UAT {tenantName ? `— ${tenantName}` : ''}
+                </span>
+              )}
             </div>
           </div>
         </header>

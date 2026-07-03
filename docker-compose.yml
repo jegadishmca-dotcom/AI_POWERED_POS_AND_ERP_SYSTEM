@@ -10,7 +10,7 @@ services:
     environment:
       POSTGRES_USER: posadmin
       POSTGRES_PASSWORD: pospassword
-      POSTGRES_DB: posdb
+      POSTGRES_DB: posdb_live
     ports:
       - "5432:5432"
     volumes:
@@ -20,7 +20,7 @@ services:
       - pos_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U posadmin -d posdb"]
+      test: ["CMD-SHELL", "pg_isready -U posadmin -d posdb_live"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -32,7 +32,7 @@ services:
       DB_USER: posadmin
       DB_PASSWORD: pospassword
       DB_HOST: postgres
-      DB_NAME: posdb
+      DB_NAME: posdb_live
       AUTH_TYPE: scram-sha-256
       POOL_MODE: transaction
       MAX_CLIENT_CONN: 1000
@@ -99,11 +99,10 @@ services:
       - ASPNETCORE_ENVIRONMENT=Production
       - SystemConfig__DeploymentMode=SelfHosted
       # DefaultConnection is used for migrations, Hangfire, and system startup
-      - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
+      - ConnectionStrings__DefaultConnection=Host=pgbouncer;Port=5432;Database=posdb_live;Username=posadmin;Password=pospassword;Pooling=true;
       # LiveConnection and UatConnection MUST be explicit — do NOT let ConnectionStringProvider
-      # derive them by appending _live/_uat (posdb_live doesn't exist on this server).
-      # In Self-hosted mode, LIVE = the real production posdb. UAT is created on demand by RefreshUatFromLiveSnapshotAsync.
-      - ConnectionStrings__LiveConnection=Host=pgbouncer;Port=5432;Database=posdb;Username=posadmin;Password=pospassword;Pooling=true;
+      # derive them by appending _live/_uat suffixes. LIVE = posdb_live, UAT = posdb_uat (created on demand).
+      - ConnectionStrings__LiveConnection=Host=pgbouncer;Port=5432;Database=posdb_live;Username=posadmin;Password=pospassword;Pooling=true;
       - ConnectionStrings__UatConnection=Host=pgbouncer;Port=5432;Database=posdb_uat;Username=posadmin;Password=pospassword;Pooling=true;
       # Persist operation_mode.json (LIVE/UAT state + token_version) across container restarts
       - SYSTEM_CONFIG_DIR=/app/config

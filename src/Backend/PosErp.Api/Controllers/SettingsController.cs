@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
+using Npgsql;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Auth;
 using PosErp.Application.Features.Inventory.Services;
@@ -20,19 +22,22 @@ public class SettingsController : ControllerBase
     private readonly PosErp.Application.Features.Audit.Services.IAuditLoggingService _auditLoggingService;
     private readonly PosErp.Application.Features.Inventory.Services.IEmailSettingsManager _emailSettingsManager;
     private readonly IEmailService _emailService;
+    private readonly IConfiguration _configuration;
 
     public SettingsController(
-        IApplicationDbContext context, 
+        IApplicationDbContext context,
         IPasswordHasher passwordHasher,
         PosErp.Application.Features.Audit.Services.IAuditLoggingService auditLoggingService,
         PosErp.Application.Features.Inventory.Services.IEmailSettingsManager emailSettingsManager,
-        IEmailService emailService)
+        IEmailService emailService,
+        IConfiguration configuration)
     {
         _context = context;
         _passwordHasher = passwordHasher;
         _auditLoggingService = auditLoggingService;
         _emailSettingsManager = emailSettingsManager;
         _emailService = emailService;
+        _configuration = configuration;
     }
 
     // ── User Management Endpoints ─────────────────────────────────────────────
@@ -518,6 +523,74 @@ public class SettingsController : ControllerBase
             return StatusCode(500, new { success = false, message = $"Email connection test failed: {detail}" });
         }
     }
+
+    // ── GST Compliance Feature Toggles ───────────────────────────────────────
+    // Reads from and writes to database_metadata so the settings survive Docker
+    // image rebuilds (appsettings.json is baked into the image and reverts on rebuild).
+
+    [HttpGet("features/compliance")]
+    [Authorize(Roles = "Owner,Developer")] // Owner/Developer only — gates statutory GST e-invoicing integration
+    public async Task<IActionResult> GetComplianceFeatures()
+    {
+        var connStr = _configuration.GetConnectionString("DefaultConnection");
+        try
+        {
+            await using var conn = new NpgsqlConnection(connStr);
+            await conn.OpenAsync();
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT einvoice_enabled, ewaybill_enabled FROM database_metadata LIMIT 1";
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync())
+            {
+                return Ok(new ComplianceFeaturesDto(
+                    EInvoiceEnabled: reader.GetBoolean(0),
+                    EWayBillEnabled: reader.GetBoolean(1)
+                ));
+            }
+            return Ok(new ComplianceFeaturesDto(false, false)); // no metadata row yet
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Failed to read compliance flags: {ex.Message}" });
+        }
+    }
+
+    [HttpPost("features/compliance")]
+    [Authorize(Roles = "Owner,Developer")] // Owner/Developer only — gates statutory GST e-invoicing integration
+    public async Task<IActionResult> UpdateComplianceFeatures([FromBody] ComplianceFeaturesDto request)
+    {
+        var connStr = _configuration.GetConnectionString("DefaultConnection");
+        try
+        {
+            await using var conn = new NpgsqlConnection(connStr);
+            await conn.OpenAsync();
+            await using var cmd = conn.CreateCommand();
+            // Updates only the compliance columns; all other database_metadata columns are untouched.
+            cmd.CommandText = @"
+                UPDATE database_metadata
+                SET einvoice_enabled = @einvoice,
+                    ewaybill_enabled  = @ewaybill,
+                    updated_at        = NOW()";
+            cmd.Parameters.AddWithValue("einvoice", request.EInvoiceEnabled);
+            cmd.Parameters.AddWithValue("ewaybill",  request.EWayBillEnabled);
+            var affected = await cmd.ExecuteNonQueryAsync();
+            if (affected == 0)
+                return StatusCode(500, new { message = "database_metadata row not found. Ensure the database is initialised." });
+
+            return Ok(new
+            {
+                success = true,
+                // Settings take effect immediately (read from DB on each request) — no restart needed.
+                message = "Compliance feature settings saved to database. Changes take effect immediately (no restart required).",
+                eInvoiceEnabled = request.EInvoiceEnabled,
+                eWayBillEnabled = request.EWayBillEnabled
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { message = $"Failed to update compliance flags: {ex.Message}" });
+        }
+    }
 }
 
 // ── Settings DTOs ─────────────────────────────────────────────────────────────
@@ -552,3 +625,7 @@ public record TerminalRequest(
     string TerminalCode,
     string Name,
     bool IsActive);
+
+public record ComplianceFeaturesDto(
+    bool EInvoiceEnabled,
+    bool EWayBillEnabled);

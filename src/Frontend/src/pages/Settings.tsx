@@ -4,13 +4,14 @@ import { PrinterConfig } from '../features/settings/components/PrinterConfig';
 import { TerminalConfig } from '../features/settings/components/TerminalConfig';
 import { UserManagement } from '../features/settings/components/UserManagement';
 import { ChangeOverridePinPanel } from '../features/settings/components/ChangeOverridePinPanel';
-import { Settings as SettingsIcon, Network, Printer, Monitor, Users, ShieldCheck, Database, Mail } from 'lucide-react';
+import { Settings as SettingsIcon, Network, Printer, Monitor, Users, ShieldCheck, Database, Mail, FileCheck } from 'lucide-react';
+import { ComplianceFeatures } from '../features/settings/components/ComplianceFeatures';
 import { useAuthStore } from '../features/auth/store/auth.store';
 import { InventorySafeguards } from '../features/settings/components/InventorySafeguards';
 import { EmailConfig } from '../features/settings/components/EmailConfig';
 import { EnvironmentConfig } from '../features/settings/components/EnvironmentConfig';
 
-type SettingsTab = 'connection' | 'printers' | 'terminals' | 'users' | 'security' | 'inventoryRules' | 'emailSetup' | 'environment';
+type SettingsTab = 'connection' | 'printers' | 'terminals' | 'users' | 'security' | 'inventoryRules' | 'emailSetup' | 'environment' | 'compliance';
 
 export const Settings: React.FC = () => {
   const { user } = useAuthStore();
@@ -26,6 +27,7 @@ export const Settings: React.FC = () => {
     { id: 'inventoryRules', label: 'Inventory Rules', icon: <Database className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
     { id: 'emailSetup', label: 'Email Setup', icon: <Mail className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
     { id: 'environment', label: 'Environment Mode', icon: <Database className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
+    { id: 'compliance', label: 'GST Compliance', icon: <FileCheck className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
     { id: 'security', label: 'Security PIN', icon: <ShieldCheck className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
   ];
 
@@ -74,6 +76,7 @@ export const Settings: React.FC = () => {
           {currentTab === 'inventoryRules' && <InventorySafeguards />}
           {currentTab === 'emailSetup' && <EmailConfig />}
           {currentTab === 'environment' && <EnvironmentConfig />}
+          {currentTab === 'compliance' && <ComplianceFeatures />}
           {currentTab === 'security' && (
             <div className="bg-white p-6 rounded-xl border border-slate-100 shadow-sm max-w-xl">
               <h3 className="font-bold text-slate-800 mb-2">POS Security PIN</h3>

@@ -5,56 +5,86 @@
 -- by the automated test suite can be permanently distinguished from genuine
 -- customer transactions.
 --
--- Also adds a partial index so queries can cheaply exclude test rows without
--- touching live data, and a CHECK constraint that enforces the reserved
--- "TEST-" invoice-number prefix must always coincide with is_test = TRUE.
--- This makes it impossible to accidentally create a real invoice with a TEST-
--- prefix, or a test invoice without the flag.
+-- Execution order (important — constraint MUST come last):
+--   1. Add the column (DEFAULT FALSE — all existing rows are live by default).
+--   2. Create partial indexes (can exist before the constraint).
+--   3. Back-fill legacy test rows: rename their invoice_number to carry a
+--      "TEST-LEGACY-" prefix AND set is_test = TRUE in one atomic UPDATE, so
+--      every row already satisfies the forthcoming CHECK before it is added.
+--   4. Add the CHECK constraint (now safe — all rows are consistent).
+--
+-- Why rename rather than just setting the flag?
+--   The CHECK constraint enforces both directions simultaneously:
+--     • is_test = TRUE  ↔  invoice_number LIKE 'TEST-%'
+--   Setting is_test = TRUE while leaving a 'WF-…' prefix would violate the
+--   constraint.  Renaming the legacy numbers is safe here because every WF-/
+--   DIAG-/SMOKE- row is test contamination that lives only in posdb_uat;
+--   none of these prefixes appear in posdb_live's genuine transaction history.
 -- =============================================================================
 
--- 1. Add the flag column (NULL-safe: existing rows default to false)
+-- ── Step 1: Column ─────────────────────────────────────────────────────────
 ALTER TABLE invoices
     ADD COLUMN IF NOT EXISTS is_test BOOLEAN NOT NULL DEFAULT FALSE;
 
--- 2. Enforce the naming convention in both directions via CHECK constraint:
---    • Any invoice whose number starts with "TEST-" MUST have is_test = TRUE.
---    • Any invoice with is_test = TRUE MUST have an invoice_number starting
---      with "TEST-".
-ALTER TABLE invoices
-    ADD CONSTRAINT ck_invoices_is_test_prefix
-    CHECK (
-        (is_test = FALSE AND invoice_number NOT LIKE 'TEST-%')
-        OR
-        (is_test = TRUE  AND invoice_number LIKE 'TEST-%')
-    );
-
--- 3. Partial index: make filtering out test rows in production queries free.
+-- ── Step 2: Partial indexes ─────────────────────────────────────────────────
+-- Created before the constraint so they are available immediately and do not
+-- depend on the constraint's existence.
 CREATE INDEX IF NOT EXISTS idx_invoices_live_only
     ON invoices (created_at DESC)
     WHERE is_test = FALSE;
 
--- 4. Partial index: make the test-cleanup / audit queries fast.
 CREATE INDEX IF NOT EXISTS idx_invoices_test_rows
     ON invoices (created_at DESC)
     WHERE is_test = TRUE;
 
--- 5. Back-fill the flag for any pre-existing test invoice numbers that used
---    the old ad-hoc "SMOKE-" / "WF" / "DIAG-" prefixes (these rows already
---    carry recognisable test patterns in their invoice_number, so we can
---    safely mark them now rather than leaving them unlabelled).
+-- ── Step 3: Back-fill ───────────────────────────────────────────────────────
+-- Rename legacy ad-hoc test invoice numbers to carry the canonical 'TEST-'
+-- prefix AND set the flag in a single UPDATE so the two columns stay consistent
+-- with each other at every point during the transaction.
+--
+-- Pattern mapping:
+--   WF1-…, WF3-…, WF4-…, WF5-…  → TEST-LEGACY-WF1-… etc.
+--   DIAG-…                        → TEST-LEGACY-DIAG-…
+--   SMOKE-…  / INV-SMOKE-…        → TEST-LEGACY-SMOKE-…  / TEST-LEGACY-INV-SMOKE-…
+--
+-- Rows whose invoice_number already starts with 'TEST-' are also set here
+-- so a re-run of the migration is idempotent.
 UPDATE invoices
-SET is_test = TRUE
+SET
+    is_test        = TRUE,
+    invoice_number = CASE
+        WHEN invoice_number LIKE 'TEST-%'
+            THEN invoice_number                            -- already canonical, no rename
+        ELSE 'TEST-LEGACY-' || invoice_number              -- prepend prefix
+    END
 WHERE invoice_number LIKE 'WF%'
    OR invoice_number LIKE 'DIAG-%'
-   OR invoice_number LIKE 'INV-SMOKE-%'
    OR invoice_number LIKE 'SMOKE-%'
-   OR invoice_number LIKE 'TEST-%';
+   OR invoice_number LIKE 'INV-SMOKE-%'
+   OR invoice_number LIKE 'TEST-%';                        -- idempotency guard
 
--- Note: the CHECK constraint above is evaluated AFTER the UPDATE, so these
--- rows must already have a TEST-prefixed number or the UPDATE won't rename
--- them — it only sets the flag. The naming convention enforcement kicks in
--- for all future INSERTs/UPDATEs; legacy rows with non-TEST- prefixes that
--- were just back-filled are grandfathered (the constraint is not retroactive
--- against rows that existed before the ALTER TABLE).
--- If strict enforcement is desired for legacy rows too, rename them first, then
--- apply the constraint. That cleanup is left to a future targeted migration.
+-- ── Step 4: CHECK constraint (added last — all rows already comply) ─────────
+-- Enforces the bidirectional invariant:
+--   • Every is_test = FALSE row must NOT start with 'TEST-'.
+--   • Every is_test = TRUE  row MUST start with 'TEST-'.
+--
+-- Using NOT EXISTS rather than DROP/ADD so the migration is re-runnable
+-- on a database that already applied it (pg_constraint lookup).
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'ck_invoices_is_test_prefix'
+          AND conrelid = 'invoices'::regclass
+    ) THEN
+        ALTER TABLE invoices
+            ADD CONSTRAINT ck_invoices_is_test_prefix
+            CHECK (
+                (is_test = FALSE AND invoice_number NOT LIKE 'TEST-%')
+                OR
+                (is_test = TRUE  AND invoice_number LIKE 'TEST-%')
+            );
+    END IF;
+END
+$$;
+

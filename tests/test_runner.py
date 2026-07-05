@@ -13,11 +13,11 @@
 #   python tests/test_runner.py --html     — Also generate HTML report
 # =============================================================================
 
-import sys, os, time, argparse, datetime
+import sys, os, time, argparse, datetime, requests
 
 # Allow imports from tests/
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import C, header, section
+from config import C, header, section, TEST_RUN_ID, TEST_PREFIX, DB_CONFIG, API_BASE_URL, ADMIN_USER
 
 def banner():
     print(f"""
@@ -26,13 +26,48 @@ def banner():
     APPLE SUPERMARKET ERP -- AUTOMATED TEST RUNNER
     4-Layer System-Wide Bug Detection Suite
 =================================================================={C.RESET}
-  {C.INFO}Run Date:{C.RESET} {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-  {C.INFO}Layers:{C.RESET}   Schema Scanner | API Smoke | Workflows | Accounting
+  {C.INFO}Run Date:{C.RESET}  {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+  {C.INFO}Test Run ID:{C.RESET} {TEST_RUN_ID}  (stamped into every invoice created this run)
+  {C.INFO}Invoice Prefix:{C.RESET} {TEST_PREFIX}-*
+  {C.INFO}Target DB:{C.RESET}  {DB_CONFIG['database']} @ {DB_CONFIG['host']}
+  {C.INFO}API:{C.RESET}       {API_BASE_URL}
+  {C.INFO}Layers:{C.RESET}    Schema Scanner | API Smoke | Workflows | Accounting
 """)
 
 
-def run_all(layers_to_run: list, generate_html: bool):
+def preflight_uat_guard() -> bool:
+    """Abort with a loud warning if the backend is currently in LIVE mode.
+    The automated test suite must only run against the UAT environment."""
+    try:
+        r = requests.get(
+            f"{API_BASE_URL}/api/environment/mode",
+            timeout=8,
+        )
+        if r.status_code == 200:
+            mode = r.json().get("activeMode", "").upper()
+            if mode == "LIVE":
+                print(f"\n{C.FAIL}{C.BOLD}" + "=" * 70)
+                print("  ⛔  PRE-FLIGHT GUARD: SERVER IS IN LIVE MODE")
+                print("")
+                print("  The automated test suite writes test invoices to the database.")
+                print("  Running against LIVE will contaminate production data.")
+                print("")
+                print("  ➜  Switch the server to UAT mode via the admin UI first,")
+                print("     then re-run the test suite.")
+                print("=" * 70 + C.RESET + "\n")
+                return False
+            elif mode == "UAT":
+                print(f"  {C.PASS}[PRE-FLIGHT]{C.RESET} Server is in UAT mode — safe to proceed.")
+                return True
+    except Exception as e:
+        print(f"  {C.WARN}[PRE-FLIGHT]{C.RESET} Could not verify server mode ({e}). Proceeding with caution.")
+    return True  # Unknown mode — don't hard-block, but warn already shown.
+
+
+def run_all(layers_to_run: list, generate_html: bool, skip_guard: bool = False):
     banner()
+    if not skip_guard and not preflight_uat_guard():
+        return 1
     start_time = time.time()
     all_results = {}
 
@@ -118,6 +153,19 @@ def run_all(layers_to_run: list, generate_html: bool):
             context = cls or wf
             print(f"  {i}. [{layer}]{f' ({context})' if context else ''}: {str(err)[:100]}")
 
+    # ── Test Record Cleanup Hint ───────────────────────────────────────────────
+    print(f"\n{C.INFO}{'─'*70}")
+    print(f"  Test Run ID: {TEST_RUN_ID}")
+    print(f"  All invoices created this run are prefixed: {TEST_PREFIX}-")
+    print(f"  They are stored in: {DB_CONFIG['database']} @ {DB_CONFIG['host']}")
+    print(f"  To inspect them:\n")
+    print(f"    SELECT invoice_number, status, total_amount, created_at")
+    print(f"    FROM invoices")
+    print(f"    WHERE invoice_number LIKE '{TEST_PREFIX}-%'")
+    print(f"    ORDER BY created_at;")
+    print(f"")
+    print(f"  (posdb_uat is refreshed from posdb_live on demand — no manual cleanup needed){C.RESET}")
+
     # ── Optional HTML Report ───────────────────────────────────────────────────
     if generate_html:
         generate_html_report(all_results, total_passed, total_failed, total_time, all_issues)
@@ -196,9 +244,10 @@ def generate_html_report(all_results, total_passed, total_failed, total_time, al
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Apple Supermarket ERP Test Runner")
-    parser.add_argument("--layer", type=int, choices=[1,2,3,4], help="Run only a specific layer (1-4)")
-    parser.add_argument("--html", action="store_true", help="Generate HTML report")
+    parser.add_argument("--layer",      type=int, choices=[1,2,3,4], help="Run only a specific layer (1-4)")
+    parser.add_argument("--html",       action="store_true", help="Generate HTML report")
+    parser.add_argument("--skip-guard", action="store_true", help="Skip the UAT pre-flight mode check (dangerous — use only in CI against a dedicated UAT instance)")
     args = parser.parse_args()
 
     layers = [args.layer] if args.layer else [1, 2, 3, 4]
-    sys.exit(run_all(layers, args.html))
+    sys.exit(run_all(layers, args.html, skip_guard=args.skip_guard))

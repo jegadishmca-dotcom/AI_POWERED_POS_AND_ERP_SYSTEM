@@ -16,7 +16,7 @@ import sys, os, uuid, time
 import requests, psycopg2
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from config import API_BASE_URL, ADMIN_USER, DB_CONFIG, ok, fail, warn, info, header, section, C
+from config import API_BASE_URL, ADMIN_USER, DB_CONFIG, ok, fail, warn, info, header, section, C, TEST_PREFIX
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Helpers
@@ -132,7 +132,7 @@ def workflow_1_cash_sale(session: dict, conn) -> dict:
     je_count_before = cur.fetchone()[0]
 
     # Step 2: Create invoice
-    inv_num = f"WF1-{uuid.uuid4().hex[:8].upper()}"
+    inv_num = f"{TEST_PREFIX}-WF1-{uuid.uuid4().hex[:8].upper()}"
     payload = {
         "invoiceNumber": inv_num,
         "terminalId": session["terminalId"],
@@ -154,7 +154,9 @@ def workflow_1_cash_sale(session: dict, conn) -> dict:
     if r.status_code not in [200, 201]:
         fail(f"Step 2: Invoice creation FAILED — {r.status_code}: {r.text[:200]}")
         return {"passed": False, "issues": [f"Invoice creation failed: {r.text[:200]}"]}
-    inv_id = str(r.json())
+    res = r.json()
+    inv_id = res.get("invoiceId") if isinstance(res, dict) else str(res)
+    inv_num = res.get("invoiceNumber", inv_num) if isinstance(res, dict) else inv_num
     ok(f"Step 2: Invoice created — {inv_num} | ID={inv_id}")
 
     time.sleep(1)  # let async processing complete
@@ -358,7 +360,7 @@ def workflow_3_offer_promo(session: dict, conn) -> dict:
 
     # Step 4: Create invoice with promo and verify journal is balanced
     if prod:
-        inv_num = f"WF3-PROMO-{uuid.uuid4().hex[:6].upper()}"
+        inv_num = f"{TEST_PREFIX}-WF3-PROMO-{uuid.uuid4().hex[:6].upper()}"
         inv_payload = {
             "invoiceNumber": inv_num,
             "terminalId": session["terminalId"],
@@ -439,7 +441,7 @@ def workflow_4_loyalty_points(session: dict, conn) -> dict:
         return {"passed": False, "issues": ["No stock for loyalty test"]}
     prod_id, prod_name, price, _ = prod
 
-    inv_num = f"WF4-LOYALTY-{uuid.uuid4().hex[:6].upper()}"
+    inv_num = f"{TEST_PREFIX}-WF4-LOYALTY-{uuid.uuid4().hex[:6].upper()}"
     qty = max(1, int(150 / price) + 1)
     net_payable = round(price * qty, 2)
     
@@ -508,7 +510,7 @@ def workflow_5_sales_return(session: dict, conn) -> dict:
         fail("Step 1: No in-stock product for return test")
         return {"passed": False, "issues": ["No stock"]}
     prod_id, prod_name, price, _ = prod
-    inv_num = f"WF5-ORIG-{uuid.uuid4().hex[:6].upper()}"
+    inv_num = f"{TEST_PREFIX}-WF5-ORIG-{uuid.uuid4().hex[:6].upper()}"
     r = api("POST", "/api/pos/create", token, {
         "invoiceNumber": inv_num,
         "terminalId": session["terminalId"],
@@ -523,7 +525,9 @@ def workflow_5_sales_return(session: dict, conn) -> dict:
     if r.status_code not in [200, 201]:
         fail(f"Step 1: Original sale FAILED — {r.status_code}: {r.text[:200]}")
         return {"passed": False, "issues": [f"Original sale failed: {r.text[:200]}"]}
-    inv_id = str(r.json())
+    res = r.json()
+    inv_id = res.get("invoiceId") if isinstance(res, dict) else str(res)
+    inv_num = res.get("invoiceNumber", inv_num) if isinstance(res, dict) else inv_num
     ok(f"Step 1: Original invoice created — {inv_num} | ID={inv_id}")
     time.sleep(1)
 

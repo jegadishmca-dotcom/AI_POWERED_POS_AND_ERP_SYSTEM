@@ -71,3 +71,19 @@ export const deleteTerminal = async (id: string): Promise<any> => {
   const response = await api.delete(`/api/settings/terminals/${id}`);
   return response.data;
 };
+
+// Compliance Feature Toggle APIs
+export interface ComplianceFeaturesDto {
+  eInvoiceEnabled: boolean;
+  eWayBillEnabled: boolean;
+}
+
+export const getComplianceFeatures = async (): Promise<ComplianceFeaturesDto> => {
+  const response = await api.get('/api/settings/features/compliance');
+  return response.data;
+};
+
+export const updateComplianceFeatures = async (payload: ComplianceFeaturesDto): Promise<any> => {
+  const response = await api.post('/api/settings/features/compliance', payload);
+  return response.data;
+};

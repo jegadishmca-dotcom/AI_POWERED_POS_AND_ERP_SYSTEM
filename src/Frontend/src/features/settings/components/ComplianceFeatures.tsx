@@ -1,11 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { FileCheck, AlertTriangle, CheckCircle2, Info, Loader2, ToggleLeft, ToggleRight } from 'lucide-react';
-import api from '../../../services/api';
-
-interface ComplianceFeaturesDto {
-  eInvoiceEnabled: boolean;
-  eWayBillEnabled: boolean;
-}
+import { getComplianceFeatures, updateComplianceFeatures, ComplianceFeaturesDto } from '../api/settings.api';
 
 export const ComplianceFeatures: React.FC = () => {
   const [features, setFeatures] = useState<ComplianceFeaturesDto>({
@@ -23,10 +18,10 @@ export const ComplianceFeatures: React.FC = () => {
   const fetchFeatures = async () => {
     setLoading(true);
     try {
-      const res = await api.get<ComplianceFeaturesDto>('/api/settings/features/compliance');
-      setFeatures(res.data);
+      const data = await getComplianceFeatures();
+      setFeatures(data);
     } catch {
-      // If endpoint not yet wired, default to off (matches appsettings.json default)
+      // If endpoint not yet wired, default to off (matches database default)
       setFeatures({ eInvoiceEnabled: false, eWayBillEnabled: false });
       setMessage({ text: 'Could not load settings from server — showing defaults (both OFF).', type: 'info' });
     } finally {
@@ -38,7 +33,7 @@ export const ComplianceFeatures: React.FC = () => {
     setSaving(true);
     setMessage(null);
     try {
-      await api.post('/api/settings/features/compliance', features);
+      await updateComplianceFeatures(features);
       setMessage({ text: 'Compliance settings saved. Changes take effect immediately — no restart required.', type: 'success' });
     } catch (err: any) {
       setMessage({ text: err?.response?.data?.message || 'Failed to save settings.', type: 'error' });

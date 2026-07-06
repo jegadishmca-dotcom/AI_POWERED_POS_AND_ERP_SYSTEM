@@ -428,26 +428,13 @@ public class EnvironmentToggleController : ControllerBase
         // 4. Approval passed — reset failed count for the requesting user
         await ResetLockoutStateAsync(requestingUserGuid);
 
-        // 5. Write final audit log to database and await durability BEFORE executing refresh (GAP-003)
+        // 5. Resolve active mode and connection strings based on deployment type
+        string liveConn;
+        string uatConn;
+        string activeMode = "LIVE";
+
         try
         {
-            await WriteAuditLogAsync("UatRefresh", "REFRESH_STARTED",
-                requestingUserId, requestingUserName,
-                $"UAT database refresh started by approved Developer.");
-        }
-        catch (Exception ex)
-        {
-            return StatusCode(500, new { Error = ex.Message });
-        }
-
-        // 6. Execute direct refresh via database provisioning service
-        try
-        {
-            var provisioningService = HttpContext.RequestServices.GetRequiredService<IDatabaseProvisioningService>();
-            
-            string liveConn;
-            string uatConn;
-
             if (isSaaS)
             {
                 var platformConnection = _configuration.GetConnectionString("DefaultConnection") 
@@ -461,7 +448,7 @@ public class EnvironmentToggleController : ControllerBase
                     await conn.OpenAsync();
                     await using (var cmd = conn.CreateCommand())
                     {
-                        cmd.CommandText = "SELECT live_connection_string, uat_connection_string FROM tenant_environments WHERE tenant_id = @p0";
+                        cmd.CommandText = "SELECT active_mode, live_connection_string, uat_connection_string FROM tenant_environments WHERE tenant_id = @p0";
                         var p = cmd.CreateParameter();
                         p.ParameterName = "@p0";
                         p.Value = tenantId;
@@ -471,8 +458,9 @@ public class EnvironmentToggleController : ControllerBase
                         {
                             if (await reader.ReadAsync())
                             {
-                                liveConnSaaS = reader.IsDBNull(0) ? null : reader.GetString(0);
-                                uatConnSaaS = reader.IsDBNull(1) ? null : reader.GetString(1);
+                                activeMode = reader.IsDBNull(0) ? "LIVE" : reader.GetString(0);
+                                liveConnSaaS = reader.IsDBNull(1) ? null : reader.GetString(1);
+                                uatConnSaaS = reader.IsDBNull(2) ? null : reader.GetString(2);
                             }
                         }
                     }
@@ -488,6 +476,8 @@ public class EnvironmentToggleController : ControllerBase
             }
             else
             {
+                activeMode = _connectionStringProvider.GetSelfHostedActiveMode();
+                
                 liveConn = _configuration.GetConnectionString("DirectPostgresConnection") 
                     ?? _configuration.GetConnectionString("DefaultConnection")
                     ?? throw new InvalidOperationException("Live connection configuration missing.");
@@ -495,7 +485,39 @@ public class EnvironmentToggleController : ControllerBase
                 uatConn = _configuration.GetConnectionString("UatConnection")
                     ?? throw new InvalidOperationException("UAT connection configuration missing.");
             }
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = $"Failed to resolve environment state: {ex.Message}" });
+        }
 
+        // 6. Refuse to run refresh if UAT is the active environment
+        if (string.Equals(activeMode, "UAT", StringComparison.OrdinalIgnoreCase))
+        {
+            await WriteAuditLogAsync("UatRefresh", "REFRESH_BLOCKED",
+                requestingUserId, requestingUserName,
+                "UAT database refresh blocked: UAT is currently the active environment.");
+
+            return StatusCode(409, new { Error = "UAT database cannot be refreshed while UAT is the active environment. Switch the environment to LIVE first." });
+        }
+
+        // 7. Write final audit log to database and await durability BEFORE executing refresh (GAP-003)
+        try
+        {
+            await WriteAuditLogAsync("UatRefresh", "REFRESH_STARTED",
+                requestingUserId, requestingUserName,
+                $"UAT database refresh started by approved Developer.");
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+
+        // 8. Execute direct refresh via database provisioning service
+        try
+        {
+            var provisioningService = HttpContext.RequestServices.GetRequiredService<IDatabaseProvisioningService>();
+            
             await provisioningService.RefreshUatFromLiveSnapshotAsync(liveConn, uatConn, tenantId);
 
             await WriteAuditLogAsync("UatRefresh", "REFRESH_SUCCESS",

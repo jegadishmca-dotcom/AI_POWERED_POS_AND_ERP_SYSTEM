@@ -181,9 +181,7 @@ public class F42_ToggleLockoutConcurrencyTests : IDisposable
             lifetime,
             config,
             tenantProvider,
-            memoryCache,
-            new TestEmailService(),
-            new TestEmailSettingsManager()
+            memoryCache
         );
 
         var userClaims = new System.Security.Claims.ClaimsPrincipal(new System.Security.Claims.ClaimsIdentity(new[]
@@ -393,9 +391,7 @@ public class F42_ToggleLockoutConcurrencyTests : IDisposable
             lifetime,
             config,
             tenantProvider,
-            memoryCache,
-            new TestEmailService(),
-            new TestEmailSettingsManager()
+            memoryCache
         );
 
         // Claims principal
@@ -667,16 +663,5 @@ public class F42_ToggleLockoutConcurrencyTests : IDisposable
         public long? Size { get; set; }
         public CacheItemPriority Priority { get; set; } = CacheItemPriority.Normal;
         public void Dispose() { _cache.Cache[_key] = Value!; }
-    }
-
-    private class TestEmailService : IEmailService
-    {
-        public Task SendEmailAsync(string to, string subject, string htmlBody) => Task.CompletedTask;
-    }
-
-    private class TestEmailSettingsManager : PosErp.Application.Features.Inventory.Services.IEmailSettingsManager
-    {
-        public PosErp.Application.Features.Inventory.Services.EmailSettings GetSettings() => new PosErp.Application.Features.Inventory.Services.EmailSettings();
-        public void SaveSettings(PosErp.Application.Features.Inventory.Services.EmailSettings settings) {}
     }
 }

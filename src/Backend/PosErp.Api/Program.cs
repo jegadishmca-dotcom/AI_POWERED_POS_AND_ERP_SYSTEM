@@ -641,16 +641,13 @@ using (var scope = app.Services.CreateScope())
         var startupDeploymentMode = startupConfig["SystemConfig:DeploymentMode"] ?? "SelfHosted";
         if (string.Equals(startupDeploymentMode, "SelfHosted", StringComparison.OrdinalIgnoreCase))
         {
-            var defaultConnection = startupConfig.GetConnectionString("DefaultConnection") 
-                ?? "Host=localhost;Database=poserp;Username=postgres;Password=postgres";
+            var directConnection = startupConfig.GetConnectionString("DirectPostgresConnection") 
+                ?? startupConfig.GetConnectionString("DefaultConnection")
+                ?? "Host=localhost;Database=posdb_live;Username=postgres;Password=postgres";
             
             try
             {
-                var connBuilder = new Npgsql.NpgsqlConnectionStringBuilder(defaultConnection);
-                if (string.Equals(connBuilder.Host, "pgbouncer", StringComparison.OrdinalIgnoreCase))
-                {
-                    connBuilder.Host = "postgres";
-                }
+                var connBuilder = new Npgsql.NpgsqlConnectionStringBuilder(directConnection);
                 var auditDbName = "posdb_audit";
 
                 // Connect to postgres system database to create posdb_audit

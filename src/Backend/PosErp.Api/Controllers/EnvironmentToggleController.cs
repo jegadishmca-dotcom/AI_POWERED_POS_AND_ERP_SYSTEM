@@ -333,6 +333,143 @@ public class EnvironmentToggleController : ControllerBase
         });
     }
 
+    // POST /api/environment/refresh-uat
+    // Body: { "developerPassword": "..." }
+    [HttpPost("refresh-uat")]
+    public async Task<IActionResult> RefreshUat([FromBody] UatRefreshRequest request)
+    {
+        if (string.IsNullOrWhiteSpace(request.DeveloperPassword))
+            return BadRequest(new { Error = "Developer password is required." });
+
+        var deploymentMode = _configuration["SystemConfig:DeploymentMode"] ?? "SelfHosted";
+        var isSaaS = string.Equals(deploymentMode, "SaaS", StringComparison.OrdinalIgnoreCase);
+        var tenantId = _tenantProvider.TenantId;
+
+        if (isSaaS && tenantId == Guid.Empty)
+        {
+            return BadRequest(new { Error = "Tenant ID is required but missing." });
+        }
+
+        var requestingUserId = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+        var requestingUserName = User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value ?? "unknown";
+
+        // Clean up any expired lockouts before checking status
+        await CleanExpiredLockoutsAsync();
+
+        if (string.IsNullOrEmpty(requestingUserId) || !Guid.TryParse(requestingUserId, out var requestingUserGuid))
+        {
+            return Unauthorized(new { Error = "User is not authenticated." });
+        }
+
+        // 1. Check lockout status for the requesting user
+        var lockedUntil = await GetActiveRequestingUserLockoutAsync(requestingUserGuid);
+        if (lockedUntil.HasValue)
+        {
+            await WriteAuditLogAsync("UatRefresh", "LOCKOUT_BLOCKED",
+                requestingUserId, requestingUserName,
+                $"UAT Refresh attempt blocked: lockout active until {lockedUntil.Value:u}.");
+
+            return StatusCode(429, new
+            {
+                Error = "Too many failed attempts. The operation is locked for 15 minutes.",
+                LockoutUntil = lockedUntil.Value
+            });
+        }
+
+        // 2. Fetch active Developer users by role join
+        var developerUsers = await (from u in _db.Users
+                                    join r in _db.Roles on u.RoleId equals r.Id
+                                    where r.Name == "Developer" && u.IsActive && !u.IsDeleted
+                                    select u).ToListAsync();
+
+        if (!developerUsers.Any())
+        {
+            return BadRequest(new { Error = "No active Developer accounts configured in the system." });
+        }
+
+        // 3. Verify Developer password against active accounts
+        PosErp.Domain.Entities.Auth.User? matchingDeveloper = null;
+        foreach (var devUser in developerUsers)
+        {
+            if (!string.IsNullOrEmpty(devUser.PasswordHash) &&
+                BCrypt.Net.BCrypt.Verify(request.DeveloperPassword, devUser.PasswordHash))
+            {
+                matchingDeveloper = devUser;
+                break;
+            }
+        }
+
+        if (matchingDeveloper == null)
+        {
+            // Lockout tracking: increment failed count atomically on the requesting user
+            var (failedCount, lockoutTime) = await IncrementFailedAttemptAsync(requestingUserGuid);
+
+            await WriteAuditLogAsync("UatRefresh", "APPROVAL_FAILED",
+                requestingUserId, requestingUserName,
+                $"Developer password verification failed for UAT Refresh. Attempt {failedCount}/{MaxFailedAttempts}.");
+
+            if (lockoutTime.HasValue)
+            {
+                await WriteAuditLogAsync("UatRefresh", "LOCKOUT_ACTIVATED",
+                    requestingUserId, requestingUserName,
+                    $"Lockout activated after {MaxFailedAttempts} failed UAT Refresh attempts. Duration: 15 minutes.");
+
+                return StatusCode(429, new
+                {
+                    Error = "Maximum attempts exceeded. Operation locked for 15 minutes.",
+                    LockoutUntil = lockoutTime.Value
+                });
+            }
+
+            var remaining = MaxFailedAttempts - failedCount;
+            return Unauthorized(new { Error = "Developer password incorrect.", AttemptsRemaining = remaining });
+        }
+
+        // 4. Approval passed — reset failed count for the requesting user
+        await ResetLockoutStateAsync(requestingUserGuid);
+
+        // 5. Write final audit log to database and await durability BEFORE executing refresh (GAP-003)
+        try
+        {
+            await WriteAuditLogAsync("UatRefresh", "REFRESH_STARTED",
+                requestingUserId, requestingUserName,
+                $"UAT database refresh started by approved Developer.");
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { Error = ex.Message });
+        }
+
+        // 6. Execute direct refresh via database provisioning service
+        try
+        {
+            var provisioningService = HttpContext.RequestServices.GetRequiredService<IDatabaseProvisioningService>();
+            
+            var liveConn = _configuration.GetConnectionString("DirectPostgresConnection") 
+                ?? _configuration.GetConnectionString("DefaultConnection")
+                ?? throw new InvalidOperationException("Live connection configuration missing.");
+                
+            var uatConn = _configuration.GetConnectionString("UatConnection")
+                ?? throw new InvalidOperationException("UAT connection configuration missing.");
+
+            await provisioningService.RefreshUatFromLiveSnapshotAsync(liveConn, uatConn, tenantId);
+
+            await WriteAuditLogAsync("UatRefresh", "REFRESH_SUCCESS",
+                requestingUserId, requestingUserName,
+                $"UAT database refresh completed successfully.");
+                
+            return Ok(new { Message = "UAT database refresh executed successfully." });
+        }
+        catch (Exception ex)
+        {
+            await WriteAuditLogAsync("UatRefresh", "REFRESH_FAILED",
+                requestingUserId, requestingUserName,
+                $"UAT database refresh failed: {ex.Message}");
+                
+            return StatusCode(500, new { Error = $"UAT refresh failed: {ex.Message}" });
+        }
+    }
+
     // ─── Private helpers ──────────────────────────────────────────────────────
 
     private async Task WriteAuditLogAsync(string entityType, string action, string? userId, string userName, string details)
@@ -340,24 +477,21 @@ public class EnvironmentToggleController : ControllerBase
         var deploymentMode = _configuration["SystemConfig:DeploymentMode"] ?? "SelfHosted";
         var isSaaS = string.Equals(deploymentMode, "SaaS", StringComparison.OrdinalIgnoreCase);
         
-        var defaultConnection = _configuration.GetConnectionString("DefaultConnection") 
-            ?? "Host=localhost;Database=poserp;Username=postgres;Password=postgres";
+        var directConnection = _configuration.GetConnectionString("DirectPostgresConnection") 
+            ?? _configuration.GetConnectionString("DefaultConnection")
+            ?? "Host=localhost;Database=posdb_live;Username=postgres;Password=postgres";
         
         string auditConnectionString;
         string tableName;
         
         if (isSaaS)
         {
-            auditConnectionString = defaultConnection;
+            auditConnectionString = directConnection;
             tableName = "tenant_environment_audit_logs";
         }
         else
         {
-            var builder = new NpgsqlConnectionStringBuilder(defaultConnection);
-            if (string.Equals(builder.Host, "pgbouncer", StringComparison.OrdinalIgnoreCase))
-            {
-                builder.Host = "postgres";
-            }
+            var builder = new NpgsqlConnectionStringBuilder(directConnection);
             var auditDbName = "posdb_audit";
             
             // Defensive fallback check/creation in case startup provisioning was bypassed (Correction 1)
@@ -574,4 +708,9 @@ public class ToggleEnvironmentRequest
 {
     public string DeveloperPassword { get; set; } = string.Empty;
     public string TargetMode { get; set; } = string.Empty;
+}
+
+public class UatRefreshRequest
+{
+    public string DeveloperPassword { get; set; } = string.Empty;
 }

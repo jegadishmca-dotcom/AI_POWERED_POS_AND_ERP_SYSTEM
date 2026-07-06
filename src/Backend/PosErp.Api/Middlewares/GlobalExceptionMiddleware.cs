@@ -39,9 +39,13 @@ public class GlobalExceptionMiddleware
         context.Response.ContentType = "application/json";
 
         // Map specific exception types to appropriate HTTP status codes
-        context.Response.StatusCode = exception is UnauthorizedAccessException
-            ? (int)HttpStatusCode.Unauthorized
-            : (int)HttpStatusCode.InternalServerError;
+        context.Response.StatusCode = exception switch
+        {
+            UnauthorizedAccessException => (int)HttpStatusCode.Unauthorized,
+            InvalidOperationException => (int)HttpStatusCode.BadRequest,
+            ArgumentException => (int)HttpStatusCode.BadRequest,
+            _ => (int)HttpStatusCode.InternalServerError
+        };
 
         var innerMsg = exception.InnerException != null ? exception.InnerException.Message : "";
 

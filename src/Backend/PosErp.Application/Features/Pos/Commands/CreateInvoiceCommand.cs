@@ -208,7 +208,8 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 .MaxAsync(cancellationToken) ?? 0;
             var nextSeq = lastSeq + 1;
 
-            string generatedInvoiceNumber = $"INV-{terminal.TerminalCode}-{today:yyyyMMdd}-{nextSeq:D4}";
+            bool isTest = !string.IsNullOrEmpty(request.InvoiceNumber) && request.InvoiceNumber.StartsWith("TEST-", StringComparison.OrdinalIgnoreCase);
+            string generatedInvoiceNumber = isTest ? request.InvoiceNumber : $"INV-{terminal.TerminalCode}-{today:yyyyMMdd}-{nextSeq:D4}";
 
             var invoiceId = Guid.NewGuid();
             var invoice = new Invoice
@@ -221,6 +222,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 CustomerId = customer?.Id,
                 BusinessDate = today,
                 StoreId = Guid.Empty,
+                IsTest = isTest,
                 // SubTotal = sum of post-discount line totals (what's printed in the item section)
                 SubTotal = cartEvaluation.Items.Sum(i => i.FinalLineTotal),
                 // DiscountAmount = total discount applied (for reporting purposes)

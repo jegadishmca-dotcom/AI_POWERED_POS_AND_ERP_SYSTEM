@@ -48,6 +48,7 @@ public class Invoice
     public Guid? UpdatedBy { get; set; }
     public DateTime? DueDate { get; set; }
     public bool IsDeleted { get; set; }
+    public bool IsTest { get; set; }
 
     public ICollection<InvoiceItem> Items { get; set; } = new List<InvoiceItem>();
 }

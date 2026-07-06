@@ -445,12 +445,56 @@ public class EnvironmentToggleController : ControllerBase
         {
             var provisioningService = HttpContext.RequestServices.GetRequiredService<IDatabaseProvisioningService>();
             
-            var liveConn = _configuration.GetConnectionString("DirectPostgresConnection") 
-                ?? _configuration.GetConnectionString("DefaultConnection")
-                ?? throw new InvalidOperationException("Live connection configuration missing.");
-                
-            var uatConn = _configuration.GetConnectionString("UatConnection")
-                ?? throw new InvalidOperationException("UAT connection configuration missing.");
+            string liveConn;
+            string uatConn;
+
+            if (isSaaS)
+            {
+                var platformConnection = _configuration.GetConnectionString("DefaultConnection") 
+                    ?? "Host=localhost;Database=posdb_live;Username=postgres;Password=postgres";
+
+                string? liveConnSaaS = null;
+                string? uatConnSaaS = null;
+
+                await using (var conn = new NpgsqlConnection(platformConnection))
+                {
+                    await conn.OpenAsync();
+                    await using (var cmd = conn.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT live_connection_string, uat_connection_string FROM tenant_environments WHERE tenant_id = @p0";
+                        var p = cmd.CreateParameter();
+                        p.ParameterName = "@p0";
+                        p.Value = tenantId;
+                        cmd.Parameters.Add(p);
+
+                        await using (var reader = await cmd.ExecuteReaderAsync())
+                        {
+                            if (await reader.ReadAsync())
+                            {
+                                liveConnSaaS = reader.IsDBNull(0) ? null : reader.GetString(0);
+                                uatConnSaaS = reader.IsDBNull(1) ? null : reader.GetString(1);
+                            }
+                        }
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(liveConnSaaS) || string.IsNullOrWhiteSpace(uatConnSaaS))
+                {
+                    return BadRequest(new { Error = "SaaS tenant connection strings are missing or unconfigured in the platform environment." });
+                }
+
+                liveConn = liveConnSaaS;
+                uatConn = uatConnSaaS;
+            }
+            else
+            {
+                liveConn = _configuration.GetConnectionString("DirectPostgresConnection") 
+                    ?? _configuration.GetConnectionString("DefaultConnection")
+                    ?? throw new InvalidOperationException("Live connection configuration missing.");
+                    
+                uatConn = _configuration.GetConnectionString("UatConnection")
+                    ?? throw new InvalidOperationException("UAT connection configuration missing.");
+            }
 
             await provisioningService.RefreshUatFromLiveSnapshotAsync(liveConn, uatConn, tenantId);
 

@@ -354,6 +354,10 @@ public class EnvironmentToggleController : ControllerBase
         else
         {
             var builder = new NpgsqlConnectionStringBuilder(defaultConnection);
+            if (string.Equals(builder.Host, "pgbouncer", StringComparison.OrdinalIgnoreCase))
+            {
+                builder.Host = "postgres";
+            }
             var auditDbName = "posdb_audit";
             
             // Defensive fallback check/creation in case startup provisioning was bypassed (Correction 1)

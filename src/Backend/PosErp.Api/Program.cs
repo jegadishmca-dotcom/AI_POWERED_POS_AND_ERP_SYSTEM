@@ -647,6 +647,10 @@ using (var scope = app.Services.CreateScope())
             try
             {
                 var connBuilder = new Npgsql.NpgsqlConnectionStringBuilder(defaultConnection);
+                if (string.Equals(connBuilder.Host, "pgbouncer", StringComparison.OrdinalIgnoreCase))
+                {
+                    connBuilder.Host = "postgres";
+                }
                 var auditDbName = "posdb_audit";
 
                 // Connect to postgres system database to create posdb_audit

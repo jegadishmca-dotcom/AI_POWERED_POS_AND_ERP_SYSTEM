@@ -2,6 +2,8 @@ using MediatR;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using PosErp.Application.Interfaces;
+using Microsoft.AspNetCore.Http;
+using System.Security.Claims;
 using PosErp.Domain.Entities.Pos;
 using PosErp.Domain.Entities.Finance;
 using PosErp.Application.Features.Offers.Services;
@@ -52,6 +54,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
     private readonly IAccountResolutionService _accountResolutionService;
     private readonly ILogger<CreateInvoiceCommandHandler>? _logger;
     private readonly IConfiguration _configuration;
+    private readonly IHttpContextAccessor? _httpContextAccessor;
 
     public CreateInvoiceCommandHandler(
         IApplicationDbContext context, 
@@ -62,6 +65,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
         PosErp.Application.Features.Inventory.Services.IStockLedgerService stockLedgerService,
         IPasswordHasher passwordHasher,
         IAccountResolutionService accountResolutionService,
+        IHttpContextAccessor? httpContextAccessor = null,
         ILogger<CreateInvoiceCommandHandler>? logger = null,
         IConfiguration? configuration = null)
     {
@@ -73,6 +77,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
         _stockLedgerService = stockLedgerService;
         _passwordHasher = passwordHasher;
         _accountResolutionService = accountResolutionService;
+        _httpContextAccessor = httpContextAccessor;
         _logger = logger;
         _configuration = configuration;
     }
@@ -209,6 +214,24 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             var nextSeq = lastSeq + 1;
 
             bool isTest = !string.IsNullOrEmpty(request.InvoiceNumber) && request.InvoiceNumber.StartsWith("TEST-", StringComparison.OrdinalIgnoreCase);
+            if (isTest && _httpContextAccessor?.HttpContext != null)
+            {
+                var httpContext = _httpContextAccessor.HttpContext;
+                var userIdStr = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+                    ?? httpContext.User.FindFirst("sub")?.Value;
+                if (string.IsNullOrEmpty(userIdStr)) throw new UnauthorizedAccessException("User is not authenticated.");
+                var callerId = Guid.Parse(userIdStr);
+
+                var callerUser = await _context.Users
+                    .Join(_context.Roles, u => u.RoleId, r => r.Id, (u, r) => new { User = u, Role = r })
+                    .FirstOrDefaultAsync(x => x.User.Id == callerId, cancellationToken);
+
+                bool isAllowed = callerUser != null && (callerUser.Role.Name == "Owner" || callerUser.Role.Name == "Developer");
+                if (!isAllowed)
+                {
+                    throw new UnauthorizedAccessException("Unauthorized: Cashier role is not permitted to submit custom test invoice numbers.");
+                }
+            }
             string generatedInvoiceNumber = isTest ? request.InvoiceNumber : $"INV-{terminal.TerminalCode}-{today:yyyyMMdd}-{nextSeq:D4}";
 
             var invoiceId = Guid.NewGuid();

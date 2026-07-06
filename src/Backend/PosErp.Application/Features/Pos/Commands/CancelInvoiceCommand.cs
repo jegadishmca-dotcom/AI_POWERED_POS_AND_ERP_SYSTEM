@@ -59,9 +59,9 @@ public class CancelInvoiceCommandHandler : IRequestHandler<CancelInvoiceCommand,
         if (invoice.Status == "HOLD")
             throw new InvalidOperationException("Held invoices cannot be cancelled via this endpoint.");
 
-        // Guard: Block if there are any returns processed for this invoice
+        // Guard: Block if there are any active returns processed for this invoice
         var hasReturns = await _context.SalesReturns
-            .AnyAsync(sr => sr.InvoiceId == invoice.Id, cancellationToken);
+            .AnyAsync(sr => sr.InvoiceId == invoice.Id && sr.Status != "CANCELLED", cancellationToken);
         if (hasReturns)
         {
             throw new InvalidOperationException(

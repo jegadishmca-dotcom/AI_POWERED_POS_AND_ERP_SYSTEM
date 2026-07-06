@@ -17,7 +17,7 @@ public class AiJobValidationController : ControllerBase
     }
 
     [HttpPost("run-all")]
-    [AllowAnonymous]
+    [Authorize(Roles = "Owner,Developer")]
     public async Task<IActionResult> RunAllJobs()
     {
         var results = new List<object>();

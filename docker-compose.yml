@@ -108,11 +108,11 @@ services:
       # Persist operation_mode.json (LIVE/UAT state + token_version) across container restarts
       - SYSTEM_CONFIG_DIR=/app/config
       - Redis__ConnectionString=pos_redis:6379,abortConnect=false
-      - JWT__Secret=UatDeploymentSecretKey_ReplaceInRealProduction_MinLength64Chars1234567890ABCD
+      - JWT__Secret=${JWT_SECRET}
       - EmailSettings__SmtpServer=smtp.gmail.com
       - EmailSettings__SmtpPort=587
       - EmailSettings__SenderEmail=fortabletuse999@gmail.com
-      - EmailSettings__SenderPassword=brtb rhbq voqh xhyg
+      - EmailSettings__SenderPassword=${EMAIL_SENDER_PASSWORD}
       - EmailSettings__RecipientEmail=jegadishmca@gmail.com
     volumes:
       - pos_config:/app/config

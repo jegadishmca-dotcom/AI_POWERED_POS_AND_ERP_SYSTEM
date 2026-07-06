@@ -94,6 +94,20 @@ public class AccountsReceivableController : ControllerBase
         var result = await _mediator.Send(new GetCreditMonitoringQuery(activeStoreId));
         return Ok(result);
     }
+
+    [HttpPost("returns/{id}/cancel")]
+    [Authorize(Roles = "Owner,Manager,Developer")]
+    public async Task<IActionResult> CancelReturn(Guid id, [FromBody] CancelSalesReturnRequest request)
+    {
+        var command = new CancelSalesReturnCommand(id, request.Reason);
+        var success = await _mediator.Send(command);
+        return Ok(new { success });
+    }
+}
+
+public class CancelSalesReturnRequest
+{
+    public string? Reason { get; set; }
 }
 
 public class ProcessCustomerReceiptRequest

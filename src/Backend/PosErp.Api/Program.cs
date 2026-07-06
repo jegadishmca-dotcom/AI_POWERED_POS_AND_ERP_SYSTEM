@@ -636,6 +636,68 @@ using (var scope = app.Services.CreateScope())
         // GST Slab master + HsnMasterIndia2026 seeding
         await PosErp.Api.Infrastructure.GstMasterSeeder.SeedAsync(context);
 
+        // Ensure posdb_audit database and environment_audit_logs table exist for Self-hosted environment toggle auditing (GAP-003)
+        var startupConfig = services.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>();
+        var startupDeploymentMode = startupConfig["SystemConfig:DeploymentMode"] ?? "SelfHosted";
+        if (string.Equals(startupDeploymentMode, "SelfHosted", StringComparison.OrdinalIgnoreCase))
+        {
+            var defaultConnection = startupConfig.GetConnectionString("DefaultConnection") 
+                ?? "Host=localhost;Database=poserp;Username=postgres;Password=postgres";
+            
+            try
+            {
+                var connBuilder = new Npgsql.NpgsqlConnectionStringBuilder(defaultConnection);
+                var auditDbName = "posdb_audit";
+
+                // Connect to postgres system database to create posdb_audit
+                connBuilder.Database = "postgres";
+                using (var adminConn = new Npgsql.NpgsqlConnection(connBuilder.ToString()))
+                {
+                    await adminConn.OpenAsync();
+                    using (var cmd = adminConn.CreateCommand())
+                    {
+                        cmd.CommandText = $"CREATE DATABASE {auditDbName};";
+                        try
+                        {
+                            await cmd.ExecuteNonQueryAsync();
+                            Console.WriteLine($"[Startup] Created dedicated audit database '{auditDbName}' successfully.");
+                        }
+                        catch (Npgsql.PostgresException ex) when (ex.SqlState == "42P04") // duplicate_database
+                        {
+                            // Already exists, ignore
+                        }
+                    }
+                }
+
+                // Connect to posdb_audit database to create environment_audit_logs table
+                connBuilder.Database = auditDbName;
+                using (var auditConn = new Npgsql.NpgsqlConnection(connBuilder.ToString()))
+                {
+                    await auditConn.OpenAsync();
+                    using (var cmd = auditConn.CreateCommand())
+                    {
+                        cmd.CommandText = @"
+                            CREATE TABLE IF NOT EXISTS environment_audit_logs (
+                                id UUID PRIMARY KEY,
+                                user_id UUID,
+                                user_name VARCHAR(255),
+                                action VARCHAR(100),
+                                entity_type VARCHAR(100),
+                                details TEXT,
+                                timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+                                ip_address VARCHAR(100),
+                                tenant_id UUID
+                            );";
+                        await cmd.ExecuteNonQueryAsync();
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Startup WARNING] Failed to provision dedicated audit database/table: {ex.Message}");
+            }
+        }
+
         // ── PRODUCT TAX SLAB CORRECTION (idempotent) ─────────────────────────
         // Seeded products were created when only the old 18% slab existed.
         // Now we correct each product to its legally correct Indian GST slab.

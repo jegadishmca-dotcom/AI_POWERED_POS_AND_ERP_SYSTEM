@@ -214,8 +214,13 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             var nextSeq = lastSeq + 1;
 
             bool isTest = !string.IsNullOrEmpty(request.InvoiceNumber) && request.InvoiceNumber.StartsWith("TEST-", StringComparison.OrdinalIgnoreCase);
-            if (isTest && _httpContextAccessor?.HttpContext != null)
+            if (isTest)
             {
+                if (_httpContextAccessor?.HttpContext == null)
+                {
+                    throw new UnauthorizedAccessException("Unable to verify caller identity for custom test invoice numbers.");
+                }
+
                 var httpContext = _httpContextAccessor.HttpContext;
                 var userIdStr = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
                     ?? httpContext.User.FindFirst("sub")?.Value;

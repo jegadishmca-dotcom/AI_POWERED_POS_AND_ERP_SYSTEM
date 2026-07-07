@@ -46,25 +46,26 @@ public class CancelSalesReturnCommandHandler : IRequestHandler<CancelSalesReturn
     public async Task<bool> Handle(CancelSalesReturnCommand request, CancellationToken cancellationToken)
     {
         // 1. User Gating & Verification (Authenticated ClaimsPrincipal)
-        Guid callerId = Guid.Empty;
-        if (_httpContextAccessor?.HttpContext != null)
+        if (_httpContextAccessor?.HttpContext == null)
         {
-            var httpContext = _httpContextAccessor.HttpContext;
-            var userIdStr = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
-                ?? httpContext.User.FindFirst("sub")?.Value;
-            if (string.IsNullOrEmpty(userIdStr)) throw new UnauthorizedAccessException("User is not authenticated.");
-            callerId = Guid.Parse(userIdStr);
+            throw new UnauthorizedAccessException("Unable to verify caller identity for this operation.");
+        }
 
-            var callerUser = await _context.Users
-                .Join(_context.Roles, u => u.RoleId, r => r.Id, (u, r) => new { User = u, Role = r })
-                .FirstOrDefaultAsync(x => x.User.Id == callerId, cancellationToken);
+        var httpContext = _httpContextAccessor.HttpContext;
+        var userIdStr = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? httpContext.User.FindFirst("sub")?.Value;
+        if (string.IsNullOrEmpty(userIdStr)) throw new UnauthorizedAccessException("User is not authenticated.");
+        var callerId = Guid.Parse(userIdStr);
 
-            bool isAllowed = callerUser != null &&
-                (callerUser.Role.Name == "Owner" || callerUser.Role.Name == "Developer" || callerUser.Role.Name == "Manager");
-            if (!isAllowed)
-            {
-                throw new UnauthorizedAccessException("Unauthorized: User does not have Owner, Developer, or Manager privileges.");
-            }
+        var callerUser = await _context.Users
+            .Join(_context.Roles, u => u.RoleId, r => r.Id, (u, r) => new { User = u, Role = r })
+            .FirstOrDefaultAsync(x => x.User.Id == callerId, cancellationToken);
+
+        bool isAllowed = callerUser != null &&
+            (callerUser.Role.Name == "Owner" || callerUser.Role.Name == "Developer" || callerUser.Role.Name == "Manager");
+        if (!isAllowed)
+        {
+            throw new UnauthorizedAccessException("Unauthorized: User does not have Owner, Developer, or Manager privileges.");
         }
 
         var strategy = ((DbContext)_context).Database.CreateExecutionStrategy();

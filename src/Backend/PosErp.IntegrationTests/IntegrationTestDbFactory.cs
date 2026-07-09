@@ -119,13 +119,6 @@ public static class IntegrationTestDbFactory
                     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
                     actioned_at TIMESTAMP WITH TIME ZONE,
                     actioned_by UUID
-                );",
-                @"CREATE TABLE IF NOT EXISTS idempotent_requests (
-                    client_request_token UUID PRIMARY KEY,
-                    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
-                    response_payload TEXT,
-                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-                    tenant_id UUID NOT NULL
                 );"
             };
 

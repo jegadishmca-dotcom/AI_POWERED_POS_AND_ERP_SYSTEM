@@ -53,13 +53,12 @@ namespace PosErp.IntegrationTests
             // Connect to integration test database without dropping/rebuilding schema
             var db = IntegrationTestDbFactory.CreateNewContext();
             
-            // Locally ensure the idempotent_requests table exists to isolate from global test runner parallel execution ordering
             db.Database.ExecuteSqlRaw(@"
                 CREATE TABLE IF NOT EXISTS idempotent_requests (
                     client_request_token UUID PRIMARY KEY,
-                    status VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+                    status TEXT NOT NULL,
                     response_payload TEXT,
-                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+                    created_at TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT NOW(),
                     tenant_id UUID NOT NULL
                 );");
 

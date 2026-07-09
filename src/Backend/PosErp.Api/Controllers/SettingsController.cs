@@ -591,7 +591,43 @@ public class SettingsController : ControllerBase
             return StatusCode(500, new { message = $"Failed to update compliance flags: {ex.Message}" });
         }
     }
+
+    [HttpPost("email/alert")]
+    [AllowAnonymous] // Authenticated via custom X-System-Alert-Key header
+    public async Task<IActionResult> DispatchSystemAlert(
+        [FromBody] SystemAlertRequest request,
+        [FromHeader(Name = "X-System-Alert-Key")] string alertKey)
+    {
+        var expectedKey = _configuration["EmailSettings:SystemAlertApiKey"];
+        if (string.IsNullOrEmpty(expectedKey) || alertKey != expectedKey)
+        {
+            return Unauthorized("Invalid alert API key.");
+        }
+
+        var settings = _emailSettingsManager.GetSettings();
+        var to = !string.IsNullOrWhiteSpace(settings.DeveloperAlertEmail) 
+            ? settings.DeveloperAlertEmail 
+            : (!string.IsNullOrWhiteSpace(settings.RecipientEmail) ? settings.RecipientEmail : "jegadishmca@gmail.com");
+
+        // HTML-encode inputs to prevent layout breakage or tag injection
+        var safeSource = System.Net.WebUtility.HtmlEncode(request.AlertSource);
+        var safeMessage = System.Net.WebUtility.HtmlEncode(request.Message);
+
+        var subject = $"🚨 Apple Supermarket POS - {safeSource} FAILURE";
+        var htmlBody = $@"
+            <div style='font-family: sans-serif; padding: 20px; border: 1px solid #ef4444; border-radius: 8px;'>
+                <h2 style='color: #dc2626;'>System Backup Alert</h2>
+                <p><strong>Source:</strong> {safeSource}</p>
+                <p><strong>Message:</strong> {safeMessage}</p>
+                <p><strong>Time:</strong> {DateTime.UtcNow.AddHours(5.5):dd MMM yyyy HH:mm:ss} IST</p>
+            </div>";
+
+        await _emailService.SendEmailAsync(to, subject, htmlBody);
+        return Ok(new { success = true });
+    }
 }
+
+public record SystemAlertRequest(string AlertSource, string Message);
 
 // ── Settings DTOs ─────────────────────────────────────────────────────────────
 

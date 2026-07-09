@@ -14,7 +14,7 @@ using Microsoft.Extensions.Configuration;
 
 namespace PosErp.Application.Features.Pos.Commands.SyncInvoices;
 
-public record SyncInvoicesCommand(List<OfflineInvoiceDto> Invoices) : IRequest<SyncResult>;
+public record SyncInvoicesCommand(List<OfflineInvoiceDto> Invoices) : IRequest<SyncResult>, IRetryableRequest;
 public record SyncResult(int Synced, int Failed, List<string> Errors);
 
 public record OfflineInvoiceDto(
@@ -151,11 +151,12 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                         .Where(p => productIds.Contains(p.Id))
                         .ToDictionaryAsync(p => p.Id, cancellationToken);
 
+                    // 1. Resolve target Batch IDs and pre-calculate stock before lock acquisition
+                    var itemResolvedBatches = new List<(Guid ProductId, Guid? BatchId, decimal Quantity, decimal CurrentStock)>();
                     foreach (var itemDto in dto.Items)
                     {
-                        // Resolve Batch Id for FIFO/Expiry selection
                         Guid? selectedBatchId = null;
-                        DateTime? expiryDate = null;
+                        decimal currentStock = 0m;
                         var batchStocks = new List<(Guid Id, DateTime? ExpiryDate, decimal Stock)>();
 
                         var activeBatches = await _context.ProductBatches
@@ -172,7 +173,6 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                                 batchStocks.Add((b.Id, b.ExpiryDate, stock));
                             }
 
-                            // 1. Prefer batch with positive stock and earliest expiry
                             var bestBatchId = batchStocks
                                 .Where(x => x.Stock > 0)
                                 .OrderBy(x => x.ExpiryDate.HasValue ? 0 : 1)
@@ -180,7 +180,6 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                                 .Select(x => (Guid?)x.Id)
                                 .FirstOrDefault();
 
-                            // 2. If no batch has positive stock, fall back to any active batch ordered by expiry
                             if (bestBatchId == null)
                             {
                                 bestBatchId = batchStocks
@@ -191,7 +190,41 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                             }
 
                             selectedBatchId = bestBatchId;
+                            if (selectedBatchId.HasValue)
+                            {
+                                var bInfo = batchStocks.FirstOrDefault(x => x.Id == selectedBatchId.Value);
+                                currentStock = bInfo.Stock;
+                            }
                         }
+                        itemResolvedBatches.Add((itemDto.ProductId, selectedBatchId, itemDto.Quantity, currentStock));
+                    }
+
+                    // 2. Extract unique batch IDs and sort in ascending order to prevent deadlocks
+                    var sortedBatchIds = itemResolvedBatches
+                        .Where(x => x.BatchId.HasValue)
+                        .Select(x => x.BatchId!.Value)
+                        .Distinct()
+                        .OrderBy(id => id)
+                        .ToList();
+
+                    // 3. Acquire locks deterministically and record instrumentation metrics
+                    var lockStart = DateTime.UtcNow;
+                    foreach (var batchId in sortedBatchIds)
+                    {
+                        await ((DbContext)_context).Database.ExecuteSqlRawAsync(
+                            "SELECT 1 FROM product_batches WHERE id = {0} FOR UPDATE", 
+                            new object[] { batchId }, 
+                            cancellationToken);
+                    }
+                    var lockDuration = (DateTime.UtcNow - lockStart).TotalMilliseconds;
+                    _logger?.LogInformation("Stage 2 Sync Lock Acquisition: Locked {Count} product batch rows in {Duration}ms.", sortedBatchIds.Count, lockDuration);
+
+                    // 4. Perform updates and record stock ledger movements
+                    foreach (var itemDto in dto.Items)
+                    {
+                        var resolved = itemResolvedBatches.FirstOrDefault(x => x.ProductId == itemDto.ProductId);
+                        Guid? selectedBatchId = resolved.BatchId;
+                        DateTime? expiryDate = null;
 
                         if (selectedBatchId.HasValue)
                         {
@@ -224,12 +257,7 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                         );
 
                         // Check if the resulting stock balance goes negative using pre-calculated in-memory values
-                        decimal currentBatchStock = 0;
-                        if (selectedBatchId.HasValue)
-                        {
-                            var batchInfo = batchStocks.FirstOrDefault(x => x.Id == selectedBatchId.Value);
-                            currentBatchStock = batchInfo.Stock;
-                        }
+                        decimal currentBatchStock = resolved.CurrentStock;
                         decimal newBalance = currentBatchStock - itemDto.Quantity;
 
                         if (newBalance < 0)

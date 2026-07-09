@@ -32,6 +32,7 @@ public interface IApplicationDbContext
     DbSet<InvoiceItem> InvoiceItems { get; }
     DbSet<PosSession> PosSessions { get; }
     DbSet<StoreBusinessDate> StoreBusinessDates { get; }
+    DbSet<PosErp.Domain.Entities.Common.IdempotentRequest> IdempotentRequests { get; }
     
     // Inventory
     DbSet<ProductBatch> ProductBatches { get; }

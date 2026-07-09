@@ -22,7 +22,7 @@ public record ProcessPurchaseReturnCommand(
     DateTime ReturnDate,
     List<PurchaseReturnItemInputDto> Items,
     Guid UserId
-) : IRequest<Guid>;
+) : IRequest<Guid>, IRetryableRequest;
 
 public record PurchaseReturnItemInputDto(
     Guid ProductId,
@@ -38,7 +38,7 @@ public record ProcessSalesReturnCommand(
     List<SalesReturnItemInputDto> Items,
     Guid UserId,
     string? ManagerOverridePin = null
-) : IRequest<Guid>;
+) : IRequest<Guid>, IRetryableRequest;
 
 public record SalesReturnItemInputDto(
     Guid ProductId,

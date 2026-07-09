@@ -5,10 +5,14 @@ const API_URL = 'http://localhost:5169/api';
 // Helper: get auth token
 async function getAuthToken(request: any): Promise<string | null> {
   try {
+    const adminPassword = process.env.TEST_ADMIN_PASSWORD;
+    if (!adminPassword) {
+      throw new Error("TEST_ADMIN_PASSWORD environment variable is required but not set.");
+    }
     const response = await request.post(`${API_URL}/auth/login`, {
       data: {
         username: 'admin@supermarket.local',
-        password: 'Admin@123!',
+        password: adminPassword,
         terminalCode: ''
       },
       timeout: 5000

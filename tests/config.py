@@ -30,12 +30,27 @@ DB_CONFIG = {
 # Before running tests, ensure the server is toggled to UAT mode via the admin UI.
 API_BASE_URL = os.environ.get("TEST_API_URL", "http://192.168.1.5:8000")
 
+# Load local .env variables into environment if not present
+def _load_local_env():
+    env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
+    if os.path.exists(env_path):
+        with open(env_path, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    os.environ.setdefault(k.strip(), v.strip())
+
+_load_local_env()
+
 # ── Test Credentials ──────────────────────────────────────────────────────────
 ADMIN_USER = {
     "username": "admin@supermarket.local",
-    "password": "Admin@123!",
+    "password": os.environ.get("TEST_ADMIN_PASSWORD"),
     "terminalCode": "LOCAL POS 01",
 }
+if not ADMIN_USER["password"]:
+    raise ValueError("TEST_ADMIN_PASSWORD environment variable is required but not set.")
 
 # ── Backend Source Path (for schema scanner) ──────────────────────────────────
 BACKEND_ENTITIES_PATH = os.path.join(

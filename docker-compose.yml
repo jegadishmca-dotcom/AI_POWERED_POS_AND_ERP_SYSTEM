@@ -108,11 +108,14 @@ services:
       - SYSTEM_CONFIG_DIR=/app/config
       - Redis__ConnectionString=pos_redis:6379,abortConnect=false
       - JWT__Secret=${JWT_SECRET}
+      - SystemConfig__AdminPassword=${TEST_ADMIN_PASSWORD}
+      - SystemConfig__AdminPin=${TEST_ADMIN_PIN}
       - EmailSettings__SmtpServer=smtp.gmail.com
       - EmailSettings__SmtpPort=587
       - EmailSettings__SenderEmail=fortabletuse999@gmail.com
       - EmailSettings__SenderPassword=${EMAIL_SENDER_PASSWORD}
       - EmailSettings__RecipientEmail=jegadishmca@gmail.com
+      - EmailSettings__SystemAlertApiKey=${SYSTEM_ALERT_API_KEY}
     volumes:
       - pos_config:/app/config
     ports:

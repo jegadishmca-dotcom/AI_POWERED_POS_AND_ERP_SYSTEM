@@ -60,9 +60,13 @@ export class LoginPage {
     await this.erpBackOfficeTab.click();
     await this.page.waitForTimeout(300);
 
-    // Fill credentials directly (admin@supermarket.local / Admin@123!)
+    // Fill credentials from environment variables
+    const adminPassword = process.env.TEST_ADMIN_PASSWORD;
+    if (!adminPassword) {
+      throw new Error("TEST_ADMIN_PASSWORD environment variable is required but not set.");
+    }
     await this.usernameInput.fill('admin@supermarket.local');
-    await this.passwordInput.fill('Admin@123!');
+    await this.passwordInput.fill(adminPassword);
     await this.signInButton.click();
 
     // Wait for navigation away from login page

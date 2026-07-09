@@ -36,8 +36,9 @@ public record CreateInvoiceCommand(
     string PaymentMode,
     List<InvoiceItemDto> Items,
     decimal PointsRedeemed = 0,
-    string? SupervisorOverridePin = null
-) : IRequest<CreateInvoiceResponse>;
+    string? SupervisorOverridePin = null,
+    Guid? ClientRequestToken = null
+) : IRequest<CreateInvoiceResponse>, IRetryableRequest, IIdempotentRequest;
 
 public record InvoiceItemDto(Guid ProductId, decimal Quantity, decimal UnitPrice, Guid? BatchId);
 public record CreateInvoiceResponse(Guid InvoiceId, string InvoiceNumber);
@@ -404,12 +405,13 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
 
 
+            // 1. Resolve batch IDs first before lock acquisition
+            var itemResolvedBatches = new List<(Guid ProductId, Guid? BatchId, decimal Quantity)>();
             foreach (var item in cartEvaluation.Items)
             {
                 var originalItem = request.Items.FirstOrDefault(x => x.ProductId == item.ProductId);
                 Guid? selectedBatchId = originalItem?.BatchId;
                 var hasExpiry = productsInfo.TryGetValue(item.ProductId, out var pInfo) && pInfo.HasExpiry;
-                DateTime? expiryDate = null;
 
                 if (selectedBatchId == null && hasExpiry)
                 {
@@ -447,6 +449,36 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                         selectedBatchId = bestBatchId;
                     }
                 }
+                itemResolvedBatches.Add((item.ProductId, selectedBatchId, item.Quantity));
+            }
+
+            // 2. Extract unique batch IDs and sort in ascending order to prevent deadlocks
+            var sortedBatchIds = itemResolvedBatches
+                .Where(x => x.BatchId.HasValue)
+                .Select(x => x.BatchId!.Value)
+                .Distinct()
+                .OrderBy(id => id)
+                .ToList();
+
+            // 3. Acquire locks deterministically and record instrumentation metrics
+            var lockStart = DateTime.UtcNow;
+            foreach (var batchId in sortedBatchIds)
+            {
+                await ((DbContext)_context).Database.ExecuteSqlRawAsync(
+                    "SELECT 1 FROM product_batches WHERE id = {0} FOR UPDATE", 
+                    new object[] { batchId }, 
+                    cancellationToken);
+            }
+            var lockDuration = (DateTime.UtcNow - lockStart).TotalMilliseconds;
+            _logger?.LogInformation("Stage 2 Lock Acquisition: Locked {Count} product batch rows in {Duration}ms.", sortedBatchIds.Count, lockDuration);
+
+            // 4. Perform updates and record stock ledger movements
+            foreach (var item in cartEvaluation.Items)
+            {
+                var resolved = itemResolvedBatches.FirstOrDefault(x => x.ProductId == item.ProductId);
+                Guid? selectedBatchId = resolved.BatchId;
+                var pInfo = productsInfo.TryGetValue(item.ProductId, out var pi) ? pi : null;
+                DateTime? expiryDate = null;
 
                 if (selectedBatchId.HasValue)
                 {

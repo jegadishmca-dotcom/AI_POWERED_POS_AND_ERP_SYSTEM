@@ -157,6 +157,8 @@ builder.Services.AddMemoryCache();
 // Register MediatR
 builder.Services.AddMediatR(cfg => {
     cfg.RegisterServicesFromAssembly(typeof(IApplicationDbContext).Assembly);
+    cfg.AddOpenBehavior(typeof(PosErp.Application.Behaviors.IdempotencyBehavior<,>));
+    cfg.AddOpenBehavior(typeof(PosErp.Application.Behaviors.TransientRetryBehavior<,>));
 });
 
 // Register Infrastructure Services
@@ -298,6 +300,7 @@ builder.Services.AddScoped<PosErp.Application.Features.Ai.Services.IRecommendati
 builder.Services.AddScoped<PosErp.Application.Features.Ai.Jobs.IAiBackgroundJobs, PosErp.Application.Features.Ai.Jobs.AiBackgroundJobs>();
 
 // Procurement Recommendation Engine (was missing from DI — caused 500 on /api/procurement/recommendations)
+builder.Services.AddScoped<PosErp.Application.Features.Inventory.Services.IReorderEngine, PosErp.Application.Features.Inventory.Services.ReorderEngine>();
 builder.Services.AddScoped<PosErp.Application.Features.Inventory.Services.IPurchaseRecommendationEngine, PosErp.Application.Features.Inventory.Services.PurchaseRecommendationEngine>();
 
 // Register Materialized View Periodic Refresher
@@ -306,6 +309,7 @@ builder.Services.AddSingleton<PosErp.Infrastructure.Jobs.DailyReportEmailService
 builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.DailyReportEmailService>(
     sp => sp.GetRequiredService<PosErp.Infrastructure.Jobs.DailyReportEmailService>());
 builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.RefreshTokenCleanupService>();
+builder.Services.AddHostedService<PosErp.Infrastructure.Jobs.IdempotentRequestCleanupService>();
 
 // M1: CORS — restrict to known frontend origin in Production; allow all in Development.
 // Set FRONTEND_URL environment variable on Render (e.g. https://apple-supermarket.vercel.app)
@@ -742,11 +746,40 @@ using (var scope = app.Services.CreateScope())
         // Seed Admin User
         if (!await context.Users.AnyAsync(u => u.Username == "admin@supermarket.local"))
         {
+            var hostEnv = services.GetRequiredService<Microsoft.Extensions.Hosting.IHostEnvironment>();
+            var configuration = services.GetRequiredService<IConfiguration>();
+            var adminPassword = configuration["SystemConfig:AdminPassword"];
+            var adminPin = configuration["SystemConfig:AdminPin"];
+
+            if (string.IsNullOrEmpty(adminPassword))
+            {
+                if (!hostEnv.IsDevelopment())
+                {
+                    throw new InvalidOperationException(
+                        "FATAL: SystemConfig:AdminPassword environment variable is not set. " +
+                        "For security in Production, you must configure a bootstrap admin password. " +
+                        "Seeding with default 'Admin@123!' is prohibited.");
+                }
+                adminPassword = "Admin@123!"; // Default fallback ONLY in development
+            }
+
+            if (string.IsNullOrEmpty(adminPin))
+            {
+                if (!hostEnv.IsDevelopment())
+                {
+                    throw new InvalidOperationException(
+                        "FATAL: SystemConfig:AdminPin environment variable is not set. " +
+                        "For security in Production, you must configure a bootstrap admin PIN. " +
+                        "Seeding with default '1234' is prohibited.");
+                }
+                adminPin = "1234"; // Default fallback ONLY in development
+            }
+
             var adminUser = new PosErp.Domain.Entities.Auth.User
             {
                 Username = "admin@supermarket.local",
-                PasswordHash = passwordHasher.HashPassword("Admin@123!"),
-                PinHash = passwordHasher.HashPassword("1234"), // Default override PIN — CHANGE AFTER FIRST LOGIN
+                PasswordHash = passwordHasher.HashPassword(adminPassword),
+                PinHash = passwordHasher.HashPassword(adminPin),
                 FullName = "System Administrator",
                 RoleId = ownerRole.Id,
                 IsActive = true

@@ -44,6 +44,7 @@ public class GlobalExceptionMiddleware
             UnauthorizedAccessException => (int)HttpStatusCode.Unauthorized,
             InvalidOperationException => (int)HttpStatusCode.BadRequest,
             ArgumentException => (int)HttpStatusCode.BadRequest,
+            PosErp.Application.Exceptions.ConflictException => (int)HttpStatusCode.Conflict,
             _ => (int)HttpStatusCode.InternalServerError
         };
 

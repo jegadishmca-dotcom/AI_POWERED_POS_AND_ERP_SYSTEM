@@ -44,6 +44,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     public DbSet<InvoiceItem> InvoiceItems => Set<InvoiceItem>();
     public DbSet<PosSession> PosSessions => Set<PosSession>();
     public DbSet<StoreBusinessDate> StoreBusinessDates => Set<StoreBusinessDate>();
+    public DbSet<IdempotentRequest> IdempotentRequests => Set<IdempotentRequest>();
     
     // Inventory
     public DbSet<ProductBatch> ProductBatches => Set<ProductBatch>();
@@ -145,6 +146,10 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
     {
         base.OnModelCreating(modelBuilder);
         
+        // Idempotency entity key
+        modelBuilder.Entity<IdempotentRequest>()
+            .HasKey(r => r.ClientRequestToken);
+
         // Composite Key configurations for POS Invoices & Items
         modelBuilder.Entity<Invoice>()
             .HasKey(i => new { i.Id, i.BusinessDate });
@@ -154,6 +159,7 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         {
             modelBuilder.Entity<Store>().HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
             modelBuilder.Entity<PosErp.Domain.Entities.Audit.AuditLog>().HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
+            modelBuilder.Entity<IdempotentRequest>().HasQueryFilter(e => e.TenantId == _tenantProvider.TenantId);
         }
 
         if (Database.IsRelational())

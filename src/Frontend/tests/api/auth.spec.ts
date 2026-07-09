@@ -6,11 +6,15 @@ test.describe('API Validation - Authentication & Security', () => {
   let token: string = '';
 
   test('POST /auth/login - valid admin credentials should return 200 and JWT', async ({ request }) => {
+    const adminPassword = process.env.TEST_ADMIN_PASSWORD;
+    if (!adminPassword) {
+      throw new Error("TEST_ADMIN_PASSWORD environment variable is required but not set.");
+    }
     try {
       const response = await request.post(`${API_URL}/auth/login`, {
         data: {
           username: 'admin@supermarket.local',
-          password: 'Admin@123!',
+          password: adminPassword,
           terminalCode: ''
         },
         timeout: 8000

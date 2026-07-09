@@ -21,6 +21,7 @@ import { CANCELLATION_ALLOWED_ROLES } from '../constants/roles';
 import { posDb } from '../db/pos.db';
 import { useAuthStore } from '../../auth/store/auth.store';
 import { syncInvoices } from '../api/pos.sync';
+import { safeRandomUUID } from '../../../utils/uuid';
 
 export const PosTerminal = () => {
   const [customer, setCustomer] = useState<any>(null);
@@ -560,7 +561,7 @@ export const PosTerminal = () => {
       recalculateCart(updatedItems);
     } else {
       const newItem = {
-        id: crypto.randomUUID(), // CQ-04 FIX: use crypto.randomUUID() instead of Math.random().toString()
+        id: safeRandomUUID(), // CQ-04 FIX: use safeRandomUUID() instead of Math.random().toString()
         productId: product.id,
         name: product.name,
         qty: qtyToAdd,
@@ -664,7 +665,7 @@ export const PosTerminal = () => {
       return;
     }
     
-    const uuid = crypto.randomUUID();
+    const uuid = safeRandomUUID();
     const invoiceToHold = {
       id: uuid,
       invoiceNumber: `HOLD-${Date.now()}`,
@@ -711,7 +712,7 @@ export const PosTerminal = () => {
       setCart({
           items: (invoice.items || []).map((i: any) => ({
              ...i,
-             id: i.id || crypto.randomUUID(),
+             id: i.id || safeRandomUUID(),
              qty: i.qty ?? 0,
              unitPrice: i.unitPrice ?? 0,
              lineTotal: i.lineTotal ?? 0,
@@ -1384,7 +1385,7 @@ export const PosTerminal = () => {
             let offlineLoyaltyBalance = oldLoyaltyPoints + offlineLoyaltyEarned - pointsRedeemed;
 
             // 2. Construct the FULL invoice object for local storage and printing
-            const invoiceId = crypto.randomUUID();
+            const invoiceId = safeRandomUUID();
             const fullInvoice = {
               id: invoiceId,
               invoiceNumber: payload.invoiceNumber,
@@ -1412,7 +1413,7 @@ export const PosTerminal = () => {
               pointsRedeemed: payload.pointsRedeemed,
               status: 'COMPLETED',
               items: cart.items.map((item: any) => ({
-                id: item.id || crypto.randomUUID(),
+                id: item.id || safeRandomUUID(),
                 productId: item.productId,
                 name: item.name,
                 quantity: item.qty,

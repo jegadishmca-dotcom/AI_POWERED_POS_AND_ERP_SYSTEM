@@ -1,6 +1,7 @@
 import { api } from '@/utils/api';
 import { Invoice } from '../types';
 import { posDb } from '../db/pos.db';
+import { safeRandomUUID } from '@/utils/uuid';
 
 export const syncInvoices = async () => {
   const pending = await posDb.sync_queue.toArray();
@@ -11,10 +12,10 @@ export const syncInvoices = async () => {
     
     const payload = pending.map((inv: any) => ({
       ...inv,
-      id: isUUID(inv.id) ? inv.id : crypto.randomUUID(),
+      id: isUUID(inv.id) ? inv.id : safeRandomUUID(),
       items: inv.items.map((item: any) => ({
         ...item,
-        id: isUUID(item.id) ? item.id : crypto.randomUUID()
+        id: isUUID(item.id) ? item.id : safeRandomUUID()
       }))
     }));
 

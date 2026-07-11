@@ -38,7 +38,7 @@ export const ManagerPinModal = ({ isOpen, onClose, onSuccess, actionName }: any)
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 bg-black/60 z-override flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-sm overflow-hidden">
         <div className="bg-red-600 p-4 flex justify-between items-center text-white">
           <h2 className="text-xl font-bold flex items-center">

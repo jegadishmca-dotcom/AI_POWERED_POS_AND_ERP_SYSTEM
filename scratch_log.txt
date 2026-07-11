@@ -1,0 +1,9 @@
+Logging in to http://192.168.1.5:8000...
+Login status: OK
+Login successful. Token acquired.
+Sending query 'test'...
+Query 'test' status: OK
+Query 'test' response length: 3226
+Sending query '' (empty)...
+Query '' status: BadRequest
+Query '' response: {"type":"https://tools.ietf.org/html/rfc9110#section-15.5.1","title":"One or more validation errors occurred.","status":400,"errors":{"q":["The q field is required."]},"traceId":"00-03eddc690db7097b2cd2a10f74fcada3-f2537be2c2f65fb1-01"}

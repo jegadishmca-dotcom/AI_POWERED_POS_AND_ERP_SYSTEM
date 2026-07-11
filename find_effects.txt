@@ -1,0 +1,319 @@
+Found 10 useEffect hooks:
+
+--- Hook #1 ---
+useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+
+    const autoFullscreen = () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {
+          // ignore blocked request
+        });
+      }
+      window.removeEventListener('click', autoFullscreen);
+      window.removeEventListener('keydown', autoFullscreen);
+    };
+
+    window.addEventListener('click', autoFullscreen);
+    window.addEventListener('keydown', autoFullscreen);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('click', autoFullscreen);
+      window.removeEventListener('keydown', autoFullscreen);
+    };
+  }, []);
+
+  // Background Sync for Offline Invoices
+  useEffect(() => {
+    // Sync immediately on mount
+    syncInvoices();
+
+--- Hook #2 ---
+useEffect(() => {
+    // Sync immediately on mount
+    syncInvoices();
+    // Then sync every 15 seconds
+    const interval = setInterval(() => {
+      syncInvoices();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch((err) => {
+        console.error(`Error attempting to enable fullscreen: ${err.message}`);
+      });
+    } else {
+      document.exitFullscreen();
+    }
+  };
+
+  useEffect(() => {
+    // Focus barcode scanner input on mount
+    productInputRef.current?.focus();
+    
+    // Only check when cashierId is loaded and is not the fallback GUID
+    if (!user?.id || cashierId === '00000000-0000-0000-0000-000000000001') {
+      return;
+    }
+
+    const checkBusinessDate = async () => {
+
+--- Hook #3 ---
+useEffect(() => {
+    // Focus barcode scanner input on mount
+    productInputRef.current?.focus();
+    
+    // Only check when cashierId is loaded and is not the fallback GUID
+    if (!user?.id || cashierId === '00000000-0000-0000-0000-000000000001') {
+      return;
+    }
+
+    const checkBusinessDate = async () => {
+      try {
+        setDateLoading(true);
+        const activeState = await getActiveBusinessDate();
+        setBusinessDateOpen(activeState.isOpen);
+        setActiveBusinessDate(activeState.businessDate);
+        
+        if (activeState.isOpen) {
+          // Check for active shift only if business day is open
+          const sessionData = await getCurrentSession(terminalId, cashierId);
+          if (sessionData && sessionData.status === 'OPEN') {
+            setActiveSession(sessionData);
+            setOpenShiftModalOpen(false);
+          } else {
+            setOpenShiftModalOpen(true);
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetc
+
+--- Hook #4 ---
+useEffect(() => {
+    if (voiceError) {
+      setVoiceStatus(voiceError);
+      setVoiceStatusType('error');
+    }
+  }, [voiceError]);
+
+  useEffect(() => {
+    if (isListening) {
+      setVoiceStatus(voiceLanguage === 'ta-IN' ? 'கேட்டுக்கொண்டிருக்கிறது... பேசவும்.' : 'Listening... Speak now.');
+      setVoiceStatusType('listening');
+    } else {
+      setVoiceStatus(prev => {
+        if (prev === 'Listening... Speak now.' || prev === 'கேட்டுக்கொண்டிருக்கிறது... பேசவும்.') {
+          return null;
+        }
+        return prev;
+      });
+    }
+  }, [isListening, voiceLanguage]);
+
+  useEffect(() => {
+    if (voiceStatus && voiceStatusType !== 'listening') {
+      const timer = setTimeout(() => {
+        if (isListening) {
+          setVoiceStatus(voiceLanguage === 'ta-IN' ? 'கேட்டுக்கொண்டிருக்கிறது... பேசவும்.' : 'Listening... Speak now.');
+          setVoiceStatusType('listening');
+        } else {
+          setVoiceStatus(null);
+        }
+
+--- Hook #5 ---
+useEffect(() => {
+    if (isListening) {
+      setVoiceStatus(voiceLanguage === 'ta-IN' ? 'கேட்டுக்கொண்டிருக்கிறது... பேசவும்.' : 'Listening... Speak now.');
+      setVoiceStatusType('listening');
+    } else {
+      setVoiceStatus(prev => {
+        if (prev === 'Listening... Speak now.' || prev === 'கேட்டுக்கொண்டிருக்கிறது... பேசவும்.') {
+          return null;
+        }
+        return prev;
+      });
+    }
+  }, [isListening, voiceLanguage]);
+
+  useEffect(() => {
+    if (voiceStatus && voiceStatusType !== 'listening') {
+      const timer = setTimeout(() => {
+        if (isListening) {
+          setVoiceStatus(voiceLanguage === 'ta-IN' ? 'கேட்டுக்கொண்டிருக்கிறது... பேசவும்.' : 'Listening... Speak now.');
+          setVoiceStatusType('listening');
+        } else {
+          setVoiceStatus(null);
+        }
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [voiceStatus, voiceStatusType, isListening, voiceLanguage]);
+
+  useEffect(() => {
+    const handleVoiceShortcut = (e: 
+
+--- Hook #6 ---
+useEffect(() => {
+    if (voiceStatus && voiceStatusType !== 'listening') {
+      const timer = setTimeout(() => {
+        if (isListening) {
+          setVoiceStatus(voiceLanguage === 'ta-IN' ? 'கேட்டுக்கொண்டிருக்கிறது... பேசவும்.' : 'Listening... Speak now.');
+          setVoiceStatusType('listening');
+        } else {
+          setVoiceStatus(null);
+        }
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [voiceStatus, voiceStatusType, isListening, voiceLanguage]);
+
+  useEffect(() => {
+    const handleVoiceShortcut = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        toggleListening();
+      }
+    };
+    window.addEventListener('keydown', handleVoiceShortcut);
+    return () => window.removeEventListener('keydown', handleVoiceShortcut);
+  }, [toggleListening]);
+
+  // Debounced instant search trigger on text change
+  useEffect(() => {
+    if (isVoiceSearchingRef.current) return;
+
+    const val = product
+
+--- Hook #7 ---
+useEffect(() => {
+    const handleVoiceShortcut = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key.toLowerCase() === 'm') {
+        e.preventDefault();
+        toggleListening();
+      }
+    };
+    window.addEventListener('keydown', handleVoiceShortcut);
+    return () => window.removeEventListener('keydown', handleVoiceShortcut);
+  }, [toggleListening]);
+
+  // Debounced instant search trigger on text change
+  useEffect(() => {
+    if (isVoiceSearchingRef.current) return;
+
+    const val = productQuery.trim();
+    if (!val) {
+      setSearchResults([]);
+      setShowProductDropdown(false);
+      setFocusedProductIndex(-1);
+      return;
+    }
+
+    // Skip triggering instant search if the query is a potential barcode (long digits/letters)
+    // to let the Enter key keypress/scanner handle it uniquely without popping the dropdown.
+    // If it's a normal short text query (2 or more characters), search instantly.
+    if (val.length < 2) return;
+
+    let active = true;
+
+
+--- Hook #8 ---
+useEffect(() => {
+    if (isVoiceSearchingRef.current) return;
+
+    const val = productQuery.trim();
+    if (!val) {
+      setSearchResults([]);
+      setShowProductDropdown(false);
+      setFocusedProductIndex(-1);
+      return;
+    }
+
+    // Skip triggering instant search if the query is a potential barcode (long digits/letters)
+    // to let the Enter key keypress/scanner handle it uniquely without popping the dropdown.
+    // If it's a normal short text query (2 or more characters), search instantly.
+    if (val.length < 2) return;
+
+    let active = true;
+
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const results = await searchProducts(val);
+        if (!active) return;
+
+        if (results.length > 0) {
+          setSearchResults(results);
+          setShowProductDropdown(true);
+          // If the dropdown was not open, set focus to first item
+          setFocusedProductIndex(prev => prev >= 0 && prev < results.length ? prev : 0);
+        } else {
+   
+
+--- Hook #9 ---
+useEffect(() => {
+    if (cart.items.length > 0) {
+      recalculateCart(cart.items);
+    }
+  }, [recalculateCart, suppressOffers]);
+
+  // If suppressOffers changes, recalculate cart
+  useEffect(() => {
+    recalculateCart(cart.items);
+  }, [suppressOffers]);
+
+  const updateItemBatch = (productId: string, batchId: string) => {
+    const updatedItems = cart.items.map((item: any) => {
+      if (item.productId === productId) {
+        return { ...item, batchId: batchId };
+      }
+      return item;
+    });
+    setCart((prev: any) => ({
+      ...prev,
+      items: updatedItems
+    }));
+  };
+
+  const addProductToCart = async (product: any, overrideQty?: number) => {
+    const existing = cart.items.find((item: any) => item.productId === product.id);
+    let updatedItems = [];
+    const qtyToAdd = overrideQty !== undefined ? overrideQty : 1;
+
+    if (existing) {
+
+--- Hook #10 ---
+useEffect(() => {
+    recalculateCart(cart.items);
+  }, [suppressOffers]);
+
+  const updateItemBatch = (productId: string, batchId: string) => {
+    const updatedItems = cart.items.map((item: any) => {
+      if (item.productId === productId) {
+        return { ...item, batchId: batchId };
+      }
+      return item;
+    });
+    setCart((prev: any) => ({
+      ...prev,
+      items: updatedItems
+    }));
+  };
+
+  const addProductToCart = async (product: any, overrideQty?: number) => {
+    const existing = cart.items.find((item: any) => item.productId === product.id);
+    let updatedItems = [];
+    const qtyToAdd = overrideQty !== undefined ? overrideQty : 1;
+
+    if (existing) {
+      updatedItems = cart.items.map((item: any) =>
+        item.productId === product.id 
+          ? { ...item, qty: item.qty + qtyToAdd, lineTotal: (item.qty + qtyToAdd) * item.unitPrice } 
+          : item
+      );
+      recalculateCart(updatedItems);
+    } else {

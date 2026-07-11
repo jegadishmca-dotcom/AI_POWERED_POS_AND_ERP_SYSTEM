@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Crm;
 using System;
@@ -12,6 +12,7 @@ public record RegisterCustomerCommand(
     string Phone,
     string Name,
     string? TamilName,
+    string? Email,
     DateTime? Dob,
     bool MarketingConsent
 ) : IRequest<Guid>;
@@ -30,11 +31,27 @@ public class RegisterCustomerCommandHandler : IRequestHandler<RegisterCustomerCo
         var existing = await _context.Customers.FirstOrDefaultAsync(c => c.Phone == request.Phone, cancellationToken);
         if (existing != null) throw new Exception("Customer with this phone already exists.");
 
+        string? trimmedEmail = null;
+        if (!string.IsNullOrWhiteSpace(request.Email))
+        {
+            trimmedEmail = request.Email.Trim();
+            if (trimmedEmail.Length > 255)
+            {
+                throw new ArgumentException("Email must be 255 characters or less.");
+            }
+            var emailRegex = new System.Text.RegularExpressions.Regex(@"^[^@\s]+@[^@\s]+\.[^@\s]+$");
+            if (!emailRegex.IsMatch(trimmedEmail))
+            {
+                throw new ArgumentException("Invalid email format.");
+            }
+        }
+
         var customer = new Customer
         {
             Phone = request.Phone,
             Name = request.Name,
             TamilName = request.TamilName,
+            Email = trimmedEmail,
             Dob = request.Dob,
             MarketingConsent = request.MarketingConsent,
             ConsentRecordedAt = DateTime.UtcNow,

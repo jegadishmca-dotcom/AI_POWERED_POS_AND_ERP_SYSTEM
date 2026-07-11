@@ -14,6 +14,7 @@ using Xunit;
 
 namespace PosErp.IntegrationTests
 {
+    [Collection("Database Collection")]
     public class F47_IdempotencyBehaviorTests
     {
         private static int _handlerExecutions = 0;

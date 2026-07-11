@@ -13,6 +13,7 @@ export interface RegisterCustomerPayload {
   phone: string;
   name: string;
   tamilName?: string;
+  email?: string;
   dob?: string;
   marketingConsent: boolean;
 }

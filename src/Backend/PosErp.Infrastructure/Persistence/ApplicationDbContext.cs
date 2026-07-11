@@ -289,7 +289,14 @@ public class ApplicationDbContext : DbContext, IApplicationDbContext
         modelBuilder.Entity<PosErp.Domain.Entities.Catalog.Product>()
             .Ignore(p => p.MinStockLevel)
             .Ignore(p => p.ReorderPoint)
-            .Ignore(p => p.SearchVector);
+            .Ignore(p => p.SearchVector)
+            .ToTable("products", t =>
+            {
+                t.HasCheckConstraint("CK_Product_SellingPrice", "selling_price > 0");
+                t.HasCheckConstraint("CK_Product_Mrp", "mrp > 0");
+                t.HasCheckConstraint("CK_Product_PurchasePrice", "purchase_price >= 0");
+                t.HasCheckConstraint("CK_Product_SellingPrice_MRP", "selling_price <= mrp");
+            });
 
         modelBuilder.Entity<PosErp.Domain.Entities.Catalog.Product>()
             .HasOne<UnitOfMeasure>()

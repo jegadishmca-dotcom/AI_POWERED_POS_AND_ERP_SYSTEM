@@ -43,6 +43,7 @@ export const Customers = () => {
       phone: payload.phone,
       name: payload.name,
       tamilName: payload.tamilName,
+      email: payload.email,
       dob: payload.dob,
       marketingConsent: payload.marketingConsent,
     });

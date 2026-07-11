@@ -91,6 +91,30 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             using var transaction = await ((DbContext)_context).Database.BeginTransactionAsync(cancellationToken);
             try
             {
+            // Verify supervisor override PIN if provided early
+            bool overrideApproved = false;
+            if (!string.IsNullOrWhiteSpace(request.SupervisorOverridePin))
+            {
+                var usersWithPin = await _context.Users
+                    .Join(_context.Roles,
+                        u => u.RoleId,
+                        r => r.Id,
+                        (u, r) => new { User = u, Role = r })
+                    .Where(x => x.User.IsActive && !x.User.IsDeleted && x.User.PinHash != null &&
+                        (x.Role.Name == "Supervisor" || x.Role.Name == "Manager" || x.Role.Name == "Owner"))
+                    .Select(x => x.User)
+                    .ToListAsync(cancellationToken);
+
+                foreach (var user in usersWithPin)
+                {
+                    if (_passwordHasher.VerifyPassword(request.SupervisorOverridePin, user.PinHash!))
+                    {
+                        overrideApproved = true;
+                        break;
+                    }
+                }
+            }
+
             var customer = request.CustomerId.HasValue 
                 ? await _context.Customers.Include(c => c.Tier).FirstOrDefaultAsync(c => c.Id == request.CustomerId.Value) 
                 : null;
@@ -112,6 +136,19 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 .Include(p => p.Barcodes)  // H2: needed to populate InvoiceItem.Barcode
                 .Where(p => productIds.Contains(p.Id))
                 .ToDictionaryAsync(p => p.Id, cancellationToken);
+
+            // Zero-Rate Checkout Protection Validation
+            foreach (var item in request.Items)
+            {
+                if (item.UnitPrice <= 0)
+                {
+                    if (!overrideApproved)
+                    {
+                        var prodName = productsInfo.TryGetValue(item.ProductId, out var prod) ? prod.Name : "Unknown Product";
+                        throw new Exception($"ZERO_RATE_LIMIT: Manager override PIN is required to sell '{prodName}' at zero rate.");
+                    }
+                }
+            }
 
             var cartEvaluation = new CartEvaluationDto
             {
@@ -379,29 +416,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             }
 
             await _context.SaveChangesAsync(cancellationToken);
-            // Verify supervisor override PIN if provided
-            bool overrideApproved = false;
-            if (!string.IsNullOrWhiteSpace(request.SupervisorOverridePin))
-            {
-                var usersWithPin = await _context.Users
-                    .Join(_context.Roles,
-                        u => u.RoleId,
-                        r => r.Id,
-                        (u, r) => new { User = u, Role = r })
-                    .Where(x => x.User.IsActive && !x.User.IsDeleted && x.User.PinHash != null &&
-                        (x.Role.Name == "Supervisor" || x.Role.Name == "Manager" || x.Role.Name == "Owner"))
-                    .Select(x => x.User)
-                    .ToListAsync(cancellationToken);
-
-                foreach (var user in usersWithPin)
-                {
-                    if (_passwordHasher.VerifyPassword(request.SupervisorOverridePin, user.PinHash!))
-                    {
-                        overrideApproved = true;
-                        break;
-                    }
-                }
-            }
+            // Verify supervisor override PIN already completed at handler entry
 
 
 

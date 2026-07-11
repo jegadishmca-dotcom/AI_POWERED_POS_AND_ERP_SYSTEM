@@ -62,7 +62,7 @@ export const PaymentModal = ({ isOpen, onClose, cartTotal, customer, onCompleteP
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4" onKeyDown={handleKeyDown}>
+    <div className="fixed inset-0 bg-black/60 z-modal flex items-center justify-center p-4" onKeyDown={handleKeyDown}>
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col">
         <div className="bg-slate-800 p-4 flex justify-between items-center text-white">
           <h2 className="text-xl font-bold">Complete Payment</h2>

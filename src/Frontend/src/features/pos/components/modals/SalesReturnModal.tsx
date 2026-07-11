@@ -75,8 +75,20 @@ export const SalesReturnModal = ({ isOpen, onClose, user, requestManagerOverride
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [searchResults, setSearchResults] = useState<Invoice[]>([]);
 
   if (!isOpen) return null;
+
+  const handleSelectInvoice = (inv: Invoice) => {
+    setInvoice(inv);
+    setSearchResults([]);
+    const initialQtys: Record<string, number> = {};
+    inv.items.forEach((item: InvoiceItem) => {
+      initialQtys[item.id] = 0;
+    });
+    setReturnItems(initialQtys);
+    setInvoiceNumber(inv.invoiceNumber);
+  };
 
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -87,25 +99,21 @@ export const SalesReturnModal = ({ isOpen, onClose, user, requestManagerOverride
     setInvoice(null);
     setReturnItems({});
     setSuccessMessage('');
+    setSearchResults([]);
 
     try {
-      const res = await api.get<Invoice>(`/api/Pos/invoice/number/${invoiceNumber.trim()}`);
-      if (res.data) {
-        setInvoice(res.data);
-        // Initialize return quantities to 0 for all items (keyed by item.id)
-        const initialQtys: Record<string, number> = {};
-        res.data.items.forEach((item: InvoiceItem) => {
-          initialQtys[item.id] = 0;
-        });
-        setReturnItems(initialQtys);
+      const res = await api.get<Invoice[]>(`/api/pos/invoice/search?query=${encodeURIComponent(invoiceNumber.trim())}`);
+      if (res.data && res.data.length > 0) {
+        setSearchResults(res.data);
+        if (res.data.length === 1) {
+          handleSelectInvoice(res.data[0]);
+        }
+      } else {
+        setError('No matching invoices found.');
       }
     } catch (err: any) {
       console.error(err);
-      if (err.response?.status === 404) {
-        setError('Invoice not found. Please verify the invoice number.');
-      } else {
-        setError('Failed to fetch invoice. Please try again.');
-      }
+      setError('Invoice not found or search failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -197,7 +205,7 @@ export const SalesReturnModal = ({ isOpen, onClose, user, requestManagerOverride
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4 backdrop-blur-md">
+    <div className="fixed inset-0 bg-black/70 z-modal flex items-center justify-center p-4 backdrop-blur-md">
       <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl w-full max-w-4xl overflow-hidden flex flex-col text-slate-100 max-h-[90vh]">
         {/* Header */}
         <div className="bg-slate-950 p-5 border-b border-slate-800 flex justify-between items-center">
@@ -253,6 +261,33 @@ export const SalesReturnModal = ({ isOpen, onClose, user, requestManagerOverride
               {loading ? 'Searching...' : 'Search'}
             </button>
           </form>
+
+          {/* Matches list if multiple */}
+          {searchResults.length > 1 && (
+            <div className="bg-slate-950 border border-slate-800 rounded-xl p-4 space-y-2">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Multiple matches found. Please select one:</p>
+              <div className="divide-y divide-slate-800 max-h-48 overflow-y-auto">
+                {searchResults.map((inv: any) => (
+                  <button
+                    key={inv.id}
+                    type="button"
+                    onClick={() => handleSelectInvoice(inv)}
+                    className="w-full text-left py-2.5 px-3 hover:bg-slate-900 rounded-lg transition-colors flex justify-between items-center text-sm"
+                  >
+                    <div>
+                      <span className="font-mono font-bold text-slate-200">{inv.invoiceNumber}</span>
+                      <span className="text-slate-500 text-xs ml-2">({new Date(inv.createdAt || inv.businessDate).toLocaleString()})</span>
+                      <span className="text-slate-400 text-xs block">Cashier: {inv.cashierName || 'Unknown'}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="block text-slate-300 font-semibold">{inv.customerName || 'Walk-in'}</span>
+                      <span className="text-xs text-indigo-400 font-bold">₹{inv.netPayable.toFixed(2)}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Invoice Details and Items table */}
           {invoice && (

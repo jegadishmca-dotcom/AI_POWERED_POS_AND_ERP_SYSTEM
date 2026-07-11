@@ -26,7 +26,7 @@ export const ReprintModal = ({ isOpen, onClose, onReprint }: any) => {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/60 z-modal flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden flex flex-col">
         <div className="bg-slate-800 p-4 flex justify-between items-center text-white">
           <h2 className="text-xl font-bold flex items-center"><History className="mr-2" /> Reprint Recent Invoices</h2>

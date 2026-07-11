@@ -5,6 +5,7 @@ export const CustomerRegistrationModal = ({ isOpen, onClose, onRegister, initial
   const [phone, setPhone] = useState('');
   const [name, setName] = useState('');
   const [tamilName, setTamilName] = useState('');
+  const [email, setEmail] = useState('');
   const [dob, setDob] = useState('');
   const [marketingConsent, setMarketingConsent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -15,6 +16,7 @@ export const CustomerRegistrationModal = ({ isOpen, onClose, onRegister, initial
       setPhone(initialPhone || '');
       setName('');
       setTamilName('');
+      setEmail('');
       setDob('');
       setMarketingConsent(false);
       setError(null);
@@ -31,11 +33,12 @@ export const CustomerRegistrationModal = ({ isOpen, onClose, onRegister, initial
     setError(null);
     setIsSubmitting(true);
     try {
-      await onRegister({ phone, name, tamilName, dob: dob || undefined, marketingConsent });
+      await onRegister({ phone, name, tamilName, email: email || undefined, dob: dob || undefined, marketingConsent });
       // Clear fields on success
       setPhone('');
       setName('');
       setTamilName('');
+      setEmail('');
       setDob('');
       setMarketingConsent(false);
       onClose();
@@ -93,14 +96,26 @@ export const CustomerRegistrationModal = ({ isOpen, onClose, onRegister, initial
               />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Date of Birth (For Offers)</label>
-            <input 
-              type="date" 
-              className="w-full p-2 border rounded outline-none" 
-              value={dob}
-              onChange={e => setDob(e.target.value)}
-            />
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Email ID</label>
+              <input 
+                type="email" 
+                className="w-full p-2 border rounded focus:border-indigo-600 outline-none" 
+                placeholder="customer@domain.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Date of Birth (For Offers)</label>
+              <input 
+                type="date" 
+                className="w-full p-2 border rounded outline-none" 
+                value={dob}
+                onChange={e => setDob(e.target.value)}
+              />
+            </div>
           </div>
           
           <div className="bg-slate-50 p-3 rounded border flex items-start gap-3">

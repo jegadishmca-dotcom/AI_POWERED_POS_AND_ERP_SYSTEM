@@ -20,9 +20,9 @@ public class CustomersController : ControllerBase
     }
 
     [HttpGet("search")]
-    public async Task<IActionResult> Search([FromQuery] string q)
+    public async Task<IActionResult> Search([FromQuery] string? q = "")
     {
-        var result = await _mediator.Send(new SearchCustomersQuery(q ?? string.Empty));
+        var result = await _mediator.Send(new SearchCustomersQuery(q?.Trim() ?? string.Empty));
         return Ok(result);
     }
 

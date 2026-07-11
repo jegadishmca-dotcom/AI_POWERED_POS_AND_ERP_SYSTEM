@@ -38,6 +38,89 @@ public class PosController : ControllerBase
         _auditLogger = auditLogger;
     }
 
+    [HttpGet("invoice/search")]
+    public async Task<IActionResult> SearchInvoices([FromQuery] string query, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+        {
+            return BadRequest("Search query cannot be empty.");
+        }
+
+        var normalizedQuery = query.Trim().ToLower();
+
+        var queryable = from inv in _context.Invoices.Include(i => i.Items)
+                        join cashier in _context.Users on inv.CashierId equals cashier.Id into cashiers
+                        from c in cashiers.DefaultIfEmpty()
+                        join terminal in _context.Terminals on inv.TerminalId equals terminal.Id into terminals
+                        from t in terminals.DefaultIfEmpty()
+                        join cust in _context.Customers on inv.CustomerId equals cust.Id into customers
+                        from cu in customers.DefaultIfEmpty()
+                        where inv.InvoiceNumber.ToLower() == normalizedQuery
+                           || inv.InvoiceNumber.ToLower().EndsWith("-" + normalizedQuery)
+                           || inv.InvoiceNumber.ToLower().Contains(normalizedQuery)
+                           || (cu != null && cu.Phone != null && cu.Phone.Contains(normalizedQuery))
+                           || (cu != null && cu.Name != null && cu.Name.ToLower().Contains(normalizedQuery))
+                           || inv.Items.Any(item => item.Barcode == normalizedQuery)
+                        orderby inv.CreatedAt descending
+                        select new {
+                            Invoice = inv,
+                            CashierName = c != null ? c.FullName : "Cashier",
+                            TerminalCode = t != null ? t.TerminalCode : "POS-01",
+                            CustomerName = cu != null ? cu.Name : "",
+                            CustomerPhone = cu != null ? cu.Phone : ""
+                        };
+
+        var results = await queryable.Take(20).ToListAsync(cancellationToken);
+
+        var list = results.Select(data => {
+            var invoice = data.Invoice;
+            return new {
+                invoice.Id,
+                invoice.StoreId,
+                invoice.BusinessDate,
+                invoice.InvoiceNumber,
+                invoice.TerminalId,
+                TerminalCode = data.TerminalCode,
+                invoice.CashierId,
+                CashierName = data.CashierName,
+                invoice.CustomerId,
+                CustomerName = data.CustomerName,
+                CustomerPhone = data.CustomerPhone,
+                invoice.SubTotal,
+                invoice.DiscountAmount,
+                invoice.TaxAmount,
+                invoice.TotalAmount,
+                invoice.RoundOff,
+                invoice.NetPayable,
+                invoice.Status,
+                invoice.PaymentMode,
+                invoice.CashAmount,
+                invoice.UpiAmount,
+                invoice.CardAmount,
+                invoice.WalletAmount,
+                invoice.CreatedAt,
+                Items = invoice.Items.Select(item => new {
+                    item.Id,
+                    item.ProductId,
+                    item.Barcode,
+                    item.ProductName,
+                    item.Quantity,
+                    item.UnitPrice,
+                    item.DiscountAmount,
+                    item.CgstRate,
+                    item.CgstAmount,
+                    item.SgstRate,
+                    item.SgstAmount,
+                    item.CessRate,
+                    item.CessAmount,
+                    item.TotalAmount
+                }).ToList()
+            };
+        }).ToList();
+
+        return Ok(list);
+    }
+
     [HttpGet("invoice/number/{invoiceNumber}")]
     public async Task<IActionResult> GetInvoiceByNumber(string invoiceNumber, CancellationToken cancellationToken)
     {

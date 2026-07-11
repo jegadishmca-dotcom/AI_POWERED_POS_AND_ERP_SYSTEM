@@ -130,6 +130,19 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                         purchasePrice = sellingPrice * 0.8m; // fallback
                     }
 
+                    if (sellingPrice <= 0 || mrp <= 0 || purchasePrice < 0)
+                    {
+                        errors.Add($"Line {lineNum}: Selling Price and MRP must be greater than zero. Purchase price cannot be negative.");
+                        failed++;
+                        continue;
+                    }
+                    if (sellingPrice > mrp)
+                    {
+                        errors.Add($"Line {lineNum}: Selling Price cannot exceed MRP.");
+                        failed++;
+                        continue;
+                    }
+
                     string? barcodeVal = barcodeIdx != -1 && barcodeIdx < values.Count ? values[barcodeIdx] : null;
                     string? taxSlabName = taxSlabIdx != -1 && taxSlabIdx < values.Count ? values[taxSlabIdx] : null;
 

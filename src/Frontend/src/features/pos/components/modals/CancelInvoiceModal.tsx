@@ -64,8 +64,9 @@ export const CancelInvoiceModal = ({ isOpen, onClose, user }: CancelInvoiceModal
   const [invoice, setInvoice] = useState<Invoice | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [searchResults, setSearchResults] = useState<Invoice[]>([]);
 
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const timeoutRef = useRef<any>(null);
 
   useEffect(() => {
     return () => {
@@ -88,6 +89,12 @@ export const CancelInvoiceModal = ({ isOpen, onClose, user }: CancelInvoiceModal
   // Authorization Check - Backend Allow-List alignment
   const isAuthorized = !!(user?.role && CANCELLATION_ALLOWED_ROLES.includes(user.role));
 
+  const handleSelectInvoice = (inv: Invoice) => {
+    setInvoice(inv);
+    setSearchResults([]);
+    setInvoiceNumber(inv.invoiceNumber);
+  };
+
   const handleSearch = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     if (!invoiceNumber.trim()) return;
@@ -96,18 +103,21 @@ export const CancelInvoiceModal = ({ isOpen, onClose, user }: CancelInvoiceModal
     setError('');
     setInvoice(null);
     setSuccessMessage('');
+    setSearchResults([]);
 
     try {
-      const res = await api.get<Invoice>(`/api/Pos/invoice/number/${invoiceNumber.trim()}`);
-      if (res.data) {
-        setInvoice(res.data);
+      const res = await api.get<Invoice[]>(`/api/pos/invoice/search?query=${encodeURIComponent(invoiceNumber.trim())}`);
+      if (res.data && res.data.length > 0) {
+        setSearchResults(res.data);
+        if (res.data.length === 1) {
+          handleSelectInvoice(res.data[0]);
+        }
       } else {
-        setError('Invoice not found.');
+        setError('No matching invoices found.');
       }
     } catch (err: any) {
       console.error(err);
-      const msg = err.response?.data?.message || err.response?.data || 'Failed to search invoice.';
-      setError(msg);
+      setError('Invoice not found or search failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -148,7 +158,7 @@ export const CancelInvoiceModal = ({ isOpen, onClose, user }: CancelInvoiceModal
   const isCancellable = invoice && invoice.status !== 'CANCELLED' && invoice.status !== 'HOLD';
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 bg-black/60 z-modal flex items-center justify-center p-4 backdrop-blur-sm">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col border border-slate-100">
         
         {/* Header */}
@@ -199,6 +209,33 @@ export const CancelInvoiceModal = ({ isOpen, onClose, user }: CancelInvoiceModal
                   <span>Search</span>
                 </button>
               </form>
+
+              {/* Matches list if multiple */}
+              {searchResults.length > 1 && (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-2">
+                  <p className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Multiple matches found. Please select one:</p>
+                  <div className="divide-y divide-slate-200 max-h-48 overflow-y-auto">
+                    {searchResults.map((inv: any) => (
+                      <button
+                        key={inv.id}
+                        type="button"
+                        onClick={() => handleSelectInvoice(inv)}
+                        className="w-full text-left py-2.5 px-3 hover:bg-slate-100 rounded-lg transition-colors flex justify-between items-center text-sm text-slate-800"
+                      >
+                        <div>
+                          <span className="font-mono font-bold text-slate-900">{inv.invoiceNumber}</span>
+                          <span className="text-slate-500 text-xs ml-2">({new Date(inv.createdAt || inv.businessDate).toLocaleString()})</span>
+                          <span className="text-slate-600 text-xs block font-medium">Cashier: {inv.cashierName || 'Unknown'}</span>
+                        </div>
+                        <div className="text-right">
+                          <span className="block text-slate-800 font-semibold">{inv.customerName || 'Walk-in'}</span>
+                          <span className="text-xs text-rose-600 font-bold">₹{inv.netPayable.toFixed(2)}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Status Messages */}
               {error && (

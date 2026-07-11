@@ -33,6 +33,11 @@ export default {
           900: 'var(--indigo-900)',
           950: 'var(--indigo-950)',
         }
+      },
+      zIndex: {
+        'modal': '60',
+        'overlay': '100',
+        'override': '150',
       }
     },
   },

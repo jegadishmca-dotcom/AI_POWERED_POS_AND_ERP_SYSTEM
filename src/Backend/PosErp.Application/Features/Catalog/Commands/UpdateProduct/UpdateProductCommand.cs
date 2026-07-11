@@ -35,6 +35,23 @@ public class UpdateProductCommandHandler : IRequestHandler<UpdateProductCommand,
 
     public async Task<bool> Handle(UpdateProductCommand request, CancellationToken cancellationToken)
     {
+        if (request.SellingPrice <= 0)
+        {
+            throw new ArgumentException("Selling price must be greater than zero.");
+        }
+        if (request.Mrp <= 0)
+        {
+            throw new ArgumentException("MRP must be greater than zero.");
+        }
+        if (request.PurchasePrice < 0)
+        {
+            throw new ArgumentException("Purchase price cannot be negative.");
+        }
+        if (request.SellingPrice > request.Mrp)
+        {
+            throw new ArgumentException("Selling price cannot exceed MRP.");
+        }
+
         var product = await _context.Products
             .Include(p => p.Barcodes)
             .FirstOrDefaultAsync(p => p.Id == request.Id && !p.IsDeleted, cancellationToken);

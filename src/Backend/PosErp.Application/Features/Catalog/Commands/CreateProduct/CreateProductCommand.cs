@@ -33,6 +33,23 @@ public class CreateProductCommandHandler : IRequestHandler<CreateProductCommand,
 
     public async Task<Guid> Handle(CreateProductCommand request, CancellationToken cancellationToken)
     {
+        if (request.SellingPrice <= 0)
+        {
+            throw new ArgumentException("Selling price must be greater than zero.");
+        }
+        if (request.Mrp <= 0)
+        {
+            throw new ArgumentException("MRP must be greater than zero.");
+        }
+        if (request.PurchasePrice < 0)
+        {
+            throw new ArgumentException("Purchase price cannot be negative.");
+        }
+        if (request.SellingPrice > request.Mrp)
+        {
+            throw new ArgumentException("Selling price cannot exceed MRP.");
+        }
+
         // 1. Get requested Tax Slab or default to first if not provided
         PosErp.Domain.Entities.Catalog.TaxSlab? taxSlab = null;
         if (request.TaxSlabId.HasValue)

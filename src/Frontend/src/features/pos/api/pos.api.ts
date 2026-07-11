@@ -9,6 +9,8 @@ export interface CreateInvoicePayload {
   cashAmount: number;
   upiAmount: number;
   cardAmount: number;
+  pointsRedeemed?: number;
+  supervisorOverridePin?: string;
   items: Array<{
     productId: string;
     quantity: number;

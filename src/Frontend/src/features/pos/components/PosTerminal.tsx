@@ -737,7 +737,7 @@ export const PosTerminal = () => {
       setHoldModalOpen(false);
   };
 
-  const requestManagerOverride = (action: string, onSuccess: () => void) => {
+  const requestManagerOverride = (action: string, onSuccess: (pin?: string) => void) => {
       setManagerAction({ name: action, callback: onSuccess });
       setManagerModalOpen(true);
   };
@@ -1357,156 +1357,178 @@ export const PosTerminal = () => {
                                  : tenders.upi > 0  ? 'UPI'
                                  : tenders.card > 0 ? 'CARD'
                                  : 'WALLET';
-            const payload = {
-              invoiceNumber: `INV-${localStorage.getItem('pos_terminal_code') || 'POS-01'}-${Date.now().toString().slice(-6)}`,
-              terminalId: terminalId,
-              cashierId: cashierId,
-              customerId: customer?.id || undefined,
-              promoCode: promoCode || undefined,
-              walletAmountUsed: tenders.wallet || 0,
-              cashAmount: tenders.cash || 0,
-              upiAmount: tenders.upi || 0,
-              cardAmount: tenders.card || 0,
-              roundOff: roundOffVal,
-              netPayable: netPayableVal,
-              paymentMode: paymentModeVal,
-              pointsRedeemed: pointsRedeemed || 0,
-              items: cart.items.map((item: any) => ({
-                productId: item.productId,
-                quantity: item.qty,
-                unitPrice: item.unitPrice,
-                batchId: item.batchId || undefined
-              }))
-            };
+            
+            const hasZeroRateItem = cart.items.some((item: any) => item.unitPrice <= 0);
 
-            // 1. Calculate offline loyalty estimation
-            const oldLoyaltyPoints = customer ? (customer.points || 0) : 0;
-            let offlineLoyaltyEarned = customer ? Math.floor(finalBillTotal / 100) : 0;
-            let offlineLoyaltyBalance = oldLoyaltyPoints + offlineLoyaltyEarned - pointsRedeemed;
+            const executeCheckout = async (supervisorPin?: string) => {
+              const payload = {
+                invoiceNumber: `INV-${localStorage.getItem('pos_terminal_code') || 'POS-01'}-${Date.now().toString().slice(-6)}`,
+                terminalId: terminalId,
+                cashierId: cashierId,
+                customerId: customer?.id || undefined,
+                promoCode: promoCode || undefined,
+                walletAmountUsed: tenders.wallet || 0,
+                cashAmount: tenders.cash || 0,
+                upiAmount: tenders.upi || 0,
+                cardAmount: tenders.card || 0,
+                roundOff: roundOffVal,
+                netPayable: netPayableVal,
+                paymentMode: paymentModeVal,
+                pointsRedeemed: pointsRedeemed || 0,
+                supervisorOverridePin: supervisorPin || undefined,
+                items: cart.items.map((item: any) => ({
+                  productId: item.productId,
+                  quantity: item.qty,
+                  unitPrice: item.unitPrice,
+                  batchId: item.batchId || undefined
+                }))
+              };
 
-            // 2. Construct the FULL invoice object for local storage and printing
-            const invoiceId = safeRandomUUID();
-            const fullInvoice = {
-              id: invoiceId,
-              invoiceNumber: payload.invoiceNumber,
-              businessDate: new Date().toISOString(),
-              terminalId: payload.terminalId,
-              terminalSequence: 1,
-              cashierId: cashierId,
-              cashierName: user?.fullName || user?.username || 'Cashier',
-              customerName: customer?.name || undefined,
-              customerPhone: customer?.phone || undefined,
-              customerId: customer?.id || undefined,
-              loyaltyPointsEarned: offlineLoyaltyEarned,
-              loyaltyPointsBalance: offlineLoyaltyBalance,
-              subTotal: cart.subtotal,
-              discountAmount: cart.totalDiscount,
-              taxAmount: cart.taxTotal,
-              totalAmount: cart.finalTotal,
-              cashAmount: tenders.cash || 0,
-              upiAmount: tenders.upi || 0,
-              cardAmount: tenders.card || 0,
-              walletAmountUsed: tenders.wallet || 0,
-              roundOff: roundOffVal,
-              netPayable: netPayableVal,
-              paymentMode: paymentModeVal,
-              pointsRedeemed: payload.pointsRedeemed,
-              status: 'COMPLETED',
-              items: cart.items.map((item: any) => ({
-                id: item.id || safeRandomUUID(),
-                productId: item.productId,
-                name: item.name,
-                quantity: item.qty,
-                unitPrice: item.unitPrice,
-                cgstRate: item.cgstRate || 0,
-                sgstRate: item.sgstRate || 0,
-                cessRate: item.cessRate || 0,
-                discountAmount: item.discountAmount || 0,
-                totalAmount: item.finalLineTotal || item.lineTotal,
-                // Add mapping for Sync API expected fields
-                barcode: item.barcode || item.primaryBarcode || undefined,
-                productName: item.name,
-                cgstAmount: (() => {
-                  const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0) + (item.cessRate || 0);
-                  const lineTotal = item.finalLineTotal || item.lineTotal;
-                  const taxable = lineTotal / (1 + itemTaxRate / 100);
-                  return +(taxable * ((item.cgstRate || 0) / 100)).toFixed(2);
-                })(),
-                sgstAmount: (() => {
-                  const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0) + (item.cessRate || 0);
-                  const lineTotal = item.finalLineTotal || item.lineTotal;
-                  const taxable = lineTotal / (1 + itemTaxRate / 100);
-                  return +(taxable * ((item.sgstRate || 0) / 100)).toFixed(2);
-                })(),
-                cessAmount: (() => {
-                  const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0) + (item.cessRate || 0);
-                  const lineTotal = item.finalLineTotal || item.lineTotal;
-                  const taxable = lineTotal / (1 + itemTaxRate / 100);
-                  return +(taxable * ((item.cessRate || 0) / 100)).toFixed(2);
-                })()
-              }))
-            };
+              // 1. Calculate offline loyalty estimation
+              const oldLoyaltyPoints = customer ? (customer.points || 0) : 0;
+              let offlineLoyaltyEarned = customer ? Math.floor(finalBillTotal / 100) : 0;
+              let offlineLoyaltyBalance = oldLoyaltyPoints + offlineLoyaltyEarned - pointsRedeemed;
 
-            try {
-              const response = await createInvoice(payload);
-              fullInvoice.id = response.invoiceId;
-              fullInvoice.invoiceNumber = response.invoiceNumber;
-              // Re-fetch customer to get updated loyalty balance from backend.
-              // Only update if the backend returned a HIGHER balance than our offline
-              // estimate (guards against a race condition where the DB hasn't flushed yet).
-              if (customer?.phone) {
-                try {
-                  const freshCustomers = await searchCustomers(customer.phone);
-                  if (freshCustomers.length > 0) {
-                    const backendBalance = freshCustomers[0].loyaltyPoints || 0;
-                    if (backendBalance > oldLoyaltyPoints) {
-                      // Backend has committed the new points — use the real values
-                      fullInvoice.loyaltyPointsBalance = backendBalance;
-                      fullInvoice.loyaltyPointsEarned  = Math.max(0, backendBalance - oldLoyaltyPoints);
-                    }
-                    // else: keep the offline-calculated estimate (backend hadn't flushed yet)
-                  }
-                } catch { /* non-critical — keep offline estimate */ }
-              }
-            } catch (err: any) {
-              const errorText = err?.response?.data?.message || err?.response?.data?.detailed || err?.response?.data?.Detailed || err?.response?.data?.Message || err?.message || "";
-              
-              if (errorText.includes("INSUFFICIENT_STOCK")) {
-                const pin = prompt(`${errorText}\n\nPlease enter Supervisor PIN to override negative stock sale:`);
-                if (pin !== null && pin.trim() !== "") {
+              // 2. Construct the FULL invoice object for local storage and printing
+              const invoiceId = safeRandomUUID();
+              const fullInvoice = {
+                id: invoiceId,
+                invoiceNumber: payload.invoiceNumber,
+                businessDate: new Date().toISOString(),
+                terminalId: payload.terminalId,
+                terminalSequence: 1,
+                cashierId: cashierId,
+                cashierName: user?.fullName || user?.username || 'Cashier',
+                customerName: customer?.name || undefined,
+                customerPhone: customer?.phone || undefined,
+                customerId: customer?.id || undefined,
+                loyaltyPointsEarned: offlineLoyaltyEarned,
+                loyaltyPointsBalance: offlineLoyaltyBalance,
+                subTotal: cart.subtotal,
+                discountAmount: cart.totalDiscount,
+                taxAmount: cart.taxTotal,
+                totalAmount: cart.finalTotal,
+                cashAmount: tenders.cash || 0,
+                upiAmount: tenders.upi || 0,
+                cardAmount: tenders.card || 0,
+                walletAmountUsed: tenders.wallet || 0,
+                roundOff: roundOffVal,
+                netPayable: netPayableVal,
+                paymentMode: paymentModeVal,
+                pointsRedeemed: payload.pointsRedeemed,
+                status: 'COMPLETED',
+                items: cart.items.map((item: any) => ({
+                  id: item.id || safeRandomUUID(),
+                  productId: item.productId,
+                  name: item.name,
+                  quantity: item.qty,
+                  unitPrice: item.unitPrice,
+                  cgstRate: item.cgstRate || 0,
+                  sgstRate: item.sgstRate || 0,
+                  cessRate: item.cessRate || 0,
+                  discountAmount: item.discountAmount || 0,
+                  totalAmount: item.finalLineTotal || item.lineTotal,
+                  // Add mapping for Sync API expected fields
+                  barcode: item.barcode || item.primaryBarcode || undefined,
+                  productName: item.name,
+                  cgstAmount: (() => {
+                    const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0) + (item.cessRate || 0);
+                    const lineTotal = item.finalLineTotal || item.lineTotal;
+                    const taxable = lineTotal / (1 + itemTaxRate / 100);
+                    return +(taxable * ((item.cgstRate || 0) / 100)).toFixed(2);
+                  })(),
+                  sgstAmount: (() => {
+                    const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0) + (item.cessRate || 0);
+                    const lineTotal = item.finalLineTotal || item.lineTotal;
+                    const taxable = lineTotal / (1 + itemTaxRate / 100);
+                    return +(taxable * ((item.sgstRate || 0) / 100)).toFixed(2);
+                  })(),
+                  cessAmount: (() => {
+                    const itemTaxRate = (item.cgstRate || 0) + (item.sgstRate || 0) + (item.cessRate || 0);
+                    const lineTotal = item.finalLineTotal || item.lineTotal;
+                    const taxable = lineTotal / (1 + itemTaxRate / 100);
+                    return +(taxable * ((item.cessRate || 0) / 100)).toFixed(2);
+                  })()
+                }))
+              };
+
+              try {
+                const response = await createInvoice(payload);
+                fullInvoice.id = response.invoiceId;
+                fullInvoice.invoiceNumber = response.invoiceNumber;
+                // Re-fetch customer to get updated loyalty balance from backend.
+                // Only update if the backend returned a HIGHER balance than our offline
+                // estimate (guards against a race condition where the DB hasn't flushed yet).
+                if (customer?.phone) {
                   try {
-                    const retryPayload = { ...payload, supervisorOverridePin: pin };
-                    const retryResponse = await createInvoice(retryPayload);
-                    fullInvoice.id = retryResponse.invoiceId;
-                    fullInvoice.invoiceNumber = retryResponse.invoiceNumber;
-                  } catch (retryErr: any) {
-                    const retryErrorText = retryErr?.response?.data?.message || retryErr?.response?.data?.detailed || retryErr?.response?.data?.Detailed || retryErr?.response?.data?.Message || retryErr?.message || "Invalid PIN.";
-                    alert("Override Failed: " + retryErrorText);
-                    throw new Error(retryErrorText);
-                  }
-                } else {
-                  throw new Error("Checkout blocked: Insufficient stock and no override PIN provided.");
+                    const freshCustomers = await searchCustomers(customer.phone);
+                    if (freshCustomers.length > 0) {
+                      const backendBalance = freshCustomers[0].loyaltyPoints || 0;
+                      if (backendBalance > oldLoyaltyPoints) {
+                        // Backend has committed the new points — use the real values
+                        fullInvoice.loyaltyPointsBalance = backendBalance;
+                        fullInvoice.loyaltyPointsEarned  = Math.max(0, backendBalance - oldLoyaltyPoints);
+                      }
+                      // else: keep the offline-calculated estimate (backend hadn't flushed yet)
+                    }
+                  } catch { /* non-critical — keep offline estimate */ }
                 }
-              } else {
-                console.warn('Network issue during checkout, saving offline...', err);
-                await posDb.invoices.put(fullInvoice as any);
-                await posDb.sync_queue.put(fullInvoice as any);
-                const errorDetail = err?.response?.data?.detailed || err?.response?.data?.message || err?.response?.data?.Detailed || err?.response?.data?.Message || err?.message || JSON.stringify(err);
-                alert(`Saved Offline: Invoice ${payload.invoiceNumber} queued for sync.\n\nERROR DETAIL:\n${errorDetail}`);
+              } catch (err: any) {
+                const errorText = err?.response?.data?.message || err?.response?.data?.detailed || err?.response?.data?.Detailed || err?.response?.data?.Message || err?.message || "";
+                
+                if (errorText.includes("INSUFFICIENT_STOCK")) {
+                  const pin = prompt(`${errorText}\n\nPlease enter Supervisor PIN to override negative stock sale:`);
+                  if (pin !== null && pin.trim() !== "") {
+                    try {
+                      const retryPayload = { ...payload, supervisorOverridePin: pin };
+                      const retryResponse = await createInvoice(retryPayload);
+                      fullInvoice.id = retryResponse.invoiceId;
+                      fullInvoice.invoiceNumber = retryResponse.invoiceNumber;
+                    } catch (retryErr: any) {
+                      const retryErrorText = retryErr?.response?.data?.message || retryErr?.response?.data?.detailed || retryErr?.response?.data?.Detailed || retryErr?.response?.data?.Message || retryErr?.message || "Invalid PIN.";
+                      alert("Override Failed: " + retryErrorText);
+                      throw new Error(retryErrorText);
+                    }
+                  } else {
+                    throw new Error("Checkout blocked: Insufficient stock and no override PIN provided.");
+                  }
+                } else if (errorText.includes("ZERO_RATE_LIMIT")) {
+                  alert(errorText);
+                  throw new Error(errorText);
+                } else {
+                  console.warn('Network issue during checkout, saving offline...', err);
+                  await posDb.invoices.put(fullInvoice as any);
+                  await posDb.sync_queue.put(fullInvoice as any);
+                  const errorDetail = err?.response?.data?.detailed || err?.response?.data?.message || err?.response?.data?.Detailed || err?.response?.data?.Message || err?.message || JSON.stringify(err);
+                  alert(`Saved Offline: Invoice ${payload.invoiceNumber} queued for sync.\n\nERROR DETAIL:\n${errorDetail}`);
+                }
               }
+
+              await posDb.invoices.put(fullInvoice as any);
+
+              setCompletedInvoice(fullInvoice);
+              setPaymentModalOpen(false);
+              printReceipt(fullInvoice);
+
+              setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
+              setCustomer(null);
+              setCustomerQuery('');
+              setPromoCode('');
+              setPointsRedeemed(0);
+            };
+
+            if (hasZeroRateItem) {
+              requestManagerOverride('Zero Rate Item Checkout', (pin?: string) => {
+                if (pin) {
+                  executeCheckout(pin);
+                } else {
+                  alert("Manager Override PIN required to sell items at zero rate.");
+                  setIsProcessing(false);
+                }
+              });
+            } else {
+              await executeCheckout();
             }
-
-            await posDb.invoices.put(fullInvoice as any);
-
-            setCompletedInvoice(fullInvoice);
-            setPaymentModalOpen(false);
-            printReceipt(fullInvoice);
-
-            setCart({ items: [], subtotal: 0, totalDiscount: 0, taxTotal: 0, finalTotal: 0, appliedOfferNames: [] });
-            setCustomer(null);
-            setCustomerQuery('');
-            setPromoCode('');
-            setPointsRedeemed(0);
           } catch (err: any) {
             console.error('Checkout error:', err);
             alert('Failed to process checkout: ' + (err.message));
@@ -1528,6 +1550,7 @@ export const PosTerminal = () => {
               phone: newCust.phone,
               name: newCust.name,
               tamilName: newCust.tamilName || undefined,
+              email: newCust.email || undefined,
               dob: newCust.dob || undefined,
               marketingConsent: newCust.marketingConsent
             });
@@ -1607,14 +1630,14 @@ export const PosTerminal = () => {
       <SalesReturnModal
         isOpen={isReturnModalOpen}
         onClose={() => setReturnModalOpen(false)}
-        user={user}
+        user={user || undefined}
         requestManagerOverride={requestManagerOverride}
       />
 
       <CancelInvoiceModal
         isOpen={isCancelModalOpen}
         onClose={() => setCancelModalOpen(false)}
-        user={user}
+        user={user || undefined}
       />
 
     </div>

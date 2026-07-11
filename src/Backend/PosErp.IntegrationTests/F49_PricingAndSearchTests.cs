@@ -396,6 +396,28 @@ namespace PosErp.IntegrationTests
             await _context.SaveChangesAsync();
         }
 
+        [Fact]
+        public async Task Test_DemoSandboxMiddleware_Allows_CustomerRegistration()
+        {
+            var middleware = new PosErp.Api.Middlewares.DemoSandboxMiddleware(context =>
+            {
+                context.Response.StatusCode = 200;
+                return Task.CompletedTask;
+            });
+
+            var httpContext = new DefaultHttpContext();
+            httpContext.Request.Method = "POST";
+            httpContext.Request.Path = "/api/customers";
+            
+            var claims = new[] { new Claim(ClaimTypes.Name, "demo@supermarket.com") };
+            var identity = new ClaimsIdentity(claims, "TestAuth");
+            httpContext.User = new ClaimsPrincipal(identity);
+
+            await middleware.InvokeAsync(httpContext);
+
+            Assert.Equal(200, httpContext.Response.StatusCode);
+        }
+
         public void Dispose()
         {
             // Clean up test invoices

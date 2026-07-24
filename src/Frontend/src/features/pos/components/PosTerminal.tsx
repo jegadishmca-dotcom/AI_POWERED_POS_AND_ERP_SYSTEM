@@ -1454,8 +1454,10 @@ export const PosTerminal = () => {
 
               try {
                 const response = await createInvoice(payload);
-                fullInvoice.id = response.invoiceId;
-                fullInvoice.invoiceNumber = response.invoiceNumber;
+                if (response) {
+                  fullInvoice.id = response.invoiceId || (response as any).InvoiceId || (response as any).id || fullInvoice.id;
+                  fullInvoice.invoiceNumber = response.invoiceNumber || (response as any).InvoiceNumber || fullInvoice.invoiceNumber;
+                }
                 // Re-fetch customer to get updated loyalty balance from backend.
                 // Only update if the backend returned a HIGHER balance than our offline
                 // estimate (guards against a race condition where the DB hasn't flushed yet).
@@ -1482,8 +1484,10 @@ export const PosTerminal = () => {
                     try {
                       const retryPayload = { ...payload, supervisorOverridePin: pin };
                       const retryResponse = await createInvoice(retryPayload);
-                      fullInvoice.id = retryResponse.invoiceId;
-                      fullInvoice.invoiceNumber = retryResponse.invoiceNumber;
+                      if (retryResponse) {
+                        fullInvoice.id = retryResponse.invoiceId || (retryResponse as any).InvoiceId || (retryResponse as any).id || fullInvoice.id;
+                        fullInvoice.invoiceNumber = retryResponse.invoiceNumber || (retryResponse as any).InvoiceNumber || fullInvoice.invoiceNumber;
+                      }
                     } catch (retryErr: any) {
                       const retryErrorText = retryErr?.response?.data?.message || retryErr?.response?.data?.detailed || retryErr?.response?.data?.Detailed || retryErr?.response?.data?.Message || retryErr?.message || "Invalid PIN.";
                       alert("Override Failed: " + retryErrorText);

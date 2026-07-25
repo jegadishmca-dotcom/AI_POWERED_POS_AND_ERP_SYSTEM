@@ -741,13 +741,13 @@ using (var scope = app.Services.CreateScope())
         }
         
         var passwordHasher = services.GetRequiredService<IPasswordHasher>();
+        var hostEnv = services.GetRequiredService<Microsoft.Extensions.Hosting.IHostEnvironment>();
+        var configuration = services.GetRequiredService<IConfiguration>();
         bool usersChanged = false;
         
         // Seed Admin User
         if (!await context.Users.AnyAsync(u => u.Username == "admin@supermarket.local"))
         {
-            var hostEnv = services.GetRequiredService<Microsoft.Extensions.Hosting.IHostEnvironment>();
-            var configuration = services.GetRequiredService<IConfiguration>();
             var adminPassword = configuration["SystemConfig:AdminPassword"];
             var adminPin = configuration["SystemConfig:AdminPin"];
 
@@ -789,11 +789,23 @@ using (var scope = app.Services.CreateScope())
         }
         else
         {
-            // Ensure existing admin has a PinHash set (for upgrades from older versions)
+            // Ensure existing admin has a PinHash set (for upgrades from older versions).
+            // SEC-06a: Use env-var PIN in Production instead of hardcoded "1234".
             var existingAdmin = await context.Users.FirstOrDefaultAsync(u => u.Username == "admin@supermarket.local");
             if (existingAdmin != null && existingAdmin.PinHash == null)
             {
-                existingAdmin.PinHash = passwordHasher.HashPassword("1234");
+                var upgradePin = configuration["SystemConfig:AdminPin"];
+                if (string.IsNullOrEmpty(upgradePin))
+                {
+                    if (!hostEnv.IsDevelopment())
+                    {
+                        throw new InvalidOperationException(
+                            "FATAL: Admin user has no PIN set and SystemConfig:AdminPin is not configured. " +
+                            "Cannot upgrade with hardcoded default in Production.");
+                    }
+                    upgradePin = "1234"; // Default fallback ONLY in development
+                }
+                existingAdmin.PinHash = passwordHasher.HashPassword(upgradePin);
                 usersChanged = true;
                 Console.WriteLine("[PIN] Default override PIN set for admin user. Please change it via Settings.");
             }
@@ -802,7 +814,6 @@ using (var scope = app.Services.CreateScope())
         // Seed Developer User
         if (!await context.Users.AnyAsync(u => u.Username == "developer@supermarket.local"))
         {
-            var configuration = services.GetRequiredService<IConfiguration>();
             var devPasswordHash = configuration["SystemConfig:DeveloperPasswordHash"];
             var devUser = new PosErp.Domain.Entities.Auth.User
             {
@@ -818,41 +829,53 @@ using (var scope = app.Services.CreateScope())
             Console.WriteLine("[DEV] Developer user seeded (disabled by default unless SystemConfig:DeveloperPasswordHash is configured).");
         }
         
-        // Seed Demo Sandbox User
-        if (!await context.Users.AnyAsync(u => u.Username == "demo@supermarket.com"))
+        // SEC-06a: Demo Sandbox User — Development only.
+        // REMOVED from Production: this account had Owner-level privileges with a hardcoded
+        // password that was force-reset on every container restart, making it a persistent
+        // backdoor readable from source code. The else-branch that re-enforced the password
+        // has been deleted entirely to prevent reintroduction.
+        if (hostEnv.IsDevelopment())
         {
-            var demoUser = new PosErp.Domain.Entities.Auth.User
+            if (!await context.Users.AnyAsync(u => u.Username == "demo@supermarket.com"))
             {
-                Username = "demo@supermarket.com",
-                PasswordHash = passwordHasher.HashPassword("Demo@123456"),
-                PinHash = passwordHasher.HashPassword("1234"), // Default override PIN
-                FullName = "Demo Sandbox User",
-                RoleId = ownerRole.Id,
-                IsActive = true
-            };
-            context.Users.Add(demoUser);
-            usersChanged = true;
-            Console.WriteLine("[SEED] Seeded demo@supermarket.com sandbox user.");
-        }
-        else
-        {
-            // Ensure existing demo user has the correct password (one-time upgrade)
-            var existingDemo = await context.Users.FirstOrDefaultAsync(u => u.Username == "demo@supermarket.com");
-            if (existingDemo != null && !passwordHasher.VerifyPassword("Demo@123456", existingDemo.PasswordHash))
-            {
-                existingDemo.PasswordHash = passwordHasher.HashPassword("Demo@123456");
+                var demoUser = new PosErp.Domain.Entities.Auth.User
+                {
+                    Username = "demo@supermarket.com",
+                    PasswordHash = passwordHasher.HashPassword("Demo@123456"),
+                    PinHash = passwordHasher.HashPassword("1234"),
+                    FullName = "Demo Sandbox User",
+                    RoleId = ownerRole.Id,
+                    IsActive = true
+                };
+                context.Users.Add(demoUser);
                 usersChanged = true;
-                Console.WriteLine("[SEED] Updated demo@supermarket.com password to meet policy requirements.");
+                Console.WriteLine("[SEED] Seeded demo@supermarket.com sandbox user (Development only).");
             }
         }
-        
+
+        // SEC-06a: Cashier passwords are now env-var-driven in Production.
+        // In Development, a default fallback is used. In Production, if the env var is missing,
+        // the app fails fast — matching the same pattern as the Admin account.
+        var cashierPassword = configuration["SystemConfig:CashierPassword"];
+        if (string.IsNullOrEmpty(cashierPassword))
+        {
+            if (!hostEnv.IsDevelopment())
+            {
+                throw new InvalidOperationException(
+                    "FATAL: SystemConfig:CashierPassword environment variable is not set. " +
+                    "For security in Production, you must configure a bootstrap cashier password. " +
+                    "Seeding with default 'Cashier@123!' is prohibited.");
+            }
+            cashierPassword = "Cashier@123!"; // Default fallback ONLY in development
+        }
+
         // Seed Cashier 01 User
         if (!await context.Users.AnyAsync(u => u.Username == "cashier@supermarket.local"))
         {
             var cashierUser = new PosErp.Domain.Entities.Auth.User
             {
                 Username = "cashier@supermarket.local",
-                PasswordHash = passwordHasher.HashPassword("Cashier@123!"),
+                PasswordHash = passwordHasher.HashPassword(cashierPassword),
                 FullName = "Terminal Cashier 01",
                 RoleId = cashierRole.Id,
                 IsActive = true
@@ -867,7 +890,7 @@ using (var scope = app.Services.CreateScope())
             var cashierUser2 = new PosErp.Domain.Entities.Auth.User
             {
                 Username = "cashier02@supermarket.local",
-                PasswordHash = passwordHasher.HashPassword("Cashier@123!"),
+                PasswordHash = passwordHasher.HashPassword(cashierPassword),
                 FullName = "Terminal Cashier 02",
                 RoleId = cashierRole.Id,
                 IsActive = true
@@ -882,7 +905,7 @@ using (var scope = app.Services.CreateScope())
             var cashierUser3 = new PosErp.Domain.Entities.Auth.User
             {
                 Username = "cashier03@supermarket.local",
-                PasswordHash = passwordHasher.HashPassword("Cashier@123!"),
+                PasswordHash = passwordHasher.HashPassword(cashierPassword),
                 FullName = "Terminal Cashier 03",
                 RoleId = cashierRole.Id,
                 IsActive = true

@@ -110,6 +110,7 @@ services:
       - JWT__Secret=${JWT_SECRET}
       - SystemConfig__AdminPassword=${TEST_ADMIN_PASSWORD}
       - SystemConfig__AdminPin=${TEST_ADMIN_PIN}
+      - SystemConfig__CashierPassword=${CASHIER_PASSWORD}
       - EmailSettings__SmtpServer=smtp.gmail.com
       - EmailSettings__SmtpPort=587
       - EmailSettings__SenderEmail=fortabletuse999@gmail.com

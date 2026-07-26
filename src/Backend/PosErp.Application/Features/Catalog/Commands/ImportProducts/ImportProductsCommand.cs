@@ -239,22 +239,22 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                         _context.Products.Add(product);
                         existingProducts[productCode] = product; // Add to dictionary so duplicates in same CSV don't crash
                     }
+                    else if (_context is DbContext dbContext)
+                    {
+                        var entry = dbContext.Entry(product);
+                        if (entry.State == EntityState.Detached)
+                        {
+                            dbContext.Attach(product);
+                        }
+                        entry.State = EntityState.Modified;
+                    }
 
                     imported++;
 
-                    // Batch save every 500 records to prevent memory bloat and improve speed
-                    if (imported % 500 == 0)
+                    // Batch save every 1000 records to keep database transactions manageable
+                    if (imported % 1000 == 0)
                     {
                         await _context.SaveChangesAsync(cancellationToken);
-                        if (_context is DbContext dbContext) { dbContext.ChangeTracker.Clear(); } // Clear tracking to keep memory low
-                        // Re-fetch tax slabs & UOMs since they got detached
-                        taxSlabs = await _context.TaxSlabs.Where(t => !t.IsDeleted).ToListAsync(cancellationToken);
-                        defaultTaxSlab = taxSlabs.FirstOrDefault();
-                        uoms = await _context.UnitOfMeasures.Where(u => !u.IsDeleted).ToListAsync(cancellationToken);
-                        defaultPcsUom = uoms.FirstOrDefault(u => u.Symbol.Equals("Pcs", StringComparison.OrdinalIgnoreCase));
-                        defaultKgsUom = uoms.FirstOrDefault(u => u.Symbol.Equals("Kgs", StringComparison.OrdinalIgnoreCase));
-                        // We also lost our existingProducts tracking, but it's okay because we already processed them.
-                        // Actually, clearing ChangeTracker is dangerous if we still reference tracked entities.
                     }
                 }
                 catch (Exception ex)

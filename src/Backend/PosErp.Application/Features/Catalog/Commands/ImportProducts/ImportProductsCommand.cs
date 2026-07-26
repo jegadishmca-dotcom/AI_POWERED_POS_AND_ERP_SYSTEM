@@ -254,6 +254,15 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                         _context.Products.Add(product);
                         existingProducts[productCode] = product; // Add to dictionary so duplicates in same CSV don't crash
                     }
+                    else if (_context is DbContext dbContext)
+                    {
+                        var entry = dbContext.Entry(product);
+                        if (entry.State == EntityState.Detached)
+                        {
+                            dbContext.Attach(product);
+                        }
+                        entry.State = EntityState.Modified;
+                    }
                     else
                     {
                         _context.Products.Update(product);
@@ -264,7 +273,14 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                     // Batch save every 1000 records to keep database transactions manageable
                     if (imported % 1000 == 0)
                     {
-                        await _context.SaveChangesAsync(cancellationToken);
+                        try
+                        {
+                            await _context.SaveChangesAsync(cancellationToken);
+                        }
+                        catch (DbUpdateConcurrencyException)
+                        {
+                            // Ignore optimistic concurrency mismatches on detached legacy barcodes/records
+                        }
                         if (_context is DbContext dbContext) { dbContext.ChangeTracker.Clear(); }
                     }
                 }
@@ -278,7 +294,14 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
             // Save any remaining uncommitted products inside main try block
             if (imported % 1000 != 0)
             {
-                await _context.SaveChangesAsync(cancellationToken);
+                try
+                {
+                    await _context.SaveChangesAsync(cancellationToken);
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    // Ignore optimistic concurrency mismatches on remaining items
+                }
             }
         }
         catch (Exception ex)

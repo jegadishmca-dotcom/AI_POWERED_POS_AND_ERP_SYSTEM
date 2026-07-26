@@ -82,6 +82,7 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
 
             // Pre-load all existing products to avoid 30,000 queries
             var existingProducts = await _context.Products
+                .AsNoTracking()
                 .Include(p => p.Barcodes)
                 .Where(p => !p.IsDeleted)
                 .ToDictionaryAsync(p => p.ProductCode, StringComparer.OrdinalIgnoreCase, cancellationToken);
@@ -239,14 +240,9 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                         _context.Products.Add(product);
                         existingProducts[productCode] = product; // Add to dictionary so duplicates in same CSV don't crash
                     }
-                    else if (_context is DbContext dbContext)
+                    else
                     {
-                        var entry = dbContext.Entry(product);
-                        if (entry.State == EntityState.Detached)
-                        {
-                            dbContext.Attach(product);
-                        }
-                        entry.State = EntityState.Modified;
+                        _context.Products.Update(product);
                     }
 
                     imported++;
@@ -255,6 +251,7 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                     if (imported % 1000 == 0)
                     {
                         await _context.SaveChangesAsync(cancellationToken);
+                        if (_context is DbContext dbContext) { dbContext.ChangeTracker.Clear(); }
                     }
                 }
                 catch (Exception ex)

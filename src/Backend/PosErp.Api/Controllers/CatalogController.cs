@@ -63,6 +63,8 @@ public class CatalogController : ControllerBase
 
     [HttpPost("import")]
     [Authorize(Roles = "Admin,Manager,Owner")]
+    [Microsoft.AspNetCore.Mvc.RequestSizeLimit(100_000_000)]
+    [Microsoft.AspNetCore.Mvc.RequestFormLimits(MultipartBodyLengthLimit = 100_000_000, ValueLengthLimit = 100_000_000)]
     public async Task<IActionResult> ImportCsv(IFormFile file)
     {
         var result = await _mediator.Send(new ImportProductsCommand(file));

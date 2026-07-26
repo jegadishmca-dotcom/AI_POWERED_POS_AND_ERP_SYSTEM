@@ -38,7 +38,7 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
 
         try
         {
-            using var reader = new StreamReader(request.File.OpenReadStream());
+            using var reader = new StreamReader(request.File.OpenReadStream(), System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
             var headerLine = await reader.ReadLineAsync(cancellationToken);
             if (string.IsNullOrWhiteSpace(headerLine))
             {

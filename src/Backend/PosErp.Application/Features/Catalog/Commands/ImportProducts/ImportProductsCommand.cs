@@ -67,18 +67,34 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                 return new ImportProductResult(0, 0, new List<string> { "CSV missing required headers. Required: ProductCode, Name, Mrp, SellingPrice." });
             }
 
-            // Pre-load TaxSlabs to map names quickly
+            // Pre-load TaxSlabs to map names quickly (auto-seed if empty due to db wipe)
             var taxSlabs = await _context.TaxSlabs.Where(t => !t.IsDeleted).ToListAsync(cancellationToken);
-            var defaultTaxSlab = taxSlabs.FirstOrDefault();
-            if (defaultTaxSlab == null)
+            if (!taxSlabs.Any())
             {
-                return new ImportProductResult(0, 0, new List<string> { "No active Tax Slabs found in database to map products." });
+                var gst0 = new TaxSlab { Id = Guid.NewGuid(), Name = "GST 0%", CgstRate = 0, SgstRate = 0, IgstRate = 0, CreatedAt = DateTime.UtcNow };
+                var gst5 = new TaxSlab { Id = Guid.NewGuid(), Name = "GST 5%", CgstRate = 2.5m, SgstRate = 2.5m, IgstRate = 5m, CreatedAt = DateTime.UtcNow };
+                var gst12 = new TaxSlab { Id = Guid.NewGuid(), Name = "GST 12%", CgstRate = 6m, SgstRate = 6m, IgstRate = 12m, CreatedAt = DateTime.UtcNow };
+                var gst18 = new TaxSlab { Id = Guid.NewGuid(), Name = "GST 18%", CgstRate = 9m, SgstRate = 9m, IgstRate = 18m, CreatedAt = DateTime.UtcNow };
+                var gst28 = new TaxSlab { Id = Guid.NewGuid(), Name = "GST 28%", CgstRate = 14m, SgstRate = 14m, IgstRate = 28m, CreatedAt = DateTime.UtcNow };
+                
+                _context.TaxSlabs.AddRange(gst0, gst5, gst12, gst18, gst28);
+                await _context.SaveChangesAsync(cancellationToken);
+                taxSlabs = await _context.TaxSlabs.Where(t => !t.IsDeleted).ToListAsync(cancellationToken);
             }
+            var defaultTaxSlab = taxSlabs.FirstOrDefault(t => t.Name.StartsWith("GST 0")) ?? taxSlabs.First();
 
-            // Pre-load UOMs to map symbols quickly
+            // Pre-load UOMs to map symbols quickly (auto-seed if empty)
             var uoms = await _context.UnitOfMeasures.Where(u => !u.IsDeleted).ToListAsync(cancellationToken);
-            var defaultPcsUom = uoms.FirstOrDefault(u => u.Symbol.Equals("Pcs", StringComparison.OrdinalIgnoreCase));
-            var defaultKgsUom = uoms.FirstOrDefault(u => u.Symbol.Equals("Kgs", StringComparison.OrdinalIgnoreCase));
+            if (!uoms.Any())
+            {
+                var uomPcs = new UnitOfMeasure { Id = new Guid("a0000000-0000-0000-0000-000000000001"), Name = "Pieces", Symbol = "Pcs", CreatedAt = DateTime.UtcNow };
+                var uomKgs = new UnitOfMeasure { Id = new Guid("a0000000-0000-0000-0000-000000000002"), Name = "Kilograms", Symbol = "Kgs", CreatedAt = DateTime.UtcNow };
+                _context.UnitOfMeasures.AddRange(uomPcs, uomKgs);
+                await _context.SaveChangesAsync(cancellationToken);
+                uoms = await _context.UnitOfMeasures.Where(u => !u.IsDeleted).ToListAsync(cancellationToken);
+            }
+            var defaultPcsUom = uoms.FirstOrDefault(u => u.Symbol.Equals("Pcs", StringComparison.OrdinalIgnoreCase)) ?? uoms.First();
+            var defaultKgsUom = uoms.FirstOrDefault(u => u.Symbol.Equals("Kgs", StringComparison.OrdinalIgnoreCase)) ?? uoms.First();
 
             // Pre-load all existing products to avoid 30,000 queries
             var existingProducts = await _context.Products
@@ -208,9 +224,7 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                     }
                     else
                     {
-                        product.UnitOfMeasureId = isWeighable 
-                            ? (defaultKgsUom?.Id ?? new Guid("a0000000-0000-0000-0000-000000000002")) 
-                            : (defaultPcsUom?.Id ?? new Guid("a0000000-0000-0000-0000-000000000001"));
+                        product.UnitOfMeasureId = isWeighable ? defaultKgsUom.Id : defaultPcsUom.Id;
                         product.IsWeighable = isWeighable;
                     }
 
@@ -260,17 +274,17 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                     failed++;
                 }
             }
+
+            // Save any remaining uncommitted products inside main try block
+            if (imported % 1000 != 0)
+            {
+                await _context.SaveChangesAsync(cancellationToken);
+            }
         }
         catch (Exception ex)
         {
             errors.Add($"File processing error: {ex.Message}");
             return new ImportProductResult(imported, failed, errors);
-        }
-
-        // Save any remaining uncommitted products
-        if (imported % 500 != 0)
-        {
-            await _context.SaveChangesAsync(cancellationToken);
         }
 
         return new ImportProductResult(imported, failed, errors);

@@ -51,8 +51,8 @@ export const PosTerminal = () => {
   const [isCloseShiftModalOpen, setCloseShiftModalOpen] = useState(false);
   const { user } = useAuthStore();
   const isAuthorizedToCancel = !!(user?.role && CANCELLATION_ALLOWED_ROLES.includes(user.role));
-  const terminalId = localStorage.getItem('pos_terminal_id') || '00000000-0000-0000-0000-000000000001';
-  const cashierId = user?.id || '00000000-0000-0000-0000-000000000001';
+  const terminalId = localStorage.getItem('pos_terminal_id') || '';
+  const cashierId = user?.id || '';
 
   // Business Date State
   const [isBusinessDateOpen, setBusinessDateOpen] = useState(true);
@@ -766,22 +766,41 @@ export const PosTerminal = () => {
     if (e.key === 'Enter') {
       e.preventDefault();
 
-      // If dropdown is open and an item is focused, select it
-      if (showProductDropdown && focusedProductIndex >= 0 && focusedProductIndex < searchResults.length) {
-        addProductToCart(searchResults[focusedProductIndex], voiceQuantity || undefined);
-        setVoiceQuantity(null);
-        setProductQuery('');
-        setSearchResults([]);
-        setShowProductDropdown(false);
-        setFocusedProductIndex(-1);
-        return;
-      }
-
       const val = productQuery.trim();
       if (!val) return;
 
       try {
         const results = await searchProducts(val);
+
+        // GLOBAL POS RETAIL STANDARD: 1-to-1 Exact Barcode / ProductCode Match Check
+        const exactMatch = results.find((p: any) =>
+          p.primaryBarcode?.trim().toLowerCase() === val.toLowerCase() ||
+          p.productCode?.trim().toLowerCase() === val.toLowerCase() ||
+          (p.barcodes && p.barcodes.some((b: any) => b.barcodeValue?.trim().toLowerCase() === val.toLowerCase()))
+        );
+
+        if (exactMatch) {
+          // Exact 1-to-1 match found! Directly add to cart and reset search box
+          addProductToCart(exactMatch, voiceQuantity || undefined);
+          setVoiceQuantity(null);
+          setProductQuery('');
+          setSearchResults([]);
+          setShowProductDropdown(false);
+          setFocusedProductIndex(-1);
+          return;
+        }
+
+        // If dropdown is open and an item is focused, select it
+        if (showProductDropdown && focusedProductIndex >= 0 && focusedProductIndex < searchResults.length) {
+          addProductToCart(searchResults[focusedProductIndex], voiceQuantity || undefined);
+          setVoiceQuantity(null);
+          setProductQuery('');
+          setSearchResults([]);
+          setShowProductDropdown(false);
+          setFocusedProductIndex(-1);
+          return;
+        }
+
         if (results.length === 1) {
           addProductToCart(results[0], voiceQuantity || undefined);
           setVoiceQuantity(null);
@@ -794,7 +813,7 @@ export const PosTerminal = () => {
           setShowProductDropdown(true);
           setFocusedProductIndex(0); // auto-focus first item
         } else {
-          alert('Product not found.');
+          alert('Product not found for: ' + val);
         }
       } catch (err) {
         console.error('Error searching products:', err);
@@ -1349,6 +1368,22 @@ export const PosTerminal = () => {
         onCompletePayment={async (tenders: any) => {
           try {
             setIsProcessing(true);
+
+            // LOGIC-01 Guard: Block checkout if terminalId or cashierId is missing/invalid.
+            // Runs before any payload construction, network call, or IndexedDB write.
+            const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+            if (!terminalId || !UUID_RE.test(terminalId)) {
+              console.error('[POS] Checkout blocked: terminalId is missing or invalid.', { terminalId });
+              alert('This device is not registered as a POS terminal. Please go to Settings \u2192 Terminal Configuration \u2192 "Register This Device" before billing.');
+              setIsProcessing(false);
+              return;
+            }
+            if (!cashierId || !UUID_RE.test(cashierId)) {
+              console.error('[POS] Checkout blocked: cashierId is missing or invalid.', { cashierId, user });
+              alert('Your session has expired. Please log in again to complete this sale.');
+              setIsProcessing(false);
+              return;
+            }
             // Generate dynamic invoice payload matching CreateInvoiceCommand
             const roundOffVal = +(Math.round(finalBillTotal) - finalBillTotal).toFixed(2);
             const netPayableVal = Math.round(finalBillTotal);

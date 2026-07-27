@@ -96,144 +96,113 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
         <style>{`
           @media screen { .pos-receipt { display: none !important; } }
           @media print  {
+            @page { size: 76mm auto; margin: 0mm !important; }
+            html, body { width: 76mm !important; margin: 0 !important; padding: 0 !important; background: #fff !important; color: #000 !important; -webkit-print-color-adjust: exact; }
             body * { visibility: hidden; }
-            .pos-receipt { visibility: visible !important; position: fixed; top: 0; left: 0; width: 80mm; }
+            .pos-receipt { visibility: visible !important; position: absolute; top: 0; left: 0; width: 76mm !important; margin: 0 auto; padding: 1mm 2mm; background: #fff; color: #000; }
             .pos-receipt * { visibility: visible !important; }
           }
         `}</style>
 
-        <div ref={ref} className="pos-receipt" style={S.wrap}>
+        <div ref={ref} className="pos-receipt" style={{ width: '76mm', padding: '1mm 2mm', fontFamily: 'Arial, sans-serif', color: '#000', background: '#fff', fontSize: '11px', lineHeight: '1.2' }}>
 
           {/* ── HEADER ── */}
-          <div style={{ ...S.center, fontWeight: 'bold', fontSize: '13px', marginTop: '6px' }}>{STORE.nameTamil}</div>
-          <div style={{ ...S.center, fontWeight: 'bold', fontSize: '11px' }}>{STORE.nameEn}</div>
-          <div style={{ ...S.center, marginTop: '3px' }}>{STORE.address}</div>
-          <div style={S.center}>{STORE.city}</div>
-          <div style={S.center}>Ph: {STORE.phone}</div>
-          <div style={{ ...S.center, marginTop: '2px' }}>GSTIN: {STORE.gstin}</div>
-          <div style={S.center}>FSSAI: {STORE.fssai}</div>
-          <div style={{ ...S.center, fontWeight: 'bold', marginTop: '3px' }}>TAX INVOICE</div>
+          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '15px', marginTop: '2px' }}>{STORE.nameTamil}</div>
+          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '10px', marginTop: '1px' }}>GST :{STORE.gstin}</div>
+          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '10px' }}>FSSAI : {STORE.fssai}</div>
+          <div style={{ textAlign: 'center', fontSize: '10px' }}>1E -1G மாதா கோவில் தெரு</div>
+          <div style={{ textAlign: 'center', fontSize: '10px' }}>இளையான்குடி -630702</div>
+          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '10px', marginBottom: '4px' }}>CELL:{STORE.phone}</div>
 
-          <div style={S.hr}/>
+          {/* ── INVOICE META BOX ── */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginBottom: '4px', fontSize: '10px' }}>
+            <tbody>
+              <tr>
+                <td style={{ border: '1px solid #000', padding: '2px 4px', fontWeight: 'bold', width: '55%' }}>
+                  Bill No : &nbsp; {invoice.invoiceNumber || '-'}<br/>
+                  <span style={{ fontSize: '11px' }}>{invoice.cashierName || 'USER3'}</span>
+                </td>
+                <td style={{ border: '1px solid #000', padding: '2px 4px', fontWeight: 'bold', width: '45%' }}>
+                  Date : {invoice.businessDate ? new Date(invoice.businessDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}<br/>
+                  Time : {invoice.businessDate ? new Date(invoice.businessDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                </td>
+              </tr>
+              <tr>
+                <td style={{ border: '1px solid #000', padding: '2px 4px', fontWeight: 'bold' }}>NAME : {invoice.customerName || ''}</td>
+                <td style={{ border: '1px solid #000', padding: '2px 4px', fontWeight: 'bold' }}>CELL : {invoice.customerPhone || ''}</td>
+              </tr>
+            </tbody>
+          </table>
 
-          {/* ── INVOICE META ── */}
-          <div style={S.row}><span>Bill No: {invoice.invoiceNumber || '-'}</span></div>
-          <div style={S.row}>
-            <span>Date: {invoice.businessDate ? new Date(invoice.businessDate).toLocaleDateString('en-IN') : '-'}</span>
-            <span>Time: {invoice.businessDate ? new Date(invoice.businessDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-'}</span>
-          </div>
-          <div style={S.row}>
-            <span>Cashier: {invoice.cashierName || 'Cashier'}</span>
-            <span>Terminal: {terminalCode}</span>
-          </div>
-          {invoice.customerName && (
-            <div>Customer: {invoice.customerName}{invoice.customerPhone ? ` | ${invoice.customerPhone}` : ''}</div>
-          )}
+          {/* ── ITEMS BOXED TABLE ── */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginBottom: '4px', fontSize: '10px' }}>
+            <thead>
+              <tr>
+                <th style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', width: '44%' }}>Items</th>
+                <th style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', width: '10%' }}>Qty</th>
+                <th style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', width: '14%' }}>MRP</th>
+                <th style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', width: '16%' }}>Rate</th>
+                <th style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', width: '16%' }}>Amt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {(invoice.items || []).map((item: any, idx: number) => {
+                const qty = safe(item.quantity, safe(item.qty));
+                const disc = safe(item.discountAmount);
+                const lineAmt = safe(item.unitPrice) * qty - disc;
+                const mrp = safe(item.mrp || item.unitPrice);
+                const mrpVal = mrp > 0 ? Math.round(mrp).toString() : '-';
+                return (
+                  <tr key={idx}>
+                    <td style={{ border: '1px solid #000', padding: '2px', fontWeight: 'bold' }}>{item.name || item.productName || '-'}</td>
+                    <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center' }}>{qty}</td>
+                    <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center' }}>{mrpVal}</td>
+                    <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'right' }}>{fmt(item.unitPrice)}</td>
+                    <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'right', fontWeight: 'bold' }}>{fmt(lineAmt)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
 
-          <div style={S.hr}/>
+          {/* ── TOTAL BOX ── */}
+          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginBottom: '4px' }}>
+            <tbody>
+              <tr>
+                <td style={{ border: '1px solid #000', padding: '4px', fontSize: '16px', fontWeight: 'bold', textAlign: 'center', width: '55%' }}>
+                  TOTAL
+                </td>
+                <td style={{ border: '1px solid #000', padding: '4px', fontSize: '18px', fontWeight: 'bold', textAlign: 'right', width: '45%' }}>
+                  {fmt(Math.round(safe(invoice.totalAmount)))}
+                </td>
+              </tr>
+            </tbody>
+          </table>
 
-          {/* ── ITEMS ── */}
-          <div style={S.tableHead}>
-            <span style={S.name}>Item</span>
-            <span style={S.qty}>Qty</span>
-            <span style={S.rate}>Rate</span>
-            <span style={S.amt}>Amt</span>
-          </div>
-          {(invoice.items || []).map((item: any, idx: number) => {
-            const lineAmt = safe(item.unitPrice) * safe(item.quantity) - safe(item.discountAmount);
-            return (
-              <div key={idx}>
-                <div style={S.itemRow}>
-                  <span style={S.name}>{item.name || '-'}</span>
-                  <span style={S.qty}>{safe(item.quantity)}</span>
-                  <span style={S.rate}>{fmt(item.unitPrice)}</span>
-                  <span style={S.amt}>{fmt(lineAmt)}</span>
-                </div>
-                {safe(item.discountAmount) > 0 && (
-                  <div style={S.discLine}>Discount: -{fmt(item.discountAmount)}</div>
-                )}
-              </div>
-            );
-          })}
+          {/* ── SUMMARY & POINTS ── */}
+          <table style={{ width: '100%', fontSize: '10px', fontWeight: 'bold', marginBttom: '4px', borderCollapse: 'collapse' }}>
+            <tbody>
+              <tr>
+                <td style={{ width: '55%' }}>OLD POINTS : {Math.max(0, safe(invoice.loyaltyPointsBalance) - safe(invoice.loyaltyPointsEarned)).toFixed(2)}</td>
+                <td style={{ width: '45%', textAlign: 'right' }}>RCVD : {fmt(totalTendered > 0 ? totalTendered : netPayable)}</td>
+              </tr>
+              <tr>
+                <td style={{ width: '55%' }}>TODAY PTS : {safe(invoice.loyaltyPointsEarned).toFixed(2)}</td>
+                <td style={{ width: '45%', textAlign: 'right' }}>RFND : {fmt(changeDue)}</td>
+              </tr>
+              <tr>
+                <td style={{ width: '55%' }}>TOTAL PTS : {safe(invoice.loyaltyPointsBalance).toFixed(2)}</td>
+                <td style={{ width: '45%' }}></td>
+              </tr>
+            </tbody>
+          </table>
 
-          <div style={S.hr}/>
-
-          {/* ── BILL SUMMARY ── */}
-          <div style={S.row}><span>Sub Total</span><span>{fmt(invoice.subTotal || invoice.totalAmount)}</span></div>
-          {safe(invoice.discountAmount) > 0 && (
-            <div style={S.row}><span>Discount</span><span>-{fmt(invoice.discountAmount)}</span></div>
-          )}
-          {totalGstAmount > 0 ? (
-            <div style={S.row}><span>GST (CGST+SGST)</span><span>+{fmt(totalGstAmount)}</span></div>
-          ) : (safe(invoice.taxAmount) > 0 && !totalCessAmount) ? (
-            <div style={S.row}><span>GST (CGST+SGST)</span><span>+{fmt(invoice.taxAmount)}</span></div>
-          ) : null}
-          {totalCessAmount > 0 && (
-            <div style={S.row}><span>GST CESS</span><span>+{fmt(totalCessAmount)}</span></div>
-          )}
-          {safe(invoice.pointsRedeemed) > 0 && (
-            <div style={S.row}><span>Points Redeemed ({safe(invoice.pointsRedeemed)})</span><span>-{fmt(safe(invoice.pointsRedeemed) / 10)}</span></div>
-          )}
-          {roundOffAmt !== 0 && (
-            <div style={S.row}><span>Round Off</span><span>{roundOffAmt > 0 ? '+' : ''}{fmt(roundOffAmt)}</span></div>
-          )}
-          <div style={S.bigTotal}><span>NET PAYABLE</span><span>₹ {netPayable}</span></div>
-
-          <div style={S.hr}/>
-
-          {/* ── PAYMENT ── */}
-          {tenderCash   > 0 && <div style={S.row}><span>Cash Tendered</span><span>{fmt(tenderCash)}</span></div>}
-          {tenderUpi    > 0 && <div style={S.row}><span>UPI Paid</span><span>{fmt(tenderUpi)}</span></div>}
-          {tenderCard   > 0 && <div style={S.row}><span>Card Paid</span><span>{fmt(tenderCard)}</span></div>}
-          {tenderWallet > 0 && <div style={S.row}><span>Wallet Paid</span><span>{fmt(tenderWallet)}</span></div>}
-          {!tenderCash && !tenderUpi && !tenderCard && !tenderWallet && (
-            <div style={S.row}><span>Paid via</span><span>{invoice.paymentMode || 'CASH'}</span></div>
-          )}
-          {changeDue > 0 && <div style={{ ...S.row, ...S.bold }}><span>Change Due</span><span>{fmt(changeDue)}</span></div>}
-
-          {/* ── LOYALTY ── */}
-          {invoice.customerName && (
-            <>
-              <div style={S.hr}/>
-              <div style={S.row}><span>Points Earned Today</span><span>+{fmt(safe(invoice.loyaltyPointsEarned))}</span></div>
-              <div style={S.row}><span>Total Points Balance</span><span>{fmt(safe(invoice.loyaltyPointsBalance))}</span></div>
-            </>
-          )}
-
-          {/* ── GST SUMMARY ── */}
-          {Object.keys(taxSlabs).length > 0 && (
-            <>
-              <div style={S.hr}/>
-              <div style={{ ...S.bold, ...S.small, marginBottom: '2px' }}>GST Summary</div>
-              <div style={{ ...S.tableHead, ...S.small }}>
-                <span style={{ width: '40px' }}>Slab</span>
-                <span style={{ flex: 1, textAlign: 'right' }}>Taxable</span>
-                <span style={{ flex: 1, textAlign: 'right' }}>CGST</span>
-                <span style={{ flex: 1, textAlign: 'right' }}>SGST</span>
-                {hasCess && <span style={{ flex: 1, textAlign: 'right' }}>CESS</span>}
-              </div>
-              {Object.entries(taxSlabs).map(([key, slab], i) => (
-                <div key={i} style={{ ...S.itemRow, ...S.small }}>
-                  <span style={{ width: '40px' }}>{key}</span>
-                  <span style={{ flex: 1, textAlign: 'right' }}>{fmt(slab.taxable)}</span>
-                  <span style={{ flex: 1, textAlign: 'right' }}>{fmt(slab.cgst)}</span>
-                  <span style={{ flex: 1, textAlign: 'right' }}>{fmt(slab.sgst)}</span>
-                  {hasCess && <span style={{ flex: 1, textAlign: 'right' }}>{fmt(slab.cess)}</span>}
-                </div>
-              ))}
-            </>
-          )}
-
-          {/* ── FOOTER ── */}
-          <div style={S.footer}>
-            <div>Tax Invoice | GSTIN: {STORE.gstin}</div>
-            <div style={{ marginTop: '4px' }}>அனைத்தும் வாங்க நன்றிபிளுக்கு வாங்க</div>
-            <div>Thank you for shopping with us!</div>
-            <div>Visit Again!</div>
+          {/* ── FOOTER TAMIL SLOGAN ── */}
+          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '13px', marginTop: '4px', marginBottom: '4px' }}>
+            அனைத்தும் வாங்க<br/>
+            ஆப்பிளுக்கு வாங்க
           </div>
 
-          {/* Spacer for thermal auto-cutter */}
-          <div style={{ height: '20mm' }}/>
         </div>
       </>
     );

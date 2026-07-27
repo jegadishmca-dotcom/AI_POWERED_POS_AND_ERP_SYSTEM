@@ -171,177 +171,37 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   const tendered  = cashAmt + upiAmt + cardAmt + walletAmt;
   const change    = Math.max(0, tendered - rounded);
 
-  const dateStr  = invoice.businessDate ? new Date(invoice.businessDate).toLocaleDateString('en-IN') : '-';
-  const timeStr  = invoice.businessDate ? new Date(invoice.businessDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
+  const dateStr  = invoice.businessDate ? new Date(invoice.businessDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN');
+  const timeStr  = invoice.businessDate ? new Date(invoice.businessDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // Build items HTML
-  let itemsHtml = `
-    <div style="display:flex;font-weight:bold;border-bottom:1px dashed #000;padding-bottom:2px;margin-bottom:2px;">
-      <span style="flex:1;">Item</span>
-      <span style="width:24px;text-align:center;">Qty</span>
-      <span style="width:52px;text-align:right;">Rate</span>
-      <span style="width:54px;text-align:right;">Amt</span>
-    </div>`;
-
-  // GST slab summary
-  const taxSlabs: Record<string, { taxable: number; cgst: number; sgst: number; cess: number }> = {};
-  let totalCessAmount = 0;
-  let totalGstAmount = 0;
-  const hasCess = (invoice.items || []).some((item: any) => safe(item.cessRate) > 0 || safe(item.cessAmount) > 0);
-
+  // Build items boxed table rows
+  let itemsRowsHtml = '';
   (invoice.items || []).forEach((item: any) => {
     const qty  = safe(item.quantity, safe(item.qty));
     const disc = safe(item.discountAmount);
     const lineAmt = safe(item.unitPrice) * qty - disc;
-    itemsHtml += `
-      <div style="display:flex;margin-bottom:1px;">
-        <span style="flex:1;">${item.name || item.productName || '-'}</span>
-        <span style="width:24px;text-align:center;">${qty}</span>
-        <span style="width:52px;text-align:right;">${fmt(item.unitPrice)}</span>
-        <span style="width:54px;text-align:right;">${fmt(lineAmt)}</span>
-      </div>`;
-    if (disc > 0) {
-      itemsHtml += `<div style="font-size:9px;padding-left:8px;color:#2d6a2d;">Discount: -${fmt(disc)}</div>`;
-    }
+    const mrp = safe(item.mrp || item.unitPrice);
+    const mrpVal = mrp > 0 ? Math.round(mrp).toString() : '-';
 
-    const cgstRate = safe(item.cgstRate);
-    const sgstRate = safe(item.sgstRate);
-    const cessRate = safe(item.cessRate);
-    const totalRate = cgstRate + sgstRate + cessRate;
-    const itemBaseTaxable = totalRate > 0 ? lineAmt / (1 + totalRate / 100) : lineAmt;
-
-    const cgstAmt = item.cgstAmount !== undefined ? safe(item.cgstAmount) : itemBaseTaxable * (cgstRate / 100);
-    const sgstAmt = item.sgstAmount !== undefined ? safe(item.sgstAmount) : itemBaseTaxable * (sgstRate / 100);
-    const cessAmt = item.cessAmount !== undefined ? safe(item.cessAmount) : itemBaseTaxable * (cessRate / 100);
-
-    totalCessAmount += cessAmt;
-    totalGstAmount += cgstAmt + sgstAmt;
-
-    if ((cgstRate + sgstRate) > 0 || cessRate > 0) {
-      const key = `GST ${(cgstRate + sgstRate)}%`;
-      if (!taxSlabs[key]) taxSlabs[key] = { taxable: 0, cgst: 0, sgst: 0, cess: 0 };
-      taxSlabs[key].taxable += itemBaseTaxable;
-      taxSlabs[key].cgst    += cgstAmt;
-      taxSlabs[key].sgst    += sgstAmt;
-      taxSlabs[key].cess    += cessAmt;
-    }
+    itemsRowsHtml += `
+      <tr>
+        <td style="border:1px solid #000; padding:2px; font-weight:bold; font-size:10px;">${item.name || item.productName || '-'}</td>
+        <td style="border:1px solid #000; text-align:center; padding:2px; font-size:10px;">${qty}</td>
+        <td style="border:1px solid #000; text-align:center; padding:2px; font-size:10px;">${mrpVal}</td>
+        <td style="border:1px solid #000; text-align:right; padding:2px; font-size:10px;">${fmt(item.unitPrice)}</td>
+        <td style="border:1px solid #000; text-align:right; padding:2px; font-weight:bold; font-size:10px;">${fmt(lineAmt)}</td>
+      </tr>`;
   });
 
-  // Payment rows
-  let paymentHtml = '';
-  if (cashAmt > 0)   paymentHtml += row('Cash Tendered', fmt(cashAmt));
-  if (upiAmt > 0)    paymentHtml += row('UPI Paid', fmt(upiAmt));
-  if (cardAmt > 0)   paymentHtml += row('Card Paid', fmt(cardAmt));
-  if (walletAmt > 0) paymentHtml += row('Wallet Paid', fmt(walletAmt));
-  if (!cashAmt && !upiAmt && !cardAmt && !walletAmt)
-    paymentHtml += row('Paid via', invoice.paymentMode || 'CASH');
-  if (change > 0) paymentHtml += row('Change Due', fmt(change), true);
-
-  // GST summary table
-  let gstHtml = '';
-  const hasAnyTax = Object.keys(taxSlabs).length > 0;
-  gstHtml = hr() + `<div style="font-weight:bold;font-size:9px;margin-bottom:2px;">GST Summary</div>`;
-  if (hasAnyTax) {
-    if (hasCess) {
-      gstHtml += `<div style="display:flex;font-weight:bold;font-size:9px;border-bottom:1px dashed #000;padding-bottom:1px;">
-        <span style="width:40px;">Slab</span>
-        <span style="flex:1;text-align:right;">Taxable</span>
-        <span style="flex:1;text-align:right;">CGST</span>
-        <span style="flex:1;text-align:right;">SGST</span>
-        <span style="flex:1;text-align:right;">CESS</span>
-      </div>`;
-      let totalCgst = 0, totalSgst = 0, totalCess = 0, totalTaxable = 0;
-      Object.entries(taxSlabs).forEach(([key, s]) => {
-        gstHtml += `<div style="display:flex;font-size:9px;">
-          <span style="width:40px;">${key}</span>
-          <span style="flex:1;text-align:right;">${fmt(s.taxable)}</span>
-          <span style="flex:1;text-align:right;">${fmt(s.cgst)}</span>
-          <span style="flex:1;text-align:right;">${fmt(s.sgst)}</span>
-          <span style="flex:1;text-align:right;">${fmt(s.cess)}</span>
-        </div>`;
-        totalCgst += s.cgst; totalSgst += s.sgst; totalCess += s.cess; totalTaxable += s.taxable;
-      });
-      gstHtml += `<div style="display:flex;font-size:9px;font-weight:bold;border-top:1px dashed #000;padding-top:1px;">
-        <span style="width:40px;">Total</span>
-        <span style="flex:1;text-align:right;">${fmt(totalTaxable)}</span>
-        <span style="flex:1;text-align:right;">${fmt(totalCgst)}</span>
-        <span style="flex:1;text-align:right;">${fmt(totalSgst)}</span>
-        <span style="flex:1;text-align:right;">${fmt(totalCess)}</span>
-      </div>`;
-    } else {
-      gstHtml += `<div style="display:flex;font-weight:bold;font-size:9px;border-bottom:1px dashed #000;padding-bottom:1px;">
-        <span style="width:42px;">Slab</span>
-        <span style="flex:1;text-align:right;">Taxable</span>
-        <span style="flex:1;text-align:right;">CGST</span>
-        <span style="flex:1;text-align:right;">SGST</span>
-      </div>`;
-      let totalCgst = 0, totalSgst = 0, totalTaxable = 0;
-      Object.entries(taxSlabs).forEach(([key, s]) => {
-        gstHtml += `<div style="display:flex;font-size:9px;">
-          <span style="width:42px;">${key}</span>
-          <span style="flex:1;text-align:right;">${fmt(s.taxable)}</span>
-          <span style="flex:1;text-align:right;">${fmt(s.cgst)}</span>
-          <span style="flex:1;text-align:right;">${fmt(s.sgst)}</span>
-        </div>`;
-        totalCgst += s.cgst; totalSgst += s.sgst; totalTaxable += s.taxable;
-      });
-      gstHtml += `<div style="display:flex;font-size:9px;font-weight:bold;border-top:1px dashed #000;padding-top:1px;">
-        <span style="width:42px;">Total</span>
-        <span style="flex:1;text-align:right;">${fmt(totalTaxable)}</span>
-        <span style="flex:1;text-align:right;">${fmt(totalCgst)}</span>
-        <span style="flex:1;text-align:right;">${fmt(totalSgst)}</span>
-      </div>`;
-    }
-  } else {
-    gstHtml += `<div style="font-size:9px;font-style:italic;">All items: Nil Rated / Exempt (GST \u20b90.00)</div>`;
-  }
-
-  let loyaltyHtml = '';
-  if (invoice.customerName) {
-    const earned  = safe(invoice.loyaltyPointsEarned);
-    const balance = safe(invoice.loyaltyPointsBalance);
-    const oldPts  = Math.max(0, balance - earned);
-    const rcvd    = tendered;
-    const rfnd    = change;
-
-    const earnedStr  = earned.toFixed(2);
-    const balanceStr = balance.toFixed(2);
-    const oldPtsStr  = oldPts.toFixed(2);
-    const rcvdStr    = fmt(rcvd);
-    const rfndStr    = fmt(rfnd);
-
-    const maxValLeftLen = Math.max(oldPtsStr.length, earnedStr.length, balanceStr.length);
-    const oldPtsVal  = oldPtsStr.padStart(maxValLeftLen, ' ');
-    const earnedVal  = earnedStr.padStart(maxValLeftLen, ' ');
-    const balanceVal = balanceStr.padStart(maxValLeftLen, ' ');
-
-    const maxValRightLen = Math.max(rcvdStr.length, rfndStr.length);
-    const rcvdVal    = rcvdStr.padStart(maxValRightLen, ' ');
-    const rfndVal    = rfndStr.padStart(maxValRightLen, ' ');
-
-    const leftColWidth = 10;
-    const rightColWidth = 13;
-
-    const oldPtsLine  = `${'OLD POINTS'.padEnd(leftColWidth, ' ')} : ${oldPtsVal}`;
-    const todayPtsLine = `${'TODAY PTS'.padEnd(leftColWidth, ' ')} : ${earnedVal}`;
-    const totalPtsLine = `${'TOTAL PTS'.padEnd(leftColWidth, ' ')} : ${balanceVal}`;
-
-    const cashRcvdLine = `${'CASH RECEIVED'.padEnd(rightColWidth, ' ')} : ${rcvdVal}`;
-    const refundLine   = `${'REFUND'.padEnd(rightColWidth, ' ')} : ${rfndVal}`;
-
-    loyaltyHtml = hr() + `
-      <div style="font-size:10px; font-family:monospace; line-height:1.2;">
-        <div style="display:flex;justify-content:space-between;">
-          <span style="white-space:pre;">${oldPtsLine}</span>
-          <span style="white-space:pre;">${cashRcvdLine}</span>
-        </div>
-        <div style="display:flex;justify-content:space-between;">
-          <span style="white-space:pre;">${todayPtsLine}</span>
-          <span style="white-space:pre;">${refundLine}</span>
-        </div>
-        <div><span style="white-space:pre;">${totalPtsLine}</span></div>
-      </div>`;
-  }
+  // Customer Loyalty / Points
+  const earned  = safe(invoice.loyaltyPointsEarned);
+  const balance = safe(invoice.loyaltyPointsBalance);
+  const oldPts  = Math.max(0, balance - earned);
+  const oldPtsStr  = oldPts.toFixed(2);
+  const earnedStr  = earned.toFixed(2);
+  const balanceStr = balance.toFixed(2);
+  const rcvdStr    = fmt(tendered > 0 ? tendered : rounded);
+  const rfndStr    = fmt(change);
 
   const html = `<!DOCTYPE html>
 <html lang="ta">
@@ -350,52 +210,110 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Receipt - ${invoice.invoiceNumber || ''}</title>
   <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: monospace; font-size: 11px; width: 80mm; color: #000; background: #fff; padding: 0 3mm; }
-    @media print { body { width: 80mm; } }
+    @page {
+      size: 76mm auto;
+      margin: 0mm !important;
+    }
+    @media print {
+      html, body {
+        width: 76mm !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #fff !important;
+        color: #000 !important;
+        -webkit-print-color-adjust: exact;
+      }
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, "Helvetica Neue", Helvetica, sans-serif; color: #000; }
+    body { width: 76mm; margin: 0 auto; padding: 1mm 2mm; font-size: 11px; line-height: 1.2; background: #fff; }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .font-bold { font-weight: bold; }
+    .border-table { border-collapse: collapse; width: 100%; border: 1px solid #000; }
+    .border-table th, .border-table td { border: 1px solid #000; padding: 2px 3px; font-size: 10px; }
   </style>
 </head>
 <body>
-  <div style="text-align:center;font-weight:bold;font-size:14px;margin-top:6px;">${STORE.nameTamil}</div>
-  <div style="text-align:center;font-weight:bold;font-size:12px;">${STORE.nameEn}</div>
-  <div style="text-align:center;margin-top:3px;">${STORE.address}</div>
-  <div style="text-align:center;">${STORE.city}</div>
-  <div style="text-align:center;">Ph: ${STORE.phone}</div>
-  <div style="text-align:center;margin-top:2px;">GSTIN: ${STORE.gstin}</div>
-  <div style="text-align:center;">FSSAI: ${STORE.fssai}</div>
-  <div style="text-align:center;font-weight:bold;margin-top:3px;">TAX INVOICE</div>
-  ${hr()}
-  ${row('Bill No: ' + (invoice.invoiceNumber || '-'), '')}
-  <div style="display:flex;justify-content:space-between;"><span>Date: ${dateStr}</span><span>Time: ${timeStr}</span></div>
-  <div style="display:flex;justify-content:space-between;"><span>Cashier: ${invoice.cashierName || 'Cashier'}</span><span>Terminal: ${terminalCode}</span></div>
-  ${invoice.customerName ? `<div>Customer: ${invoice.customerName}${invoice.customerPhone ? ' | ' + invoice.customerPhone : ''}</div>` : ''}
-  ${hr()}
-  ${itemsHtml}
-  ${hr()}
-  ${row('Sub Total', fmt(invoice.subTotal || invoice.totalAmount))}
-  ${safe(invoice.discountAmount) > 0 ? row('Discount', '-' + fmt(invoice.discountAmount)) : ''}
-  ${totalGstAmount > 0 ? row('GST (CGST+SGST)', '+' + fmt(totalGstAmount)) : (safe(invoice.taxAmount) > 0 && !totalCessAmount ? row('GST (CGST+SGST)', '+' + fmt(invoice.taxAmount)) : '')}
-  ${totalCessAmount > 0 ? row('GST CESS', '+' + fmt(totalCessAmount)) : ''}
-  ${roundOff !== 0 ? row('Round Off', (roundOff > 0 ? '+' : '') + fmt(roundOff)) : ''}
-  <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;border-top:1px dashed #000;padding-top:4px;margin-top:4px;">
-    <span>NET PAYABLE</span><span>&#8377; ${rounded}</span>
+  <!-- HEADER -->
+  <div class="text-center font-bold" style="font-size: 15px; margin-top: 2px;">${STORE.nameTamil}</div>
+  <div class="text-center font-bold" style="font-size: 10px; margin-top: 1px;">GST :${STORE.gstin}</div>
+  <div class="text-center font-bold" style="font-size: 10px;">FSSAI : ${STORE.fssai}</div>
+  <div class="text-center" style="font-size: 10px;">1E -1G மாதா கோவில் தெரு</div>
+  <div class="text-center" style="font-size: 10px;">இளையான்குடி -630702</div>
+  <div class="text-center font-bold" style="font-size: 10px; margin-bottom: 4px;">CELL:${STORE.phone}</div>
+
+  <!-- METADATA BOX -->
+  <table class="border-table" style="margin-bottom: 4px;">
+    <tr>
+      <td width="55%" style="font-weight:bold;">
+        Bill No : &nbsp; ${invoice.invoiceNumber || '-'}<br/>
+        <span style="font-size:11px;">${invoice.cashierName || 'USER3'}</span>
+      </td>
+      <td width="45%" style="font-weight:bold;">
+        Date : ${dateStr}<br/>
+        Time : ${timeStr}
+      </td>
+    </tr>
+    <tr>
+      <td style="font-weight:bold;">NAME : ${invoice.customerName || ''}</td>
+      <td style="font-weight:bold;">CELL : ${invoice.customerPhone || ''}</td>
+    </tr>
+  </table>
+
+  <!-- ITEMS BOXED TABLE -->
+  <table class="border-table" style="margin-bottom: 4px;">
+    <thead>
+      <tr>
+        <th style="width: 44%; text-align: center;">Items</th>
+        <th style="width: 10%; text-align: center;">Qty</th>
+        <th style="width: 14%; text-align: center;">MRP</th>
+        <th style="width: 16%; text-align: center;">Rate</th>
+        <th style="width: 16%; text-align: center;">Amt</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemsRowsHtml}
+    </tbody>
+  </table>
+
+  <!-- TOTAL BOX -->
+  <table class="border-table" style="margin-bottom: 4px;">
+    <tr>
+      <td width="55%" class="text-center font-bold" style="font-size: 16px; padding: 4px;">
+        TOTAL
+      </td>
+      <td width="45%" class="text-right font-bold" style="font-size: 18px; padding: 4px;">
+        ${fmt(rounded)}
+      </td>
+    </tr>
+  </table>
+
+  <!-- SUMMARY & POINTS -->
+  <table style="width: 100%; font-size: 10px; font-weight: bold; margin-bottom: 4px; border-collapse: collapse;">
+    <tr>
+      <td width="55%">OLD POINTS : ${oldPtsStr}</td>
+      <td width="45%" class="text-right">RCVD : ${rcvdStr}</td>
+    </tr>
+    <tr>
+      <td width="55%">TODAY PTS : ${earnedStr}</td>
+      <td width="45%" class="text-right">RFND : ${rfndStr}</td>
+    </tr>
+    <tr>
+      <td width="55%">TOTAL PTS : ${balanceStr}</td>
+      <td width="45%"></td>
+    </tr>
+  </table>
+
+  <!-- FOOTER TAMIL SLOGAN -->
+  <div class="text-center font-bold" style="font-size: 13px; margin-top: 4px; margin-bottom: 4px;">
+    அனைத்தும் வாங்க<br/>
+    ஆப்பிளுக்கு வாங்க
   </div>
-  ${hr()}
-  ${paymentHtml}
-  ${gstHtml}
-  ${loyaltyHtml}
-  <div style="text-align:center;margin-top:8px;padding-top:6px;border-top:1px dashed #000;padding-bottom:4px;">
-    <div>Tax Invoice | GSTIN: ${STORE.gstin}</div>
-    <div style="margin-top:4px;">${STORE.nameTamil}</div>
-    <div>அனைத்தும் வாங்க ஆப்பிளுக்கு வாங்க</div>
-    <div>Thank you for shopping with us!</div>
-    <div>Visit Again!</div>
-  </div>
-  <div style="height:20mm;"></div>
+
   <script>
     window.onload = function() {
       window.print();
-      setTimeout(function() { window.close(); }, 1000);
+      setTimeout(function() { window.close(); }, 500);
     };
   </script>
 </body>

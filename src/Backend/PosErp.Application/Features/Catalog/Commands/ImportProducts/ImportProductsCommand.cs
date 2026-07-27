@@ -237,21 +237,25 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                     // Handle Barcode
                     if (!string.IsNullOrWhiteSpace(barcodeVal))
                     {
+                        string cleanBarcode = barcodeVal.Trim();
                         var barcode = product.Barcodes.FirstOrDefault(b => b.IsPrimary);
                         if (barcode == null)
                         {
-                            product.Barcodes.Add(new Barcode
+                            var newBarcode = new Barcode
                             {
                                 Id = Guid.NewGuid(),
                                 ProductId = product.Id,
-                                BarcodeValue = barcodeVal,
+                                BarcodeValue = cleanBarcode,
                                 IsPrimary = true,
                                 CreatedAt = DateTime.UtcNow
-                            });
+                            };
+                            product.Barcodes.Add(newBarcode);
+                            _context.Barcodes.Add(newBarcode);
                         }
                         else
                         {
-                            barcode.BarcodeValue = barcodeVal;
+                            barcode.BarcodeValue = cleanBarcode;
+                            _context.Barcodes.Update(barcode);
                         }
                     }
 

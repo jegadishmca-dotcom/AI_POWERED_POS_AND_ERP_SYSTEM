@@ -547,56 +547,66 @@ export const PosTerminal = () => {
     }));
   };
 
-  const addProductToCart = async (product: any, overrideQty?: number) => {
-    const existing = cart.items.find((item: any) => item.productId === product.id);
-    let updatedItems = [];
+  const [batchModalData, setBatchModalData] = useState<{ product: any; batches: any[]; overrideQty?: number } | null>(null);
+
+  const addProductToCart = async (product: any, overrideQty?: number, selectedBatch?: any) => {
+    if (selectedBatch) {
+      addSingleProductToCartDirect(product, selectedBatch, overrideQty);
+      return;
+    }
+
+    let fetchedBatches: any[] = [];
+    try {
+      fetchedBatches = await getProductBatches(product.id);
+    } catch (err) {
+      console.warn('Failed to fetch batches', err);
+    }
+
+    if (fetchedBatches && fetchedBatches.length >= 2) {
+      setBatchModalData({ product, batches: fetchedBatches, overrideQty });
+      return;
+    }
+
+    const chosenBatch = (fetchedBatches && fetchedBatches.length === 1) ? fetchedBatches[0] : null;
+    addSingleProductToCartDirect(product, chosenBatch, overrideQty, fetchedBatches);
+  };
+
+  const addSingleProductToCartDirect = (product: any, batch?: any, overrideQty?: number, allBatches?: any[]) => {
+    const sellingPrice = batch && batch.sellingPrice ? batch.sellingPrice : product.sellingPrice;
+    const mrp = batch && batch.mrp ? batch.mrp : (product.mrp || sellingPrice);
+
+    const existing = cart.items.find((item: any) => item.productId === product.id && (batch ? item.batchId === batch.id : true));
     const qtyToAdd = overrideQty !== undefined ? overrideQty : 1;
 
     if (existing) {
-      updatedItems = cart.items.map((item: any) =>
-        item.productId === product.id 
-          ? { ...item, qty: item.qty + qtyToAdd, lineTotal: (item.qty + qtyToAdd) * item.unitPrice } 
+      const updatedItems = cart.items.map((item: any) =>
+        item.productId === product.id && (batch ? item.batchId === batch.id : true)
+          ? { ...item, qty: item.qty + qtyToAdd, lineTotal: (item.qty + qtyToAdd) * item.unitPrice }
           : item
       );
       recalculateCart(updatedItems);
     } else {
       const newItem = {
-        id: safeRandomUUID(), // CQ-04 FIX: use safeRandomUUID() instead of Math.random().toString()
+        id: safeRandomUUID(),
         productId: product.id,
         name: product.name,
+        mrp: mrp,
         qty: qtyToAdd,
-        unitPrice: product.sellingPrice,
-        lineTotal: product.sellingPrice * qtyToAdd,
+        unitPrice: sellingPrice,
+        lineTotal: sellingPrice * qtyToAdd,
         discountAmount: 0,
-        finalLineTotal: product.sellingPrice * qtyToAdd,
+        finalLineTotal: sellingPrice * qtyToAdd,
         appliedOfferName: null,
         cgstRate: product.cgstRate || 0,
         sgstRate: product.sgstRate || 0,
         cessRate: product.cessRate || 0,
         isWeighable: product.isWeighable || false,
-        batches: [],
-        batchId: undefined
+        batches: allBatches || (batch ? [batch] : []),
+        batchId: batch ? batch.id : undefined
       };
 
-      updatedItems = [...cart.items, newItem];
+      const updatedItems = [...cart.items, newItem];
       recalculateCart(updatedItems);
-
-      // Fetch batches asynchronously in the background
-      try {
-        const fetchedBatches = await getProductBatches(product.id);
-        if (fetchedBatches && fetchedBatches.length > 0) {
-          setCart((prev: any) => ({
-            ...prev,
-            items: prev.items.map((i: any) => 
-              i.productId === product.id 
-                ? { ...i, batches: fetchedBatches, batchId: fetchedBatches[0].id } 
-                : i
-            )
-          }));
-        }
-      } catch (err) {
-        console.warn('Failed to fetch batches for product', err);
-      }
     }
   };
 
@@ -1137,6 +1147,7 @@ export const PosTerminal = () => {
                 <tr>
                   <th className="p-3">Item</th>
                   <th className="p-3 text-center">Qty</th>
+                  <th className="p-3 text-right">MRP</th>
                   <th className="p-3 text-right">Price</th>
                   <th className="p-3 text-right">Total</th>
                   <th className="p-3 text-center w-16"></th>
@@ -1200,7 +1211,8 @@ export const PosTerminal = () => {
                         </button>
                       </div>
                     </td>
-                    <td className="p-3 text-right font-medium">₹{item.unitPrice.toFixed(2)}</td>
+                    <td className="p-3 text-right font-semibold text-slate-500">₹{(item.mrp || item.unitPrice).toFixed(2)}</td>
+                    <td className="p-3 text-right font-medium text-slate-800">₹{item.unitPrice.toFixed(2)}</td>
                     <td className="p-3 text-right">
                       {item.discountAmount > 0 && <p className="text-xs text-slate-400 line-through">₹{item.lineTotal.toFixed(2)}</p>}
                       <p className="font-black text-xl text-slate-800">₹{item.finalLineTotal.toFixed(2)}</p>
@@ -1673,11 +1685,63 @@ export const PosTerminal = () => {
         requestManagerOverride={requestManagerOverride}
       />
 
-      <CancelInvoiceModal
-        isOpen={isCancelModalOpen}
-        onClose={() => setCancelModalOpen(false)}
-        user={user || undefined}
-      />
+      {/* Batch-wise Price List Selection Modal */}
+      {batchModalData && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 border border-slate-200">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+              <div>
+                <h3 className="text-lg font-black text-slate-800">{batchModalData.product.name}</h3>
+                <p className="text-xs font-bold text-indigo-600 mt-0.5">Multiple Batches Found — Select Batch & Price Line Item:</p>
+              </div>
+              <button 
+                onClick={() => setBatchModalData(null)} 
+                className="text-slate-400 hover:text-slate-600 font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="mt-4 space-y-2 max-h-72 overflow-y-auto pr-1">
+              {batchModalData.batches.map((batch: any) => (
+                <div 
+                  key={batch.id}
+                  onClick={() => {
+                    addProductToCart(batchModalData.product, batchModalData.overrideQty, batch);
+                    setBatchModalData(null);
+                  }}
+                  className="p-3.5 border rounded-xl border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/60 cursor-pointer flex justify-between items-center transition group shadow-sm"
+                >
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-extrabold text-sm text-slate-800 group-hover:text-indigo-600">Batch: {batch.batchNumber}</span>
+                      {batch.expiryDate && (
+                        <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                          Exp: {batch.expiryDate.substring(0, 10)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs font-semibold text-slate-500 mt-1">Available Stock: <span className="font-bold text-slate-700">{batch.currentStock} Pcs</span></p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-xs text-slate-400 line-through">MRP: ₹{(batch.mrp || batchModalData.product.mrp || batchModalData.product.sellingPrice).toFixed(2)}</p>
+                    <p className="font-black text-indigo-600 text-base">₹{(batch.sellingPrice || batchModalData.product.sellingPrice).toFixed(2)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 pt-3 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setBatchModalData(null)}
+                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

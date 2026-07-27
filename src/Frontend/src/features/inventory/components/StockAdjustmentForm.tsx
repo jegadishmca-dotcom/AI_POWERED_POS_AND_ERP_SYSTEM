@@ -551,19 +551,49 @@ export const StockAdjustmentForm = () => {
                     {/* Batch Selector */}
                     <td className="p-3 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                       {item.batches.length > 0 ? (
-                        <select
-                          className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-950"
-                          value={item.batchId}
-                          onChange={(e) => handleBatchChange(idx, e.target.value)}
-                        >
-                          {item.batches.map((b) => (
-                            <option key={b.id} value={b.id}>
-                              {b.batchNumber} {b.expiryDate ? `(Exp: ${b.expiryDate.substring(0, 10)})` : '(No Exp)'}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="space-y-1">
+                          <select
+                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-950"
+                            value={item.batchId || (item.batchNumber ? '__custom__' : '')}
+                            onChange={(e) => {
+                              if (e.target.value === '__custom__') {
+                                setFormItems(prev => prev.map((row, i) => i === idx ? { ...row, batchId: '', batchNumber: '', currentStock: 0 } : row));
+                              } else {
+                                handleBatchChange(idx, e.target.value);
+                              }
+                            }}
+                          >
+                            {item.batches.map((b) => (
+                              <option key={b.id} value={b.id}>
+                                {b.batchNumber} {b.expiryDate ? `(Exp: ${b.expiryDate.substring(0, 10)})` : '(No Exp)'} [Stock: {b.currentStock}]
+                              </option>
+                            ))}
+                            <option value="__custom__">+ Enter Custom Batch No...</option>
+                          </select>
+                          {(!item.batchId || item.batchId === '') && (
+                            <input
+                              type="text"
+                              placeholder="Custom Batch No (e.g. BATCH-01)"
+                              className="w-full p-1.5 border border-indigo-300 dark:border-indigo-700 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-900 dark:text-indigo-200 bg-indigo-50/50 dark:bg-indigo-950/50"
+                              value={item.batchNumber === 'NO BATCH' ? '' : item.batchNumber}
+                              onChange={(e) => {
+                                const val = e.target.value;
+                                setFormItems(prev => prev.map((row, i) => i === idx ? { ...row, batchNumber: val, batchId: '' } : row));
+                              }}
+                            />
+                          )}
+                        </div>
                       ) : (
-                        <span className="text-xs text-slate-400 font-bold pl-2">No active batches</span>
+                        <input
+                          type="text"
+                          placeholder="Type Batch No (e.g. BATCH-01)"
+                          className="w-full p-2 border border-amber-300 dark:border-amber-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-amber-500 font-bold text-amber-900 dark:text-amber-200 bg-amber-50/40 dark:bg-amber-950/40"
+                          value={item.batchNumber === 'NO BATCH' ? '' : item.batchNumber}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setFormItems(prev => prev.map((row, i) => i === idx ? { ...row, batchNumber: val, batchId: '' } : row));
+                          }}
+                        />
                       )}
                     </td>
  

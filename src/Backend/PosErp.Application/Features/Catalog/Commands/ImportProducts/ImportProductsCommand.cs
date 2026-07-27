@@ -40,12 +40,18 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
         {
             using var reader = new StreamReader(request.File.OpenReadStream(), System.Text.Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
             var headerLine = await reader.ReadLineAsync(cancellationToken);
+            while (string.IsNullOrWhiteSpace(headerLine) && !reader.EndOfStream)
+            {
+                headerLine = await reader.ReadLineAsync(cancellationToken);
+            }
             if (string.IsNullOrWhiteSpace(headerLine))
             {
                 return new ImportProductResult(0, 0, new List<string> { "CSV file is empty." });
             }
 
-            var headers = ParseCsvLine(headerLine).Select(h => h.ToLower()).ToList();
+            var headers = ParseCsvLine(headerLine)
+                .Select(h => h.Trim('\uFEFF', ' ', '"', '\t').ToLower())
+                .ToList();
 
             // Find column indices
             int codeIdx = headers.IndexOf("productcode");
@@ -318,6 +324,7 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
         var result = new List<string>();
         bool inQuotes = false;
         var currentToken = new System.Text.StringBuilder();
+        char delimiter = (line.Contains('\t') && !line.Contains(',')) ? '\t' : ',';
 
         for (int i = 0; i < line.Length; i++)
         {
@@ -326,9 +333,9 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
             {
                 inQuotes = !inQuotes;
             }
-            else if (c == ',' && !inQuotes)
+            else if (c == delimiter && !inQuotes)
             {
-                result.Add(currentToken.ToString().Trim(' ', '"'));
+                result.Add(currentToken.ToString().Trim('\uFEFF', ' ', '"', '\r', '\n'));
                 currentToken.Clear();
             }
             else
@@ -336,7 +343,7 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                 currentToken.Append(c);
             }
         }
-        result.Add(currentToken.ToString().Trim(' ', '"'));
+        result.Add(currentToken.ToString().Trim('\uFEFF', ' ', '"', '\r', '\n'));
         return result;
     }
 }

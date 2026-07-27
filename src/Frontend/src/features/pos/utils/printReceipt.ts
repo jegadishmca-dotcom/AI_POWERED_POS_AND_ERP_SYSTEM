@@ -224,39 +224,54 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
         -webkit-print-color-adjust: exact;
       }
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; font-family: Arial, "Helvetica Neue", Helvetica, sans-serif; color: #000; }
-    body { width: 76mm; margin: 0 auto; padding: 1mm 2mm; font-size: 11px; line-height: 1.2; background: #fff; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
+      font-weight: 800; /* Extra bold for maximum thermal print density */
+      color: #000 !important;
+    }
+    body {
+      width: 76mm;
+      margin: 0 auto;
+      padding: 1mm 2mm;
+      font-size: 11.5px;
+      line-height: 1.25;
+      background: #fff;
+      -webkit-font-smoothing: antialiased;
+    }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
-    .font-bold { font-weight: bold; }
-    .border-table { border-collapse: collapse; width: 100%; border: 1px solid #000; }
-    .border-table th, .border-table td { border: 1px solid #000; padding: 2px 3px; font-size: 10px; }
+    .font-bold { font-weight: 900; }
+    .border-table { border-collapse: collapse; width: 100%; border: 2px solid #000; }
+    .border-table th, .border-table td { border: 1.5px solid #000; padding: 3px 3px; font-size: 11px; font-weight: 800; }
   </style>
 </head>
 <body>
   <!-- HEADER -->
-  <div class="text-center font-bold" style="font-size: 15px; margin-top: 2px;">${STORE.nameTamil}</div>
-  <div class="text-center font-bold" style="font-size: 10px; margin-top: 1px;">GST :${STORE.gstin}</div>
-  <div class="text-center font-bold" style="font-size: 10px;">FSSAI : ${STORE.fssai}</div>
-  <div class="text-center" style="font-size: 10px;">1E -1G மாதா கோவில் தெரு</div>
-  <div class="text-center" style="font-size: 10px;">இளையான்குடி -630702</div>
-  <div class="text-center font-bold" style="font-size: 10px; margin-bottom: 4px;">CELL:${STORE.phone}</div>
+  <div class="text-center font-bold" style="font-size: 17px; margin-top: 2px;">${STORE.nameTamil}</div>
+  <div class="text-center font-bold" style="font-size: 11px; margin-top: 1px;">GST :${STORE.gstin}</div>
+  <div class="text-center font-bold" style="font-size: 11px;">FSSAI : ${STORE.fssai}</div>
+  <div class="text-center font-bold" style="font-size: 11px;">1E -1G மாதா கோவில் தெரு</div>
+  <div class="text-center font-bold" style="font-size: 11px;">இளையான்குடி -630702</div>
+  <div class="text-center font-bold" style="font-size: 11px; margin-bottom: 4px;">CELL:${STORE.phone}</div>
 
   <!-- METADATA BOX -->
   <table class="border-table" style="margin-bottom: 4px;">
     <tr>
-      <td width="55%" style="font-weight:bold;">
+      <td width="55%" style="font-weight: 900;">
         Bill No : &nbsp; ${invoice.invoiceNumber || '-'}<br/>
-        <span style="font-size:11px;">${invoice.cashierName || 'USER3'}</span>
+        <span style="font-size: 11.5px; font-weight: 900;">${invoice.cashierName || 'USER3'}</span>
       </td>
-      <td width="45%" style="font-weight:bold;">
+      <td width="45%" style="font-weight: 900;">
         Date : ${dateStr}<br/>
         Time : ${timeStr}
       </td>
     </tr>
     <tr>
-      <td style="font-weight:bold;">NAME : ${invoice.customerName || ''}</td>
-      <td style="font-weight:bold;">CELL : ${invoice.customerPhone || ''}</td>
+      <td style="font-weight: 900;">NAME : ${invoice.customerName || ''}</td>
+      <td style="font-weight: 900;">CELL : ${invoice.customerPhone || ''}</td>
     </tr>
   </table>
 
@@ -264,11 +279,11 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   <table class="border-table" style="margin-bottom: 4px;">
     <thead>
       <tr>
-        <th style="width: 44%; text-align: center;">Items</th>
-        <th style="width: 10%; text-align: center;">Qty</th>
-        <th style="width: 14%; text-align: center;">MRP</th>
-        <th style="width: 16%; text-align: center;">Rate</th>
-        <th style="width: 16%; text-align: center;">Amt</th>
+        <th style="width: 44%; text-align: center; font-weight: 900; font-size: 11px;">Items</th>
+        <th style="width: 10%; text-align: center; font-weight: 900; font-size: 11px;">Qty</th>
+        <th style="width: 14%; text-align: center; font-weight: 900; font-size: 11px;">MRP</th>
+        <th style="width: 16%; text-align: center; font-weight: 900; font-size: 11px;">Rate</th>
+        <th style="width: 16%; text-align: center; font-weight: 900; font-size: 11px;">Amt</th>
       </tr>
     </thead>
     <tbody>
@@ -279,17 +294,17 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   <!-- TOTAL BOX -->
   <table class="border-table" style="margin-bottom: 4px;">
     <tr>
-      <td width="55%" class="text-center font-bold" style="font-size: 16px; padding: 4px;">
+      <td width="50%" class="text-center" style="font-size: 18px; font-weight: 900; padding: 5px 4px;">
         TOTAL
       </td>
-      <td width="45%" class="text-right font-bold" style="font-size: 18px; padding: 4px;">
+      <td width="50%" class="text-right" style="font-size: 22px; font-weight: 900; padding: 5px 4px;">
         ${fmt(rounded)}
       </td>
     </tr>
   </table>
 
   <!-- SUMMARY & POINTS -->
-  <table style="width: 100%; font-size: 10px; font-weight: bold; margin-bottom: 4px; border-collapse: collapse;">
+  <table style="width: 100%; font-size: 11px; font-weight: 900; margin-bottom: 4px; border-collapse: collapse;">
     <tr>
       <td width="55%">OLD POINTS : ${oldPtsStr}</td>
       <td width="45%" class="text-right">RCVD : ${rcvdStr}</td>
@@ -305,7 +320,7 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   </table>
 
   <!-- FOOTER TAMIL SLOGAN -->
-  <div class="text-center font-bold" style="font-size: 13px; margin-top: 4px; margin-bottom: 4px;">
+  <div class="text-center" style="font-size: 15px; font-weight: 900; margin-top: 6px; margin-bottom: 4px; line-height: 1.3;">
     அனைத்தும் வாங்க<br/>
     ஆப்பிளுக்கு வாங்க
   </div>

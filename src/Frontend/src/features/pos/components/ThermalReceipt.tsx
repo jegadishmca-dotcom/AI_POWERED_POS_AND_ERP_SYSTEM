@@ -82,67 +82,56 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
       qty:       { width: '24px', textAlign: 'center' },
       rate:      { width: '50px', textAlign: 'right' },
       amt:       { width: '52px', textAlign: 'right' },
-      small:     { fontSize: '9px' },
-      discLine:  { fontSize: '9px', paddingLeft: '8px', color: '#2d6a2d' },
-      footer:    { textAlign: 'center', marginTop: '8px', paddingTop: '6px', borderTop: '1px dashed #000', paddingBottom: '4px' },
-    };
-
-    return (
-      <>
-        {/* 
-          PRINT CSS: visibility:hidden on body lets children override with visibility:visible.
-          display:none on parent would block all children — that was causing the blank receipt.
-        */}
-        <style>{`
+             <style>{`
           @media screen { .pos-receipt { display: none !important; } }
           @media print  {
             @page { size: 76mm auto; margin: 0mm !important; }
             html, body { width: 76mm !important; margin: 0 !important; padding: 0 !important; background: #fff !important; color: #000 !important; -webkit-print-color-adjust: exact; }
             body * { visibility: hidden; }
             .pos-receipt { visibility: visible !important; position: absolute; top: 0; left: 0; width: 76mm !important; margin: 0 auto; padding: 1mm 2mm; background: #fff; color: #000; }
-            .pos-receipt * { visibility: visible !important; }
+            .pos-receipt * { visibility: visible !important; font-weight: 800 !important; color: #000 !important; }
           }
         `}</style>
 
-        <div ref={ref} className="pos-receipt" style={{ width: '76mm', padding: '1mm 2mm', fontFamily: 'Arial, sans-serif', color: '#000', background: '#fff', fontSize: '11px', lineHeight: '1.2' }}>
+        <div ref={ref} className="pos-receipt" style={{ width: '76mm', padding: '1mm 2mm', fontFamily: 'Arial, sans-serif', color: '#000', background: '#fff', fontSize: '11.5px', lineHeight: '1.25', fontWeight: 800 }}>
 
           {/* ── HEADER ── */}
-          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '15px', marginTop: '2px' }}>{STORE.nameTamil}</div>
-          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '10px', marginTop: '1px' }}>GST :{STORE.gstin}</div>
-          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '10px' }}>FSSAI : {STORE.fssai}</div>
-          <div style={{ textAlign: 'center', fontSize: '10px' }}>1E -1G மாதா கோவில் தெரு</div>
-          <div style={{ textAlign: 'center', fontSize: '10px' }}>இளையான்குடி -630702</div>
-          <div style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '10px', marginBottom: '4px' }}>CELL:{STORE.phone}</div>
+          <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '17px', marginTop: '2px' }}>{STORE.nameTamil}</div>
+          <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px', marginTop: '1px' }}>GST :{STORE.gstin}</div>
+          <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px' }}>FSSAI : {STORE.fssai}</div>
+          <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '11px' }}>1E -1G மாதா கோவில் தெரு</div>
+          <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '11px' }}>இளையான்குடி -630702</div>
+          <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px', marginBottom: '4px' }}>CELL:{STORE.phone}</div>
 
           {/* ── INVOICE META BOX ── */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginBottom: '4px', fontSize: '10px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid #000', marginBottom: '4px', fontSize: '11px' }}>
             <tbody>
               <tr>
-                <td style={{ border: '1px solid #000', padding: '2px 4px', fontWeight: 'bold', width: '55%' }}>
+                <td style={{ border: '1.5px solid #000', padding: '3px 4px', fontWeight: 900, width: '55%' }}>
                   Bill No : &nbsp; {invoice.invoiceNumber || '-'}<br/>
-                  <span style={{ fontSize: '11px' }}>{invoice.cashierName || 'USER3'}</span>
+                  <span style={{ fontSize: '11.5px', fontWeight: 900 }}>{invoice.cashierName || 'USER3'}</span>
                 </td>
-                <td style={{ border: '1px solid #000', padding: '2px 4px', fontWeight: 'bold', width: '45%' }}>
+                <td style={{ border: '1.5px solid #000', padding: '3px 4px', fontWeight: 900, width: '45%' }}>
                   Date : {invoice.businessDate ? new Date(invoice.businessDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN')}<br/>
                   Time : {invoice.businessDate ? new Date(invoice.businessDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                 </td>
               </tr>
               <tr>
-                <td style={{ border: '1px solid #000', padding: '2px 4px', fontWeight: 'bold' }}>NAME : {invoice.customerName || ''}</td>
-                <td style={{ border: '1px solid #000', padding: '2px 4px', fontWeight: 'bold' }}>CELL : {invoice.customerPhone || ''}</td>
+                <td style={{ border: '1.5px solid #000', padding: '3px 4px', fontWeight: 900 }}>NAME : {invoice.customerName || ''}</td>
+                <td style={{ border: '1.5px solid #000', padding: '3px 4px', fontWeight: 900 }}>CELL : {invoice.customerPhone || ''}</td>
               </tr>
             </tbody>
           </table>
 
           {/* ── ITEMS BOXED TABLE ── */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginBottom: '4px', fontSize: '10px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid #000', marginBottom: '4px', fontSize: '11px' }}>
             <thead>
               <tr>
-                <th style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', width: '44%' }}>Items</th>
-                <th style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', width: '10%' }}>Qty</th>
-                <th style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', width: '14%' }}>MRP</th>
-                <th style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', width: '16%' }}>Rate</th>
-                <th style={{ border: '1px solid #000', padding: '2px', textAlign: 'center', width: '16%' }}>Amt</th>
+                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '44%', fontWeight: 900 }}>Items</th>
+                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '10%', fontWeight: 900 }}>Qty</th>
+                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '14%', fontWeight: 900 }}>MRP</th>
+                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '16%', fontWeight: 900 }}>Rate</th>
+                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '16%', fontWeight: 900 }}>Amt</th>
               </tr>
             </thead>
             <tbody>
@@ -154,11 +143,11 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
                 const mrpVal = mrp > 0 ? Math.round(mrp).toString() : '-';
                 return (
                   <tr key={idx}>
-                    <td style={{ border: '1px solid #000', padding: '2px', fontWeight: 'bold' }}>{item.name || item.productName || '-'}</td>
-                    <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center' }}>{qty}</td>
-                    <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'center' }}>{mrpVal}</td>
-                    <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'right' }}>{fmt(item.unitPrice)}</td>
-                    <td style={{ border: '1px solid #000', padding: '2px', textAlign: 'right', fontWeight: 'bold' }}>{fmt(lineAmt)}</td>
+                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', fontWeight: 900 }}>{item.name || item.productName || '-'}</td>
+                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', fontWeight: 800 }}>{qty}</td>
+                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', fontWeight: 800 }}>{mrpVal}</td>
+                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'right', fontWeight: 800 }}>{fmt(item.unitPrice)}</td>
+                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'right', fontWeight: 900 }}>{fmt(lineAmt)}</td>
                   </tr>
                 );
               })}
@@ -166,13 +155,13 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
           </table>
 
           {/* ── TOTAL BOX ── */}
-          <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', marginBottom: '4px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid #000', marginBottom: '4px' }}>
             <tbody>
               <tr>
-                <td style={{ border: '1px solid #000', padding: '4px', fontSize: '16px', fontWeight: 'bold', textAlign: 'center', width: '55%' }}>
+                <td style={{ border: '1.5px solid #000', padding: '5px 4px', fontSize: '18px', fontWeight: 900, textAlign: 'center', width: '50%' }}>
                   TOTAL
                 </td>
-                <td style={{ border: '1px solid #000', padding: '4px', fontSize: '18px', fontWeight: 'bold', textAlign: 'right', width: '45%' }}>
+                <td style={{ border: '1.5px solid #000', padding: '5px 4px', fontSize: '22px', fontWeight: 900, textAlign: 'right', width: '50%' }}>
                   {fmt(Math.round(safe(invoice.totalAmount)))}
                 </td>
               </tr>
@@ -180,7 +169,7 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
           </table>
 
           {/* ── SUMMARY & POINTS ── */}
-          <table style={{ width: '100%', fontSize: '10px', fontWeight: 'bold', marginBttom: '4px', borderCollapse: 'collapse' }}>
+          <table style={{ width: '100%', fontSize: '11px', fontWeight: 900, marginBottom: '4px', borderCollapse: 'collapse' }}>
             <tbody>
               <tr>
                 <td style={{ width: '55%' }}>OLD POINTS : {Math.max(0, safe(invoice.loyaltyPointsBalance) - safe(invoice.loyaltyPointsEarned)).toFixed(2)}</td>
@@ -189,6 +178,25 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
               <tr>
                 <td style={{ width: '55%' }}>TODAY PTS : {safe(invoice.loyaltyPointsEarned).toFixed(2)}</td>
                 <td style={{ width: '45%', textAlign: 'right' }}>RFND : {fmt(changeDue)}</td>
+              </tr>
+              <tr>
+                <td style={{ width: '55%' }}>TOTAL PTS : {safe(invoice.loyaltyPointsBalance).toFixed(2)}</td>
+                <td style={{ width: '45%' }}></td>
+              </tr>
+            </tbody>
+          </table>
+
+          {/* ── FOOTER TAMIL SLOGAN ── */}
+          <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '15px', marginTop: '6px', marginBottom: '4px', lineHeight: '1.3' }}>
+            அனைத்தும் வாங்க<br/>
+            ஆப்பிளுக்கு வாங்க
+          </div>
+
+        </div>
+      </>
+    );
+  }
+);={{ width: '45%', textAlign: 'right' }}>RFND : {fmt(changeDue)}</td>
               </tr>
               <tr>
                 <td style={{ width: '55%' }}>TOTAL PTS : {safe(invoice.loyaltyPointsBalance).toFixed(2)}</td>

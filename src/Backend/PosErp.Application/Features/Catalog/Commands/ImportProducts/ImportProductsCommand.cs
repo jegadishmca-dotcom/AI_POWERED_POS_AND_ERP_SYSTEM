@@ -110,6 +110,15 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                 .Where(p => !p.IsDeleted)
                 .ToDictionaryAsync(p => p.ProductCode, StringComparer.OrdinalIgnoreCase, cancellationToken);
 
+            // Pre-load existing active product batches in memory to avoid EF Core translation errors & 30,000 DB queries
+            var existingBatchesList = await _context.ProductBatches
+                .Where(b => b.IsActive)
+                .ToListAsync(cancellationToken);
+
+            var existingBatches = existingBatchesList
+                .GroupBy(b => $"{b.ProductId}_{b.BatchNumber.Trim().ToLower()}")
+                .ToDictionary(g => g.Key, g => g.First());
+
             int lineNum = 1;
             while (!reader.EndOfStream)
             {
@@ -256,10 +265,8 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                         }
 
                         // Also insert or update ProductBatch entity for batch-level pricing and tracking
-                        var existingBatch = await _context.ProductBatches
-                            .FirstOrDefaultAsync(b => b.ProductId == product.Id && b.BatchNumber.Equals(cleanBarcode, StringComparison.OrdinalIgnoreCase), cancellationToken);
-
-                        if (existingBatch == null)
+                        string batchKey = $"{product.Id}_{cleanBarcode.ToLower()}";
+                        if (!existingBatches.TryGetValue(batchKey, out var existingBatch))
                         {
                             var newBatch = new ProductBatch
                             {
@@ -273,6 +280,7 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                                 CreatedAt = DateTime.UtcNow
                             };
                             _context.ProductBatches.Add(newBatch);
+                            existingBatches[batchKey] = newBatch;
                         }
                         else
                         {

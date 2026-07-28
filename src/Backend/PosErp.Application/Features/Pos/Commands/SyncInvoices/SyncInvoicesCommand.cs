@@ -15,7 +15,7 @@ using Microsoft.Extensions.Configuration;
 namespace PosErp.Application.Features.Pos.Commands.SyncInvoices;
 
 public record SyncInvoicesCommand(List<OfflineInvoiceDto> Invoices) : IRequest<SyncResult>, IRetryableRequest;
-public record SyncResult(int Synced, int Failed, List<string> Errors);
+public record SyncResult(int Synced, int Failed, List<string> Errors, List<string> SyncedIds);
 
 public record OfflineInvoiceDto(
     Guid Id,
@@ -98,6 +98,7 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
     public async Task<SyncResult> Handle(SyncInvoicesCommand request, CancellationToken cancellationToken)
     {
         var errors = new List<string>();
+        var syncedIds = new List<string>();
         int synced = 0;
         int failed = 0;
 
@@ -113,6 +114,7 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                     var existsById = await _context.Invoices.AnyAsync(i => i.Id == dto.Id, cancellationToken);
                     if (existsById)
                     {
+                        syncedIds.Add(dto.Id.ToString());
                         synced++;
                         return; 
                     }
@@ -431,8 +433,8 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
 
                     // Financial Double-Entry Posting for Sync
                     decimal totalCess = dto.Items.Sum(i => i.CessAmount);
-                    decimal cgst = Math.Round((dto.TaxAmount - totalCess) / 2m, 2);
-                    decimal sgst = dto.TaxAmount - totalCess - cgst;
+                    decimal totalCgst = dto.Items.Sum(i => i.CgstAmount);
+                    decimal totalSgst = dto.Items.Sum(i => i.SgstAmount);
                     decimal taxableValue = dto.TotalAmount - dto.TaxAmount;
 
                     var journalLines = new List<PosErp.Application.Features.Finance.Services.JournalLineDto>();
@@ -517,20 +519,19 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
 
                     journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = salesAccountCode, Description = "Sales Revenue", Debit = 0, Credit = taxableValue });
                     
-                    // For double entry posting, we split total tax (including Cess) between CGST/SGST to match system Chart of Accounts
-                    decimal ledgerCgst = Math.Round(dto.TaxAmount / 2m, 2);
-                    decimal ledgerSgst = dto.TaxAmount - ledgerCgst;
-                    if (ledgerCgst > 0) journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = outputCgstAccountCode, Description = "Output CGST", Debit = 0, Credit = ledgerCgst });
-                    if (ledgerSgst > 0) journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = outputSgstAccountCode, Description = "Output SGST", Debit = 0, Credit = ledgerSgst });
+                    // Use actual per-item CGST/SGST sums for journal entry (consistent with online path)
+                    if (totalCgst > 0) journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = outputCgstAccountCode, Description = "Output CGST", Debit = 0, Credit = totalCgst });
+                    if (totalSgst > 0) journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = outputSgstAccountCode, Description = "Output SGST", Debit = 0, Credit = totalSgst });
 
                     await _financialPostingService.PostJournalEntryAsync(
                         null, dto.BusinessDate.Date, $"Offline POS Invoice {dto.InvoiceNumber}", $"INV-{dto.Id}", journalLines, cancellationToken);
 
                     await _financialPostingService.RecordGstTransactionAsync(
-                        null, "SALE", dto.InvoiceNumber, dto.BusinessDate.Date, taxableValue, cgst, sgst, totalCess, null, cancellationToken);
+                        null, "SALE", dto.InvoiceNumber, dto.BusinessDate.Date, taxableValue, totalCgst, totalSgst, totalCess, null, cancellationToken);
 
                     await _context.SaveChangesAsync(cancellationToken);
                     await transaction.CommitAsync(cancellationToken);
+                    syncedIds.Add(dto.Id.ToString());
                     synced++;
                 }
                 catch (Exception ex)
@@ -543,7 +544,7 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
             });
         }
 
-        return new SyncResult(synced, failed, errors);
+        return new SyncResult(synced, failed, errors, syncedIds);
     }
 }
 

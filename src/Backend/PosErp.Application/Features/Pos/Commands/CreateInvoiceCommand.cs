@@ -578,9 +578,10 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             decimal totalSgst = invoice.Items.Sum(i => i.SgstAmount);
             decimal totalCess = invoice.Items.Sum(i => i.CessAmount);
 
-            // For double-entry posting, we split the total tax amount (CGST+SGST+Cess) between CGST/SGST
-            decimal cgst = Math.Round(invoice.TaxAmount / 2m, 2);
-            decimal sgst = invoice.TaxAmount - cgst; // ensure CGST+SGST = TaxAmount exactly
+            // For double-entry posting, use the actual per-item CGST/SGST/Cess sums
+            // computed above from real tax slab rates (not an approximate 50/50 split).
+            decimal cgst = totalCgst;
+            decimal sgst = totalSgst;
             decimal taxableValue = invoice.SubTotal; // SubTotal = sum of post-discount item totals (ex-tax)
 
             decimal creditSaleAmount = 0;

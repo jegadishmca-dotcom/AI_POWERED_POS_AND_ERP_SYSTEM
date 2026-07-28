@@ -187,6 +187,10 @@ public class DatabaseProvisioningService : IDatabaseProvisioningService
     /// </summary>
     public async Task RefreshUatFromLiveSnapshotAsync(string liveConnectionString, string uatConnectionString, Guid tenantId)
     {
+        throw new InvalidOperationException(
+            "FATAL SECURITY GUARD: RefreshUatFromLiveSnapshotAsync is hard-blocked. " +
+            "posdb_uat currently contains active store transaction data. Overwriting it from posdb_live is strictly prohibited.");
+
         var liveBuilder = new NpgsqlConnectionStringBuilder(liveConnectionString);
         var uatBuilder = new NpgsqlConnectionStringBuilder(uatConnectionString);
         var liveDb = liveBuilder.Database ?? throw new InvalidOperationException("Live connection string missing database name.");

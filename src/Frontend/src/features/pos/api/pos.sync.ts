@@ -21,14 +21,33 @@ export const syncInvoices = async () => {
 
     const res = await api.post('/api/pos/sync', { invoices: payload });
     
-    // If successful, clear the sync queue
-    if (res.data.failed === 0) {
-      await posDb.sync_queue.clear();
-    } else {
-      console.warn('Partial sync success', res.data.errors);
-      // Logic to remove only successfully synced invoices goes here
+    // Server returns syncedIds: string[] — the invoice IDs that were committed.
+    // Remove ONLY those invoices from the local sync queue.
+    const syncedIds: string[] = res.data.syncedIds || res.data.SyncedIds || [];
+
+    if (syncedIds.length > 0) {
+      // Normalize to lowercase for case-insensitive matching against Dexie keys
+      const syncedSet = new Set(syncedIds.map((id: string) => id.toLowerCase()));
+
+      const idsToRemove = pending
+        .filter((inv: any) => syncedSet.has(String(inv.id).toLowerCase()))
+        .map((inv: any) => inv.id);
+
+      if (idsToRemove.length > 0) {
+        await posDb.sync_queue.bulkDelete(idsToRemove);
+        console.info(`[Sync] Removed ${idsToRemove.length} synced invoice(s) from queue.`);
+      }
+    }
+
+    // Log any failures so the operator is aware queued invoices remain
+    if (res.data.failed > 0) {
+      const errors: string[] = res.data.errors || res.data.Errors || [];
+      console.warn(
+        `[Sync] ${res.data.failed} invoice(s) failed to sync and remain queued for retry.`,
+        errors
+      );
     }
   } catch (error) {
-    console.error('Offline mode: Sync failed, will retry later.');
+    console.error('[Sync] Offline mode: Sync failed, will retry later.', error);
   }
 };

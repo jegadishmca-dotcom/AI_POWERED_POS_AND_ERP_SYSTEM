@@ -13,8 +13,8 @@ export const ShiftReport = () => {
   const [isClosed, setIsClosed] = useState(false);
 
   const { user } = useAuthStore();
-  const terminalId = localStorage.getItem('pos_terminal_id') || '00000000-0000-0000-0000-000000000001';
-  const cashierId = user?.id || '00000000-0000-0000-0000-000000000001';
+  const terminalId = localStorage.getItem('pos_terminal_id') || '';
+  const cashierId = user?.id || '';
   const terminalCode = localStorage.getItem('pos_terminal_code') || 'POS-01';
 
   useEffect(() => {

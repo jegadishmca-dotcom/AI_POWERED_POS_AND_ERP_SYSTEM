@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using System;
 using System.Net;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace PosErp.Api.Middlewares;
@@ -12,13 +14,21 @@ public class RateLimitingMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<RateLimitingMiddleware> _logger;
     private readonly IConnectionMultiplexer _redis;
-    private const int MaxRequestsPerMinute = 100;
+    private readonly int _maxRequestsPerMinute;
+    private readonly int _loginMaxAttemptsPerMinute;
+    private readonly int _loginWindowSeconds;
 
-    public RateLimitingMiddleware(RequestDelegate next, ILogger<RateLimitingMiddleware> logger, IConnectionMultiplexer redis)
+    public RateLimitingMiddleware(RequestDelegate next, ILogger<RateLimitingMiddleware> logger, IConnectionMultiplexer redis, IConfiguration configuration)
     {
         _next = next;
         _logger = logger;
         _redis = redis;
+
+        // Read rate-limiting thresholds from appsettings.json (RateLimiting section), with sensible defaults.
+        var section = configuration.GetSection("RateLimiting");
+        _maxRequestsPerMinute = section.GetValue<int>("GeneralMaxRequestsPerMinute", 100);
+        _loginMaxAttemptsPerMinute = section.GetValue<int>("LoginMaxAttemptsPerMinute", 5);
+        _loginWindowSeconds = section.GetValue<int>("LoginWindowSeconds", 60);
     }
 
     public async Task InvokeAsync(HttpContext context)
@@ -35,6 +45,43 @@ public class RateLimitingMiddleware
             try
             {
                 var db = _redis.GetDatabase();
+
+                // SEC-05: Stricter rate limit on login endpoint (per-IP).
+                // This check runs BEFORE the generic limiter so the tighter login limit fires first.
+                // Login POSTs still also increment the generic counter below (both counters serve
+                // different purposes: login limit prevents brute-force, generic limit prevents DoS).
+                if (endpoint.Equals("/api/auth/login", StringComparison.OrdinalIgnoreCase)
+                    && context.Request.Method == "POST")
+                {
+                    var loginKey = $"rate_limit:login:{ipAddress}";
+                    var loginCount = await db.StringIncrementAsync(loginKey);
+                    if (loginCount == 1)
+                    {
+                        await db.KeyExpireAsync(loginKey, TimeSpan.FromSeconds(_loginWindowSeconds));
+                    }
+
+                    if (loginCount > _loginMaxAttemptsPerMinute)
+                    {
+                        _logger.LogWarning("Login rate limit exceeded for IP: {IpAddress} ({Count} attempts in {Window}s window)",
+                            ipAddress, loginCount, _loginWindowSeconds);
+
+                        context.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
+                        context.Response.ContentType = "application/json";
+
+                        // Match the error envelope used by GlobalExceptionMiddleware:
+                        // { "statusCode": 429, "message": "..." }
+                        var response = new
+                        {
+                            StatusCode = (int)HttpStatusCode.TooManyRequests,
+                            Message = $"Too many login attempts. Please wait {_loginWindowSeconds} seconds before trying again."
+                        };
+                        var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+                        await context.Response.WriteAsync(JsonSerializer.Serialize(response, options));
+                        return;
+                    }
+                }
+
+                // Generic per-IP rate limit for all /api/* endpoints (including login — see comment above).
                 var key = $"rate_limit:{ipAddress}";
 
                 var count = await db.StringIncrementAsync(key);
@@ -43,18 +90,27 @@ public class RateLimitingMiddleware
                     await db.KeyExpireAsync(key, TimeSpan.FromMinutes(1));
                 }
 
-                if (count > MaxRequestsPerMinute)
+                if (count > _maxRequestsPerMinute)
                 {
-                    _logger.LogWarning($"Rate limit exceeded for IP: {ipAddress}");
+                    _logger.LogWarning("Rate limit exceeded for IP: {IpAddress}", ipAddress);
+
                     context.Response.StatusCode = (int)HttpStatusCode.TooManyRequests;
                     context.Response.ContentType = "application/json";
-                    await context.Response.WriteAsync("{\"error\": \"Too many requests. Please try again later.\"}");
+
+                    // Match the error envelope used by GlobalExceptionMiddleware
+                    var response = new
+                    {
+                        StatusCode = (int)HttpStatusCode.TooManyRequests,
+                        Message = "Too many requests. Please try again later."
+                    };
+                    var options = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+                    await context.Response.WriteAsync(JsonSerializer.Serialize(response, options));
                     return;
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogWarning($"Redis connection failed during rate limiting check. Proceeding without rate limiting. Error: {ex.Message}");
+                _logger.LogWarning("Redis connection failed during rate limiting check. Proceeding without rate limiting. Error: {ErrorMessage}", ex.Message);
             }
         }
 

@@ -15,7 +15,69 @@ namespace PosErp.Application.Features.Catalog.Commands.ImportProducts;
 
 public record ImportProductResult(int TotalImported, int TotalFailed, List<string> Errors);
 
-public record ImportProductsCommand(IFormFile File) : IRequest<ImportProductResult>;
+public record ImportProductsCommand(IFormFile File, string? JobId = null) : IRequest<ImportProductResult>;
+
+public class ImportJobStatus
+{
+    public string JobId { get; set; } = string.Empty;
+    public int TotalRows { get; set; }
+    public int ProcessedRows { get; set; }
+    public int ImportedCount { get; set; }
+    public int FailedCount { get; set; }
+    public int Percent => TotalRows > 0 ? Math.Min(99, (int)((double)ProcessedRows / TotalRows * 100)) : 0;
+    public bool IsCompleted { get; set; }
+    public List<string> Errors { get; set; } = new();
+}
+
+public static class ImportProgressTracker
+{
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, ImportJobStatus> _jobs = new(StringComparer.OrdinalIgnoreCase);
+
+    public static void StartJob(string jobId, int totalRows)
+    {
+        _jobs[jobId] = new ImportJobStatus
+        {
+            JobId = jobId,
+            TotalRows = totalRows,
+            ProcessedRows = 0,
+            ImportedCount = 0,
+            FailedCount = 0,
+            IsCompleted = false
+        };
+    }
+
+    public static void UpdateJob(string jobId, int processedRows, int importedCount, int failedCount, List<string>? errors = null)
+    {
+        if (_jobs.TryGetValue(jobId, out var status))
+        {
+            status.ProcessedRows = processedRows;
+            status.ImportedCount = importedCount;
+            status.FailedCount = failedCount;
+            if (errors != null && errors.Any())
+            {
+                status.Errors = errors.Take(20).ToList();
+            }
+        }
+    }
+
+    public static void CompleteJob(string jobId, int importedCount, int failedCount, List<string> errors)
+    {
+        if (_jobs.TryGetValue(jobId, out var status))
+        {
+            status.ProcessedRows = status.TotalRows > 0 ? status.TotalRows : status.ProcessedRows;
+            status.ImportedCount = importedCount;
+            status.FailedCount = failedCount;
+            status.IsCompleted = true;
+            status.Errors = errors;
+        }
+    }
+
+    public static ImportJobStatus? GetStatus(string jobId)
+    {
+        _jobs.TryGetValue(jobId, out var status);
+        return status;
+    }
+}
 
 public class ImportProductsCommandHandler : IRequestHandler<ImportProductsCommand, ImportProductResult>
 {
@@ -36,6 +98,12 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
         var errors = new List<string>();
         int imported = 0;
         int failed = 0;
+
+        if (!string.IsNullOrEmpty(request.JobId))
+        {
+            int estimatedRows = Math.Max(100, (int)(request.File.Length / 110));
+            ImportProgressTracker.StartJob(request.JobId, estimatedRows);
+        }
 
         try
         {
@@ -312,6 +380,11 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
 
                     imported++;
 
+                    if (!string.IsNullOrEmpty(request.JobId) && lineNum % 50 == 0)
+                    {
+                        ImportProgressTracker.UpdateJob(request.JobId, lineNum, imported, failed, errors);
+                    }
+
                     // Batch save every 1000 records to keep database transactions manageable
                     if (imported % 1000 == 0)
                     {
@@ -349,7 +422,16 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
         catch (Exception ex)
         {
             errors.Add($"File processing error: {ex.Message}");
+            if (!string.IsNullOrEmpty(request.JobId))
+            {
+                ImportProgressTracker.CompleteJob(request.JobId, imported, failed, errors);
+            }
             return new ImportProductResult(imported, failed, errors);
+        }
+
+        if (!string.IsNullOrEmpty(request.JobId))
+        {
+            ImportProgressTracker.CompleteJob(request.JobId, imported, failed, errors);
         }
 
         return new ImportProductResult(imported, failed, errors);

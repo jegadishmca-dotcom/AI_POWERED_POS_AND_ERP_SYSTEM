@@ -6,14 +6,50 @@ export const searchProducts = async (q: string, limit: number = 20): Promise<Pro
   return data;
 };
 
-export const importCsv = async (file: File): Promise<ImportResult> => {
+export const importCsv = async (
+  file: File, 
+  jobId?: string, 
+  onProgress?: (progress: { processedRows: number; totalRows: number; importedCount: number; failedCount: number; percent: number }) => void
+): Promise<ImportResult> => {
   const formData = new FormData();
   formData.append('file', file);
+  if (jobId) {
+    formData.append('jobId', jobId);
+  }
+
+  let intervalId: any = null;
+  if (jobId && onProgress) {
+    intervalId = setInterval(async () => {
+      try {
+        const { data } = await api.get(`/api/catalog/import-status/${jobId}`);
+        if (data) {
+          onProgress({
+            processedRows: data.processedRows || 0,
+            totalRows: data.totalRows || 0,
+            importedCount: data.importedCount || 0,
+            failedCount: data.failedCount || 0,
+            percent: data.percent || 0
+          });
+          if (data.isCompleted) {
+            clearInterval(intervalId);
+          }
+        }
+      } catch (e) {
+        // ignore status check errors
+      }
+    }, 400);
+  }
   
-  const { data } = await api.post('/api/catalog/import', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  });
-  return data;
+  try {
+    const { data } = await api.post('/api/catalog/import', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    if (intervalId) clearInterval(intervalId);
+    return data;
+  } catch (err) {
+    if (intervalId) clearInterval(intervalId);
+    throw err;
+  }
 };
 
 export interface TaxSlab {

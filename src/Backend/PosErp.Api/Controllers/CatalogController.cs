@@ -65,10 +65,19 @@ public class CatalogController : ControllerBase
     [Authorize(Roles = "Admin,Manager,Owner")]
     [Microsoft.AspNetCore.Mvc.RequestSizeLimit(100_000_000)]
     [Microsoft.AspNetCore.Mvc.RequestFormLimits(MultipartBodyLengthLimit = 100_000_000, ValueLengthLimit = 100_000_000)]
-    public async Task<IActionResult> ImportCsv(IFormFile file)
+    public async Task<IActionResult> ImportCsv(IFormFile file, [FromForm] string? jobId = null)
     {
-        var result = await _mediator.Send(new ImportProductsCommand(file));
+        var result = await _mediator.Send(new ImportProductsCommand(file, jobId));
         return Ok(result);
+    }
+
+    [HttpGet("import-status/{jobId}")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
+    public IActionResult GetImportStatus(string jobId)
+    {
+        var status = ImportProgressTracker.GetStatus(jobId);
+        if (status == null) return NotFound("Import job not found.");
+        return Ok(status);
     }
 
     [HttpPost]

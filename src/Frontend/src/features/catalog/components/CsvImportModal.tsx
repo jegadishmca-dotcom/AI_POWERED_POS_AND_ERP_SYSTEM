@@ -7,6 +7,7 @@ export const CsvImportModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  const [progress, setProgress] = useState<{ processedRows: number; totalRows: number; importedCount: number; failedCount: number; percent: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
@@ -16,12 +17,20 @@ export const CsvImportModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
     if (!file) return;
     setIsUploading(true);
     setResult(null);
+    setProgress({ processedRows: 0, totalRows: Math.max(100, Math.round(file.size / 110)), importedCount: 0, failedCount: 0, percent: 0 });
+
+    const jobId = 'job_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
+
     try {
-      const res = await importCsv(file);
+      const res = await importCsv(file, jobId, (p) => {
+        setProgress(p);
+      });
       setResult(res);
+      setProgress(null);
       queryClient.invalidateQueries({ queryKey: ['products'] });
     } catch (e: any) {
       setResult({ error: 'Upload failed: ' + (e.message || 'Unknown error') });
+      setProgress(null);
     } finally {
       setIsUploading(false);
     }
@@ -30,13 +39,13 @@ export const CsvImportModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm">
       <div className="bg-white dark:bg-slate-800 rounded-xl shadow-xl max-w-lg w-full p-6 relative">
-        <button onClick={onClose} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-white">
+        <button onClick={onClose} disabled={isUploading} className="absolute right-4 top-4 text-slate-400 hover:text-slate-600 dark:hover:text-white disabled:opacity-30">
           <X className="w-5 h-5" />
         </button>
         
         <h2 className="text-xl font-bold mb-4 text-slate-900 dark:text-white">Import Products CSV</h2>
         
-        {!result && (
+        {!result && !isUploading && (
           <div className="border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-lg p-8 text-center">
             <UploadCloud className="mx-auto h-12 w-12 text-slate-400 mb-4" />
             <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
@@ -58,13 +67,48 @@ export const CsvImportModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
           </div>
         )}
 
+        {isUploading && progress && (
+          <div className="bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 p-5 rounded-xl space-y-4">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center space-x-2">
+                <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+                <span className="font-bold text-sm text-slate-800 dark:text-slate-100">Importing Products...</span>
+              </div>
+              <span className="font-black text-indigo-600 text-base">{progress.percent}%</span>
+            </div>
+
+            {/* Progress Bar Track */}
+            <div className="w-full bg-slate-200 dark:bg-slate-700 h-3 rounded-full overflow-hidden">
+              <div 
+                className="bg-indigo-600 h-full rounded-full transition-all duration-300 ease-out bg-gradient-to-r from-indigo-500 to-emerald-500" 
+                style={{ width: `${Math.max(2, Math.min(100, progress.percent))}%` }}
+              />
+            </div>
+
+            <div className="grid grid-cols-3 gap-2 text-center text-xs pt-1">
+              <div className="bg-white dark:bg-slate-800 p-2 rounded-lg border border-slate-200 dark:border-slate-700">
+                <p className="text-slate-400 font-bold">Processed</p>
+                <p className="font-extrabold text-slate-800 dark:text-slate-200">{progress.processedRows.toLocaleString()}</p>
+              </div>
+              <div className="bg-emerald-50 dark:bg-emerald-900/30 p-2 rounded-lg border border-emerald-200 dark:border-emerald-800">
+                <p className="text-emerald-600 dark:text-emerald-400 font-bold">Imported</p>
+                <p className="font-extrabold text-emerald-700 dark:text-emerald-300">{progress.importedCount.toLocaleString()}</p>
+              </div>
+              <div className="bg-amber-50 dark:bg-amber-900/30 p-2 rounded-lg border border-amber-200 dark:border-amber-800">
+                <p className="text-amber-600 dark:text-amber-400 font-bold">Failed</p>
+                <p className="font-extrabold text-amber-700 dark:text-amber-300">{progress.failedCount.toLocaleString()}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {result && !result.error && (
           <div className="bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 p-4 rounded-lg">
             <h3 className="flex items-center text-emerald-800 dark:text-emerald-400 font-bold mb-2">
               <CheckCircle2 className="w-5 h-5 mr-2" /> Import Complete
             </h3>
             <p className="text-sm text-emerald-700 dark:text-emerald-300">
-              Imported: <strong>{result.totalImported}</strong> | Failed: <strong>{result.totalFailed}</strong>
+              Imported: <strong>{result.totalImported?.toLocaleString()}</strong> | Failed: <strong>{result.totalFailed?.toLocaleString()}</strong>
             </p>
             {result.errors?.length > 0 && (
               <ul className="mt-2 text-xs text-red-600 dark:text-red-300 max-h-32 overflow-y-auto bg-white/50 dark:bg-black/20 p-2 rounded border border-red-100 dark:border-red-900/30">
@@ -84,7 +128,7 @@ export const CsvImportModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
         )}
 
         <div className="mt-6 flex justify-end space-x-3">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900">
+          <button onClick={onClose} disabled={isUploading} className="px-4 py-2 text-sm text-slate-600 dark:text-slate-300 hover:text-slate-900 disabled:opacity-40">
             {result && !result.error && result.totalFailed === 0 ? 'Close' : 'Cancel'}
           </button>
           {!(result && !result.error && result.totalFailed === 0) && (

@@ -548,6 +548,38 @@ export const PosTerminal = () => {
   };
 
   const [batchModalData, setBatchModalData] = useState<{ product: any; batches: any[]; overrideQty?: number } | null>(null);
+  const [selectedBatchIndex, setSelectedBatchIndex] = useState(0);
+
+  useEffect(() => {
+    if (!batchModalData || !batchModalData.batches || batchModalData.batches.length === 0) return;
+
+    const handleBatchKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedBatchIndex((prev) => (prev + 1) % batchModalData.batches.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        e.stopPropagation();
+        setSelectedBatchIndex((prev) => (prev - 1 + batchModalData.batches.length) % batchModalData.batches.length);
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        const chosenBatch = batchModalData.batches[selectedBatchIndex];
+        if (chosenBatch) {
+          addProductToCart(batchModalData.product, batchModalData.overrideQty, chosenBatch);
+          setBatchModalData(null);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        setBatchModalData(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleBatchKeyDown, true);
+    return () => window.removeEventListener('keydown', handleBatchKeyDown, true);
+  }, [batchModalData, selectedBatchIndex]);
 
   const addProductToCart = async (product: any, overrideQty?: number, selectedBatch?: any) => {
     if (selectedBatch) {
@@ -563,6 +595,7 @@ export const PosTerminal = () => {
     }
 
     if (fetchedBatches && fetchedBatches.length >= 2) {
+      setSelectedBatchIndex(0);
       setBatchModalData({ product, batches: fetchedBatches, overrideQty });
       return;
     }
@@ -1725,6 +1758,7 @@ export const PosTerminal = () => {
                     const mrpVal = batch.mrp || batchModalData.product.mrp || batchModalData.product.sellingPrice;
                     const priceVal = batch.sellingPrice || batchModalData.product.sellingPrice;
                     const stockVal = batch.currentStock ?? 0;
+                    const isSelected = index === selectedBatchIndex;
 
                     return (
                       <tr 
@@ -1733,13 +1767,21 @@ export const PosTerminal = () => {
                           addProductToCart(batchModalData.product, batchModalData.overrideQty, batch);
                           setBatchModalData(null);
                         }}
-                        className={`border-b border-slate-300 cursor-pointer font-bold text-xs transition ${
-                          index === 0 
-                            ? 'bg-red-600 text-white hover:bg-red-700' 
-                            : 'bg-orange-500 text-white hover:bg-orange-600'
+                        onMouseEnter={() => setSelectedBatchIndex(index)}
+                        className={`border-b border-slate-300 cursor-pointer font-bold text-xs transition transform ${
+                          isSelected
+                            ? 'bg-red-700 text-white ring-4 ring-indigo-600 ring-offset-1 z-10 scale-[1.01] shadow-lg' 
+                            : index === 0 
+                              ? 'bg-red-600 text-white hover:bg-red-700' 
+                              : 'bg-orange-500 text-white hover:bg-orange-600'
                         }`}
                       >
-                        <td className="p-2.5 border-r border-white/30 text-center font-black">{batch.batchNumber || 'DEFAULT'}</td>
+                        <td className="p-2.5 border-r border-white/30 text-center font-black">
+                          <span className="inline-flex items-center justify-center gap-1">
+                            {isSelected && <span className="text-yellow-300 font-black text-sm">▶</span>}
+                            {batch.batchNumber || 'DEFAULT'}
+                          </span>
+                        </td>
                         <td className="p-2.5 border-r border-white/30 text-center">Nos</td>
                         <td className="p-2.5 border-r border-white/30 text-right font-black">₹{mrpVal.toFixed(2)}</td>
                         <td className="p-2.5 border-r border-white/30 text-right font-black">₹{priceVal.toFixed(2)}</td>
@@ -1754,7 +1796,9 @@ export const PosTerminal = () => {
             </div>
 
             <div className="mt-5 pt-3 border-t border-slate-100 flex justify-between items-center">
-              <span className="text-xs text-slate-500 font-bold">Select a batch row above to add to cart</span>
+              <span className="text-xs text-indigo-700 font-extrabold flex items-center gap-1 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-200">
+                <span>⌨ Use <kbd className="bg-white border px-1 rounded shadow-xs">↑</kbd> <kbd className="bg-white border px-1 rounded shadow-xs">↓</kbd> Arrow keys & press <kbd className="bg-white border px-1 rounded shadow-xs">Enter</kbd> to select batch</span>
+              </span>
               <button
                 onClick={() => setBatchModalData(null)}
                 className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-lg transition"

@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Http;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Catalog;
+using PosErp.Domain.Entities.Inventory;
 using System;
 using System.IO;
 using System.Collections.Generic;
@@ -234,28 +235,51 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                         product.IsWeighable = isWeighable;
                     }
 
-                    // Handle Barcode
+                    // Handle Barcode & ProductBatch
                     if (!string.IsNullOrWhiteSpace(barcodeVal))
                     {
                         string cleanBarcode = barcodeVal.Trim();
-                        var barcode = product.Barcodes.FirstOrDefault(b => b.IsPrimary);
-                        if (barcode == null)
+                        var existingBarcode = product.Barcodes.FirstOrDefault(b => b.BarcodeValue.Equals(cleanBarcode, StringComparison.OrdinalIgnoreCase));
+                        if (existingBarcode == null)
                         {
+                            bool isPrimary = !product.Barcodes.Any();
                             var newBarcode = new Barcode
                             {
                                 Id = Guid.NewGuid(),
                                 ProductId = product.Id,
                                 BarcodeValue = cleanBarcode,
-                                IsPrimary = true,
+                                IsPrimary = isPrimary,
                                 CreatedAt = DateTime.UtcNow
                             };
                             product.Barcodes.Add(newBarcode);
                             _context.Barcodes.Add(newBarcode);
                         }
+
+                        // Also insert or update ProductBatch entity for batch-level pricing and tracking
+                        var existingBatch = await _context.ProductBatches
+                            .FirstOrDefaultAsync(b => b.ProductId == product.Id && b.BatchNumber.Equals(cleanBarcode, StringComparison.OrdinalIgnoreCase), cancellationToken);
+
+                        if (existingBatch == null)
+                        {
+                            var newBatch = new ProductBatch
+                            {
+                                Id = Guid.NewGuid(),
+                                ProductId = product.Id,
+                                BatchNumber = cleanBarcode,
+                                Mrp = mrp,
+                                CostPrice = purchasePrice > 0 ? purchasePrice : (sellingPrice * 0.7m),
+                                AvailableQuantity = 0,
+                                IsActive = true,
+                                CreatedAt = DateTime.UtcNow
+                            };
+                            _context.ProductBatches.Add(newBatch);
+                        }
                         else
                         {
-                            barcode.BarcodeValue = cleanBarcode;
-                            _context.Barcodes.Update(barcode);
+                            existingBatch.Mrp = mrp;
+                            existingBatch.CostPrice = purchasePrice > 0 ? purchasePrice : (sellingPrice * 0.7m);
+                            existingBatch.IsActive = true;
+                            _context.ProductBatches.Update(existingBatch);
                         }
                     }
 

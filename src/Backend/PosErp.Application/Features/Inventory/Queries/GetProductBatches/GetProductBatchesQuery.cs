@@ -17,6 +17,9 @@ public class ProductBatchDto
     public string BatchNumber { get; set; } = string.Empty;
     public DateTime? ExpiryDate { get; set; }
     public decimal CurrentStock { get; set; }
+    public decimal Mrp { get; set; }
+    public decimal SellingPrice { get; set; }
+    public decimal CostPrice { get; set; }
 }
 
 public class GetProductBatchesQueryHandler : IRequestHandler<GetProductBatchesQuery, List<ProductBatchDto>>
@@ -30,6 +33,10 @@ public class GetProductBatchesQueryHandler : IRequestHandler<GetProductBatchesQu
 
     public async Task<List<ProductBatchDto>> Handle(GetProductBatchesQuery request, CancellationToken cancellationToken)
     {
+        var product = await _context.Products
+            .Include(p => p.Barcodes)
+            .FirstOrDefaultAsync(p => p.Id == request.ProductId, cancellationToken);
+
         // Fetch all active batches for the given ProductId
         var batches = await _context.ProductBatches
             .Where(b => b.ProductId == request.ProductId && b.IsActive)
@@ -37,23 +44,51 @@ public class GetProductBatchesQueryHandler : IRequestHandler<GetProductBatchesQu
 
         var result = new List<ProductBatchDto>();
 
-        foreach (var b in batches)
+        if (batches.Any())
         {
-            // Sum ledger quantities to get current stock of this specific batch
-            var currentStock = await _context.StockLedger
-                .Where(sl => sl.ProductId == request.ProductId && sl.BatchId == b.Id)
-                .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
-
-            result.Add(new ProductBatchDto
+            foreach (var b in batches)
             {
-                Id = b.Id,
-                BatchNumber = b.BatchNumber,
-                ExpiryDate = b.ExpiryDate,
-                CurrentStock = currentStock
-            });
+                var currentStock = await _context.StockLedger
+                    .Where(sl => sl.ProductId == request.ProductId && sl.BatchId == b.Id)
+                    .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+
+                decimal mrpVal = b.Mrp > 0 ? b.Mrp : (product?.Mrp ?? 0);
+                decimal sellingPriceVal = b.Mrp > 0 ? b.Mrp : (product?.SellingPrice ?? 0);
+
+                result.Add(new ProductBatchDto
+                {
+                    Id = b.Id,
+                    BatchNumber = b.BatchNumber,
+                    ExpiryDate = b.ExpiryDate,
+                    CurrentStock = currentStock,
+                    Mrp = mrpVal,
+                    SellingPrice = sellingPriceVal,
+                    CostPrice = b.CostPrice
+                });
+            }
+        }
+        else if (product != null && product.Barcodes.Any())
+        {
+            // Fallback: If no explicit ProductBatch records exist yet, generate batch entries from registered Barcodes
+            foreach (var bc in product.Barcodes)
+            {
+                var currentStock = await _context.StockLedger
+                    .Where(sl => sl.ProductId == request.ProductId)
+                    .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+
+                result.Add(new ProductBatchDto
+                {
+                    Id = bc.Id,
+                    BatchNumber = bc.BarcodeValue,
+                    ExpiryDate = null,
+                    CurrentStock = currentStock,
+                    Mrp = product.Mrp,
+                    SellingPrice = product.SellingPrice,
+                    CostPrice = product.PurchasePrice
+                });
+            }
         }
 
-        // Sort by FEFO: nearest expiry first. Null expiries (non-perishables or incomplete records) are put last.
         return result
             .OrderBy(b => b.ExpiryDate.HasValue ? 0 : 1)
             .ThenBy(b => b.ExpiryDate)

@@ -1685,56 +1685,72 @@ export const PosTerminal = () => {
         requestManagerOverride={requestManagerOverride}
       />
 
-      {/* Batch-wise Price List Selection Modal */}
+      {/* Batch Selection Modal (matching Sigma POS Image 1) */}
       {batchModalData && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-lg w-full p-6 border border-slate-200">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-100">
+          <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full p-6 border border-slate-200">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-200">
               <div>
-                <h3 className="text-lg font-black text-slate-800">{batchModalData.product.name}</h3>
-                <p className="text-xs font-bold text-indigo-600 mt-0.5">Multiple Batches Found — Select Batch & Price Line Item:</p>
+                <h3 className="text-xl font-black text-slate-800 underline decoration-slate-400">Batch Selection:</h3>
+                <p className="text-sm font-bold text-slate-600 mt-1">Product Name: <span className="text-slate-900 font-extrabold">{batchModalData.product.name}</span></p>
               </div>
               <button 
                 onClick={() => setBatchModalData(null)} 
-                className="text-slate-400 hover:text-slate-600 font-bold text-sm"
+                className="text-slate-400 hover:text-slate-600 font-bold text-xl px-2"
               >
                 ✕
               </button>
             </div>
 
-            <div className="mt-4 space-y-2 max-h-72 overflow-y-auto pr-1">
-              {batchModalData.batches.map((batch: any) => (
-                <div 
-                  key={batch.id}
-                  onClick={() => {
-                    addProductToCart(batchModalData.product, batchModalData.overrideQty, batch);
-                    setBatchModalData(null);
-                  }}
-                  className="p-3.5 border rounded-xl border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/60 cursor-pointer flex justify-between items-center transition group shadow-sm"
-                >
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-extrabold text-sm text-slate-800 group-hover:text-indigo-600">Batch: {batch.batchNumber}</span>
-                      {batch.expiryDate && (
-                        <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
-                          Exp: {batch.expiryDate.substring(0, 10)}
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs font-semibold text-slate-500 mt-1">Available Stock: <span className="font-bold text-slate-700">{batch.currentStock} Pcs</span></p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-xs text-slate-400 line-through">MRP: ₹{(batch.mrp || batchModalData.product.mrp || batchModalData.product.sellingPrice).toFixed(2)}</p>
-                    <p className="font-black text-indigo-600 text-base">₹{(batch.sellingPrice || batchModalData.product.sellingPrice).toFixed(2)}</p>
-                  </div>
-                </div>
-              ))}
+            <div className="mt-4 overflow-x-auto border border-slate-400 rounded-lg">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-slate-200">
+                  <tr className="border-b border-slate-400 text-xs font-black text-slate-800">
+                    <th className="p-2.5 border-r border-slate-400 text-center">Batch No</th>
+                    <th className="p-2.5 border-r border-slate-400 text-center">Unit</th>
+                    <th className="p-2.5 border-r border-slate-400 text-right">MRP</th>
+                    <th className="p-2.5 border-r border-slate-400 text-right">Sales Rate1</th>
+                    <th className="p-2.5 text-right">Stock</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batchModalData.batches.map((batch: any, index: number) => {
+                    const mrpVal = batch.mrp || batchModalData.product.mrp || batchModalData.product.sellingPrice;
+                    const priceVal = batch.sellingPrice || batchModalData.product.sellingPrice;
+                    const stockVal = batch.currentStock ?? 0;
+
+                    return (
+                      <tr 
+                        key={batch.id || index}
+                        onClick={() => {
+                          addProductToCart(batchModalData.product, batchModalData.overrideQty, batch);
+                          setBatchModalData(null);
+                        }}
+                        className={`border-b border-slate-300 cursor-pointer font-bold text-xs transition ${
+                          index === 0 
+                            ? 'bg-red-600 text-white hover:bg-red-700' 
+                            : 'bg-orange-500 text-white hover:bg-orange-600'
+                        }`}
+                      >
+                        <td className="p-2.5 border-r border-white/30 text-center font-black">{batch.batchNumber || 'DEFAULT'}</td>
+                        <td className="p-2.5 border-r border-white/30 text-center">Nos</td>
+                        <td className="p-2.5 border-r border-white/30 text-right font-black">₹{mrpVal.toFixed(2)}</td>
+                        <td className="p-2.5 border-r border-white/30 text-right font-black">₹{priceVal.toFixed(2)}</td>
+                        <td className="p-2.5 text-right font-black">
+                          {stockVal.toFixed(2)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
 
-            <div className="mt-5 pt-3 border-t border-slate-100 flex justify-end">
+            <div className="mt-5 pt-3 border-t border-slate-100 flex justify-between items-center">
+              <span className="text-xs text-slate-500 font-bold">Select a batch row above to add to cart</span>
               <button
                 onClick={() => setBatchModalData(null)}
-                className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-lg transition"
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-lg transition"
               >
                 Cancel
               </button>

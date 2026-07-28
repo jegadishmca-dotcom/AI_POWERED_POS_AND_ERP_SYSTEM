@@ -37,59 +37,65 @@ public class GetProductBatchesQueryHandler : IRequestHandler<GetProductBatchesQu
             .Include(p => p.Barcodes)
             .FirstOrDefaultAsync(p => p.Id == request.ProductId, cancellationToken);
 
-        // Fetch all active batches for the given ProductId
-        var batches = await _context.ProductBatches
+        if (product == null) return new List<ProductBatchDto>();
+
+        // 1. Fetch explicit active ProductBatches
+        var explicitBatches = await _context.ProductBatches
             .Where(b => b.ProductId == request.ProductId && b.IsActive)
             .ToListAsync(cancellationToken);
 
-        var result = new List<ProductBatchDto>();
+        var resultDict = new Dictionary<string, ProductBatchDto>(StringComparer.OrdinalIgnoreCase);
 
-        if (batches.Any())
+        foreach (var b in explicitBatches)
         {
-            foreach (var b in batches)
+            var currentStock = await _context.StockLedger
+                .Where(sl => sl.ProductId == request.ProductId && sl.BatchId == b.Id)
+                .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+
+            decimal mrpVal = b.Mrp > 0 ? b.Mrp : product.Mrp;
+            decimal sellingPriceVal = b.Mrp > 0 ? b.Mrp : product.SellingPrice;
+
+            if (!string.IsNullOrWhiteSpace(b.BatchNumber))
             {
-                var currentStock = await _context.StockLedger
-                    .Where(sl => sl.ProductId == request.ProductId && sl.BatchId == b.Id)
-                    .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
-
-                decimal mrpVal = b.Mrp > 0 ? b.Mrp : (product?.Mrp ?? 0);
-                decimal sellingPriceVal = b.Mrp > 0 ? b.Mrp : (product?.SellingPrice ?? 0);
-
-                result.Add(new ProductBatchDto
+                resultDict[b.BatchNumber.Trim()] = new ProductBatchDto
                 {
                     Id = b.Id,
-                    BatchNumber = b.BatchNumber,
+                    BatchNumber = b.BatchNumber.Trim(),
                     ExpiryDate = b.ExpiryDate,
                     CurrentStock = currentStock,
                     Mrp = mrpVal,
                     SellingPrice = sellingPriceVal,
                     CostPrice = b.CostPrice
-                });
+                };
             }
         }
-        else if (product != null && product.Barcodes.Any())
+
+        // 2. ALSO check all registered Barcodes for this product so every barcode variant acts as a batch selection
+        if (product.Barcodes != null)
         {
-            // Fallback: If no explicit ProductBatch records exist yet, generate batch entries from registered Barcodes
             foreach (var bc in product.Barcodes)
             {
-                var currentStock = await _context.StockLedger
-                    .Where(sl => sl.ProductId == request.ProductId)
-                    .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
-
-                result.Add(new ProductBatchDto
+                if (!string.IsNullOrWhiteSpace(bc.BarcodeValue) && !resultDict.ContainsKey(bc.BarcodeValue.Trim()))
                 {
-                    Id = bc.Id,
-                    BatchNumber = bc.BarcodeValue,
-                    ExpiryDate = null,
-                    CurrentStock = currentStock,
-                    Mrp = product.Mrp,
-                    SellingPrice = product.SellingPrice,
-                    CostPrice = product.PurchasePrice
-                });
+                    var currentStock = await _context.StockLedger
+                        .Where(sl => sl.ProductId == request.ProductId)
+                        .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+
+                    resultDict[bc.BarcodeValue.Trim()] = new ProductBatchDto
+                    {
+                        Id = bc.Id,
+                        BatchNumber = bc.BarcodeValue.Trim(),
+                        ExpiryDate = null,
+                        CurrentStock = currentStock,
+                        Mrp = product.Mrp,
+                        SellingPrice = product.SellingPrice,
+                        CostPrice = product.PurchasePrice
+                    };
+                }
             }
         }
 
-        return result
+        return resultDict.Values
             .OrderBy(b => b.ExpiryDate.HasValue ? 0 : 1)
             .ThenBy(b => b.ExpiryDate)
             .ThenBy(b => b.BatchNumber)

@@ -231,17 +231,16 @@ public class ImportProductsCommandHandler : IRequestHandler<ImportProductsComman
                         purchasePrice = sellingPrice * 0.8m; // fallback
                     }
 
-                    if (sellingPrice <= 0 || mrp <= 0 || purchasePrice < 0)
+                    if (sellingPrice <= 0 || purchasePrice < 0)
                     {
-                        errors.Add($"Line {lineNum}: Selling Price and MRP must be greater than zero. Purchase price cannot be negative.");
+                        errors.Add($"Line {lineNum}: Selling Price must be greater than zero. Purchase price cannot be negative.");
                         failed++;
                         continue;
                     }
-                    if (sellingPrice > mrp)
+                    if (mrp <= 0 || sellingPrice > mrp)
                     {
-                        errors.Add($"Line {lineNum}: Selling Price cannot exceed MRP.");
-                        failed++;
-                        continue;
+                        // Auto-adjust MRP to match Selling Price for legacy data typos so no product rows are lost
+                        mrp = Math.Max(mrp, sellingPrice);
                     }
 
                     string? barcodeVal = barcodeIdx != -1 && barcodeIdx < values.Count ? values[barcodeIdx] : null;

@@ -652,8 +652,11 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             }
             
             // Credits (Revenue & Tax Liability)
-            // Sales Revenue = SubTotal (post-discount, ex-tax) + any round-off adjustment
-            decimal revenueCredit = taxableValue + invoice.RoundOff;
+            // Sales Revenue = Total Tender Debits minus Tax Liabilities to guarantee exact double-entry balance
+            decimal totalTaxes = cgst + sgst + totalCess;
+            decimal totalTenders = journalLines.Where(l => l.Credit == 0 && l.AccountCode != cogsAccountCode).Sum(l => l.Debit);
+            decimal revenueCredit = Math.Max(0, totalTenders - totalTaxes);
+
             if (revenueCredit > 0) journalLines.Add(new JournalLineDto { AccountCode = salesAccountCode, Description = "Sales Revenue", Debit = 0, Credit = revenueCredit });
             if (cgst > 0) journalLines.Add(new JournalLineDto { AccountCode = outputCgstAccountCode, Description = "Output CGST", Debit = 0, Credit = cgst });
             if (sgst > 0) journalLines.Add(new JournalLineDto { AccountCode = outputSgstAccountCode, Description = "Output SGST", Debit = 0, Credit = sgst });

@@ -517,7 +517,12 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                         journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = inventoryAssetAccountCode, Description = "Inventory Asset Reduction", Debit = 0, Credit = totalCogs });
                     }
 
-                    journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = salesAccountCode, Description = "Sales Revenue", Debit = 0, Credit = taxableValue });
+                    // Compute Sales Revenue as (Total Tender Debits minus Tax Liabilities) to guarantee double-entry journal balance
+                    decimal totalTaxes = totalCgst + totalSgst + totalCess;
+                    decimal totalTenders = journalLines.Where(l => l.Credit == 0 && l.AccountCode != cogsAccountCode).Sum(l => l.Debit);
+                    decimal revenueCredit = Math.Max(0, totalTenders - totalTaxes);
+
+                    if (revenueCredit > 0) journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = salesAccountCode, Description = "Sales Revenue", Debit = 0, Credit = revenueCredit });
                     
                     // Use actual per-item CGST/SGST sums for journal entry (consistent with online path)
                     if (totalCgst > 0) journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = outputCgstAccountCode, Description = "Output CGST", Debit = 0, Credit = totalCgst });

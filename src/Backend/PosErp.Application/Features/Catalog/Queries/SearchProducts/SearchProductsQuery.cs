@@ -28,7 +28,8 @@ public record ProductSearchResultDto(
     string TaxSlabName,
     Guid TaxSlabId,
     Guid? CategoryId,
-    Guid UnitOfMeasureId
+    Guid UnitOfMeasureId,
+    List<string> Barcodes
 );
 
 public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, List<ProductSearchResultDto>>
@@ -82,7 +83,7 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, L
                 p.Name, 
                 p.TamilName, 
                 p.SellingPrice, 
-                p.Barcodes.Where(b => b.IsPrimary).Select(b => b.BarcodeValue).FirstOrDefault() ?? string.Empty,
+                p.Barcodes.Where(b => b.IsPrimary).Select(b => b.BarcodeValue).FirstOrDefault() ?? p.Barcodes.Select(b => b.BarcodeValue).FirstOrDefault() ?? string.Empty,
                 p.TaxSlab != null ? p.TaxSlab.CgstRate : 0m,
                 p.TaxSlab != null ? p.TaxSlab.SgstRate : 0m,
                 p.TaxSlab != null ? p.TaxSlab.CessRate : 0m,
@@ -93,7 +94,8 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, L
                 p.TaxSlab != null ? p.TaxSlab.Name : "GST 0%",
                 p.TaxSlabId,
                 p.CategoryId,
-                p.UnitOfMeasureId
+                p.UnitOfMeasureId,
+                p.Barcodes.Select(b => b.BarcodeValue).ToList()
             ))
             .ToListAsync(cancellationToken);
 

@@ -786,12 +786,26 @@ export const PosTerminal = () => {
         const exactMatch = results.find((p: any) =>
           p.primaryBarcode?.trim().toLowerCase() === val.toLowerCase() ||
           p.productCode?.trim().toLowerCase() === val.toLowerCase() ||
-          (p.barcodes && p.barcodes.some((b: any) => b.barcodeValue?.trim().toLowerCase() === val.toLowerCase()))
+          (Array.isArray(p.barcodes) && p.barcodes.some((b: any) => {
+            const str = typeof b === 'string' ? b : b?.barcodeValue;
+            return str?.trim().toLowerCase() === val.toLowerCase();
+          }))
         );
 
         if (exactMatch) {
           // Exact 1-to-1 match found! Directly add to cart and reset search box
           addProductToCart(exactMatch, voiceQuantity || undefined);
+          setVoiceQuantity(null);
+          setProductQuery('');
+          setSearchResults([]);
+          setShowProductDropdown(false);
+          setFocusedProductIndex(-1);
+          return;
+        }
+
+        if (results.length === 1) {
+          // Single match found! Directly add to cart and reset search box
+          addProductToCart(results[0], voiceQuantity || undefined);
           setVoiceQuantity(null);
           setProductQuery('');
           setSearchResults([]);
@@ -811,14 +825,7 @@ export const PosTerminal = () => {
           return;
         }
 
-        if (results.length === 1) {
-          addProductToCart(results[0], voiceQuantity || undefined);
-          setVoiceQuantity(null);
-          setProductQuery('');
-          setSearchResults([]);
-          setShowProductDropdown(false);
-          setFocusedProductIndex(-1);
-        } else if (results.length > 1) {
+        if (results.length > 1) {
           setSearchResults(results);
           setShowProductDropdown(true);
           setFocusedProductIndex(0); // auto-focus first item

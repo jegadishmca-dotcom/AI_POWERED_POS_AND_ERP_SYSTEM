@@ -211,17 +211,25 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   <title>Receipt - ${invoice.invoiceNumber || ''}</title>
   <style>
     @page {
-      size: 76mm auto;
-      margin: 0mm !important;
+      size: 80mm auto;
+      margin: 0 auto !important;
     }
     @media print {
       html, body {
-        width: 76mm !important;
+        width: 100% !important;
         margin: 0 !important;
         padding: 0 !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: flex-start !important;
         background: #fff !important;
         color: #000 !important;
         -webkit-print-color-adjust: exact;
+      }
+      .receipt-container {
+        width: 72mm !important;
+        margin: 0 auto !important;
+        padding: 2mm 3mm !important;
       }
     }
     * {
@@ -233,13 +241,22 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
       color: #000 !important;
     }
     body {
-      width: 76mm;
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
       margin: 0 auto;
-      padding: 1mm 2mm;
+      padding: 0;
+      background: #fff;
+      -webkit-font-smoothing: antialiased;
+    }
+    .receipt-container {
+      width: 72mm;
+      margin: 0 auto;
+      padding: 2mm 3mm;
       font-size: 11.5px;
       line-height: 1.25;
       background: #fff;
-      -webkit-font-smoothing: antialiased;
     }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
@@ -249,6 +266,7 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   </style>
 </head>
 <body>
+  <div class="receipt-container">
   <!-- HEADER -->
   <div class="text-center font-bold" style="font-size: 17px; margin-top: 2px;">${STORE.nameTamil}</div>
   <div class="text-center font-bold" style="font-size: 11px; margin-top: 1px;">GST :${STORE.gstin}</div>
@@ -323,6 +341,7 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   <div class="text-center" style="font-size: 15px; font-weight: 900; margin-top: 6px; margin-bottom: 4px; line-height: 1.3;">
     அனைத்தும் வாங்க<br/>
     ஆப்பிளுக்கு வாங்க
+  </div>
   </div>
 
   <script>

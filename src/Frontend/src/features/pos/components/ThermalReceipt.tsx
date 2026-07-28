@@ -85,15 +85,15 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
              <style>{`
           @media screen { .pos-receipt { display: none !important; } }
           @media print  {
-            @page { size: 76mm auto; margin: 0mm !important; }
-            html, body { width: 76mm !important; margin: 0 !important; padding: 0 !important; background: #fff !important; color: #000 !important; -webkit-print-color-adjust: exact; }
+            @page { size: 80mm auto; margin: 0 auto !important; }
+            html, body { width: 100% !important; margin: 0 !important; padding: 0 !important; display: flex !important; justify-content: center !important; align-items: flex-start !important; background: #fff !important; color: #000 !important; -webkit-print-color-adjust: exact; }
             body * { visibility: hidden; }
-            .pos-receipt { visibility: visible !important; position: absolute; top: 0; left: 0; width: 76mm !important; margin: 0 auto; padding: 1mm 2mm; background: #fff; color: #000; }
+            .pos-receipt { visibility: visible !important; position: relative !important; width: 72mm !important; margin: 0 auto !important; padding: 2mm 3mm; background: #fff; color: #000; }
             .pos-receipt * { visibility: visible !important; font-weight: 800 !important; color: #000 !important; }
           }
         `}</style>
 
-        <div ref={ref} className="pos-receipt" style={{ width: '76mm', padding: '1mm 2mm', fontFamily: 'Arial, sans-serif', color: '#000', background: '#fff', fontSize: '11.5px', lineHeight: '1.25', fontWeight: 800 }}>
+        <div ref={ref} className="pos-receipt" style={{ width: '72mm', margin: '0 auto', padding: '2mm 3mm', fontFamily: 'Arial, sans-serif', color: '#000', background: '#fff', fontSize: '11.5px', lineHeight: '1.25', fontWeight: 800 }}>
 
           {/* ── HEADER ── */}
           <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '17px', marginTop: '2px' }}>{STORE.nameTamil}</div>

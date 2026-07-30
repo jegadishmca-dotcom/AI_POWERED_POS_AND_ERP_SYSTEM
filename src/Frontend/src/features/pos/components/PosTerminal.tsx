@@ -1256,18 +1256,7 @@ export const PosTerminal = () => {
           )}
         </div>
 
-        {/* Active Cursor Selection Bar */}
-        {cart.items.length > 0 && (
-          <div className="bg-slate-900 text-amber-300 text-xs px-3 py-1.5 flex justify-between items-center font-bold border-b border-slate-800 shadow-inner">
-            <span className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping inline-block" />
-              <span>ACTIVE LINE FOCUS: <span className="text-white font-black underline">{cart.items[selectedCartIndex >= 0 && selectedCartIndex < cart.items.length ? selectedCartIndex : cart.items.length - 1]?.name}</span></span>
-            </span>
-            <span className="text-[11px] text-slate-300">
-              Press <kbd className="bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded font-black text-xs">+</kbd> / <kbd className="bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded font-black text-xs">-</kbd> to change Qty
-            </span>
-          </div>
-        )}
+
 
         {/* Cart Table with Dynamic Controls */}
         <div ref={cartContainerRef} className="p-0 flex-1 overflow-y-auto">

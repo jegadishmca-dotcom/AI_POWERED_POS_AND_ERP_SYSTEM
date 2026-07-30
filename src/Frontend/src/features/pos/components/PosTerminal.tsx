@@ -86,7 +86,26 @@ export const PosTerminal = () => {
   const customerInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const cartContainerRef = useRef<HTMLDivElement>(null);
+  const activeItemRowRef = useRef<HTMLTableRowElement>(null);
   const isVoiceSearchingRef = useRef(false);
+
+  const [toastNotification, setToastNotification] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
+
+  const showToastNotification = useCallback((message: string, type: 'error' | 'success' | 'info' = 'error') => {
+    setToastNotification({ message, type });
+    requestPOSFullscreen();
+    setTimeout(() => {
+      setToastNotification((prev) => (prev?.message === message ? null : prev));
+    }, 3500);
+  }, []);
+
+  // Auto-scroll cart container to active/last item row
+  useEffect(() => {
+    if (cart.items.length > 0) {
+      activeItemRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [cart.items.length, selectedCartIndex]);
 
   // Shift Management State
   const [activeSession, setActiveSession] = useState<any>(null);
@@ -722,7 +741,7 @@ export const PosTerminal = () => {
         if (product) {
             addProductToCart(product, weight);
         } else {
-            alert('Barcode not found: ' + barcode);
+            showToastNotification(`Barcode not found: "${barcode}"`, 'error');
             setProductQuery('');
             setSearchResults([]);
             setShowProductDropdown(false);
@@ -912,7 +931,7 @@ export const PosTerminal = () => {
           setShowProductDropdown(true);
           setFocusedProductIndex(0); // auto-focus first item
         } else {
-          alert('Product not found for: ' + val);
+          showToastNotification(`Product not found for: "${val}"`, 'error');
           setProductQuery('');
           setSearchResults([]);
           setShowProductDropdown(false);
@@ -942,7 +961,7 @@ export const PosTerminal = () => {
             tier: cust.tierName
           });
         } else {
-          alert('Customer not found. Click "+" to register a new customer!');
+          showToastNotification(`Customer not found for: "${val}". Click "+" to register a new customer!`, 'info');
         }
       } catch (err) {
         console.error('Error searching customer:', err);
@@ -1130,12 +1149,12 @@ export const PosTerminal = () => {
         <div className="p-4 bg-slate-50 border-b border-slate-200 relative">
           <div className="flex gap-2 items-center">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-2.5 text-slate-400 w-5 h-5" />
+              <Search className="absolute left-3 top-3 text-slate-400 w-5 h-5" />
               <input 
                 ref={productInputRef}
                 type="text"
                 placeholder="F2: Scan Barcode or Type Product Name (Press Enter)..."
-                className="w-full pl-10 pr-4 py-2 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-bold text-slate-850"
+                className="w-full pl-10 pr-4 py-2.5 border-2 border-slate-300 rounded-lg outline-none focus:ring-4 focus:ring-emerald-500/40 focus:border-emerald-600 font-bold text-slate-850 text-base shadow-sm transition-all"
                 value={productQuery}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -1153,7 +1172,7 @@ export const PosTerminal = () => {
             {/* Language Selector Capsule */}
             <button
               onClick={handleVoiceLanguageToggle}
-              className="px-3 py-2 border border-slate-300 rounded-lg bg-white text-xs font-black text-slate-700 hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap min-w-[70px]"
+              className="px-3.5 py-2.5 border border-slate-300 rounded-lg bg-white text-xs font-black text-slate-700 hover:bg-slate-50 transition-colors shadow-sm whitespace-nowrap min-w-[70px]"
               title="Voice Language (மொழி)"
             >
               {voiceLanguage === 'ta-IN' ? 'தமிழ்' : 'English'}
@@ -1162,7 +1181,7 @@ export const PosTerminal = () => {
             {/* Mic Toggle Button */}
             <button
               onClick={toggleListening}
-              className={`p-2 rounded-lg border transition-all flex items-center justify-center shadow-sm ${
+              className={`p-2.5 rounded-lg border transition-all flex items-center justify-center shadow-sm ${
                 isListening 
                   ? 'bg-red-500 text-white border-red-500 animate-pulse' 
                   : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
@@ -1188,6 +1207,14 @@ export const PosTerminal = () => {
                 'bg-slate-500'
               }`} />
               <span>{voiceStatus}</span>
+            </div>
+          )}
+
+          {/* Toast Notification Banner overlay */}
+          {toastNotification && (
+            <div className="mt-2 px-4 py-2 rounded-lg font-black text-xs border-2 shadow-md flex items-center gap-2 animate-pulse bg-rose-600 text-white border-rose-700">
+              <span className="w-2 h-2 rounded-full bg-white animate-ping" />
+              <span>{toastNotification.message}</span>
             </div>
           )}
 
@@ -1227,8 +1254,21 @@ export const PosTerminal = () => {
           )}
         </div>
 
+        {/* Active Cursor Selection Bar */}
+        {cart.items.length > 0 && (
+          <div className="bg-slate-900 text-amber-300 text-xs px-3 py-1.5 flex justify-between items-center font-bold border-b border-slate-800 shadow-inner">
+            <span className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping inline-block" />
+              <span>ACTIVE LINE FOCUS: <span className="text-white font-black underline">{cart.items[selectedCartIndex >= 0 && selectedCartIndex < cart.items.length ? selectedCartIndex : cart.items.length - 1]?.name}</span></span>
+            </span>
+            <span className="text-[11px] text-slate-300">
+              Press <kbd className="bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded font-black text-xs">+</kbd> / <kbd className="bg-amber-500 text-slate-950 px-1.5 py-0.5 rounded font-black text-xs">-</kbd> to change Qty
+            </span>
+          </div>
+        )}
+
         {/* Cart Table with Dynamic Controls */}
-        <div className="p-0 flex-1 overflow-y-auto">
+        <div ref={cartContainerRef} className="p-0 flex-1 overflow-y-auto">
           {cart.items.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-slate-400">
               <ShoppingCart className="w-16 h-16 mb-2 stroke-1" />
@@ -1237,10 +1277,10 @@ export const PosTerminal = () => {
             </div>
           ) : (
             <table className="w-full text-left border-collapse border border-slate-300">
-              <thead className="bg-slate-200 sticky top-0 border-b-2 border-slate-400 shadow-xs">
+              <thead className="bg-slate-200 sticky top-0 border-b-2 border-slate-400 shadow-xs z-10">
                 <tr className="text-slate-800 font-extrabold text-xs">
-                  <th className="p-3 text-center w-12 border-r border-slate-300">S.No</th>
-                  <th className="p-3 border-r border-slate-300">Item</th>
+                  <th className="p-3 text-center w-14 border-r border-slate-300">S.No</th>
+                  <th className="p-3 border-r border-slate-300">Item Name & Details</th>
                   <th className="p-3 text-center w-36 border-r border-slate-300">Qty</th>
                   <th className="p-3 text-right w-24 border-r border-slate-300">MRP</th>
                   <th className="p-3 text-right w-24 border-r border-slate-300">Price</th>
@@ -1251,14 +1291,29 @@ export const PosTerminal = () => {
               <tbody>
                 {cart.items.map((item: any, index: number) => {
                   const isSelected = selectedCartIndex === index || (selectedCartIndex === -1 && index === cart.items.length - 1);
+                  const isEven = index % 2 === 0;
+
+                  const rowStyle = isSelected
+                    ? 'bg-gradient-to-r from-amber-100/90 via-amber-50 to-amber-100/90 border-l-4 border-l-amber-500 font-extrabold shadow-sm text-slate-900'
+                    : isEven
+                      ? 'bg-white hover:bg-slate-100/70'
+                      : 'bg-emerald-50/40 hover:bg-emerald-100/50';
+
                   return (
                     <tr 
                       key={item.id} 
+                      ref={isSelected ? activeItemRowRef : null}
                       onClick={() => setSelectedCartIndex(index)}
-                      className={`border-b border-slate-300 cursor-pointer transition ${isSelected ? 'bg-indigo-50/90 border-l-4 border-l-indigo-600' : 'hover:bg-slate-50'}`}
+                      className={`border-b border-slate-300 cursor-pointer transition-all duration-150 ${rowStyle}`}
                     >
-                      <td className="p-3 text-center font-black text-slate-600 text-sm border-r border-slate-300 bg-slate-100/50">
-                        {index + 1}
+                      <td className={`p-3 text-center border-r border-slate-300 ${isSelected ? 'bg-amber-200/80 font-black text-slate-900' : 'bg-slate-100/60 font-bold text-slate-600'}`}>
+                        {isSelected ? (
+                          <span className="inline-flex items-center gap-0.5 text-xs font-black text-amber-950 bg-amber-400 px-1.5 py-0.5 rounded shadow-xs animate-pulse">
+                            ▶ {index + 1}
+                          </span>
+                        ) : (
+                          index + 1
+                        )}
                       </td>
                       <td className="p-3 border-r border-slate-300">
                         <p className="font-extrabold text-slate-800 text-sm">{item.name}</p>

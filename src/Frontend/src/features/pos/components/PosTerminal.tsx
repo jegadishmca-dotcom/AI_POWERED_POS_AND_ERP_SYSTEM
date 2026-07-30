@@ -100,12 +100,7 @@ export const PosTerminal = () => {
     }, 3500);
   }, []);
 
-  // Auto-scroll cart container to active/last item row
-  useEffect(() => {
-    if (cart.items.length > 0) {
-      activeItemRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-  }, [cart.items.length, selectedCartIndex]);
+
 
   // Shift Management State
   const [activeSession, setActiveSession] = useState<any>(null);
@@ -556,6 +551,13 @@ export const PosTerminal = () => {
   useEffect(() => {
     recalculateCart(cart.items);
   }, [suppressOffers]);
+
+  // Auto-scroll cart container to active/last item row
+  useEffect(() => {
+    if (cart && cart.items && cart.items.length > 0) {
+      activeItemRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [cart?.items?.length, selectedCartIndex]);
 
   const updateItemBatch = (productId: string, batchId: string) => {
     const updatedItems = cart.items.map((item: any) => {

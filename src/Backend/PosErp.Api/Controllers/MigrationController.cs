@@ -1,11 +1,11 @@
 using System;
 using System.Collections.Generic;
 using System.Data;
+using System.Data.SqlClient;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using System.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Catalog;
@@ -128,18 +128,26 @@ public class MigrationController : ControllerBase
             }
             await _context.SaveChangesAsync(default);
 
-            // 3. GET OR CREATE DEFAULT TAX SLABS & CATEGORY
+            // 3. GET OR CREATE DEFAULT TAX SLABS, UOM & CATEGORY
             var taxSlabs = await _context.TaxSlabs.ToListAsync();
-            var tax0 = taxSlabs.FirstOrDefault(t => t.Rate == 0) ?? taxSlabs.FirstOrDefault();
-            var tax5 = taxSlabs.FirstOrDefault(t => t.Rate == 5) ?? tax0;
-            var tax12 = taxSlabs.FirstOrDefault(t => t.Rate == 12) ?? tax0;
-            var tax18 = taxSlabs.FirstOrDefault(t => t.Rate == 18) ?? tax0;
-            var tax28 = taxSlabs.FirstOrDefault(t => t.Rate == 28) ?? tax0;
+            var tax0 = taxSlabs.FirstOrDefault(t => (t.CgstRate + t.SgstRate) == 0) ?? taxSlabs.FirstOrDefault();
+            var tax5 = taxSlabs.FirstOrDefault(t => (t.CgstRate + t.SgstRate) == 5) ?? tax0;
+            var tax12 = taxSlabs.FirstOrDefault(t => (t.CgstRate + t.SgstRate) == 12) ?? tax0;
+            var tax18 = taxSlabs.FirstOrDefault(t => (t.CgstRate + t.SgstRate) == 18) ?? tax0;
+            var tax28 = taxSlabs.FirstOrDefault(t => (t.CgstRate + t.SgstRate) == 28) ?? tax0;
+
+            var defaultUom = await _context.UnitOfMeasures.FirstOrDefaultAsync();
+            if (defaultUom == null)
+            {
+                defaultUom = new UnitOfMeasure { Id = Guid.NewGuid(), Name = "Pcs", Symbol = "Pcs" };
+                _context.UnitOfMeasures.Add(defaultUom);
+                await _context.SaveChangesAsync(default);
+            }
 
             var defaultCategory = await _context.Categories.FirstOrDefaultAsync();
             if (defaultCategory == null)
             {
-                defaultCategory = new Category { Id = Guid.NewGuid(), Name = "General", Code = "GEN" };
+                defaultCategory = new Category { Id = Guid.NewGuid(), Name = "General" };
                 _context.Categories.Add(defaultCategory);
                 await _context.SaveChangesAsync(default);
             }
@@ -215,15 +223,25 @@ public class MigrationController : ControllerBase
                             Mrp = Convert.ToDecimal(reader["Mrp"]),
                             SellingPrice = Convert.ToDecimal(reader["SellingPrice"]),
                             PurchasePrice = Convert.ToDecimal(reader["PurchasePrice"]),
-                            PrimaryBarcode = reader["Barcode"].ToString(),
-                            SecondaryBarcode = code,
                             TaxSlabId = taxSlabId,
                             CategoryId = defaultCategory.Id,
+                            UnitOfMeasureId = defaultUom.Id,
                             IsWeighable = Convert.ToInt32(reader["IsWeighable"]) == 1,
-                            UnitOfMeasure = reader["Uom"].ToString() ?? "Pcs",
                             IsActive = true,
                             CreatedAt = DateTime.UtcNow
                         };
+
+                        var barcodeVal = reader["Barcode"].ToString()?.Trim();
+                        if (!string.IsNullOrWhiteSpace(barcodeVal))
+                        {
+                            p.Barcodes.Add(new Barcode
+                            {
+                                Id = Guid.NewGuid(),
+                                ProductId = p.Id,
+                                BarcodeValue = barcodeVal,
+                                IsPrimary = true
+                            });
+                        }
 
                         productListToInsert.Add(p);
                         existingCodes.Add(code);
@@ -283,9 +301,8 @@ public class MigrationController : ControllerBase
                             BatchNumber = reader["BatchNumber"].ToString() ?? "DEFAULT",
                             ExpiryDate = expDate,
                             Mrp = Convert.ToDecimal(reader["Mrp"]),
-                            SellingPrice = Convert.ToDecimal(reader["SellingPrice"]),
-                            PurchasePrice = Convert.ToDecimal(reader["PurchasePrice"]),
-                            CurrentStock = Convert.ToDecimal(reader["CurrentStock"]),
+                            CostPrice = Convert.ToDecimal(reader["PurchasePrice"]),
+                            AvailableQuantity = Convert.ToDecimal(reader["CurrentStock"]),
                             IsActive = true,
                             CreatedAt = DateTime.UtcNow
                         };

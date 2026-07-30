@@ -22,9 +22,11 @@ NEVER suggest `systemctl restart`, `dotnet run`, `npm run dev`, or any non-Docke
 ALWAYS use `docker compose` (not the deprecated `docker-compose` syntax) in all examples.
 SQL migrations run automatically on backend container startup via the migration runner in Program.cs — never tell the user to run SQL manually on the server unless the migration runner is explicitly broken.
 
-## Network IP Assignments
+## Network IP Assignments & Database Credentials
 
-The system uses the following IP assignments for development and deployment configurations:
+The system uses the following IP assignments and database settings for development and deployment configurations:
 - **Development PC** (this workstation running the IDE): `192.168.1.4`
 - **Ubuntu Production Server** (hosting the application containers via Docker): `192.168.1.5`
+- **Production PostgreSQL Database Name**: `posdb_uat`
+- **Production PostgreSQL User**: `posadmin`
 </RULE[project]>

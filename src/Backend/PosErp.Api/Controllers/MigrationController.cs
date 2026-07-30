@@ -89,7 +89,9 @@ public class MigrationController : ControllerBase
             }
             await _context.SaveChangesAsync(default);
 
-            // 2. MIGRATE SUPPLIERS
+            // 2. MIGRATE SUPPLIERS & BUILD SUPPLIER MAP
+            var supplierCodeMap = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+
             var suppCmd = sqlConn.CreateCommand();
             suppCmd.CommandText = @"
                 SELECT 
@@ -101,19 +103,23 @@ public class MigrationController : ControllerBase
                 FROM Master_Accounts
                 WHERE FormName = 'Supplier' OR AccountType = 'Sundry Creditors' OR AccountType LIKE '%Creditor%'";
 
+            var existingSuppliersDict = await _context.Suppliers.ToDictionaryAsync(s => s.Name.ToLower(), s => s.Id);
+
             using (var reader = await suppCmd.ExecuteReaderAsync())
             {
-                var existingSuppliers = await _context.Suppliers.Select(s => s.Name.ToLower()).ToListAsync();
                 while (await reader.ReadAsync())
                 {
+                    var code = reader["SupplierCode"].ToString()?.Trim();
                     var name = reader["Name"].ToString()?.Trim();
                     if (string.IsNullOrWhiteSpace(name)) continue;
 
-                    if (!existingSuppliers.Contains(name.ToLower()))
+                    Guid suppId;
+                    if (!existingSuppliersDict.TryGetValue(name.ToLower(), out suppId))
                     {
+                        suppId = Guid.NewGuid();
                         var supp = new Supplier
                         {
-                            Id = Guid.NewGuid(),
+                            Id = suppId,
                             Name = name,
                             Phone = reader["Phone"].ToString(),
                             Gstin = reader["Gstin"].ToString(),
@@ -121,8 +127,13 @@ public class MigrationController : ControllerBase
                             IsActive = true
                         };
                         _context.Suppliers.Add(supp);
-                        existingSuppliers.Add(name.ToLower());
+                        existingSuppliersDict[name.ToLower()] = suppId;
                         suppliersMigrated++;
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(code))
+                    {
+                        supplierCodeMap[code] = suppId;
                     }
                 }
             }
@@ -152,15 +163,33 @@ public class MigrationController : ControllerBase
                 await _context.SaveChangesAsync(default);
             }
 
-            // 4. MIGRATE PRODUCTS (39,000+ items)
+            // 4. MIGRATE PRODUCTS WITH PREFERRED SUPPLIER ID (39,000+ items)
             var prodCmd = sqlConn.CreateCommand();
             prodCmd.CommandTimeout = 600;
             prodCmd.CommandText = @"
+                WITH RecentPurchase AS (
+                    SELECT 
+                        ProductName AS ProductCode,
+                        Account AS SupplierCode,
+                        ROW_NUMBER() OVER (PARTITION BY ProductName ORDER BY Date DESC, VNO DESC) AS rnk
+                    FROM Trans_Inventory_SOM
+                    WHERE FormName = 'Purchase' 
+                      AND Account IS NOT NULL AND Account <> ''
+                ),
+                BatchSupplier AS (
+                    SELECT 
+                        b.ProductName AS ProductCode,
+                        b.SupplierName AS SupplierCode,
+                        ROW_NUMBER() OVER (PARTITION BY b.ProductName ORDER BY b.ID DESC) AS rnk
+                    FROM Master_Batch b
+                    WHERE b.SupplierName IS NOT NULL AND b.SupplierName <> ''
+                )
                 SELECT 
                     p.ID AS ProductCode,
                     p.Name,
                     ISNULL(p.TamilName, N'') AS TamilName,
                     ISNULL(p.Category, N'General') AS Category,
+                    COALESCE(rp.SupplierCode, bs.SupplierCode, N'') AS MappedSupplierCode,
                     CASE 
                         WHEN ISNULL(b.MRP, 0) > 0 THEN CAST(b.MRP AS DECIMAL(18,2))
                         WHEN ISNULL(p.PMRP, 0) > 0 THEN CAST(p.PMRP AS DECIMAL(18,2))
@@ -195,6 +224,8 @@ public class MigrationController : ControllerBase
                 FROM Master_Inventory_Product p
                 LEFT JOIN Master_Batch b ON b.ProductName = p.ID AND b.Status = 1
                 LEFT JOIN Master_Base_GST g ON p.GSTInterStateOutput = g.ID
+                LEFT JOIN RecentPurchase rp ON p.ID = rp.ProductCode AND rp.rnk = 1
+                LEFT JOIN BatchSupplier bs ON p.ID = bs.ProductCode AND bs.rnk = 1
                 WHERE p.Status = 1";
 
             var existingCodes = new HashSet<string>(await _context.Products.Select(p => p.ProductCode).ToListAsync());
@@ -213,6 +244,13 @@ public class MigrationController : ControllerBase
                         var gstPct = Convert.ToDecimal(reader["GstPercentage"]);
                         var taxSlabId = (gstPct == 5 ? tax5?.Id : gstPct == 12 ? tax12?.Id : gstPct == 18 ? tax18?.Id : gstPct == 28 ? tax28?.Id : tax0?.Id) ?? tax0?.Id ?? Guid.NewGuid();
 
+                        var mappedSuppCode = reader["MappedSupplierCode"].ToString()?.Trim();
+                        Guid? preferredSupplierId = null;
+                        if (!string.IsNullOrWhiteSpace(mappedSuppCode) && supplierCodeMap.TryGetValue(mappedSuppCode, out var suppId))
+                        {
+                            preferredSupplierId = suppId;
+                        }
+
                         var p = new Product
                         {
                             Id = Guid.NewGuid(),
@@ -226,6 +264,7 @@ public class MigrationController : ControllerBase
                             TaxSlabId = taxSlabId,
                             CategoryId = defaultCategory.Id,
                             UnitOfMeasureId = defaultUom.Id,
+                            PreferredSupplierId = preferredSupplierId,
                             IsWeighable = Convert.ToInt32(reader["IsWeighable"]) == 1,
                             IsActive = true,
                             CreatedAt = DateTime.UtcNow
@@ -336,6 +375,112 @@ public class MigrationController : ControllerBase
             SuppliersMigrated = suppliersMigrated,
             ProductsMigrated = productsMigrated,
             StockBatchesMigrated = stockBatchesMigrated
+        });
+    }
+
+    [HttpPost("backfill-supplier-mappings")]
+    public async Task<IActionResult> BackfillSupplierMappings(
+        [FromQuery] string server = "192.168.1.10",
+        [FromQuery] string database = "APPLE26-27",
+        [FromQuery] string username = "sa",
+        [FromQuery] string password = "Q7!mX#92Lp@Tz4Ks")
+    {
+        var connStr = $"Server={server};Database={database};User Id={username};Password={password};TrustServerCertificate=True;Connect Timeout=30;";
+        int updatedProductsCount = 0;
+
+        using (var sqlConn = new SqlConnection(connStr))
+        {
+            await sqlConn.OpenAsync();
+
+            // 1. Build Supplier Code Map from Sigma 21 Master_Accounts to PosErp Suppliers
+            var suppCmd = sqlConn.CreateCommand();
+            suppCmd.CommandText = @"
+                SELECT ID AS SupplierCode, Name 
+                FROM Master_Accounts 
+                WHERE FormName = 'Supplier' OR AccountType = 'Sundry Creditors' OR AccountType LIKE '%Creditor%'";
+
+            var dbSuppliers = await _context.Suppliers.ToListAsync();
+            var supplierCodeMap = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
+
+            using (var reader = await suppCmd.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var code = reader["SupplierCode"].ToString()?.Trim();
+                    var name = reader["Name"].ToString()?.Trim();
+                    if (!string.IsNullOrWhiteSpace(code) && !string.IsNullOrWhiteSpace(name))
+                    {
+                        var match = dbSuppliers.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
+                        if (match != null)
+                        {
+                            supplierCodeMap[code] = match.Id;
+                        }
+                    }
+                }
+            }
+
+            // 2. Scan Sigma 21 for product supplier mapping
+            var scanCmd = sqlConn.CreateCommand();
+            scanCmd.CommandTimeout = 600;
+            scanCmd.CommandText = @"
+                WITH RecentPurchase AS (
+                    SELECT 
+                        ProductName AS ProductCode,
+                        Account AS SupplierCode,
+                        ROW_NUMBER() OVER (PARTITION BY ProductName ORDER BY Date DESC, VNO DESC) AS rnk
+                    FROM Trans_Inventory_SOM
+                    WHERE FormName = 'Purchase' AND Account IS NOT NULL AND Account <> ''
+                ),
+                BatchSupplier AS (
+                    SELECT 
+                        b.ProductName AS ProductCode,
+                        b.SupplierName AS SupplierCode,
+                        ROW_NUMBER() OVER (PARTITION BY b.ProductName ORDER BY b.ID DESC) AS rnk
+                    FROM Master_Batch b
+                    WHERE b.SupplierName IS NOT NULL AND b.SupplierName <> ''
+                )
+                SELECT 
+                    p.ID AS ProductCode,
+                    COALESCE(rp.SupplierCode, bs.SupplierCode, N'') AS MappedSupplierCode
+                FROM Master_Inventory_Product p
+                LEFT JOIN RecentPurchase rp ON p.ID = rp.ProductCode AND rp.rnk = 1
+                LEFT JOIN BatchSupplier bs ON p.ID = bs.ProductCode AND bs.rnk = 1
+                WHERE p.Status = 1 AND COALESCE(rp.SupplierCode, bs.SupplierCode, N'') <> N''";
+
+            var productsDict = await _context.Products.ToDictionaryAsync(p => p.ProductCode, p => p);
+
+            using (var reader = await scanCmd.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var pCode = reader["ProductCode"].ToString()?.Trim();
+                    var suppCode = reader["MappedSupplierCode"].ToString()?.Trim();
+
+                    if (!string.IsNullOrWhiteSpace(pCode) && 
+                        !string.IsNullOrWhiteSpace(suppCode) &&
+                        productsDict.TryGetValue(pCode, out var product) &&
+                        supplierCodeMap.TryGetValue(suppCode, out var suppId))
+                    {
+                        if (product.PreferredSupplierId != suppId)
+                        {
+                            product.PreferredSupplierId = suppId;
+                            updatedProductsCount++;
+                        }
+                    }
+                }
+            }
+
+            if (updatedProductsCount > 0)
+            {
+                await _context.SaveChangesAsync(default);
+            }
+        }
+
+        return Ok(new
+        {
+            Status = "SUCCESS",
+            UpdatedProductsCount = updatedProductsCount,
+            Message = $"Successfully backfilled PreferredSupplierId for {updatedProductsCount} product master items from Sigma 21!"
         });
     }
 }

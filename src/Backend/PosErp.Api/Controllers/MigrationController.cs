@@ -139,7 +139,7 @@ public class MigrationController : ControllerBase
             }
             await _context.SaveChangesAsync(default);
 
-            // 3. GET OR CREATE DEFAULT TAX SLABS, UOM & CATEGORY
+            // 3. GET OR CREATE DEFAULT TAX SLABS, UOMS & CATEGORY
             var taxSlabs = await _context.TaxSlabs.ToListAsync();
             var tax0 = taxSlabs.FirstOrDefault(t => (t.CgstRate + t.SgstRate) == 0) ?? taxSlabs.FirstOrDefault();
             var tax5 = taxSlabs.FirstOrDefault(t => (t.CgstRate + t.SgstRate) == 5) ?? tax0;
@@ -147,12 +147,26 @@ public class MigrationController : ControllerBase
             var tax18 = taxSlabs.FirstOrDefault(t => (t.CgstRate + t.SgstRate) == 18) ?? tax0;
             var tax28 = taxSlabs.FirstOrDefault(t => (t.CgstRate + t.SgstRate) == 28) ?? tax0;
 
-            var defaultUom = await _context.UnitOfMeasures.FirstOrDefaultAsync();
-            if (defaultUom == null)
+            var allUoms = await _context.UnitOfMeasures.ToListAsync();
+            var uomPcs = allUoms.FirstOrDefault(u => u.Symbol.Equals("Pcs", StringComparison.OrdinalIgnoreCase) || u.Name.Equals("Pieces", StringComparison.OrdinalIgnoreCase));
+            if (uomPcs == null)
             {
-                defaultUom = new UnitOfMeasure { Id = Guid.NewGuid(), Name = "Pcs", Symbol = "Pcs" };
-                _context.UnitOfMeasures.Add(defaultUom);
-                await _context.SaveChangesAsync(default);
+                uomPcs = new UnitOfMeasure { Id = Guid.NewGuid(), Name = "Pieces", Symbol = "Pcs" };
+                _context.UnitOfMeasures.Add(uomPcs);
+            }
+
+            var uomKgs = allUoms.FirstOrDefault(u => u.Symbol.Equals("Kgs", StringComparison.OrdinalIgnoreCase) || u.Name.Equals("Kilograms", StringComparison.OrdinalIgnoreCase));
+            if (uomKgs == null)
+            {
+                uomKgs = new UnitOfMeasure { Id = Guid.NewGuid(), Name = "Kilograms", Symbol = "Kgs" };
+                _context.UnitOfMeasures.Add(uomKgs);
+            }
+
+            var uomBox = allUoms.FirstOrDefault(u => u.Symbol.Equals("Box", StringComparison.OrdinalIgnoreCase));
+            if (uomBox == null)
+            {
+                uomBox = new UnitOfMeasure { Id = Guid.NewGuid(), Name = "Box", Symbol = "Box" };
+                _context.UnitOfMeasures.Add(uomBox);
             }
 
             var defaultCategory = await _context.Categories.FirstOrDefaultAsync();
@@ -160,10 +174,10 @@ public class MigrationController : ControllerBase
             {
                 defaultCategory = new Category { Id = Guid.NewGuid(), Name = "General" };
                 _context.Categories.Add(defaultCategory);
-                await _context.SaveChangesAsync(default);
             }
+            await _context.SaveChangesAsync(default);
 
-            // 4. MIGRATE PRODUCTS WITH PREFERRED SUPPLIER ID (39,000+ items)
+            // 4. MIGRATE PRODUCTS WITH UOM & PREFERRED SUPPLIER ID (39,000+ items)
             var prodCmd = sqlConn.CreateCommand();
             prodCmd.CommandTimeout = 600;
             prodCmd.CommandText = @"
@@ -213,11 +227,25 @@ public class MigrationController : ControllerBase
                     END AS Barcode,
                     ISNULL(g.Percentage, 0) AS GstPercentage,
                     CASE 
-                        WHEN p.Weight > 0 OR p.Name LIKE '%KG%' OR p.Name LIKE '%GRAM%' OR p.Name LIKE '%GRM%' THEN 1
+                        WHEN p.Weight > 0 
+                          OR p.Name LIKE '%VELLAM%' OR p.Name LIKE '%RICE%' OR p.Name LIKE '%PARUPPU%' OR p.Name LIKE '%SUGAR%'
+                          OR p.Name LIKE '%DHAL%' OR p.Name LIKE '%DAL%' OR p.Name LIKE '%ATTA%' OR p.Name LIKE '%MAIDA%' OR p.Name LIKE '%RAVA%'
+                          OR p.Name LIKE '%KG%' OR p.Name LIKE '%1K%' OR p.Name LIKE '%2K%' OR p.Name LIKE '%5K%' OR p.Name LIKE '%10K%' OR p.Name LIKE '%25K%'
+                          OR p.Name LIKE '%500G%' OR p.Name LIKE '%250G%' OR p.Name LIKE '%100G%' OR p.Name LIKE '%50G%' OR p.Name LIKE '%GRAM%' OR p.Name LIKE '%GRM%'
+                          OR p.Name LIKE '%KILO%' OR p.Name LIKE '%LOOSE%' OR p.Name LIKE '%OIL%' OR p.Name LIKE '%GHEE%' OR p.Name LIKE '%SALT%'
+                          OR p.TamilName LIKE N'%கி%' OR p.TamilName LIKE N'%கிலோ%' OR p.TamilName LIKE N'%வெல்லம்%' OR p.TamilName LIKE N'%அரிசி%' OR p.TamilName LIKE N'%பருப்பு%'
+                        THEN 1
                         ELSE 0
                     END AS IsWeighable,
                     CASE 
-                        WHEN p.Weight > 0 OR p.Name LIKE '%KG%' OR p.Name LIKE '%GRAM%' OR p.Name LIKE '%GRM%' THEN N'Kgs'
+                        WHEN p.Weight > 0 
+                          OR p.Name LIKE '%VELLAM%' OR p.Name LIKE '%RICE%' OR p.Name LIKE '%PARUPPU%' OR p.Name LIKE '%SUGAR%'
+                          OR p.Name LIKE '%DHAL%' OR p.Name LIKE '%DAL%' OR p.Name LIKE '%ATTA%' OR p.Name LIKE '%MAIDA%' OR p.Name LIKE '%RAVA%'
+                          OR p.Name LIKE '%KG%' OR p.Name LIKE '%1K%' OR p.Name LIKE '%2K%' OR p.Name LIKE '%5K%' OR p.Name LIKE '%10K%' OR p.Name LIKE '%25K%'
+                          OR p.Name LIKE '%500G%' OR p.Name LIKE '%250G%' OR p.Name LIKE '%100G%' OR p.Name LIKE '%50G%' OR p.Name LIKE '%GRAM%' OR p.Name LIKE '%GRM%'
+                          OR p.Name LIKE '%KILO%' OR p.Name LIKE '%LOOSE%' OR p.Name LIKE '%OIL%' OR p.Name LIKE '%GHEE%' OR p.Name LIKE '%SALT%'
+                          OR p.TamilName LIKE N'%கி%' OR p.TamilName LIKE N'%கிலோ%' OR p.TamilName LIKE N'%வெல்லம்%' OR p.TamilName LIKE N'%அரிசி%' OR p.TamilName LIKE N'%பருப்பு%'
+                        THEN N'Kgs'
                         WHEN p.Box = 1 THEN N'Box'
                         ELSE N'Pcs'
                     END AS Uom
@@ -251,6 +279,10 @@ public class MigrationController : ControllerBase
                             preferredSupplierId = suppId;
                         }
 
+                        var uomStr = reader["Uom"].ToString()?.Trim();
+                        var isWeighable = Convert.ToInt32(reader["IsWeighable"]) == 1;
+                        var targetUomId = uomStr == "Kgs" ? uomKgs.Id : uomStr == "Box" ? uomBox.Id : uomPcs.Id;
+
                         var p = new Product
                         {
                             Id = Guid.NewGuid(),
@@ -263,9 +295,9 @@ public class MigrationController : ControllerBase
                             PurchasePrice = Convert.ToDecimal(reader["PurchasePrice"]),
                             TaxSlabId = taxSlabId,
                             CategoryId = defaultCategory.Id,
-                            UnitOfMeasureId = defaultUom.Id,
+                            UnitOfMeasureId = targetUomId,
                             PreferredSupplierId = preferredSupplierId,
-                            IsWeighable = Convert.ToInt32(reader["IsWeighable"]) == 1,
+                            IsWeighable = isWeighable,
                             IsActive = true,
                             CreatedAt = DateTime.UtcNow
                         };
@@ -378,6 +410,70 @@ public class MigrationController : ControllerBase
         });
     }
 
+    [HttpPost("backfill-uom-mappings")]
+    public async Task<IActionResult> BackfillUomMappings()
+    {
+        var allUoms = await _context.UnitOfMeasures.ToListAsync();
+        var uomPcs = allUoms.FirstOrDefault(u => u.Symbol.Equals("Pcs", StringComparison.OrdinalIgnoreCase) || u.Name.Equals("Pieces", StringComparison.OrdinalIgnoreCase));
+        if (uomPcs == null)
+        {
+            uomPcs = new UnitOfMeasure { Id = Guid.NewGuid(), Name = "Pieces", Symbol = "Pcs" };
+            _context.UnitOfMeasures.Add(uomPcs);
+        }
+
+        var uomKgs = allUoms.FirstOrDefault(u => u.Symbol.Equals("Kgs", StringComparison.OrdinalIgnoreCase) || u.Name.Equals("Kilograms", StringComparison.OrdinalIgnoreCase));
+        if (uomKgs == null)
+        {
+            uomKgs = new UnitOfMeasure { Id = Guid.NewGuid(), Name = "Kilograms", Symbol = "Kgs" };
+            _context.UnitOfMeasures.Add(uomKgs);
+        }
+
+        var uomBox = allUoms.FirstOrDefault(u => u.Symbol.Equals("Box", StringComparison.OrdinalIgnoreCase));
+        if (uomBox == null)
+        {
+            uomBox = new UnitOfMeasure { Id = Guid.NewGuid(), Name = "Box", Symbol = "Box" };
+            _context.UnitOfMeasures.Add(uomBox);
+        }
+        await _context.SaveChangesAsync(default);
+
+        var products = await _context.Products.ToListAsync();
+        int updatedCount = 0;
+
+        foreach (var p in products)
+        {
+            var name = (p.Name ?? "").ToUpper();
+            var tamilName = (p.TamilName ?? "");
+
+            bool isWeighable = name.Contains("VELLAM") || name.Contains("RICE") || name.Contains("PARUPPU") || name.Contains("SUGAR")
+                || name.Contains("DHAL") || name.Contains("DAL") || name.Contains("ATTA") || name.Contains("MAIDA") || name.Contains("RAVA")
+                || name.Contains("KG") || name.Contains("1K") || name.Contains("2K") || name.Contains("5K") || name.Contains("10K") || name.Contains("25K")
+                || name.Contains("500G") || name.Contains("250G") || name.Contains("100G") || name.Contains("50G") || name.Contains("GRAM") || name.Contains("GRM")
+                || name.Contains("KILO") || name.Contains("LOOSE") || name.Contains("OIL") || name.Contains("GHEE") || name.Contains("SALT")
+                || tamilName.Contains("கி") || tamilName.Contains("கிலோ") || tamilName.Contains("வெல்லம்") || tamilName.Contains("அரிசி") || tamilName.Contains("பருப்பு");
+
+            var targetUomId = isWeighable ? uomKgs.Id : uomPcs.Id;
+
+            if (p.UnitOfMeasureId != targetUomId || p.IsWeighable != isWeighable)
+            {
+                p.UnitOfMeasureId = targetUomId;
+                p.IsWeighable = isWeighable;
+                updatedCount++;
+            }
+        }
+
+        if (updatedCount > 0)
+        {
+            await _context.SaveChangesAsync(default);
+        }
+
+        return Ok(new
+        {
+            Status = "SUCCESS",
+            UpdatedProductsCount = updatedCount,
+            Message = $"Successfully updated UOM & IsWeighable for {updatedCount} products in ERP system!"
+        });
+    }
+
     [HttpPost("backfill-supplier-mappings")]
     public async Task<IActionResult> BackfillSupplierMappings(
         [FromQuery] string server = "192.168.1.10",
@@ -392,7 +488,6 @@ public class MigrationController : ControllerBase
         {
             await sqlConn.OpenAsync();
 
-            // 1. Build Supplier Code Map from Sigma 21 Master_Accounts to PosErp Suppliers
             var suppCmd = sqlConn.CreateCommand();
             suppCmd.CommandText = @"
                 SELECT ID AS SupplierCode, Name 
@@ -419,7 +514,6 @@ public class MigrationController : ControllerBase
                 }
             }
 
-            // 2. Scan Sigma 21 for product supplier mapping
             var scanCmd = sqlConn.CreateCommand();
             scanCmd.CommandTimeout = 600;
             scanCmd.CommandText = @"

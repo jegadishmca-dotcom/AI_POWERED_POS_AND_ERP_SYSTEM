@@ -176,7 +176,7 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
 
   // Build items boxed table rows
   let itemsRowsHtml = '';
-  (invoice.items || []).forEach((item: any) => {
+  (invoice.items || []).forEach((item: any, idx: number) => {
     const qty  = safe(item.quantity, safe(item.qty));
     const disc = safe(item.discountAmount);
     const lineAmt = safe(item.unitPrice) * qty - disc;
@@ -185,6 +185,7 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
 
     itemsRowsHtml += `
       <tr>
+        <td style="border:1.5px solid #000; text-align:center; padding:2px 3px; font-weight:800; font-size:11px;">${idx + 1}</td>
         <td style="border:1.5px solid #000; padding:2px 3px; font-weight:800; font-size:11px;">${item.name || item.productName || '-'}</td>
         <td style="border:1.5px solid #000; text-align:center; padding:2px 3px; font-weight:800; font-size:11px;">${qty}</td>
         <td style="border:1.5px solid #000; text-align:center; padding:2px 3px; font-weight:800; font-size:11px;">${mrpVal}</td>
@@ -297,7 +298,8 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   <table class="border-table" style="margin-bottom: 4px;">
     <thead>
       <tr>
-        <th style="width: 44%; text-align: center; font-weight: 900; font-size: 11px;">Items</th>
+        <th style="width: 10%; text-align: center; font-weight: 900; font-size: 11px;">S.No</th>
+        <th style="width: 34%; text-align: center; font-weight: 900; font-size: 11px;">Items</th>
         <th style="width: 10%; text-align: center; font-weight: 900; font-size: 11px;">Qty</th>
         <th style="width: 14%; text-align: center; font-weight: 900; font-size: 11px;">MRP</th>
         <th style="width: 16%; text-align: center; font-weight: 900; font-size: 11px;">Rate</th>

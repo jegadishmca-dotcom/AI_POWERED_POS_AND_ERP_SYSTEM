@@ -1195,6 +1195,7 @@ export const PosTerminal = () => {
             <table className="w-full text-left">
               <thead className="bg-slate-100 sticky top-0 border-b">
                 <tr>
+                  <th className="p-3 text-center w-12">S.No</th>
                   <th className="p-3">Item</th>
                   <th className="p-3 text-center">Qty</th>
                   <th className="p-3 text-right">MRP</th>
@@ -1204,8 +1205,11 @@ export const PosTerminal = () => {
                 </tr>
               </thead>
               <tbody>
-                {cart.items.map((item: any) => (
+                {cart.items.map((item: any, index: number) => (
                   <tr key={item.id} className="border-b hover:bg-slate-50/50">
+                    <td className="p-3 text-center font-black text-slate-500 text-sm">
+                      {index + 1}
+                    </td>
                     <td className="p-3">
                       <p className="font-bold text-slate-800">{item.name}</p>
                       {item.appliedOfferName && (

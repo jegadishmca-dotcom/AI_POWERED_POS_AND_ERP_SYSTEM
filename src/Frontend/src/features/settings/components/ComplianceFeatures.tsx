@@ -129,6 +129,22 @@ export const ComplianceFeatures: React.FC = () => {
           value={features.eWayBillEnabled}
           onChange={(v) => setFeatures(f => ({ ...f, eWayBillEnabled: v }))}
         />
+        <Toggle
+          id="toggle-whatsapp-enabled"
+          label="WhatsApp Digital Receipts (Meta API)"
+          description="When enabled, the system automatically sends an interactive WhatsApp PDF invoice link to the customer's mobile number upon POS checkout."
+          warning="Ensure Meta Cloud API Token & WABA Phone Number ID are configured. Standard Meta per-message conversation rates apply."
+          value={features.whatsAppReceiptsEnabled || false}
+          onChange={(v) => setFeatures(f => ({ ...f, whatsAppReceiptsEnabled: v }))}
+        />
+        <Toggle
+          id="toggle-sms-enabled"
+          label="SMS Notification Receipts (DLT Registered)"
+          description="When enabled, the system sends an SMS text with invoice bill link to the customer's phone number."
+          warning="Requires active DLT Entity ID and Registered SMS Gateway API Credentials. Standard telecom SMS charges apply."
+          value={features.smsReceiptsEnabled || false}
+          onChange={(v) => setFeatures(f => ({ ...f, smsReceiptsEnabled: v }))}
+        />
       </div>
 
       {/* Status message */}

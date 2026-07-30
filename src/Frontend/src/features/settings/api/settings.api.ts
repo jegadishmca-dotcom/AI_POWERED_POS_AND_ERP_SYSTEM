@@ -76,6 +76,8 @@ export const deleteTerminal = async (id: string): Promise<any> => {
 export interface ComplianceFeaturesDto {
   eInvoiceEnabled: boolean;
   eWayBillEnabled: boolean;
+  whatsAppReceiptsEnabled?: boolean;
+  smsReceiptsEnabled?: boolean;
 }
 
 export const getComplianceFeatures = async (): Promise<ComplianceFeaturesDto> => {

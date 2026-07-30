@@ -185,11 +185,11 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
 
     itemsRowsHtml += `
       <tr>
-        <td style="border:1px solid #000; padding:2px; font-weight:bold; font-size:10px;">${item.name || item.productName || '-'}</td>
-        <td style="border:1px solid #000; text-align:center; padding:2px; font-size:10px;">${qty}</td>
-        <td style="border:1px solid #000; text-align:center; padding:2px; font-size:10px;">${mrpVal}</td>
-        <td style="border:1px solid #000; text-align:right; padding:2px; font-size:10px;">${fmt(item.unitPrice)}</td>
-        <td style="border:1px solid #000; text-align:right; padding:2px; font-weight:bold; font-size:10px;">${fmt(lineAmt)}</td>
+        <td style="border:1.5px solid #000; padding:2px 3px; font-weight:800; font-size:11px;">${item.name || item.productName || '-'}</td>
+        <td style="border:1.5px solid #000; text-align:center; padding:2px 3px; font-weight:800; font-size:11px;">${qty}</td>
+        <td style="border:1.5px solid #000; text-align:center; padding:2px 3px; font-weight:800; font-size:11px;">${mrpVal}</td>
+        <td style="border:1.5px solid #000; text-align:right; padding:2px 3px; font-weight:800; font-size:11px;">${fmt(item.unitPrice)}</td>
+        <td style="border:1.5px solid #000; text-align:right; padding:2px 3px; font-weight:900; font-size:11.5px;">${fmt(lineAmt)}</td>
       </tr>`;
   });
 
@@ -301,7 +301,7 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
         <th style="width: 10%; text-align: center; font-weight: 900; font-size: 11px;">Qty</th>
         <th style="width: 14%; text-align: center; font-weight: 900; font-size: 11px;">MRP</th>
         <th style="width: 16%; text-align: center; font-weight: 900; font-size: 11px;">Rate</th>
-        <th style="width: 16%; text-align: center; font-weight: 900; font-size: 11px;">Amt</th>
+        <th style="width: 16%; text-align: center; font-weight: 900; font-size: 12px;">Amt</th>
       </tr>
     </thead>
     <tbody>

@@ -131,7 +131,7 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
                 <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '10%', fontWeight: 900 }}>Qty</th>
                 <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '14%', fontWeight: 900 }}>MRP</th>
                 <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '16%', fontWeight: 900 }}>Rate</th>
-                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '16%', fontWeight: 900 }}>Amt</th>
+                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '16%', fontWeight: 900, fontSize: '12px' }}>Amt</th>
               </tr>
             </thead>
             <tbody>
@@ -147,7 +147,7 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
                     <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', fontWeight: 800 }}>{qty}</td>
                     <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', fontWeight: 800 }}>{mrpVal}</td>
                     <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'right', fontWeight: 800 }}>{fmt(item.unitPrice)}</td>
-                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'right', fontWeight: 900 }}>{fmt(lineAmt)}</td>
+                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'right', fontWeight: 900, fontSize: '11.5px' }}>{fmt(lineAmt)}</td>
                   </tr>
                 );
               })}

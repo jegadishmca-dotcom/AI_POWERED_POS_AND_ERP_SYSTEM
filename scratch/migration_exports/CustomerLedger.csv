@@ -1,0 +1,2 @@
+﻿"ReferenceNumber","EntryDate","CustomerCode","CustomerName","TransactionType","GrossAmount","DiscountAmount","GSTTaxAmount","NetAmount","Narration"
+"CRA-2","24-07-2026 12:00:00 AM","BA-729","MOON","CashReceipt","16819.00","0.00","0.00","16819.00",""

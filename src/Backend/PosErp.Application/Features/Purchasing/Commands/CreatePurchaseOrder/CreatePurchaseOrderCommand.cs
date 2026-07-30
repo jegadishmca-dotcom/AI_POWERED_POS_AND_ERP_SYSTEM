@@ -1,11 +1,12 @@
-﻿using MediatR;
+using MediatR;
+using Microsoft.EntityFrameworkCore;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Purchasing;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Linq;
 
 namespace PosErp.Application.Features.Purchasing.Commands.CreatePurchaseOrder;
 
@@ -34,11 +35,21 @@ public class CreatePurchaseOrderCommandHandler : IRequestHandler<CreatePurchaseO
 
     public async Task<Guid> Handle(CreatePurchaseOrderCommand request, CancellationToken cancellationToken)
     {
+        string poNumber = string.Empty;
+        int attempts = 0;
+        do
+        {
+            var uniqueSuffix = Guid.NewGuid().ToString().Replace("-", "").Substring(0, 8).ToUpper();
+            poNumber = $"PO-{DateTime.UtcNow:yyyyMMdd}-{uniqueSuffix}";
+            attempts++;
+        }
+        while (await _context.PurchaseOrders.AnyAsync(p => p.PoNumber == poNumber, cancellationToken) && attempts < 10);
+
         var po = new PurchaseOrderHeader
         {
             StoreId = request.StoreId,
             SupplierId = request.SupplierId,
-            PoNumber = $"PO-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 4).ToUpper()}",
+            PoNumber = poNumber,
             PoDate = DateTime.UtcNow,
             ExpectedDeliveryDate = request.ExpectedDeliveryDate,
             Status = "DRAFT",

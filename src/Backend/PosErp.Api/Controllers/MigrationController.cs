@@ -500,6 +500,7 @@ public class MigrationController : ControllerBase
 
         var connStr = $"Server={server};Database={database};User Id={username};Password={password};TrustServerCertificate=True;Connect Timeout=30;";
         int updatedProductsCount = 0;
+        int newSuppliersCreated = 0;
 
         using (var sqlConn = new SqlConnection(connStr))
         {
@@ -507,7 +508,11 @@ public class MigrationController : ControllerBase
 
             var suppCmd = sqlConn.CreateCommand();
             suppCmd.CommandText = @"
-                SELECT ID AS SupplierCode, Name 
+                SELECT 
+                    ID AS SupplierCode, 
+                    Name,
+                    ISNULL(Mobile1, ISNULL(Phone1, N'')) AS Phone,
+                    ISNULL(GSTNO, N'') AS Gstin
                 FROM Master_Accounts 
                 WHERE FormName = 'Supplier' OR AccountType = 'Sundry Creditors' OR AccountType LIKE '%Creditor%'";
 
@@ -523,12 +528,29 @@ public class MigrationController : ControllerBase
                     if (!string.IsNullOrWhiteSpace(code) && !string.IsNullOrWhiteSpace(name))
                     {
                         var match = dbSuppliers.FirstOrDefault(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
-                        if (match != null)
+                        if (match == null)
                         {
-                            supplierCodeMap[code] = match.Id;
+                            match = new Supplier
+                            {
+                                Id = Guid.NewGuid(),
+                                Name = name,
+                                Phone = reader["Phone"].ToString(),
+                                Gstin = reader["Gstin"].ToString(),
+                                PaymentTerms = "NET30",
+                                IsActive = true
+                            };
+                            _context.Suppliers.Add(match);
+                            dbSuppliers.Add(match);
+                            newSuppliersCreated++;
                         }
+                        supplierCodeMap[code] = match.Id;
                     }
                 }
+            }
+
+            if (newSuppliersCreated > 0)
+            {
+                await _context.SaveChangesAsync(default);
             }
 
             var scanCmd = sqlConn.CreateCommand();
@@ -590,8 +612,9 @@ public class MigrationController : ControllerBase
         return Ok(new
         {
             Status = "SUCCESS",
+            NewSuppliersCreated = newSuppliersCreated,
             UpdatedProductsCount = updatedProductsCount,
-            Message = $"Successfully backfilled PreferredSupplierId for {updatedProductsCount} product master items from Sigma 21!"
+            Message = $"Successfully backfilled PreferredSupplierId for {updatedProductsCount} product master items ({newSuppliersCreated} suppliers created) from Sigma 21!"
         });
     }
 }

@@ -27,6 +27,7 @@ SQL migrations run automatically on backend container startup via the migration 
 The system uses the following IP assignments and database settings for development and deployment configurations:
 - **Development PC** (this workstation running the IDE): `192.168.1.4`
 - **Ubuntu Production Server** (hosting the application containers via Docker): `192.168.1.5`
-- **Production PostgreSQL Database Name**: `posdb_uat`
-- **Production PostgreSQL User**: `posadmin`
+- **Development & UAT Testing Database Name**: `posdb_uat`
+- **Production Live Database Name**: `posdb_live`
+- **PostgreSQL Database User**: `posadmin`
 </RULE[project]>

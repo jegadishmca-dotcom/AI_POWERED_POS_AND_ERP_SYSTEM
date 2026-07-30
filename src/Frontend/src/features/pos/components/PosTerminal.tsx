@@ -698,7 +698,12 @@ export const PosTerminal = () => {
         cgstRate: product.cgstRate || 0,
         sgstRate: product.sgstRate || 0,
         cessRate: product.cessRate || 0,
-        isWeighable: product.isWeighable || false,
+        isWeighable: !!(
+          product.isWeighable ||
+          (product.unitOfMeasure && /kg|gram|gm|ltr|liter/i.test(product.unitOfMeasure)) ||
+          (product.uomName && /kg|gram|gm|ltr|liter/i.test(product.uomName)) ||
+          (product.uom && /kg|gram|gm|ltr|liter/i.test(product.uom))
+        ),
         batches: allBatches || (batch ? [batch] : []),
         batchId: batch ? batch.id : undefined
       };

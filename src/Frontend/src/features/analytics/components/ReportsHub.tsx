@@ -9,29 +9,41 @@ import {
   Calendar, 
   Download, 
   Search, 
-  FileText 
+  FileText,
+  Eye,
+  CreditCard,
+  Wallet,
+  Receipt
 } from 'lucide-react';
 import { 
   getGstReport, 
   getMarginReport, 
   getInventoryInsights, 
+  getInvoiceSalesReport,
   GstReportRow, 
   MarginReport, 
-  InventoryInsights 
+  InventoryInsights,
+  InvoiceSalesRow 
 } from '../api/reports.api';
+import { getInvoiceByNumber } from '../../pos/api/pos.api';
+import { printReceipt } from '../../pos/utils/printReceipt';
 
 export const ReportsHub: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'margins' | 'gst' | 'inventory'>('margins');
-  const [fromDate, setFromDate] = useState<string>(
-    new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
-  );
-  const [toDate, setToDate] = useState<string>(
-    new Date().toISOString().split('T')[0]
-  );
+  const [activeTab, setActiveTab] = useState<'margins' | 'gst' | 'invoices' | 'inventory'>('invoices');
+  
+  // Set default date range to today's date so cashier/owner sees selected business date sales instantly
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [fromDate, setFromDate] = useState<string>(todayStr);
+  const [toDate, setToDate] = useState<string>(todayStr);
   
   const [marginData, setMarginData] = useState<MarginReport | null>(null);
   const [gstData, setGstData] = useState<GstReportRow[]>([]);
   const [inventoryData, setInventoryData] = useState<InventoryInsights | null>(null);
+  const [invoiceSalesData, setInvoiceSalesData] = useState<InvoiceSalesRow[]>([]);
+
+  // Filters for Invoice-Wise Sales
+  const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('');
+  const [paymentModeFilter, setPaymentModeFilter] = useState<string>('ALL');
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,6 +59,9 @@ export const ReportsHub: React.FC = () => {
       } else if (activeTab === 'gst') {
         const data = await getGstReport(fromDate, toDate);
         setGstData(data);
+      } else if (activeTab === 'invoices') {
+        const data = await getInvoiceSalesReport(fromDate, toDate);
+        setInvoiceSalesData(data);
       } else if (activeTab === 'inventory') {
         const data = await getInventoryInsights();
         setInventoryData(data);
@@ -63,12 +78,83 @@ export const ReportsHub: React.FC = () => {
     fetchReportsData();
   }, [activeTab, fromDate, toDate]);
 
+  const handlePrintInvoice = async (invoiceNumber: string) => {
+    try {
+      const fullInvoice = await getInvoiceByNumber(invoiceNumber);
+      if (fullInvoice) {
+        printReceipt(fullInvoice);
+      } else {
+        alert('Invoice details not found');
+      }
+    } catch (err) {
+      console.error('Error opening receipt:', err);
+      alert('Could not load invoice receipt details.');
+    }
+  };
+
+  // Filtered Invoices calculation
+  const filteredInvoices = invoiceSalesData.filter((inv) => {
+    const query = invoiceSearchQuery.toLowerCase().trim();
+    const matchesQuery = !query || (
+      inv.invoiceNumber.toLowerCase().includes(query) ||
+      inv.cashierName.toLowerCase().includes(query) ||
+      (inv.customerName && inv.customerName.toLowerCase().includes(query)) ||
+      (inv.customerPhone && inv.customerPhone.includes(query))
+    );
+
+    const matchesPayment = paymentModeFilter === 'ALL' || (
+      inv.paymentMode && inv.paymentMode.toUpperCase().includes(paymentModeFilter.toUpperCase())
+    );
+
+    return matchesQuery && matchesPayment;
+  });
+
+  // Invoice Summary Totals
+  const totalInvoicesCount = filteredInvoices.length;
+  const totalNetSales = filteredInvoices.reduce((sum, item) => sum + (item.netPayable || 0), 0);
+  const totalDiscounts = filteredInvoices.reduce((sum, item) => sum + (item.discountAmount || 0), 0);
+  const totalTaxes = filteredInvoices.reduce((sum, item) => sum + (item.taxAmount || 0), 0);
+
   const handleExportCSV = (type: string) => {
     let headers: string[] = [];
     let rows: string[][] = [];
     let filename = '';
 
-    if (type === 'gst') {
+    if (type === 'invoices') {
+      filename = `Invoice_Wise_Sales_Report_${fromDate}_to_${toDate}.csv`;
+      headers = [
+        'S.No',
+        'Invoice Number',
+        'Date & Time',
+        'Cashier',
+        'Customer Name',
+        'Customer Phone',
+        'Items Count',
+        'Total Qty Sold',
+        'Subtotal (₹)',
+        'Discount (₹)',
+        'Tax (GST ₹)',
+        'Net Value (₹)',
+        'Payment Mode',
+        'Status'
+      ];
+      rows = filteredInvoices.map((inv, idx) => [
+        (idx + 1).toString(),
+        inv.invoiceNumber,
+        inv.createdAt ? new Date(inv.createdAt).toLocaleString('en-IN') : 'N/A',
+        inv.cashierName || 'Cashier',
+        inv.customerName || 'WALK-IN',
+        inv.customerPhone || '',
+        inv.itemCount.toString(),
+        inv.totalQty.toString(),
+        inv.subTotal.toFixed(2),
+        inv.discountAmount.toFixed(2),
+        inv.taxAmount.toFixed(2),
+        inv.netPayable.toFixed(2),
+        inv.paymentMode || 'Cash',
+        inv.status || 'Completed'
+      ]);
+    } else if (type === 'gst') {
       filename = `GST_Tax_Report_${fromDate}_to_${toDate}.csv`;
       headers = ['Tax Rate %', 'Taxable Amount', 'CGST Collected', 'SGST Collected', 'Cess Collected', 'Total Tax Collected'];
       rows = gstData.map(r => [
@@ -147,29 +233,29 @@ export const ReportsHub: React.FC = () => {
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-black text-slate-800">Reports & Insights</h1>
-          <p className="text-gray-500">Supermarket gross margins, tax filings, and stock metrics</p>
+          <p className="text-gray-500 font-medium">Invoice sales breakdown, gross margins, tax filings, and stock metrics</p>
         </div>
 
-        {/* Date Filters (Hidden on Inventory Health since it is live snapshot) */}
+        {/* Date Filters */}
         {activeTab !== 'inventory' && (
-          <div className="flex items-center gap-4 bg-white p-3 rounded-xl shadow-sm border border-slate-100">
+          <div className="flex items-center gap-4 bg-white p-3 rounded-xl shadow-sm border border-slate-200">
             <div className="flex items-center text-gray-500">
-              <Calendar className="w-4 h-4 mr-2" />
-              <span className="text-xs font-bold uppercase">Date Filter</span>
+              <Calendar className="w-4 h-4 mr-2 text-indigo-600" />
+              <span className="text-xs font-black uppercase text-slate-700">Business Date</span>
             </div>
             <div className="flex items-center gap-2">
               <input 
                 type="date" 
                 value={fromDate}
                 onChange={(e) => setFromDate(e.target.value)}
-                className="px-3 py-1.5 border rounded-lg text-sm font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-bold text-slate-800 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
-              <span className="text-gray-400">to</span>
+              <span className="text-gray-400 font-bold">to</span>
               <input 
                 type="date" 
                 value={toDate}
                 onChange={(e) => setToDate(e.target.value)}
-                className="px-3 py-1.5 border rounded-lg text-sm font-semibold text-slate-700 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="px-3 py-1.5 border border-slate-300 rounded-lg text-sm font-bold text-slate-800 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
             </div>
           </div>
@@ -177,36 +263,46 @@ export const ReportsHub: React.FC = () => {
       </div>
 
       {/* Tabs Menu */}
-      <div className="flex border-b border-slate-200 mb-8 gap-6">
+      <div className="flex border-b border-slate-200 mb-8 gap-6 overflow-x-auto">
         <button 
-          onClick={() => setActiveTab('margins')}
-          className={`pb-4 text-sm font-bold border-b-2 transition-all ${
-            activeTab === 'margins' 
-              ? 'border-indigo-600 text-indigo-600 font-extrabold' 
-              : 'border-transparent text-slate-400 hover:text-slate-600'
+          onClick={() => setActiveTab('invoices')}
+          className={`pb-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+            activeTab === 'invoices' 
+              ? 'border-indigo-600 text-indigo-600 font-black' 
+              : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
-          Sales & Profit Margins
+          <Receipt className="w-4 h-4" /> Invoice-Wise Sales
+        </button>
+        <button 
+          onClick={() => setActiveTab('margins')}
+          className={`pb-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
+            activeTab === 'margins' 
+              ? 'border-indigo-600 text-indigo-600 font-black' 
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          <TrendingUp className="w-4 h-4" /> Sales & Profit Margins
         </button>
         <button 
           onClick={() => setActiveTab('gst')}
-          className={`pb-4 text-sm font-bold border-b-2 transition-all ${
+          className={`pb-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
             activeTab === 'gst' 
-              ? 'border-indigo-600 text-indigo-600 font-extrabold' 
-              : 'border-transparent text-slate-400 hover:text-slate-600'
+              ? 'border-indigo-600 text-indigo-600 font-black' 
+              : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
-          GST Tax Filings (Sales)
+          <FileText className="w-4 h-4" /> GST Tax Filings (Sales)
         </button>
         <button 
           onClick={() => setActiveTab('inventory')}
-          className={`pb-4 text-sm font-bold border-b-2 transition-all ${
+          className={`pb-4 text-sm font-bold border-b-2 transition-all flex items-center gap-2 ${
             activeTab === 'inventory' 
-              ? 'border-indigo-600 text-indigo-600 font-extrabold' 
-              : 'border-transparent text-slate-400 hover:text-slate-600'
+              ? 'border-indigo-600 text-indigo-600 font-black' 
+              : 'border-transparent text-slate-500 hover:text-slate-700'
           }`}
         >
-          Inventory Health & Alerts
+          <AlertTriangle className="w-4 h-4" /> Inventory Health & Alerts
         </button>
       </div>
 
@@ -233,6 +329,150 @@ export const ReportsHub: React.FC = () => {
       {/* Reports Content Panels */}
       {!loading && !error && (
         <div>
+          {/* TAB: INVOICE-WISE SALES REPORT */}
+          {activeTab === 'invoices' && (
+            <div className="space-y-6">
+              {/* Summary KPIs */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Total Invoices</p>
+                  <h2 className="text-3xl font-black text-slate-800">{totalInvoicesCount}</h2>
+                  <p className="text-xs text-slate-400 mt-1 font-semibold">Selected business date range</p>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Total Net Revenue</p>
+                  <h2 className="text-3xl font-black text-emerald-600">₹{totalNetSales.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h2>
+                  <p className="text-xs text-emerald-600/80 mt-1 font-bold">Sum of invoice net payable</p>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Total Discounts</p>
+                  <h2 className="text-3xl font-black text-amber-600">₹{totalDiscounts.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h2>
+                  <p className="text-xs text-amber-600/80 mt-1 font-bold">Promotions & offers given</p>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Total Tax (GST)</p>
+                  <h2 className="text-3xl font-black text-indigo-600">₹{totalTaxes.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h2>
+                  <p className="text-xs text-indigo-600/80 mt-1 font-bold">CGST + SGST + Cess</p>
+                </div>
+              </div>
+
+              {/* Table Controls Bar */}
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 justify-between items-center">
+                <div className="flex flex-wrap gap-3 items-center flex-1">
+                  <div className="relative min-w-[280px]">
+                    <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                    <input 
+                      type="text"
+                      placeholder="Search Invoice #, Cashier, Customer..."
+                      value={invoiceSearchQuery}
+                      onChange={(e) => setInvoiceSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    />
+                  </div>
+
+                  {/* Payment Mode Pills */}
+                  <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg">
+                    {['ALL', 'CASH', 'UPI', 'CARD'].map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setPaymentModeFilter(mode)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-black transition-all ${
+                          paymentModeFilter === mode
+                            ? 'bg-indigo-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                        }`}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => handleExportCSV('invoices')}
+                  className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 transition shadow-sm"
+                >
+                  <Download className="w-4 h-4" /> Export CSV
+                </button>
+              </div>
+
+              {/* Invoice List Table */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                {filteredInvoices.length === 0 ? (
+                  <div className="p-12 text-center text-slate-400 font-semibold">
+                    No invoices found for the selected business date and filter criteria.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-black text-xs uppercase tracking-wider">
+                          <th className="p-3.5 text-center w-12">S.No</th>
+                          <th className="p-3.5">Invoice #</th>
+                          <th className="p-3.5">Date & Time</th>
+                          <th className="p-3.5">Cashier</th>
+                          <th className="p-3.5">Customer</th>
+                          <th className="p-3.5 text-center">Items / Units</th>
+                          <th className="p-3.5 text-right">Subtotal (₹)</th>
+                          <th className="p-3.5 text-right">Discount (₹)</th>
+                          <th className="p-3.5 text-right">GST Tax (₹)</th>
+                          <th className="p-3.5 text-right">Net Value (₹)</th>
+                          <th className="p-3.5 text-center">Payment</th>
+                          <th className="p-3.5 text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 text-slate-800">
+                        {filteredInvoices.map((inv, idx) => {
+                          const isEven = idx % 2 === 0;
+                          return (
+                            <tr key={inv.id || idx} className={`transition-colors hover:bg-indigo-50/50 ${isEven ? 'bg-white' : 'bg-slate-50/60'}`}>
+                              <td className="p-3.5 text-center font-bold text-slate-500 text-xs">{idx + 1}</td>
+                              <td className="p-3.5 font-black text-slate-900">{inv.invoiceNumber}</td>
+                              <td className="p-3.5 text-xs font-bold text-slate-600 whitespace-nowrap">
+                                {inv.createdAt ? new Date(inv.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
+                              </td>
+                              <td className="p-3.5 font-bold text-slate-700 text-xs">{inv.cashierName || 'Cashier'}</td>
+                              <td className="p-3.5">
+                                <p className="font-bold text-slate-800 text-xs">{inv.customerName || 'WALK-IN'}</p>
+                                {inv.customerPhone && <p className="text-[11px] text-slate-400 font-semibold">{inv.customerPhone}</p>}
+                              </td>
+                              <td className="p-3.5 text-center font-bold text-xs text-slate-700">
+                                {inv.itemCount} items ({inv.totalQty} units)
+                              </td>
+                              <td className="p-3.5 text-right font-semibold text-slate-600">₹{inv.subTotal.toFixed(2)}</td>
+                              <td className="p-3.5 text-right font-bold text-amber-600">{inv.discountAmount > 0 ? `-₹${inv.discountAmount.toFixed(2)}` : '₹0.00'}</td>
+                              <td className="p-3.5 text-right font-semibold text-slate-600">₹{inv.taxAmount.toFixed(2)}</td>
+                              <td className="p-3.5 text-right font-black text-emerald-700 text-base">₹{inv.netPayable.toFixed(2)}</td>
+                              <td className="p-3.5 text-center">
+                                <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider ${
+                                  inv.paymentMode?.toUpperCase().includes('CASH') ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                                  inv.paymentMode?.toUpperCase().includes('UPI') ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                                  inv.paymentMode?.toUpperCase().includes('CARD') ? 'bg-purple-100 text-purple-800 border border-purple-300' :
+                                  'bg-slate-200 text-slate-800 border border-slate-300'
+                                }`}>
+                                  {inv.paymentMode || 'CASH'}
+                                </span>
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <button 
+                                  onClick={() => handlePrintInvoice(inv.invoiceNumber)}
+                                  className="text-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-2.5 py-1.5 rounded-lg font-bold transition flex items-center justify-center gap-1 mx-auto"
+                                  title="View & Print Invoice Receipt"
+                                >
+                                  <Eye className="w-3.5 h-3.5" /> Receipt
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* TAB 1: PROFIT MARGINS */}
           {activeTab === 'margins' && marginData && (
             <div className="space-y-8">
@@ -250,24 +490,18 @@ export const ReportsHub: React.FC = () => {
                 </div>
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                   <p className="text-sm font-bold text-gray-500 mb-1">Gross Profit</p>
-                  <h2 className="text-3xl font-black text-slate-800 text-indigo-600">₹{(marginData.summary?.totalProfit || 0).toLocaleString()}</h2>
-                  <p className="text-xs text-slate-400 mt-2">Revenue minus product cost</p>
+                  <h2 className="text-3xl font-black text-indigo-600">₹{(marginData.summary?.totalProfit || 0).toLocaleString()}</h2>
+                  <p className="text-xs text-indigo-500 mt-2 font-medium">Revenue minus product cost</p>
                 </div>
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-bold text-gray-500 mb-1">Gross Profit Margin</p>
-                    <h2 className="text-3xl font-black text-emerald-500">{(marginData.summary?.marginPercentage || 0).toFixed(2)}%</h2>
-                    <p className="text-xs text-slate-400 mt-2">Average markup percentage</p>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                    <Percent className="w-6 h-6" />
-                  </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                  <p className="text-sm font-bold text-gray-500 mb-1">Gross Profit Margin</p>
+                  <h2 className="text-3xl font-black text-emerald-600">{(marginData.summary?.marginPercentage || 0).toFixed(2)}%</h2>
+                  <p className="text-xs text-slate-400 mt-2">Average markup percentage</p>
                 </div>
               </div>
 
-              {/* Detail Panels */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Category Profitability */}
+              {/* Category Profitability Breakdown */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                   <div className="flex justify-between items-center mb-6">
                     <h3 className="text-lg font-bold text-slate-800">Category Profitability</h3>
@@ -275,28 +509,38 @@ export const ReportsHub: React.FC = () => {
                       <Download className="w-3.5 h-3.5 mr-1" /> Export CSV
                     </button>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm">
-                      <thead>
-                        <tr className="border-b text-slate-400 uppercase text-xs font-bold">
-                          <th className="pb-3">Category</th>
-                          <th className="pb-3 text-right">Qty</th>
-                          <th className="pb-3 text-right">Revenue</th>
-                          <th className="pb-3 text-right">Margin %</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y text-slate-700">
-                        {marginData.categoryMargins.map((cat, idx) => (
-                          <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                            <td className="py-4 font-bold text-slate-800">{cat.categoryName}</td>
-                            <td className="py-4 text-right font-medium">{cat.quantitySold}</td>
-                            <td className="py-4 text-right font-bold">₹{cat.revenue.toLocaleString()}</td>
-                            <td className="py-4 text-right font-extrabold text-emerald-500">{cat.marginPercentage.toFixed(1)}%</td>
+                  {marginData.categoryMargins.length === 0 ? (
+                    <div className="h-60 flex items-center justify-center text-gray-400 font-medium">
+                      No sales data available for this range.
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-sm">
+                        <thead>
+                          <tr className="border-b text-slate-400 uppercase text-xs font-bold">
+                            <th className="pb-3">Category</th>
+                            <th className="pb-3 text-center">Qty</th>
+                            <th className="pb-3 text-right">Revenue</th>
+                            <th className="pb-3 text-right">Margin %</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y text-slate-700">
+                          {marginData.categoryMargins.map((cat, idx) => (
+                            <tr key={idx} className="hover:bg-slate-50 transition-colors">
+                              <td className="py-4 font-bold text-slate-800">{cat.categoryName}</td>
+                              <td className="py-4 text-center font-medium">{cat.quantitySold}</td>
+                              <td className="py-4 text-right font-bold">₹{cat.revenue.toLocaleString()}</td>
+                              <td className="py-4 text-right">
+                                <span className={`font-extrabold ${cat.marginPercentage >= 15 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                  {cat.marginPercentage.toFixed(1)}%
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </div>
 
                 {/* Top Profitable Products */}
@@ -307,29 +551,26 @@ export const ReportsHub: React.FC = () => {
                       <Download className="w-3.5 h-3.5 mr-1" /> Export CSV
                     </button>
                   </div>
-                  <div className="space-y-4">
-                    {marginData.productMargins.map((prod, idx) => (
-                      <div key={idx} className="flex flex-col border-b pb-3 last:border-0">
-                        <div className="flex justify-between items-center mb-2">
-                          <div className="max-w-[70%]">
-                            <p className="font-bold text-slate-800 text-sm truncate" title={prod.productName}>{prod.productName}</p>
-                            <p className="text-xs text-gray-400">{prod.quantitySold} Units Sold • Sales ₹{prod.revenue.toLocaleString()}</p>
+                  {marginData.productMargins.length === 0 ? (
+                    <div className="h-60 flex items-center justify-center text-gray-400 font-medium">
+                      No sales data available for this range.
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {marginData.productMargins.slice(0, 5).map((item, idx) => (
+                        <div key={idx} className="flex justify-between items-center border-b pb-3">
+                          <div>
+                            <p className="font-bold text-slate-800">{item.productName}</p>
+                            <p className="text-xs text-slate-400">{item.quantitySold} Units Sold • Sales ₹{item.revenue.toLocaleString()}</p>
                           </div>
                           <div className="text-right">
-                            <p className="font-extrabold text-indigo-600 text-sm">₹{prod.profit.toLocaleString()}</p>
-                            <p className="text-xs font-bold text-emerald-500">{prod.marginPercentage.toFixed(1)}% margin</p>
+                            <p className="font-extrabold text-indigo-600">₹{item.profit.toLocaleString()}</p>
+                            <p className="text-xs font-bold text-emerald-600">{item.marginPercentage.toFixed(1)}% margin</p>
                           </div>
                         </div>
-                        {/* Margin Bar */}
-                        <div className="w-full bg-slate-100 rounded-full h-1.5">
-                          <div 
-                            className="bg-indigo-600 h-1.5 rounded-full" 
-                            style={{ width: `${Math.min(100, Math.max(0, prod.marginPercentage))}%` }}
-                          ></div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -337,116 +578,79 @@ export const ReportsHub: React.FC = () => {
 
           {/* TAB 2: GST TAX FILINGS */}
           {activeTab === 'gst' && (
-            <div className="space-y-8">
-              {/* Summary GST Card */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 max-w-md flex justify-between items-center">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+              <div className="flex justify-between items-center mb-6">
                 <div>
-                  <p className="text-sm font-bold text-gray-500 mb-1">Total GST collected</p>
-                  <h2 className="text-3xl font-black text-indigo-600">₹{gstData.reduce((acc, row) => acc + row.totalTax, 0).toLocaleString()}</h2>
-                  <p className="text-xs text-slate-400 mt-2">Combined CGST + SGST + Cess</p>
+                  <h3 className="text-lg font-bold text-slate-800">GST Sales Tax Summary</h3>
+                  <p className="text-xs text-gray-400">CGST + SGST tax collected grouped by GST Slab %</p>
                 </div>
-                <div className="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
-                  <FileText className="w-6 h-6" />
-                </div>
+                <button onClick={() => handleExportCSV('gst')} className="bg-indigo-50 text-indigo-600 hover:bg-indigo-100 px-4 py-2 rounded-lg font-bold text-sm transition flex items-center">
+                  <Download className="w-4 h-4 mr-2" /> Export CSV
+                </button>
               </div>
 
-              {/* GST Table */}
-              <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-                <div className="flex justify-between items-center mb-6">
-                  <h3 className="text-lg font-bold text-slate-800">GST Sales Summary (Rate-wise)</h3>
-                  <button onClick={() => handleExportCSV('gst')} className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 text-xs shadow-sm flex items-center transition">
-                    <Download className="w-3.5 h-3.5 mr-2" /> Export Tax CSV
-                  </button>
+              {gstData.length === 0 ? (
+                <div className="h-60 flex items-center justify-center text-gray-400 font-medium">
+                  No tax data recorded for the selected period.
                 </div>
+              ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr className="border-b text-slate-400 uppercase text-xs font-bold">
-                        <th className="pb-3">GST Rate</th>
-                        <th className="pb-3 text-right">Taxable Sales (Base)</th>
-                        <th className="pb-3 text-right">Output CGST</th>
-                        <th className="pb-3 text-right">Output SGST</th>
+                        <th className="pb-3">GST Slab</th>
+                        <th className="pb-3 text-right">Taxable Amount</th>
+                        <th className="pb-3 text-right">CGST</th>
+                        <th className="pb-3 text-right">SGST</th>
                         <th className="pb-3 text-right">Cess</th>
-                        <th className="pb-3 text-right font-black">Total Tax Collected</th>
+                        <th className="pb-3 text-right">Total Tax Collected</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y text-slate-700">
                       {gstData.map((row, idx) => (
                         <tr key={idx} className="hover:bg-slate-50 transition-colors">
-                          <td className="py-4 font-black text-slate-800 bg-slate-50 px-3 rounded-lg">{row.taxRate}% Rate</td>
+                          <td className="py-4 font-extrabold text-slate-800">{row.taxRate}% GST</td>
                           <td className="py-4 text-right font-medium">₹{row.taxableAmount.toLocaleString()}</td>
-                          <td className="py-4 text-right text-slate-500">₹{row.cgstCollected.toLocaleString()}</td>
-                          <td className="py-4 text-right text-slate-500">₹{row.sgstCollected.toLocaleString()}</td>
-                          <td className="py-4 text-right text-slate-500">₹{row.cessCollected.toLocaleString()}</td>
+                          <td className="py-4 text-right font-medium text-slate-600">₹{row.cgstCollected.toLocaleString()}</td>
+                          <td className="py-4 text-right font-medium text-slate-600">₹{row.sgstCollected.toLocaleString()}</td>
+                          <td className="py-4 text-right font-medium text-slate-600">₹{row.cessCollected.toLocaleString()}</td>
                           <td className="py-4 text-right font-bold text-indigo-600">₹{row.totalTax.toLocaleString()}</td>
                         </tr>
                       ))}
-                      {gstData.length > 0 && (
-                        <tr className="bg-slate-50 font-bold border-t-2 border-slate-200">
-                          <td className="py-4 px-3 text-slate-800">Total Summary</td>
-                          <td className="py-4 text-right text-slate-800">₹{gstData.reduce((acc, r) => acc + r.taxableAmount, 0).toLocaleString()}</td>
-                          <td className="py-4 text-right text-slate-600">₹{gstData.reduce((acc, r) => acc + r.cgstCollected, 0).toLocaleString()}</td>
-                          <td className="py-4 text-right text-slate-600">₹{gstData.reduce((acc, r) => acc + r.sgstCollected, 0).toLocaleString()}</td>
-                          <td className="py-4 text-right text-slate-600">₹{gstData.reduce((acc, r) => acc + r.cessCollected, 0).toLocaleString()}</td>
-                          <td className="py-4 text-right text-indigo-600 font-extrabold text-lg">₹{gstData.reduce((acc, r) => acc + r.totalTax, 0).toLocaleString()}</td>
-                        </tr>
-                      )}
                     </tbody>
                   </table>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
           {/* TAB 3: INVENTORY HEALTH & ALERTS */}
           {activeTab === 'inventory' && inventoryData && (
             <div className="space-y-8">
-              {/* Summary KPIs */}
+              {/* Overview Metrics */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-bold text-gray-500 mb-1">Total Stock Assets Valuation</p>
-                    <h2 className="text-3xl font-black text-slate-800">₹{inventoryData.totalValuation.toLocaleString()}</h2>
-                    <p className="text-xs text-slate-400 mt-2">Valued at active cost prices</p>
-                  </div>
-                  <div className="w-12 h-12 rounded-full bg-slate-100 text-slate-600 flex items-center justify-center">
-                    <Layers className="w-6 h-6" />
-                  </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                  <p className="text-sm font-bold text-gray-500 mb-1">Total Stock Valuation</p>
+                  <h2 className="text-3xl font-black text-slate-800">₹{inventoryData.totalValuation.toLocaleString()}</h2>
+                  <p className="text-xs text-slate-400 mt-2">Based on active batch purchase costs</p>
                 </div>
-
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-bold text-gray-500 mb-1">Low Stock Alerts</p>
-                    <h2 className={`text-3xl font-black ${inventoryData.lowStockCount > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
-                      {inventoryData.lowStockCount} Items
-                    </h2>
-                    <p className="text-xs text-slate-400 mt-2">Stock is below reorder thresholds</p>
-                  </div>
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${inventoryData.lowStockCount > 0 ? 'bg-amber-50 text-amber-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                    <AlertTriangle className="w-6 h-6" />
-                  </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                  <p className="text-sm font-bold text-gray-500 mb-1">Low Stock Alerts</p>
+                  <h2 className="text-3xl font-black text-rose-500">{inventoryData.lowStockCount}</h2>
+                  <p className="text-xs text-rose-500 mt-2 font-medium">Products below reorder threshold</p>
                 </div>
-
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-bold text-gray-500 mb-1">Expiring Batches (Within 30 Days)</p>
-                    <h2 className={`text-3xl font-black ${inventoryData.nearExpiryCount > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                      {inventoryData.nearExpiryCount} Batches
-                    </h2>
-                    <p className="text-xs text-slate-400 mt-2">Critical attention needed</p>
-                  </div>
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center ${inventoryData.nearExpiryCount > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
-                    <Clock className="w-6 h-6" />
-                  </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                  <p className="text-sm font-bold text-gray-500 mb-1">Near Expiry Batches</p>
+                  <h2 className="text-3xl font-black text-amber-500">{inventoryData.nearExpiryCount}</h2>
+                  <p className="text-xs text-amber-500 mt-2 font-medium">Batches expiring within 30 days</p>
                 </div>
               </div>
 
-              {/* Detail Panels */}
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                {/* Critical Low Stock Items List */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                {/* Low Stock Items List */}
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                   <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-lg font-bold text-slate-800">Critical Low Stock Items</h3>
+                    <h3 className="text-lg font-bold text-slate-800">Low Stock Reorder Alerts</h3>
                     <button onClick={() => handleExportCSV('low-stock')} className="text-xs text-indigo-600 font-bold hover:underline flex items-center">
                       <Download className="w-3.5 h-3.5 mr-1" /> Export CSV
                     </button>

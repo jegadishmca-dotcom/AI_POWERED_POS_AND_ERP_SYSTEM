@@ -151,3 +151,8 @@ export const deleteHeldInvoice = async (id: string): Promise<any> => {
   return data;
 };
 
+export const getInvoiceByNumber = async (invoiceNumber: string): Promise<any> => {
+  const { data } = await api.get(`/api/pos/invoice/number/${invoiceNumber}`);
+  return data;
+};
+

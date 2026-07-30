@@ -82,7 +82,7 @@ public class ReportsController : ControllerBase
                                   inv.UpiAmount,
                                   inv.CardAmount,
                                   inv.WalletAmount,
-                                  inv.Status
+                                  Status = (inv.Status == "HELD" || (inv.InvoiceNumber != null && inv.InvoiceNumber.StartsWith("HOLD-"))) ? "HELD" : (string.IsNullOrWhiteSpace(inv.Status) ? "Completed" : inv.Status)
                               }).ToListAsync();
 
         return Ok(invoices);

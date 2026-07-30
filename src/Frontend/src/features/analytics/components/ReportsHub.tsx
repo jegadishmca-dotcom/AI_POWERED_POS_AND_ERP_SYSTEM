@@ -44,6 +44,7 @@ export const ReportsHub: React.FC = () => {
   // Filters for Invoice-Wise Sales
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('');
   const [paymentModeFilter, setPaymentModeFilter] = useState<string>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'COMPLETED' | 'ALL' | 'HELD'>('COMPLETED');
   
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -106,14 +107,21 @@ export const ReportsHub: React.FC = () => {
       inv.paymentMode && inv.paymentMode.toUpperCase().includes(paymentModeFilter.toUpperCase())
     );
 
-    return matchesQuery && matchesPayment;
+    const isHeld = inv.status === 'HELD' || inv.invoiceNumber.startsWith('HOLD-');
+    const matchesStatus = 
+      statusFilter === 'ALL' ? true :
+      statusFilter === 'HELD' ? isHeld :
+      !isHeld; // COMPLETED by default
+
+    return matchesQuery && matchesPayment && matchesStatus;
   });
 
-  // Invoice Summary Totals
-  const totalInvoicesCount = filteredInvoices.length;
-  const totalNetSales = filteredInvoices.reduce((sum, item) => sum + (item.netPayable || 0), 0);
-  const totalDiscounts = filteredInvoices.reduce((sum, item) => sum + (item.discountAmount || 0), 0);
-  const totalTaxes = filteredInvoices.reduce((sum, item) => sum + (item.taxAmount || 0), 0);
+  // Invoice Summary Totals (STRICT GLOBAL RETAIL STANDARD: Excludes HELD/Parked Invoices from Net Sales & Taxes)
+  const completedInvoicesList = filteredInvoices.filter((inv) => inv.status !== 'HELD' && !inv.invoiceNumber.startsWith('HOLD-'));
+  const totalInvoicesCount = completedInvoicesList.length;
+  const totalNetSales = completedInvoicesList.reduce((sum, item) => sum + (item.netPayable || 0), 0);
+  const totalDiscounts = completedInvoicesList.reduce((sum, item) => sum + (item.discountAmount || 0), 0);
+  const totalTaxes = completedInvoicesList.reduce((sum, item) => sum + (item.taxAmount || 0), 0);
 
   const handleExportCSV = (type: string) => {
     let headers: string[] = [];
@@ -370,6 +378,40 @@ export const ReportsHub: React.FC = () => {
                     />
                   </div>
 
+                  {/* Status Pills: Completed Sales vs Held Parked Carts */}
+                  <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg border border-slate-200">
+                    <button
+                      onClick={() => setStatusFilter('COMPLETED')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-black transition-all ${
+                        statusFilter === 'COMPLETED'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      Completed Sales
+                    </button>
+                    <button
+                      onClick={() => setStatusFilter('ALL')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-black transition-all ${
+                        statusFilter === 'ALL'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setStatusFilter('HELD')}
+                      className={`px-3 py-1.5 rounded-md text-xs font-black transition-all ${
+                        statusFilter === 'HELD'
+                          ? 'bg-amber-600 text-white shadow-xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                      }`}
+                    >
+                      Held / Parked
+                    </button>
+                  </div>
+
                   {/* Payment Mode Pills */}
                   <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg">
                     {['ALL', 'CASH', 'UPI', 'CARD'].map((mode) => (
@@ -417,17 +459,25 @@ export const ReportsHub: React.FC = () => {
                           <th className="p-3.5 text-right">Discount (₹)</th>
                           <th className="p-3.5 text-right">GST Tax (₹)</th>
                           <th className="p-3.5 text-right">Net Value (₹)</th>
-                          <th className="p-3.5 text-center">Payment</th>
+                          <th className="p-3.5 text-center">Payment / Status</th>
                           <th className="p-3.5 text-center">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-200 text-slate-800">
                         {filteredInvoices.map((inv, idx) => {
                           const isEven = idx % 2 === 0;
+                          const isHeld = inv.status === 'HELD' || inv.invoiceNumber.startsWith('HOLD-');
                           return (
-                            <tr key={inv.id || idx} className={`transition-colors hover:bg-indigo-50/50 ${isEven ? 'bg-white' : 'bg-slate-50/60'}`}>
+                            <tr key={inv.id || idx} className={`transition-colors ${isHeld ? 'bg-amber-50/40 hover:bg-amber-100/50' : isEven ? 'bg-white hover:bg-indigo-50/50' : 'bg-slate-50/60 hover:bg-indigo-50/50'}`}>
                               <td className="p-3.5 text-center font-bold text-slate-500 text-xs">{idx + 1}</td>
-                              <td className="p-3.5 font-black text-slate-900">{inv.invoiceNumber}</td>
+                              <td className="p-3.5 font-black text-slate-900 flex items-center gap-1.5">
+                                {inv.invoiceNumber}
+                                {isHeld && (
+                                  <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[10px] px-1.5 py-0.5 rounded font-black uppercase">
+                                    PARKED
+                                  </span>
+                                )}
+                              </td>
                               <td className="p-3.5 text-xs font-bold text-slate-600 whitespace-nowrap">
                                 {inv.createdAt ? new Date(inv.createdAt).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
                               </td>
@@ -442,16 +492,31 @@ export const ReportsHub: React.FC = () => {
                               <td className="p-3.5 text-right font-semibold text-slate-600">₹{inv.subTotal.toFixed(2)}</td>
                               <td className="p-3.5 text-right font-bold text-amber-600">{inv.discountAmount > 0 ? `-₹${inv.discountAmount.toFixed(2)}` : '₹0.00'}</td>
                               <td className="p-3.5 text-right font-semibold text-slate-600">₹{inv.taxAmount.toFixed(2)}</td>
-                              <td className="p-3.5 text-right font-black text-emerald-700 text-base">₹{inv.netPayable.toFixed(2)}</td>
+                              <td className="p-3.5 text-right">
+                                {isHeld ? (
+                                  <div>
+                                    <span className="font-black text-amber-700 text-base line-through opacity-70">₹{inv.netPayable.toFixed(2)}</span>
+                                    <p className="text-[10px] font-bold text-amber-800 uppercase">Unpaid (Excluded)</p>
+                                  </div>
+                                ) : (
+                                  <span className="font-black text-emerald-700 text-base">₹{inv.netPayable.toFixed(2)}</span>
+                                )}
+                              </td>
                               <td className="p-3.5 text-center">
-                                <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider ${
-                                  inv.paymentMode?.toUpperCase().includes('CASH') ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
-                                  inv.paymentMode?.toUpperCase().includes('UPI') ? 'bg-blue-100 text-blue-800 border border-blue-300' :
-                                  inv.paymentMode?.toUpperCase().includes('CARD') ? 'bg-purple-100 text-purple-800 border border-purple-300' :
-                                  'bg-slate-200 text-slate-800 border border-slate-300'
-                                }`}>
-                                  {inv.paymentMode || 'CASH'}
-                                </span>
+                                {isHeld ? (
+                                  <span className="inline-block px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider bg-amber-100 text-amber-900 border border-amber-300">
+                                    HELD / PARKED
+                                  </span>
+                                ) : (
+                                  <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider ${
+                                    inv.paymentMode?.toUpperCase().includes('CASH') ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                                    inv.paymentMode?.toUpperCase().includes('UPI') ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                                    inv.paymentMode?.toUpperCase().includes('CARD') ? 'bg-purple-100 text-purple-800 border border-purple-300' :
+                                    'bg-slate-200 text-slate-800 border border-slate-300'
+                                  }`}>
+                                    {inv.paymentMode || 'CASH'}
+                                  </span>
+                                )}
                               </td>
                               <td className="p-3.5 text-center">
                                 <button 

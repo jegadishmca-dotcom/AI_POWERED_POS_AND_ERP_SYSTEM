@@ -62,8 +62,9 @@ public class PurchasingController : ControllerBase
             .ToListAsync();
 
         var batches = await context.ProductBatches.Where(b => b.IsActive).ToListAsync();
-        var defaultSupplier = await context.Suppliers.FirstOrDefaultAsync(s => s.IsActive);
+        var allSuppliers = await context.Suppliers.Where(s => s.IsActive).ToListAsync();
         
+        var defaultSupplier = allSuppliers.FirstOrDefault();
         if (defaultSupplier == null)
         {
             defaultSupplier = new PosErp.Domain.Entities.Purchasing.Supplier 
@@ -75,10 +76,11 @@ public class PurchasingController : ControllerBase
             };
             context.Suppliers.Add(defaultSupplier);
             await context.SaveChangesAsync(default);
+            allSuppliers.Add(defaultSupplier);
         }
 
-        var itemsToOrder = new List<PurchaseOrderItemDto>();
-        int poGeneratedCount = 0;
+        var itemsBySupplier = new Dictionary<Guid, List<PurchaseOrderItemDto>>();
+        int totalItemsOrderedCount = 0;
 
         foreach (var p in lowStockProducts)
         {
@@ -89,25 +91,40 @@ public class PurchasingController : ControllerBase
             {
                 var orderQty = Math.Max((reorderThreshold * 2m) - currentStock, 10m);
                 var unitCost = p.PurchasePrice > 0 ? p.PurchasePrice : (p.SellingPrice * 0.75m);
-                itemsToOrder.Add(new PurchaseOrderItemDto(p.Id, orderQty, unitCost));
+                var itemDto = new PurchaseOrderItemDto(p.Id, orderQty, unitCost);
+
+                var targetSupplierId = (p.PreferredSupplierId != null && allSuppliers.Any(s => s.Id == p.PreferredSupplierId))
+                    ? p.PreferredSupplierId.Value
+                    : defaultSupplier.Id;
+
+                if (!itemsBySupplier.ContainsKey(targetSupplierId))
+                {
+                    itemsBySupplier[targetSupplierId] = new List<PurchaseOrderItemDto>();
+                }
+                itemsBySupplier[targetSupplierId].Add(itemDto);
+                totalItemsOrderedCount++;
             }
         }
 
-        if (itemsToOrder.Count > 0)
+        int poGeneratedCount = 0;
+        foreach (var entry in itemsBySupplier)
         {
-            var itemGroups = itemsToOrder
+            var supplierId = entry.Key;
+            var supplierItems = entry.Value;
+
+            var itemChunks = supplierItems
                 .Select((item, index) => new { item, index })
-                .GroupBy(x => x.index / 20)
+                .GroupBy(x => x.index / 30)
                 .Select(g => g.Select(x => x.item).ToList())
                 .ToList();
 
-            foreach (var group in itemGroups)
+            foreach (var chunk in itemChunks)
             {
                 var poCommand = new CreatePurchaseOrderCommand(
                     null,
-                    defaultSupplier.Id,
+                    supplierId,
                     DateTime.UtcNow.AddDays(3),
-                    group,
+                    chunk,
                     null
                 );
 
@@ -120,9 +137,9 @@ public class PurchasingController : ControllerBase
         {
             Success = true,
             PoCount = poGeneratedCount,
-            TotalItemsOrdered = itemsToOrder.Count,
-            Message = itemsToOrder.Count > 0 
-                ? $"Successfully auto-generated {poGeneratedCount} Purchase Orders for {itemsToOrder.Count} low-stock items." 
+            TotalItemsOrdered = totalItemsOrderedCount,
+            Message = totalItemsOrderedCount > 0 
+                ? $"Successfully auto-generated {poGeneratedCount} Purchase Orders across {itemsBySupplier.Count} vendors for {totalItemsOrderedCount} low-stock items." 
                 : "All items are currently above reorder threshold. No new POs needed."
         });
     }

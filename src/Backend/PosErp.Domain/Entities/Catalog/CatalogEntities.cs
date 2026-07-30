@@ -62,6 +62,7 @@ public class Product
     public Guid? BrandId { get; set; }
     public Guid TaxSlabId { get; set; }
     public Guid UnitOfMeasureId { get; set; }
+    public Guid? PreferredSupplierId { get; set; }
     public string? HsnCode { get; set; }
     
     // Properties

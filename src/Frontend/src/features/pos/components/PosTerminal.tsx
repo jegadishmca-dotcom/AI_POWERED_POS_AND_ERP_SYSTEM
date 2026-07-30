@@ -562,7 +562,7 @@ export const PosTerminal = () => {
         e.preventDefault();
         e.stopPropagation();
         setSelectedBatchIndex((prev) => (prev - 1 + batchModalData.batches.length) % batchModalData.batches.length);
-      } else if (e.key === 'Enter') {
+      } else if (e.key === 'Enter' || e.key === ' ' || e.code === 'Space') {
         e.preventDefault();
         e.stopPropagation();
         const chosenBatch = batchModalData.batches[selectedBatchIndex];
@@ -679,6 +679,11 @@ export const PosTerminal = () => {
             addProductToCart(product, weight);
         } else {
             alert('Barcode not found: ' + barcode);
+            setProductQuery('');
+            setSearchResults([]);
+            setShowProductDropdown(false);
+            setFocusedProductIndex(-1);
+            productInputRef.current?.focus();
         }
     } catch (err) {
         console.error('Barcode lookup failed', err);
@@ -864,6 +869,11 @@ export const PosTerminal = () => {
           setFocusedProductIndex(0); // auto-focus first item
         } else {
           alert('Product not found for: ' + val);
+          setProductQuery('');
+          setSearchResults([]);
+          setShowProductDropdown(false);
+          setFocusedProductIndex(-1);
+          productInputRef.current?.focus();
         }
       } catch (err) {
         console.error('Error searching products:', err);
@@ -1797,7 +1807,7 @@ export const PosTerminal = () => {
 
             <div className="mt-5 pt-3 border-t border-slate-100 flex justify-between items-center">
               <span className="text-xs text-indigo-700 font-extrabold flex items-center gap-1 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-200">
-                <span>⌨ Use <kbd className="bg-white border px-1 rounded shadow-xs">↑</kbd> <kbd className="bg-white border px-1 rounded shadow-xs">↓</kbd> Arrow keys & press <kbd className="bg-white border px-1 rounded shadow-xs">Enter</kbd> to select batch</span>
+                <span>⌨ Use <kbd className="bg-white border px-1 rounded shadow-xs">↑</kbd> <kbd className="bg-white border px-1 rounded shadow-xs">↓</kbd> Arrow keys & press <kbd className="bg-white border px-1 rounded shadow-xs">Enter</kbd> or <kbd className="bg-white border px-1 rounded shadow-xs">Space</kbd> to select batch</span>
               </span>
               <button
                 onClick={() => setBatchModalData(null)}

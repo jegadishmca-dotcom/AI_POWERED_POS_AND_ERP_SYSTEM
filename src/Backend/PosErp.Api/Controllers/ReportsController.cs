@@ -64,7 +64,7 @@ public class ReportsController : ControllerBase
                               {
                                   inv.Id,
                                   inv.InvoiceNumber,
-                                  BusinessDate = inv.BusinessDate ?? inv.CreatedAt,
+                                  BusinessDate = inv.BusinessDate,
                                   CreatedAt = inv.CreatedAt,
                                   CashierName = c != null ? c.FullName : "Cashier",
                                   CustomerName = cu != null ? cu.Name : "WALK-IN",

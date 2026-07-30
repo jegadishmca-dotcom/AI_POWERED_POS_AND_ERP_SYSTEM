@@ -2,7 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
-using PosErp.Application.Common.Interfaces;
+using PosErp.Application.Interfaces;
 using PosErp.Application.Features.Reports.Queries.GetGSTReport;
 using PosErp.Application.Features.Reports.Queries.GetMarginReport;
 using PosErp.Application.Features.Reports.Queries.GetInventoryInsights;

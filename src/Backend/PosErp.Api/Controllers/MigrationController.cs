@@ -29,10 +29,13 @@ public class MigrationController : ControllerBase
 
     private async Task EnsureProductColumnsExistAsync()
     {
-        await _context.Database.ExecuteSqlRawAsync(@"
-            ALTER TABLE products ADD COLUMN IF NOT EXISTS preferred_supplier_id UUID NULL;
-            ALTER TABLE products ADD COLUMN IF NOT EXISTS is_weighable BOOLEAN NOT NULL DEFAULT FALSE;
-        ");
+        if (_context is DbContext dbContext)
+        {
+            await dbContext.Database.ExecuteSqlRawAsync(@"
+                ALTER TABLE products ADD COLUMN IF NOT EXISTS preferred_supplier_id UUID NULL;
+                ALTER TABLE products ADD COLUMN IF NOT EXISTS is_weighable BOOLEAN NOT NULL DEFAULT FALSE;
+            ");
+        }
     }
 
     [HttpPost("execute-sigma21-migration")]

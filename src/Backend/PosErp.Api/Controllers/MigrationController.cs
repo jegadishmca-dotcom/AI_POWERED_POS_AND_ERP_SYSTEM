@@ -27,6 +27,14 @@ public class MigrationController : ControllerBase
         _context = context;
     }
 
+    private async Task EnsureProductColumnsExistAsync()
+    {
+        await _context.Database.ExecuteSqlRawAsync(@"
+            ALTER TABLE products ADD COLUMN IF NOT EXISTS preferred_supplier_id UUID NULL;
+            ALTER TABLE products ADD COLUMN IF NOT EXISTS is_weighable BOOLEAN NOT NULL DEFAULT FALSE;
+        ");
+    }
+
     [HttpPost("execute-sigma21-migration")]
     public async Task<IActionResult> ExecuteSigma21Migration(
         [FromQuery] string server = "192.168.1.10",
@@ -34,6 +42,8 @@ public class MigrationController : ControllerBase
         [FromQuery] string username = "sa",
         [FromQuery] string password = "Q7!mX#92Lp@Tz4Ks")
     {
+        await EnsureProductColumnsExistAsync();
+
         var connStr = $"Server={server};Database={database};User Id={username};Password={password};TrustServerCertificate=True;Connect Timeout=30;";
         
         int customersMigrated = 0;
@@ -413,6 +423,8 @@ public class MigrationController : ControllerBase
     [HttpPost("backfill-uom-mappings")]
     public async Task<IActionResult> BackfillUomMappings()
     {
+        await EnsureProductColumnsExistAsync();
+
         var allUoms = await _context.UnitOfMeasures.ToListAsync();
         var uomPcs = allUoms.FirstOrDefault(u => u.Symbol.Equals("Pcs", StringComparison.OrdinalIgnoreCase) || u.Name.Equals("Pieces", StringComparison.OrdinalIgnoreCase));
         if (uomPcs == null)
@@ -481,6 +493,8 @@ public class MigrationController : ControllerBase
         [FromQuery] string username = "sa",
         [FromQuery] string password = "Q7!mX#92Lp@Tz4Ks")
     {
+        await EnsureProductColumnsExistAsync();
+
         var connStr = $"Server={server};Database={database};User Id={username};Password={password};TrustServerCertificate=True;Connect Timeout=30;";
         int updatedProductsCount = 0;
 

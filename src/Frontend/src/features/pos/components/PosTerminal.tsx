@@ -40,6 +40,49 @@ export const PosTerminal = () => {
   const [isReturnModalOpen, setReturnModalOpen] = useState(false);
   const [isCancelModalOpen, setCancelModalOpen] = useState(false);
   const [managerAction, setManagerAction] = useState<any>(null);
+  const [selectedCartIndex, setSelectedCartIndex] = useState<number>(-1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+
+  const requestPOSFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        await document.documentElement.requestFullscreen();
+        setIsFullscreen(true);
+      }
+    } catch (err) {
+      console.log('Fullscreen request requires user interaction', err);
+    }
+  };
+
+  const toggleFullscreen = () => {
+    if (document.fullscreenElement) {
+      document.exitFullscreen().catch(() => {});
+    } else {
+      document.documentElement.requestFullscreen().catch(() => {});
+    }
+  };
+
+  useEffect(() => {
+    requestPOSFullscreen();
+
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    const handleFirstInteraction = () => {
+      if (!document.fullscreenElement) {
+        requestPOSFullscreen();
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    window.addEventListener('click', handleFirstInteraction, { once: true });
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange);
+      window.removeEventListener('click', handleFirstInteraction);
+    };
+  }, []);
+
   const customerInputRef = useRef<HTMLInputElement>(null);
   const productInputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -67,35 +110,6 @@ export const PosTerminal = () => {
     return `${yyyy}-${mm}-${dd}`;
   });
 
-  // Fullscreen management & auto-fullscreen on first user interaction
-  const [isFullscreen, setIsFullscreen] = useState(false);
-
-  useEffect(() => {
-    const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
-
-    const autoFullscreen = () => {
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().catch(() => {
-          // ignore blocked request
-        });
-      }
-      window.removeEventListener('click', autoFullscreen);
-      window.removeEventListener('keydown', autoFullscreen);
-    };
-
-    window.addEventListener('click', autoFullscreen);
-    window.addEventListener('keydown', autoFullscreen);
-
-    return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-      window.removeEventListener('click', autoFullscreen);
-      window.removeEventListener('keydown', autoFullscreen);
-    };
-  }, []);
-
   // Background Sync for Offline Invoices
   useEffect(() => {
     // Sync immediately on mount
@@ -106,16 +120,6 @@ export const PosTerminal = () => {
     }, 15000);
     return () => clearInterval(interval);
   }, []);
-
-  const toggleFullscreen = () => {
-    if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.error(`Error attempting to enable fullscreen: ${err.message}`);
-      });
-    } else {
-      document.exitFullscreen();
-    }
-  };
 
   useEffect(() => {
     // Focus barcode scanner input on mount
@@ -581,6 +585,44 @@ export const PosTerminal = () => {
     return () => window.removeEventListener('keydown', handleBatchKeyDown, true);
   }, [batchModalData, selectedBatchIndex]);
 
+  // Global Keyboard Listener for '+' and '-' Quantity adjustments on cart items
+  useEffect(() => {
+    const handleCartQtyShortcut = (e: KeyboardEvent) => {
+      // Ignore if user is currently typing in search input with non-empty text
+      const activeEl = document.activeElement;
+      const isEditingSearchInput = activeEl && (
+        (activeEl.tagName === 'INPUT' && (activeEl as HTMLInputElement).type === 'text' && (activeEl as HTMLInputElement).value.trim().length > 0) ||
+        activeEl.tagName === 'TEXTAREA'
+      );
+
+      if (isEditingSearchInput) return;
+      if (cart.items.length === 0) return;
+
+      const isPlus = e.key === '+' || e.key === '=' || e.code === 'NumpadAdd';
+      const isMinus = e.key === '-' || e.key === '_' || e.code === 'NumpadSubtract';
+
+      if (isPlus || isMinus) {
+        // Prevent default input behavior when adjusting cart qty
+        if (activeEl && activeEl.tagName === 'INPUT' && (activeEl as HTMLInputElement).type === 'text') {
+          (activeEl as HTMLInputElement).value = '';
+          setProductQuery('');
+        }
+        e.preventDefault();
+        
+        const targetIdx = (selectedCartIndex >= 0 && selectedCartIndex < cart.items.length) 
+          ? selectedCartIndex 
+          : cart.items.length - 1;
+        const targetItem = cart.items[targetIdx];
+        if (targetItem) {
+          updateItemQty(targetItem.productId, isPlus ? 1 : -1);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleCartQtyShortcut);
+    return () => window.removeEventListener('keydown', handleCartQtyShortcut);
+  }, [cart.items, selectedCartIndex]);
+
   const addProductToCart = async (product: any, overrideQty?: number, selectedBatch?: any) => {
     if (selectedBatch) {
       addSingleProductToCartDirect(product, selectedBatch, overrideQty);
@@ -608,10 +650,11 @@ export const PosTerminal = () => {
     const sellingPrice = batch && batch.sellingPrice ? batch.sellingPrice : product.sellingPrice;
     const mrp = batch && batch.mrp ? batch.mrp : (product.mrp || sellingPrice);
 
-    const existing = cart.items.find((item: any) => item.productId === product.id && (batch ? item.batchId === batch.id : true));
+    const existingIndex = cart.items.findIndex((item: any) => item.productId === product.id && (batch ? item.batchId === batch.id : true));
     const qtyToAdd = overrideQty !== undefined ? overrideQty : 1;
 
-    if (existing) {
+    if (existingIndex >= 0) {
+      setSelectedCartIndex(existingIndex);
       const updatedItems = cart.items.map((item: any) =>
         item.productId === product.id && (batch ? item.batchId === batch.id : true)
           ? { ...item, qty: item.qty + qtyToAdd, lineTotal: (item.qty + qtyToAdd) * item.unitPrice }
@@ -619,6 +662,7 @@ export const PosTerminal = () => {
       );
       recalculateCart(updatedItems);
     } else {
+      setSelectedCartIndex(cart.items.length);
       const newItem = {
         id: safeRandomUUID(),
         productId: product.id,
@@ -1192,92 +1236,99 @@ export const PosTerminal = () => {
               <p className="text-xs">Scan items or search products above to start checkout</p>
             </div>
           ) : (
-            <table className="w-full text-left">
-              <thead className="bg-slate-100 sticky top-0 border-b">
-                <tr>
-                  <th className="p-3 text-center w-12">S.No</th>
-                  <th className="p-3">Item</th>
-                  <th className="p-3 text-center">Qty</th>
-                  <th className="p-3 text-right">MRP</th>
-                  <th className="p-3 text-right">Price</th>
-                  <th className="p-3 text-right">Total</th>
-                  <th className="p-3 text-center w-16"></th>
+            <table className="w-full text-left border-collapse border border-slate-300">
+              <thead className="bg-slate-200 sticky top-0 border-b-2 border-slate-400 shadow-xs">
+                <tr className="text-slate-800 font-extrabold text-xs">
+                  <th className="p-3 text-center w-12 border-r border-slate-300">S.No</th>
+                  <th className="p-3 border-r border-slate-300">Item</th>
+                  <th className="p-3 text-center w-36 border-r border-slate-300">Qty</th>
+                  <th className="p-3 text-right w-24 border-r border-slate-300">MRP</th>
+                  <th className="p-3 text-right w-24 border-r border-slate-300">Price</th>
+                  <th className="p-3 text-right w-28 border-r border-slate-300">Total</th>
+                  <th className="p-3 text-center w-16">Action</th>
                 </tr>
               </thead>
               <tbody>
-                {cart.items.map((item: any, index: number) => (
-                  <tr key={item.id} className="border-b hover:bg-slate-50/50">
-                    <td className="p-3 text-center font-black text-slate-500 text-sm">
-                      {index + 1}
-                    </td>
-                    <td className="p-3">
-                      <p className="font-bold text-slate-800">{item.name}</p>
-                      {item.appliedOfferName && (
-                        <p className="text-xs text-emerald-600 flex items-center font-bold bg-emerald-50 w-max px-2 py-0.5 rounded mt-1">
-                          <Tag className="w-3 h-3 mr-1" /> {item.appliedOfferName}
-                        </p>
-                      )}
-                      {item.batches && item.batches.length > 0 && (
-                        <div className="mt-2 flex items-center gap-1.5">
-                          <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-1 py-0.5 rounded">Batch</span>
-                          <select
-                            className="text-xs font-semibold text-slate-700 bg-slate-50 border border-slate-200 rounded p-1 outline-none focus:ring-1 focus:ring-indigo-500 max-w-[200px]"
-                            value={item.batchId || ''}
-                            onChange={(e) => updateItemBatch(item.productId, e.target.value)}
-                          >
-                            {item.batches.map((b: any) => (
-                              <option key={b.id} value={b.id}>
-                                {b.batchNumber} {b.expiryDate ? `(Exp: ${b.expiryDate.substring(0, 10)})` : '(No Exp)'} [Qty: {b.currentStock}]
-                              </option>
-                            ))}
-                          </select>
+                {cart.items.map((item: any, index: number) => {
+                  const isSelected = selectedCartIndex === index || (selectedCartIndex === -1 && index === cart.items.length - 1);
+                  return (
+                    <tr 
+                      key={item.id} 
+                      onClick={() => setSelectedCartIndex(index)}
+                      className={`border-b border-slate-300 cursor-pointer transition ${isSelected ? 'bg-indigo-50/90 border-l-4 border-l-indigo-600' : 'hover:bg-slate-50'}`}
+                    >
+                      <td className="p-3 text-center font-black text-slate-600 text-sm border-r border-slate-300 bg-slate-100/50">
+                        {index + 1}
+                      </td>
+                      <td className="p-3 border-r border-slate-300">
+                        <p className="font-extrabold text-slate-800 text-sm">{item.name}</p>
+                        {item.appliedOfferName && (
+                          <p className="text-xs text-emerald-700 flex items-center font-bold bg-emerald-100/80 w-max px-2 py-0.5 rounded mt-1 border border-emerald-300">
+                            <Tag className="w-3 h-3 mr-1" /> {item.appliedOfferName}
+                          </p>
+                        )}
+                        {item.batches && item.batches.length > 0 && (
+                          <div className="mt-2 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-1 py-0.5 rounded border border-indigo-200">Batch</span>
+                            <select
+                              className="text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded p-1 outline-none focus:ring-1 focus:ring-indigo-500 max-w-[200px]"
+                              value={item.batchId || ''}
+                              onChange={(e) => updateItemBatch(item.productId, e.target.value)}
+                            >
+                              {item.batches.map((b: any) => (
+                                <option key={b.id} value={b.id}>
+                                  {b.batchNumber} {b.expiryDate ? `(Exp: ${b.expiryDate.substring(0, 10)})` : '(No Exp)'} [Qty: {b.currentStock}]
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        )}
+                      </td>
+                      <td className="p-3 border-r border-slate-300" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-center gap-2">
+                          <button onClick={() => updateItemQty(item.productId, -1)} className="text-slate-500 hover:text-indigo-600 transition">
+                            <MinusCircle className="w-6 h-6" />
+                          </button>
+                          <input 
+                            type="number"
+                            min="1"
+                            // GAP-05 FIX: enforce integer quantities for non-weighable products
+                            step={item.isWeighable ? 'any' : '1'}
+                            className="font-black text-lg w-16 text-center border border-slate-300 rounded focus:outline-none focus:border-indigo-500 bg-white shadow-xs"
+                            value={item.qty === '' ? '' : item.qty}
+                            onChange={(e) => {
+                              if (e.target.value === '') {
+                                updateItemQtyExact(item.productId, '');
+                                return;
+                              }
+                              const raw = item.isWeighable
+                                ? parseFloat(e.target.value)
+                                : parseInt(e.target.value, 10);
+                              const val = isNaN(raw) ? 1 : raw;
+                              if (val >= 0) {
+                                updateItemQtyExact(item.productId, val);
+                              }
+                            }}
+                          />
+                          <button onClick={() => updateItemQty(item.productId, 1)} className="text-slate-500 hover:text-indigo-600 transition">
+                            <PlusCircle className="w-6 h-6" />
+                          </button>
                         </div>
-                      )}
-                    </td>
-                    <td className="p-3">
-                      <div className="flex items-center justify-center gap-2">
-                        <button onClick={() => updateItemQty(item.productId, -1)} className="text-slate-400 hover:text-indigo-600 transition">
-                          <MinusCircle className="w-6 h-6" />
+                      </td>
+                      <td className="p-3 text-right font-bold text-slate-600 border-r border-slate-300">₹{(item.mrp || item.unitPrice).toFixed(2)}</td>
+                      <td className="p-3 text-right font-bold text-slate-800 border-r border-slate-300">₹{item.unitPrice.toFixed(2)}</td>
+                      <td className="p-3 text-right border-r border-slate-300">
+                        {item.discountAmount > 0 && <p className="text-xs text-slate-400 line-through">₹{item.lineTotal.toFixed(2)}</p>}
+                        <p className="font-black text-xl text-slate-900">₹{item.finalLineTotal.toFixed(2)}</p>
+                      </td>
+                      <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => requestManagerOverride('Void Item', () => removeItem(item.productId))} className="text-slate-400 hover:text-red-600 transition p-1" title="Void Item (Manager)">
+                          <Trash2 className="w-5 h-5" />
                         </button>
-                        <input 
-                          type="number"
-                          min="1"
-                          // GAP-05 FIX: enforce integer quantities for non-weighable products
-                          step={item.isWeighable ? 'any' : '1'}
-                          className="font-black text-lg w-16 text-center border border-slate-200 rounded focus:outline-none focus:border-indigo-500 bg-white"
-                          value={item.qty === '' ? '' : item.qty}
-                          onChange={(e) => {
-                            if (e.target.value === '') {
-                              updateItemQtyExact(item.productId, '');
-                              return;
-                            }
-                            const raw = item.isWeighable
-                              ? parseFloat(e.target.value)
-                              : parseInt(e.target.value, 10);
-                            const val = isNaN(raw) ? 1 : raw;
-                            if (val >= 0) {
-                              updateItemQtyExact(item.productId, val);
-                            }
-                          }}
-                        />
-                        <button onClick={() => updateItemQty(item.productId, 1)} className="text-slate-400 hover:text-indigo-600 transition">
-                          <PlusCircle className="w-6 h-6" />
-                        </button>
-                      </div>
-                    </td>
-                    <td className="p-3 text-right font-semibold text-slate-500">₹{(item.mrp || item.unitPrice).toFixed(2)}</td>
-                    <td className="p-3 text-right font-medium text-slate-800">₹{item.unitPrice.toFixed(2)}</td>
-                    <td className="p-3 text-right">
-                      {item.discountAmount > 0 && <p className="text-xs text-slate-400 line-through">₹{item.lineTotal.toFixed(2)}</p>}
-                      <p className="font-black text-xl text-slate-800">₹{item.finalLineTotal.toFixed(2)}</p>
-                    </td>
-                    <td className="p-3 text-center">
-                      <button onClick={() => requestManagerOverride('Void Item', () => removeItem(item.productId))} className="text-slate-300 hover:text-red-500 transition" title="Void Item (Manager)">
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}

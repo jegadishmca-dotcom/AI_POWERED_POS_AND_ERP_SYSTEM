@@ -47,7 +47,7 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
           <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px', marginTop: '1px' }}>GST :{STORE.gstin}</div>
           <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px' }}>FSSAI : {STORE.fssai}</div>
           <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '11px' }}>1E -1G மாதா கோவில் தெரு</div>
-          <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '11px' }}>இளையான்குடி -630702</div>
+          <div style={{ textAlign: 'center', fontWeight 800, fontSize: '11px' }}>இளையான்குடி -630702</div>
           <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px', marginBottom: '4px' }}>CELL:{STORE.phone}</div>
 
           {/* ── INVOICE META BOX ── */}
@@ -74,11 +74,11 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
           <table style={{ width: '100%', borderCollapse: 'collapse', border: '2px solid #000', marginBottom: '4px', fontSize: '11px' }}>
             <thead>
               <tr>
-                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '10%', fontWeight: 900 }}>S.No</th>
-                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '34%', fontWeight: 900 }}>Items</th>
-                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '10%', fontWeight: 900 }}>Qty</th>
-                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '14%', fontWeight: 900 }}>MRP</th>
-                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '16%', fontWeight: 900 }}>Rate</th>
+                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '8%', fontWeight: 900, fontSize: '11px' }}>S.No</th>
+                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '42%', fontWeight: 900, fontSize: '11px' }}>Items</th>
+                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '8%', fontWeight: 900, fontSize: '11px' }}>Qty</th>
+                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '11%', fontWeight: 900, fontSize: '11px' }}>MRP</th>
+                <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '15%', fontWeight: 900, fontSize: '11px' }}>Rate</th>
                 <th style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', width: '16%', fontWeight: 900, fontSize: '12px' }}>Amt</th>
               </tr>
             </thead>
@@ -91,12 +91,12 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
                 const mrpVal = mrp > 0 ? Math.round(mrp).toString() : '-';
                 return (
                   <tr key={idx}>
-                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', fontWeight: 800 }}>{idx + 1}</td>
-                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', fontWeight: 900 }}>{item.name || item.productName || '-'}</td>
-                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', fontWeight: 800 }}>{qty}</td>
-                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', fontWeight: 800 }}>{mrpVal}</td>
-                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'right', fontWeight: 800 }}>{fmt(item.unitPrice)}</td>
-                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'right', fontWeight: 900, fontSize: '11.5px' }}>{fmt(lineAmt)}</td>
+                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', fontWeight: 800, verticalAlign: 'middle' }}>{idx + 1}</td>
+                    <td style={{ border: '1.5px solid #000', padding: '3px 3px', fontWeight: 900, verticalAlign: 'middle', textTransform: 'uppercase' }}>{item.name || item.productName || '-'}</td>
+                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', fontWeight: 800, verticalAlign: 'middle' }}>{qty}</td>
+                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'center', fontWeight: 800, verticalAlign: 'middle' }}>{mrpVal}</td>
+                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'right', fontWeight: 800, verticalAlign: 'middle' }}>{fmt(item.unitPrice)}</td>
+                    <td style={{ border: '1.5px solid #000', padding: '3px 2px', textAlign: 'right', fontWeight: 900, fontSize: '11.5px', verticalAlign: 'middle' }}>{fmt(lineAmt)}</td>
                   </tr>
                 );
               })}

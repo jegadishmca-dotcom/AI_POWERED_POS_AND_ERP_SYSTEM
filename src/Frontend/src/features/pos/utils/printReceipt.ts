@@ -185,12 +185,12 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
 
     itemsRowsHtml += `
       <tr>
-        <td style="border:1.5px solid #000; text-align:center; padding:2px 3px; font-weight:800; font-size:11px;">${idx + 1}</td>
-        <td style="border:1.5px solid #000; padding:2px 3px; font-weight:800; font-size:11px;">${item.name || item.productName || '-'}</td>
-        <td style="border:1.5px solid #000; text-align:center; padding:2px 3px; font-weight:800; font-size:11px;">${qty}</td>
-        <td style="border:1.5px solid #000; text-align:center; padding:2px 3px; font-weight:800; font-size:11px;">${mrpVal}</td>
-        <td style="border:1.5px solid #000; text-align:right; padding:2px 3px; font-weight:800; font-size:11px;">${fmt(item.unitPrice)}</td>
-        <td style="border:1.5px solid #000; text-align:right; padding:2px 3px; font-weight:900; font-size:11.5px;">${fmt(lineAmt)}</td>
+        <td style="border:1.5px solid #000; text-align:center; padding:3px 2px; font-weight:800; font-size:11px; vertical-align:middle;">${idx + 1}</td>
+        <td style="border:1.5px solid #000; padding:3px 3px; font-weight:800; font-size:11px; vertical-align:middle; text-transform:uppercase;">${item.name || item.productName || '-'}</td>
+        <td style="border:1.5px solid #000; text-align:center; padding:3px 2px; font-weight:800; font-size:11px; vertical-align:middle;">${qty}</td>
+        <td style="border:1.5px solid #000; text-align:center; padding:3px 2px; font-weight:800; font-size:11px; vertical-align:middle;">${mrpVal}</td>
+        <td style="border:1.5px solid #000; text-align:right; padding:3px 2px; font-weight:800; font-size:11px; vertical-align:middle;">${fmt(item.unitPrice)}</td>
+        <td style="border:1.5px solid #000; text-align:right; padding:3px 2px; font-weight:900; font-size:11.5px; vertical-align:middle;">${fmt(lineAmt)}</td>
       </tr>`;
   });
 
@@ -298,12 +298,12 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   <table class="border-table" style="margin-bottom: 4px;">
     <thead>
       <tr>
-        <th style="width: 10%; text-align: center; font-weight: 900; font-size: 11px;">S.No</th>
-        <th style="width: 34%; text-align: center; font-weight: 900; font-size: 11px;">Items</th>
-        <th style="width: 10%; text-align: center; font-weight: 900; font-size: 11px;">Qty</th>
-        <th style="width: 14%; text-align: center; font-weight: 900; font-size: 11px;">MRP</th>
-        <th style="width: 16%; text-align: center; font-weight: 900; font-size: 11px;">Rate</th>
-        <th style="width: 16%; text-align: center; font-weight: 900; font-size: 12px;">Amt</th>
+        <th style="width: 8%; text-align: center; font-weight: 900; font-size: 11px; padding: 3px 2px;">S.No</th>
+        <th style="width: 42%; text-align: center; font-weight: 900; font-size: 11px; padding: 3px 2px;">Items</th>
+        <th style="width: 8%; text-align: center; font-weight: 900; font-size: 11px; padding: 3px 2px;">Qty</th>
+        <th style="width: 11%; text-align: center; font-weight: 900; font-size: 11px; padding: 3px 2px;">MRP</th>
+        <th style="width: 15%; text-align: center; font-weight: 900; font-size: 11px; padding: 3px 2px;">Rate</th>
+        <th style="width: 16%; text-align: center; font-weight: 900; font-size: 12px; padding: 3px 2px;">Amt</th>
       </tr>
     </thead>
     <tbody>

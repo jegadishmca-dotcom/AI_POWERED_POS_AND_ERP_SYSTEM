@@ -422,10 +422,23 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
             // 1. Resolve batch IDs first before lock acquisition
             var itemResolvedBatches = new List<(Guid ProductId, Guid? BatchId, decimal Quantity)>();
-            foreach (var item in cartEvaluation.Items)
+            for (int i = 0; i < cartEvaluation.Items.Count; i++)
             {
-                var originalItem = request.Items.FirstOrDefault(x => x.ProductId == item.ProductId);
+                var item = cartEvaluation.Items[i];
+                var originalItem = i < request.Items.Count ? request.Items[i] : request.Items.FirstOrDefault(x => x.ProductId == item.ProductId);
                 Guid? selectedBatchId = originalItem?.BatchId;
+
+                // Validate that selectedBatchId actually exists in ProductBatches DB table
+                if (selectedBatchId.HasValue)
+                {
+                    var exists = await _context.ProductBatches.AnyAsync(b => b.Id == selectedBatchId.Value, cancellationToken);
+                    if (!exists)
+                    {
+                        // Stale/invalid batch ID from cache or offline queue - reset to null
+                        selectedBatchId = null;
+                    }
+                }
+
                 var hasExpiry = productsInfo.TryGetValue(item.ProductId, out var pInfo) && pInfo.HasExpiry;
 
                 if (selectedBatchId == null && hasExpiry)
@@ -488,9 +501,10 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             _logger?.LogInformation("Stage 2 Lock Acquisition: Locked {Count} product batch rows in {Duration}ms.", sortedBatchIds.Count, lockDuration);
 
             // 4. Perform updates and record stock ledger movements
-            foreach (var item in cartEvaluation.Items)
+            for (int i = 0; i < cartEvaluation.Items.Count; i++)
             {
-                var resolved = itemResolvedBatches.FirstOrDefault(x => x.ProductId == item.ProductId);
+                var item = cartEvaluation.Items[i];
+                var resolved = i < itemResolvedBatches.Count ? itemResolvedBatches[i] : itemResolvedBatches.FirstOrDefault(x => x.ProductId == item.ProductId);
                 Guid? selectedBatchId = resolved.BatchId;
                 var pInfo = productsInfo.TryGetValue(item.ProductId, out var pi) ? pi : null;
                 DateTime? expiryDate = null;
@@ -502,6 +516,11 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                     {
                         expiryDate = selectedBatch.ExpiryDate;
                         selectedBatch.AvailableQuantity -= item.Quantity;
+                    }
+                    else
+                    {
+                        // Reset to null so foreign key stock_ledger_batch_id_fkey is not violated
+                        selectedBatchId = null;
                     }
                 }
 

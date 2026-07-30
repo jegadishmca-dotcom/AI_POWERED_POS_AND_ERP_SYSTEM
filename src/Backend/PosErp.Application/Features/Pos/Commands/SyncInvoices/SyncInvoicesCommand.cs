@@ -222,9 +222,10 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                     _logger?.LogInformation("Stage 2 Sync Lock Acquisition: Locked {Count} product batch rows in {Duration}ms.", sortedBatchIds.Count, lockDuration);
 
                     // 4. Perform updates and record stock ledger movements
-                    foreach (var itemDto in dto.Items)
+                    for (int i = 0; i < dto.Items.Count; i++)
                     {
-                        var resolved = itemResolvedBatches.FirstOrDefault(x => x.ProductId == itemDto.ProductId);
+                        var itemDto = dto.Items[i];
+                        var resolved = i < itemResolvedBatches.Count ? itemResolvedBatches[i] : itemResolvedBatches.FirstOrDefault(x => x.ProductId == itemDto.ProductId);
                         Guid? selectedBatchId = resolved.BatchId;
                         DateTime? expiryDate = null;
 
@@ -235,6 +236,11 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                             {
                                 expiryDate = selectedBatch.ExpiryDate;
                                 selectedBatch.AvailableQuantity -= itemDto.Quantity;
+                            }
+                            else
+                            {
+                                // Stale/invalid batch ID - reset to null to prevent foreign key stock_ledger_batch_id_fkey violation
+                                selectedBatchId = null;
                             }
                         }
 

@@ -789,6 +789,100 @@ public class MigrationController : ControllerBase
         });
     }
 
+    [HttpPost("sync-customer-balances")]
+    public async Task<IActionResult> SyncCustomerBalances(
+        [FromQuery] string server = "192.168.1.10",
+        [FromQuery] string database = "APPLE26-27",
+        [FromQuery] string username = "sa",
+        [FromQuery] string password = "Q7!mX#92Lp@Tz4Ks")
+    {
+        var connStr = $"Server={server};Database={database};User Id={username};Password={password};TrustServerCertificate=True;Connect Timeout=30;";
+        int updatedBalances = 0;
+        int ledgerEntriesCreated = 0;
+
+        var defaultStore = await _context.Stores.FirstOrDefaultAsync();
+        var storeId = defaultStore?.Id ?? Guid.NewGuid();
+
+        using (var sqlConn = new SqlConnection(connStr))
+        {
+            await sqlConn.OpenAsync();
+
+            var custCmd = sqlConn.CreateCommand();
+            custCmd.CommandTimeout = 300;
+            custCmd.CommandText = @"
+                SELECT 
+                    LTRIM(RTRIM(Name)) AS Name,
+                    ISNULL(CustomerID, ID) AS CardNo,
+                    CAST(ISNULL(BalancePoint, 0) AS DECIMAL(18,2)) AS LoyaltyPoints,
+                    CAST(ISNULL(Balance, 0) AS DECIMAL(18,2)) AS LedgerBalance
+                FROM Master_CRM_PointsCustomer
+                WHERE Name IS NOT NULL AND LEN(LTRIM(RTRIM(Name))) > 0";
+
+            var existingCustomers = await _context.Customers.ToListAsync();
+            var customerDict = existingCustomers
+                .GroupBy(c => c.Name.Trim().ToLower())
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
+            var existingLedgerCustomerIds = new HashSet<Guid>(
+                await _context.CustomerLedger.Select(l => l.CustomerId).Distinct().ToListAsync()
+            );
+
+            using (var reader = await custCmd.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var name = reader["Name"].ToString()?.Trim();
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+
+                    var points = Convert.ToDecimal(reader["LoyaltyPoints"]);
+                    var balance = Convert.ToDecimal(reader["LedgerBalance"]);
+                    var cardNo = reader["CardNo"].ToString() ?? "";
+
+                    if (customerDict.TryGetValue(name.ToLower(), out var cust))
+                    {
+                        bool updated = false;
+                        if (cust.RunningLoyaltyPoints != points) { cust.RunningLoyaltyPoints = points; updated = true; }
+                        if (cust.RunningWalletBalance != balance) { cust.RunningWalletBalance = balance; updated = true; }
+                        if (string.IsNullOrWhiteSpace(cust.MembershipCardNumber) && !string.IsNullOrWhiteSpace(cardNo)) { cust.MembershipCardNumber = cardNo; updated = true; }
+
+                        if (updated) updatedBalances++;
+
+                        if (balance != 0 && !existingLedgerCustomerIds.Contains(cust.Id))
+                        {
+                            var entry = new PosErp.Domain.Entities.Finance.CustomerLedgerEntry
+                            {
+                                Id = Guid.NewGuid(),
+                                StoreId = storeId,
+                                CustomerId = cust.Id,
+                                EntryDate = DateTime.UtcNow.Date,
+                                TransactionType = "OPENING_BALANCE",
+                                ReferenceNumber = "SIGMA21-OPENING",
+                                DebitAmount = balance > 0 ? balance : 0,
+                                CreditAmount = balance < 0 ? Math.Abs(balance) : 0,
+                                RunningBalance = balance,
+                                Description = "Opening Balance migrated from Sigma 21",
+                                CreatedAt = DateTime.UtcNow
+                            };
+                            _context.CustomerLedger.Add(entry);
+                            existingLedgerCustomerIds.Add(cust.Id);
+                            ledgerEntriesCreated++;
+                        }
+                    }
+                }
+            }
+
+            await _context.SaveChangesAsync(default);
+        }
+
+        return Ok(new
+        {
+            Status = "SUCCESS",
+            UpdatedBalances = updatedBalances,
+            LedgerEntriesCreated = ledgerEntriesCreated,
+            Message = $"Successfully synchronized customer balances for {updatedBalances} accounts and created {ledgerEntriesCreated} opening ledger entries from Sigma 21!"
+        });
+    }
+
     [HttpPost("backfill-stock-mappings")]
     public async Task<IActionResult> BackfillStockMappings(
         [FromQuery] string server = "192.168.1.10",

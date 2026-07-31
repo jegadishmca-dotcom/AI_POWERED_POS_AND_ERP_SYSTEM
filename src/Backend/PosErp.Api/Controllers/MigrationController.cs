@@ -38,6 +38,90 @@ public class MigrationController : ControllerBase
         }
     }
 
+    [HttpGet("verify-migration-integrity")]
+    public async Task<IActionResult> VerifyMigrationIntegrity()
+    {
+        await EnsureProductColumnsExistAsync();
+
+        // 1. Catalog & Master Data Metrics
+        var totalProducts = await _context.Products.CountAsync();
+        var weighableProducts = await _context.Products.CountAsync(p => p.IsWeighable);
+        var totalBarcodes = await _context.Barcodes.CountAsync();
+        var totalSuppliers = await _context.Suppliers.CountAsync();
+        var productsWithSupplier = await _context.Products.CountAsync(p => p.PreferredSupplierId != null);
+
+        // 2. Customer & Loyalty Metrics
+        var totalCustomers = await _context.Customers.CountAsync();
+        var customersWithPoints = await _context.Customers.CountAsync(c => c.RunningLoyaltyPoints > 0);
+        var totalLoyaltyPointsSum = await _context.Customers.SumAsync(c => c.RunningLoyaltyPoints);
+        var totalWalletBalanceSum = await _context.Customers.SumAsync(c => c.RunningWalletBalance);
+
+        // 3. Inventory & Stock Metrics
+        var totalStockBatches = await _context.ProductBatches.CountAsync();
+        var positiveStockBatches = await _context.ProductBatches.CountAsync(b => b.AvailableQuantity > 0);
+        var totalPhysicalStockQtySum = await _context.ProductBatches.Where(b => b.AvailableQuantity > 0).SumAsync(b => b.AvailableQuantity);
+
+        // 4. Specific Verification for 'A VELLAM 1K'
+        var vellamProducts = await _context.Products
+            .Where(p => p.Name.Contains("VELLAM") || p.ProductCode == "BA-4287")
+            .Select(p => new
+            {
+                p.ProductCode,
+                p.Name,
+                p.TamilName,
+                UomSymbol = _context.UnitOfMeasures.Where(u => u.Id == p.UnitOfMeasureId).Select(u => u.Symbol).FirstOrDefault(),
+                p.IsWeighable,
+                p.Mrp,
+                p.SellingPrice,
+                StockBatches = _context.ProductBatches.Where(b => b.ProductId == p.Id).Select(b => new { b.BatchNumber, b.AvailableQuantity }).ToList()
+            })
+            .Take(5)
+            .ToListAsync();
+
+        // 5. Data Integrity Anomaly Audit
+        var orphanedProductsNoUom = await _context.Products.CountAsync(p => p.UnitOfMeasureId == Guid.Empty);
+        var orphanedProductsNoTax = await _context.Products.CountAsync(p => p.TaxSlabId == Guid.Empty);
+
+        var duplicateBarcodesCount = await _context.Barcodes
+            .GroupBy(b => b.BarcodeValue)
+            .Where(g => g.Count() > 1)
+            .CountAsync();
+
+        var invalidCustomerNamesCount = await _context.Customers
+            .CountAsync(c => string.IsNullOrWhiteSpace(c.Name));
+
+        var auditPassed = orphanedProductsNoUom == 0 && orphanedProductsNoTax == 0 && duplicateBarcodesCount == 0 && invalidCustomerNamesCount == 0;
+
+        return Ok(new
+        {
+            Status = auditPassed ? "PASSED_ALL_INTEGRITY_CHECKS" : "WARNINGS_FOUND",
+            AuditSummary = auditPassed ? "✅ All data integrity audits passed 100% cleanly with ZERO errors or anomalies!" : "⚠️ Potential anomalies detected in database.",
+            Metrics = new
+            {
+                TotalProducts = totalProducts,
+                WeighableProductsKgs = weighableProducts,
+                TotalBarcodes = totalBarcodes,
+                TotalSuppliers = totalSuppliers,
+                ProductsWithPreferredSupplier = productsWithSupplier,
+                TotalCustomers = totalCustomers,
+                CustomersWithActiveLoyaltyPoints = customersWithPoints,
+                TotalLoyaltyPointsSum = Math.Round(totalLoyaltyPointsSum, 2),
+                TotalCustomerWalletBalanceSum = Math.Round(totalWalletBalanceSum, 2),
+                TotalStockBatches = totalStockBatches,
+                PositiveStockBatches = positiveStockBatches,
+                TotalPhysicalStockQuantitySum = Math.Round(totalPhysicalStockQtySum, 3)
+            },
+            VellamItemVerification = vellamProducts,
+            IntegrityAudit = new
+            {
+                OrphanedProductsMissingUom = orphanedProductsNoUom,
+                OrphanedProductsMissingTaxSlab = orphanedProductsNoTax,
+                DuplicateBarcodes = duplicateBarcodesCount,
+                InvalidCustomerNames = invalidCustomerNamesCount
+            }
+        });
+    }
+
     [HttpPost("execute-sigma21-migration")]
     public async Task<IActionResult> ExecuteSigma21Migration(
         [FromQuery] string server = "192.168.1.10",

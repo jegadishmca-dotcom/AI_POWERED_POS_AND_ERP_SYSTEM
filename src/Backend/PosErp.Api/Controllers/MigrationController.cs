@@ -81,7 +81,7 @@ public class MigrationController : ControllerBase
                         ISNULL(Email, N'') AS Email,
                         ISNULL(Address1, N'') + N' ' + ISNULL(Address2, N'') AS Address,
                         ISNULL(CustomerID, ID) AS MembershipCardNumber,
-                        CAST(ISNULL(BalancePoint, 0) AS INT) AS LoyaltyPoints,
+                        CAST(ISNULL(BalancePoint, 0) AS DECIMAL(18,2)) AS LoyaltyPoints,
                         CAST(ISNULL(Balance, 0) AS DECIMAL(18,2)) AS LedgerBalance,
                         ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(Name)) ORDER BY ID DESC) AS rnk
                     FROM Master_CRM_PointsCustomer
@@ -97,7 +97,7 @@ public class MigrationController : ControllerBase
                         ISNULL(Email, N'') AS Email,
                         ISNULL(Address1, N'') + N' ' + ISNULL(Address2, N'') AS Address,
                         ID AS MembershipCardNumber,
-                        0 AS LoyaltyPoints,
+                        0.00 AS LoyaltyPoints,
                         0.00 AS LedgerBalance,
                         1 AS rnk
                     FROM Master_Accounts
@@ -132,10 +132,9 @@ public class MigrationController : ControllerBase
                             Email = reader["Email"].ToString(),
                             Address = reader["Address"].ToString(),
                             MembershipCardNumber = reader["MembershipCardNumber"].ToString() ?? "",
-                            LoyaltyPoints = Convert.ToInt32(reader["LoyaltyPoints"]),
-                            WalletBalance = Convert.ToDecimal(reader["LedgerBalance"]),
-                            IsActive = true,
-                            CreatedAt = DateTime.UtcNow
+                            RunningLoyaltyPoints = Convert.ToDecimal(reader["LoyaltyPoints"]),
+                            RunningWalletBalance = Convert.ToDecimal(reader["LedgerBalance"]),
+                            MembershipStatus = "Active"
                         };
 
                         customersToInsert.Add(cust);
@@ -518,7 +517,7 @@ public class MigrationController : ControllerBase
                         ISNULL(Email, N'') AS Email,
                         ISNULL(Address1, N'') + N' ' + ISNULL(Address2, N'') AS Address,
                         ISNULL(CustomerID, ID) AS MembershipCardNumber,
-                        CAST(ISNULL(BalancePoint, 0) AS INT) AS LoyaltyPoints,
+                        CAST(ISNULL(BalancePoint, 0) AS DECIMAL(18,2)) AS LoyaltyPoints,
                         CAST(ISNULL(Balance, 0) AS DECIMAL(18,2)) AS LedgerBalance,
                         ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(Name)) ORDER BY ID DESC) AS rnk
                     FROM Master_CRM_PointsCustomer
@@ -534,7 +533,7 @@ public class MigrationController : ControllerBase
                         ISNULL(Email, N'') AS Email,
                         ISNULL(Address1, N'') + N' ' + ISNULL(Address2, N'') AS Address,
                         ID AS MembershipCardNumber,
-                        0 AS LoyaltyPoints,
+                        0.00 AS LoyaltyPoints,
                         0.00 AS LedgerBalance,
                         1 AS rnk
                     FROM Master_Accounts
@@ -556,15 +555,15 @@ public class MigrationController : ControllerBase
                     var phone = reader["Phone"].ToString()?.Trim();
                     if (string.IsNullOrWhiteSpace(phone)) phone = "0000000000";
 
-                    var points = Convert.ToInt32(reader["LoyaltyPoints"]);
+                    var points = Convert.ToDecimal(reader["LoyaltyPoints"]);
                     var balance = Convert.ToDecimal(reader["LedgerBalance"]);
                     var cardNo = reader["MembershipCardNumber"].ToString() ?? "";
 
                     if (customerNameDict.TryGetValue(name.ToLower(), out var existingCust))
                     {
                         bool updated = false;
-                        if (existingCust.LoyaltyPoints != points) { existingCust.LoyaltyPoints = points; updated = true; }
-                        if (existingCust.WalletBalance != balance) { existingCust.WalletBalance = balance; updated = true; }
+                        if (existingCust.RunningLoyaltyPoints != points) { existingCust.RunningLoyaltyPoints = points; updated = true; }
+                        if (existingCust.RunningWalletBalance != balance) { existingCust.RunningWalletBalance = balance; updated = true; }
                         if (string.IsNullOrWhiteSpace(existingCust.MembershipCardNumber) && !string.IsNullOrWhiteSpace(cardNo)) { existingCust.MembershipCardNumber = cardNo; updated = true; }
                         if (existingCust.Phone == "0000000000" && phone != "0000000000") { existingCust.Phone = phone; updated = true; }
                         if (updated) existingCustomersUpdated++;
@@ -580,10 +579,9 @@ public class MigrationController : ControllerBase
                             Email = reader["Email"].ToString(),
                             Address = reader["Address"].ToString(),
                             MembershipCardNumber = cardNo,
-                            LoyaltyPoints = points,
-                            WalletBalance = balance,
-                            IsActive = true,
-                            CreatedAt = DateTime.UtcNow
+                            RunningLoyaltyPoints = points,
+                            RunningWalletBalance = balance,
+                            MembershipStatus = "Active"
                         };
 
                         customersToInsert.Add(newCust);

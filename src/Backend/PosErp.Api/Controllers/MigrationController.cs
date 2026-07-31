@@ -620,6 +620,116 @@ public class MigrationController : ControllerBase
         });
     }
 
+    [HttpPost("backfill-stock-mappings")]
+    public async Task<IActionResult> BackfillStockMappings(
+        [FromQuery] string server = "192.168.1.10",
+        [FromQuery] string database = "APPLE26-27",
+        [FromQuery] string username = "sa",
+        [FromQuery] string password = "Q7!mX#92Lp@Tz4Ks")
+    {
+        var connStr = $"Server={server};Database={database};User Id={username};Password={password};TrustServerCertificate=True;Connect Timeout=30;";
+        int stockBatchesMigrated = 0;
+        decimal totalStockQtyMigrated = 0;
+
+        using (var sqlConn = new SqlConnection(connStr))
+        {
+            await sqlConn.OpenAsync();
+
+            var stockCmd = sqlConn.CreateCommand();
+            stockCmd.CommandTimeout = 600;
+            stockCmd.CommandText = @"
+                SELECT 
+                    b.ID AS BatchId,
+                    b.ProductName AS ProductCode,
+                    ISNULL(b.BatchNo, N'DEFAULT') AS BatchNumber,
+                    b.EXPDate AS ExpiryDate,
+                    CAST(ISNULL(b.Stock, 0) AS DECIMAL(18,3)) AS CurrentStock,
+                    CAST(ISNULL(b.MRP, 0) AS DECIMAL(18,2)) AS Mrp,
+                    CAST(ISNULL(b.SalesRate1, 0) AS DECIMAL(18,2)) AS SellingPrice,
+                    CAST(ISNULL(b.PurchaseRate, 0) AS DECIMAL(18,2)) AS PurchasePrice
+                FROM Master_Batch b
+                INNER JOIN Master_Inventory_Product p ON b.ProductName = p.ID
+                WHERE b.Status = 1 AND b.Stock > 0";
+
+            var productsDict = await _context.Products.ToDictionaryAsync(p => p.ProductCode, p => p.Id);
+            var existingBatches = await _context.ProductBatches.ToListAsync();
+            var existingBatchMap = existingBatches.ToDictionary(b => $"{b.ProductId}_{b.BatchNumber}", b => b);
+
+            var batchesToInsert = new List<ProductBatch>();
+
+            using (var reader = await stockCmd.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var pCode = reader["ProductCode"].ToString()?.Trim();
+                    if (!string.IsNullOrWhiteSpace(pCode) && productsDict.TryGetValue(pCode, out var productId))
+                    {
+                        var batchNo = reader["BatchNumber"].ToString() ?? "DEFAULT";
+                        var stockQty = Convert.ToDecimal(reader["CurrentStock"]);
+                        var costPrice = Convert.ToDecimal(reader["PurchasePrice"]);
+                        var mrp = Convert.ToDecimal(reader["Mrp"]);
+
+                        var expDateObj = reader["ExpiryDate"];
+                        DateTime? expDate = expDateObj != DBNull.Value ? Convert.ToDateTime(expDateObj) : null;
+
+                        var key = $"{productId}_{batchNo}";
+                        if (existingBatchMap.TryGetValue(key, out var existingBatch))
+                        {
+                            existingBatch.AvailableQuantity = stockQty;
+                            existingBatch.CostPrice = costPrice;
+                            existingBatch.Mrp = mrp;
+                            existingBatch.ExpiryDate = expDate;
+                        }
+                        else
+                        {
+                            var newBatch = new ProductBatch
+                            {
+                                Id = Guid.NewGuid(),
+                                ProductId = productId,
+                                BatchNumber = batchNo,
+                                ExpiryDate = expDate,
+                                Mrp = mrp,
+                                CostPrice = costPrice,
+                                AvailableQuantity = stockQty,
+                                IsActive = true,
+                                CreatedAt = DateTime.UtcNow
+                            };
+                            batchesToInsert.Add(newBatch);
+                            existingBatchMap[key] = newBatch;
+                        }
+
+                        stockBatchesMigrated++;
+                        totalStockQtyMigrated += stockQty;
+
+                        if (batchesToInsert.Count >= 1000)
+                        {
+                            _context.ProductBatches.AddRange(batchesToInsert);
+                            await _context.SaveChangesAsync(default);
+                            batchesToInsert.Clear();
+                        }
+                    }
+                }
+            }
+
+            if (batchesToInsert.Count > 0)
+            {
+                _context.ProductBatches.AddRange(batchesToInsert);
+                await _context.SaveChangesAsync(default);
+                batchesToInsert.Clear();
+            }
+
+            await _context.SaveChangesAsync(default);
+        }
+
+        return Ok(new
+        {
+            Status = "SUCCESS",
+            StockBatchesMigrated = stockBatchesMigrated,
+            TotalStockQtyMigrated = totalStockQtyMigrated,
+            Message = $"Successfully migrated {stockBatchesMigrated} stock batches ({totalStockQtyMigrated:N2} total physical stock qty) from Sigma 21!"
+        });
+    }
+
     [HttpPost("backfill-uom-mappings")]
     public async Task<IActionResult> BackfillUomMappings()
     {

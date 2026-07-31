@@ -106,7 +106,7 @@ public class MigrationController : ControllerBase
                 WHERE rnk = 1";
 
             var existingCustomers = await _context.Customers.ToListAsync();
-            var existingPhones = new HashSet<string>(existingCustomers.Select(c => c.Phone).Where(p => !string.IsNullOrWhiteSpace(p) && p != "0000000000"));
+            var existingPhones = new HashSet<string>(existingCustomers.Select(c => c.Phone).Where(p => !string.IsNullOrWhiteSpace(p)));
             var existingNames = new HashSet<string>(existingCustomers.Select(c => c.Name.ToLower()));
 
             var customersToInsert = new List<Customer>();
@@ -118,11 +118,19 @@ public class MigrationController : ControllerBase
                     var name = reader["Name"].ToString()?.Trim();
                     if (string.IsNullOrWhiteSpace(name)) continue;
 
-                    var phone = reader["Phone"].ToString()?.Trim();
-                    if (string.IsNullOrWhiteSpace(phone)) phone = "0000000000";
-
-                    if (!existingNames.Contains(name.ToLower()) && (phone == "0000000000" || !existingPhones.Contains(phone)))
+                    if (!existingNames.Contains(name.ToLower()))
                     {
+                        var rawPhone = reader["Phone"].ToString()?.Trim();
+                        string phone;
+                        if (string.IsNullOrWhiteSpace(rawPhone) || rawPhone == "0000000000" || rawPhone.Length < 5 || existingPhones.Contains(rawPhone))
+                        {
+                            phone = $"00{customersMigrated + existingCustomers.Count + 1:D8}";
+                        }
+                        else
+                        {
+                            phone = rawPhone;
+                        }
+
                         var cust = new Customer
                         {
                             Id = Guid.NewGuid(),
@@ -139,7 +147,7 @@ public class MigrationController : ControllerBase
 
                         customersToInsert.Add(cust);
                         existingNames.Add(name.ToLower());
-                        if (phone != "0000000000") existingPhones.Add(phone);
+                        existingPhones.Add(phone);
                         customersMigrated++;
 
                         if (customersToInsert.Count >= 1000)
@@ -546,6 +554,8 @@ public class MigrationController : ControllerBase
                 .GroupBy(c => c.Name.Trim().ToLower())
                 .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
 
+            var existingPhones = new HashSet<string>(existingCustomers.Select(c => c.Phone).Where(p => !string.IsNullOrWhiteSpace(p)));
+
             var customersToInsert = new List<Customer>();
 
             using (var reader = await custCmd.ExecuteReaderAsync())
@@ -555,8 +565,16 @@ public class MigrationController : ControllerBase
                     var name = reader["Name"].ToString()?.Trim();
                     if (string.IsNullOrWhiteSpace(name)) continue;
 
-                    var phone = reader["Phone"].ToString()?.Trim();
-                    if (string.IsNullOrWhiteSpace(phone)) phone = "0000000000";
+                    var rawPhone = reader["Phone"].ToString()?.Trim();
+                    string phone;
+                    if (string.IsNullOrWhiteSpace(rawPhone) || rawPhone == "0000000000" || rawPhone.Length < 5 || existingPhones.Contains(rawPhone))
+                    {
+                        phone = $"00{newCustomersMigrated + existingCustomers.Count + 1:D8}";
+                    }
+                    else
+                    {
+                        phone = rawPhone;
+                    }
 
                     var points = Convert.ToDecimal(reader["LoyaltyPoints"]);
                     var balance = Convert.ToDecimal(reader["LedgerBalance"]);
@@ -568,7 +586,7 @@ public class MigrationController : ControllerBase
                         if (existingCust.RunningLoyaltyPoints != points) { existingCust.RunningLoyaltyPoints = points; updated = true; }
                         if (existingCust.RunningWalletBalance != balance) { existingCust.RunningWalletBalance = balance; updated = true; }
                         if (string.IsNullOrWhiteSpace(existingCust.MembershipCardNumber) && !string.IsNullOrWhiteSpace(cardNo)) { existingCust.MembershipCardNumber = cardNo; updated = true; }
-                        if (existingCust.Phone == "0000000000" && phone != "0000000000") { existingCust.Phone = phone; updated = true; }
+                        if (existingCust.Phone.StartsWith("00") && phone != existingCust.Phone && !phone.StartsWith("00")) { existingCust.Phone = phone; updated = true; }
                         if (updated) existingCustomersUpdated++;
                     }
                     else
@@ -589,6 +607,7 @@ public class MigrationController : ControllerBase
 
                         customersToInsert.Add(newCust);
                         customerNameDict[name.ToLower()] = newCust;
+                        existingPhones.Add(phone);
                         newCustomersMigrated++;
 
                         if (customersToInsert.Count >= 1000)

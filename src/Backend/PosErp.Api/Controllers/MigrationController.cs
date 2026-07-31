@@ -542,7 +542,10 @@ public class MigrationController : ControllerBase
                 WHERE rnk = 1";
 
             var existingCustomers = await _context.Customers.ToListAsync();
-            var customerNameDict = existingCustomers.ToDictionary(c => c.Name.Trim().ToLower(), c => c);
+            var customerNameDict = existingCustomers
+                .GroupBy(c => c.Name.Trim().ToLower())
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
+
             var customersToInsert = new List<Customer>();
 
             using (var reader = await custCmd.ExecuteReaderAsync())

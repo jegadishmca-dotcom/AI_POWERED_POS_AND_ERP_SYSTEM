@@ -58,31 +58,70 @@ public class MigrationController : ControllerBase
         {
             await sqlConn.OpenAsync();
 
-            // 1. MIGRATE CUSTOMERS
+            // 1. MIGRATE CUSTOMERS FROM BOTH Master_CRM_PointsCustomer (14,000+ records) AND Master_Accounts
             var custCmd = sqlConn.CreateCommand();
+            custCmd.CommandTimeout = 300;
             custCmd.CommandText = @"
                 SELECT 
-                    ID AS CustomerCode,
+                    CustomerCode,
                     Name,
-                    ISNULL(PetName, N'') AS TamilName,
-                    ISNULL(Mobile1, ISNULL(Phone1, N'')) AS Phone,
-                    ISNULL(Email, N'') AS Email,
-                    ISNULL(Address1, N'') + N' ' + ISNULL(Address2, N'') AS Address
-                FROM Master_Accounts
-                WHERE FormName = 'Customer' OR AccountType = 'Sundry Debtors' OR AccountType LIKE '%Debtor%'";
+                    TamilName,
+                    Phone,
+                    Email,
+                    Address,
+                    MembershipCardNumber,
+                    LoyaltyPoints,
+                    LedgerBalance
+                FROM (
+                    SELECT 
+                        ID AS CustomerCode,
+                        LTRIM(RTRIM(Name)) AS Name,
+                        ISNULL(PetName, N'') AS TamilName,
+                        ISNULL(Mobile1, ISNULL(Mobile2, ISNULL(Phone1, N''))) AS Phone,
+                        ISNULL(Email, N'') AS Email,
+                        ISNULL(Address1, N'') + N' ' + ISNULL(Address2, N'') AS Address,
+                        ISNULL(CustomerID, ID) AS MembershipCardNumber,
+                        CAST(ISNULL(BalancePoint, 0) AS INT) AS LoyaltyPoints,
+                        CAST(ISNULL(Balance, 0) AS DECIMAL(18,2)) AS LedgerBalance,
+                        ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(Name)) ORDER BY ID DESC) AS rnk
+                    FROM Master_CRM_PointsCustomer
+                    WHERE Name IS NOT NULL AND LEN(LTRIM(RTRIM(Name))) > 0
+
+                    UNION ALL
+
+                    SELECT 
+                        ID AS CustomerCode,
+                        LTRIM(RTRIM(Name)) AS Name,
+                        ISNULL(PetName, N'') AS TamilName,
+                        ISNULL(Mobile1, ISNULL(Phone1, N'')) AS Phone,
+                        ISNULL(Email, N'') AS Email,
+                        ISNULL(Address1, N'') + N' ' + ISNULL(Address2, N'') AS Address,
+                        ID AS MembershipCardNumber,
+                        0 AS LoyaltyPoints,
+                        0.00 AS LedgerBalance,
+                        1 AS rnk
+                    FROM Master_Accounts
+                    WHERE FormName = 'Customer' OR AccountType = 'Sundry Debtors' OR AccountType LIKE '%Debtor%'
+                ) combined
+                WHERE rnk = 1";
+
+            var existingCustomers = await _context.Customers.ToListAsync();
+            var existingPhones = new HashSet<string>(existingCustomers.Select(c => c.Phone).Where(p => !string.IsNullOrWhiteSpace(p) && p != "0000000000"));
+            var existingNames = new HashSet<string>(existingCustomers.Select(c => c.Name.ToLower()));
+
+            var customersToInsert = new List<Customer>();
 
             using (var reader = await custCmd.ExecuteReaderAsync())
             {
-                var existingPhones = await _context.Customers.Select(c => c.Phone).ToListAsync();
                 while (await reader.ReadAsync())
                 {
-                    var phone = reader["Phone"].ToString()?.Trim();
                     var name = reader["Name"].ToString()?.Trim();
                     if (string.IsNullOrWhiteSpace(name)) continue;
 
+                    var phone = reader["Phone"].ToString()?.Trim();
                     if (string.IsNullOrWhiteSpace(phone)) phone = "0000000000";
 
-                    if (!existingPhones.Contains(phone))
+                    if (!existingNames.Contains(name.ToLower()) && (phone == "0000000000" || !existingPhones.Contains(phone)))
                     {
                         var cust = new Customer
                         {
@@ -92,15 +131,34 @@ public class MigrationController : ControllerBase
                             Phone = phone,
                             Email = reader["Email"].ToString(),
                             Address = reader["Address"].ToString(),
-                            MembershipCardNumber = reader["CustomerCode"].ToString() ?? ""
+                            MembershipCardNumber = reader["MembershipCardNumber"].ToString() ?? "",
+                            LoyaltyPoints = Convert.ToInt32(reader["LoyaltyPoints"]),
+                            WalletBalance = Convert.ToDecimal(reader["LedgerBalance"]),
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow
                         };
-                        _context.Customers.Add(cust);
-                        existingPhones.Add(phone);
+
+                        customersToInsert.Add(cust);
+                        existingNames.Add(name.ToLower());
+                        if (phone != "0000000000") existingPhones.Add(phone);
                         customersMigrated++;
+
+                        if (customersToInsert.Count >= 1000)
+                        {
+                            _context.Customers.AddRange(customersToInsert);
+                            await _context.SaveChangesAsync(default);
+                            customersToInsert.Clear();
+                        }
                     }
                 }
             }
-            await _context.SaveChangesAsync(default);
+
+            if (customersToInsert.Count > 0)
+            {
+                _context.Customers.AddRange(customersToInsert);
+                await _context.SaveChangesAsync(default);
+                customersToInsert.Clear();
+            }
 
             // 2. MIGRATE SUPPLIERS & BUILD SUPPLIER MAP
             var supplierCodeMap = new Dictionary<string, Guid>(StringComparer.OrdinalIgnoreCase);
@@ -420,6 +478,147 @@ public class MigrationController : ControllerBase
             SuppliersMigrated = suppliersMigrated,
             ProductsMigrated = productsMigrated,
             StockBatchesMigrated = stockBatchesMigrated
+        });
+    }
+
+    [HttpPost("backfill-customer-mappings")]
+    public async Task<IActionResult> BackfillCustomerMappings(
+        [FromQuery] string server = "192.168.1.10",
+        [FromQuery] string database = "APPLE26-27",
+        [FromQuery] string username = "sa",
+        [FromQuery] string password = "Q7!mX#92Lp@Tz4Ks")
+    {
+        var connStr = $"Server={server};Database={database};User Id={username};Password={password};TrustServerCertificate=True;Connect Timeout=30;";
+        int newCustomersMigrated = 0;
+        int existingCustomersUpdated = 0;
+
+        using (var sqlConn = new SqlConnection(connStr))
+        {
+            await sqlConn.OpenAsync();
+
+            var custCmd = sqlConn.CreateCommand();
+            custCmd.CommandTimeout = 300;
+            custCmd.CommandText = @"
+                SELECT 
+                    CustomerCode,
+                    Name,
+                    TamilName,
+                    Phone,
+                    Email,
+                    Address,
+                    MembershipCardNumber,
+                    LoyaltyPoints,
+                    LedgerBalance
+                FROM (
+                    SELECT 
+                        ID AS CustomerCode,
+                        LTRIM(RTRIM(Name)) AS Name,
+                        ISNULL(PetName, N'') AS TamilName,
+                        ISNULL(Mobile1, ISNULL(Mobile2, ISNULL(Phone1, N''))) AS Phone,
+                        ISNULL(Email, N'') AS Email,
+                        ISNULL(Address1, N'') + N' ' + ISNULL(Address2, N'') AS Address,
+                        ISNULL(CustomerID, ID) AS MembershipCardNumber,
+                        CAST(ISNULL(BalancePoint, 0) AS INT) AS LoyaltyPoints,
+                        CAST(ISNULL(Balance, 0) AS DECIMAL(18,2)) AS LedgerBalance,
+                        ROW_NUMBER() OVER (PARTITION BY LTRIM(RTRIM(Name)) ORDER BY ID DESC) AS rnk
+                    FROM Master_CRM_PointsCustomer
+                    WHERE Name IS NOT NULL AND LEN(LTRIM(RTRIM(Name))) > 0
+
+                    UNION ALL
+
+                    SELECT 
+                        ID AS CustomerCode,
+                        LTRIM(RTRIM(Name)) AS Name,
+                        ISNULL(PetName, N'') AS TamilName,
+                        ISNULL(Mobile1, ISNULL(Phone1, N'')) AS Phone,
+                        ISNULL(Email, N'') AS Email,
+                        ISNULL(Address1, N'') + N' ' + ISNULL(Address2, N'') AS Address,
+                        ID AS MembershipCardNumber,
+                        0 AS LoyaltyPoints,
+                        0.00 AS LedgerBalance,
+                        1 AS rnk
+                    FROM Master_Accounts
+                    WHERE FormName = 'Customer' OR AccountType = 'Sundry Debtors' OR AccountType LIKE '%Debtor%'
+                ) combined
+                WHERE rnk = 1";
+
+            var existingCustomers = await _context.Customers.ToListAsync();
+            var customerNameDict = existingCustomers.ToDictionary(c => c.Name.Trim().ToLower(), c => c);
+            var customersToInsert = new List<Customer>();
+
+            using (var reader = await custCmd.ExecuteReaderAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    var name = reader["Name"].ToString()?.Trim();
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+
+                    var phone = reader["Phone"].ToString()?.Trim();
+                    if (string.IsNullOrWhiteSpace(phone)) phone = "0000000000";
+
+                    var points = Convert.ToInt32(reader["LoyaltyPoints"]);
+                    var balance = Convert.ToDecimal(reader["LedgerBalance"]);
+                    var cardNo = reader["MembershipCardNumber"].ToString() ?? "";
+
+                    if (customerNameDict.TryGetValue(name.ToLower(), out var existingCust))
+                    {
+                        bool updated = false;
+                        if (existingCust.LoyaltyPoints != points) { existingCust.LoyaltyPoints = points; updated = true; }
+                        if (existingCust.WalletBalance != balance) { existingCust.WalletBalance = balance; updated = true; }
+                        if (string.IsNullOrWhiteSpace(existingCust.MembershipCardNumber) && !string.IsNullOrWhiteSpace(cardNo)) { existingCust.MembershipCardNumber = cardNo; updated = true; }
+                        if (existingCust.Phone == "0000000000" && phone != "0000000000") { existingCust.Phone = phone; updated = true; }
+                        if (updated) existingCustomersUpdated++;
+                    }
+                    else
+                    {
+                        var newCust = new Customer
+                        {
+                            Id = Guid.NewGuid(),
+                            Name = name,
+                            TamilName = reader["TamilName"].ToString(),
+                            Phone = phone,
+                            Email = reader["Email"].ToString(),
+                            Address = reader["Address"].ToString(),
+                            MembershipCardNumber = cardNo,
+                            LoyaltyPoints = points,
+                            WalletBalance = balance,
+                            IsActive = true,
+                            CreatedAt = DateTime.UtcNow
+                        };
+
+                        customersToInsert.Add(newCust);
+                        customerNameDict[name.ToLower()] = newCust;
+                        newCustomersMigrated++;
+
+                        if (customersToInsert.Count >= 1000)
+                        {
+                            _context.Customers.AddRange(customersToInsert);
+                            await _context.SaveChangesAsync(default);
+                            customersToInsert.Clear();
+                        }
+                    }
+                }
+            }
+
+            if (customersToInsert.Count > 0)
+            {
+                _context.Customers.AddRange(customersToInsert);
+                await _context.SaveChangesAsync(default);
+                customersToInsert.Clear();
+            }
+
+            if (existingCustomersUpdated > 0)
+            {
+                await _context.SaveChangesAsync(default);
+            }
+        }
+
+        return Ok(new
+        {
+            Status = "SUCCESS",
+            NewCustomersMigrated = newCustomersMigrated,
+            ExistingCustomersUpdated = existingCustomersUpdated,
+            Message = $"Successfully migrated {newCustomersMigrated} new customer profiles and updated {existingCustomersUpdated} customer balances from Sigma 21!"
         });
     }
 

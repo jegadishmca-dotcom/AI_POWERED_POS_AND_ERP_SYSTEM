@@ -237,9 +237,9 @@ public class ARCommandsAndQueriesHandler :
 
     public async Task<List<CustomerLedgerDto>> Handle(GetCustomerLedgerQuery request, CancellationToken cancellationToken)
     {
-        return await _context.CustomerLedger
+        var entries = await _context.CustomerLedger
             .AsNoTracking()
-            .Where(c => c.CustomerId == request.CustomerId && c.StoreId == request.StoreId)
+            .Where(c => c.CustomerId == request.CustomerId)
             .OrderBy(c => c.EntryDate)
             .ThenBy(c => c.CreatedAt)
             .Select(c => new CustomerLedgerDto
@@ -255,6 +255,30 @@ public class ARCommandsAndQueriesHandler :
                 JournalEntryId = c.JournalEntryId
             })
             .ToListAsync(cancellationToken);
+
+        if (entries.Count == 0)
+        {
+            var customer = await _context.Customers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == request.CustomerId, cancellationToken);
+
+            if (customer != null && (customer.RunningWalletBalance != 0 || customer.RunningLoyaltyPoints != 0))
+            {
+                entries.Add(new CustomerLedgerDto
+                {
+                    Id = Guid.NewGuid(),
+                    EntryDate = DateTime.UtcNow.Date,
+                    TransactionType = "OPENING_BALANCE",
+                    ReferenceNumber = "OPENING",
+                    DebitAmount = customer.RunningWalletBalance > 0 ? customer.RunningWalletBalance : 0,
+                    CreditAmount = customer.RunningWalletBalance < 0 ? Math.Abs(customer.RunningWalletBalance) : 0,
+                    RunningBalance = customer.RunningWalletBalance,
+                    Description = "Opening Balance from Migration"
+                });
+            }
+        }
+
+        return entries;
     }
 
     public async Task<List<CustomerAgingDto>> Handle(GetCustomerAgingReportQuery request, CancellationToken cancellationToken)

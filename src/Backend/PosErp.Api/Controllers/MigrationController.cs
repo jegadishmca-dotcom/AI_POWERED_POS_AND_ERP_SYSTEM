@@ -726,6 +726,69 @@ public class MigrationController : ControllerBase
         });
     }
 
+    [HttpPost("backfill-customer-ledger-entries")]
+    public async Task<IActionResult> BackfillCustomerLedgerEntries()
+    {
+        var defaultStore = await _context.Stores.FirstOrDefaultAsync();
+        var storeId = defaultStore?.Id ?? Guid.NewGuid();
+
+        var customersWithBalance = await _context.Customers
+            .Where(c => c.RunningWalletBalance != 0)
+            .ToListAsync();
+
+        var existingLedgerCustomerIds = new HashSet<Guid>(
+            await _context.CustomerLedger.Select(l => l.CustomerId).Distinct().ToListAsync()
+        );
+
+        int entriesAdded = 0;
+        var newEntries = new List<PosErp.Domain.Entities.Finance.CustomerLedgerEntry>();
+
+        foreach (var cust in customersWithBalance)
+        {
+            if (!existingLedgerCustomerIds.Contains(cust.Id))
+            {
+                var entry = new PosErp.Domain.Entities.Finance.CustomerLedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    StoreId = storeId,
+                    CustomerId = cust.Id,
+                    EntryDate = DateTime.UtcNow.Date,
+                    TransactionType = "OPENING_BALANCE",
+                    ReferenceNumber = "SIGMA21-OPENING",
+                    DebitAmount = cust.RunningWalletBalance > 0 ? cust.RunningWalletBalance : 0,
+                    CreditAmount = cust.RunningWalletBalance < 0 ? Math.Abs(cust.RunningWalletBalance) : 0,
+                    RunningBalance = cust.RunningWalletBalance,
+                    Description = "Opening Balance migrated from Sigma 21",
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                newEntries.Add(entry);
+                entriesAdded++;
+
+                if (newEntries.Count >= 1000)
+                {
+                    _context.CustomerLedger.AddRange(newEntries);
+                    await _context.SaveChangesAsync(default);
+                    newEntries.Clear();
+                }
+            }
+        }
+
+        if (newEntries.Count > 0)
+        {
+            _context.CustomerLedger.AddRange(newEntries);
+            await _context.SaveChangesAsync(default);
+            newEntries.Clear();
+        }
+
+        return Ok(new
+        {
+            Status = "SUCCESS",
+            EntriesAdded = entriesAdded,
+            Message = $"Successfully created physical opening ledger transaction entries for {entriesAdded} customer accounts!"
+        });
+    }
+
     [HttpPost("backfill-stock-mappings")]
     public async Task<IActionResult> BackfillStockMappings(
         [FromQuery] string server = "192.168.1.10",

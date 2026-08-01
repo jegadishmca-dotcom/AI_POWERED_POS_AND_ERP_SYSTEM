@@ -26,6 +26,10 @@ import { safeRandomUUID } from '../../../utils/uuid';
 export const PosTerminal = () => {
   const [customer, setCustomer] = useState<any>(null);
   const [customerQuery, setCustomerQuery] = useState('');
+  const [customerSearchResults, setCustomerSearchResults] = useState<any[]>([]);
+  const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
+  const [focusedCustomerIndex, setFocusedCustomerIndex] = useState(-1);
+  const customerDropdownRef = useRef<HTMLDivElement>(null);
   const [isCustomerModalOpen, setCustomerModalOpen] = useState(false);
   const [promoCode, setPromoCode] = useState('');
   const [isPaymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -436,6 +440,52 @@ export const PosTerminal = () => {
       return;
     }
     const el = dropdownRef.current.querySelector(`[data-idx="${index}"]`) as HTMLElement | null;
+    if (el) el.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+  };
+
+  // Debounced instant customer search trigger on text change
+  useEffect(() => {
+    const val = customerQuery.trim();
+    if (!val || val.length < 2) {
+      setCustomerSearchResults([]);
+      setShowCustomerDropdown(false);
+      setFocusedCustomerIndex(-1);
+      return;
+    }
+
+    let active = true;
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        const results = await searchCustomers(val);
+        if (!active) return;
+
+        if (results && results.length > 0) {
+          setCustomerSearchResults(results);
+          setShowCustomerDropdown(true);
+          setFocusedCustomerIndex(0); // auto-focus first matching customer
+        } else {
+          setCustomerSearchResults([]);
+          setShowCustomerDropdown(false);
+          setFocusedCustomerIndex(-1);
+        }
+      } catch (err) {
+        console.error('Error searching customers instantly:', err);
+      }
+    }, 200);
+
+    return () => {
+      active = false;
+      clearTimeout(delayDebounceFn);
+    };
+  }, [customerQuery]);
+
+  const scrollCustomerDropdownToIndex = (index: number) => {
+    if (!customerDropdownRef.current) return;
+    if (index <= 0) {
+      customerDropdownRef.current.scrollTop = 0;
+      return;
+    }
+    const el = customerDropdownRef.current.querySelector(`[data-cust-idx="${index}"]`) as HTMLElement | null;
     if (el) el.scrollIntoView({ block: 'nearest', behavior: 'auto' });
   };
 
@@ -993,22 +1043,61 @@ export const PosTerminal = () => {
     }
   };
 
+  const selectCustomer = (cust: any) => {
+    setCustomer({
+      id: cust.id,
+      name: cust.name,
+      phone: cust.phone,
+      walletBalance: cust.walletBalance,
+      points: cust.loyaltyPoints,
+      tier: cust.tierName
+    });
+    setCustomerQuery('');
+    setCustomerSearchResults([]);
+    setShowCustomerDropdown(false);
+    setFocusedCustomerIndex(-1);
+    productInputRef.current?.focus();
+  };
+
   const handleCustomerSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (showCustomerDropdown && customerSearchResults.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        const newIdx = focusedCustomerIndex < customerSearchResults.length - 1 ? focusedCustomerIndex + 1 : focusedCustomerIndex;
+        setFocusedCustomerIndex(newIdx);
+        scrollCustomerDropdownToIndex(newIdx);
+        return;
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        const newIdx = focusedCustomerIndex > 0 ? focusedCustomerIndex - 1 : 0;
+        setFocusedCustomerIndex(newIdx);
+        scrollCustomerDropdownToIndex(newIdx);
+        return;
+      } else if (e.key === 'Escape') {
+        setShowCustomerDropdown(false);
+        setFocusedCustomerIndex(-1);
+        return;
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (focusedCustomerIndex >= 0 && focusedCustomerIndex < customerSearchResults.length) {
+          selectCustomer(customerSearchResults[focusedCustomerIndex]);
+          return;
+        }
+      }
+    }
+
     if (e.key === 'Enter') {
+      e.preventDefault();
       const val = customerQuery.trim();
       if (!val) return;
       try {
         const results = await searchCustomers(val);
-        if (results.length > 0) {
-          const cust = results[0];
-          setCustomer({
-            id: cust.id,
-            name: cust.name,
-            phone: cust.phone,
-            walletBalance: cust.walletBalance,
-            points: cust.loyaltyPoints,
-            tier: cust.tierName
-          });
+        if (results.length === 1) {
+          selectCustomer(results[0]);
+        } else if (results.length > 1) {
+          setCustomerSearchResults(results);
+          setShowCustomerDropdown(true);
+          setFocusedCustomerIndex(0);
         } else {
           showToastNotification(`Customer not found for: "${val}". Click "+" to register a new customer!`, 'info');
         }
@@ -1137,7 +1226,7 @@ export const PosTerminal = () => {
               ref={customerInputRef}
               type="text" 
               placeholder="F1: Search Customer (Phone/Name)..." 
-              className="w-full pl-10 p-2 rounded-l border border-indigo-200 outline-none focus:ring-2 ring-indigo-500 font-bold"
+              className="w-full pl-10 p-2 rounded-l border border-indigo-200 outline-none focus:ring-2 ring-indigo-500 font-bold text-slate-800"
               value={customerQuery}
               onChange={(e) => setCustomerQuery(e.target.value)}
               onKeyDown={handleCustomerSearch}
@@ -1148,6 +1237,50 @@ export const PosTerminal = () => {
             >
               <Plus className="w-5 h-5" />
             </button>
+
+            {/* Customer Search Dropdown Overlay */}
+            {showCustomerDropdown && customerSearchResults.length > 0 && (
+              <div
+                ref={customerDropdownRef}
+                className="absolute left-0 top-full mt-1 w-[400px] bg-white border-2 border-indigo-300 rounded-lg shadow-2xl z-50 max-h-72 overflow-y-auto"
+                style={{ overscrollBehavior: 'contain' }}
+              >
+                <div className="p-2 border-b border-indigo-100 flex justify-between items-center bg-indigo-50">
+                  <span className="text-xs font-bold text-indigo-800">Select Customer (Use ↑ ↓ and Enter):</span>
+                  <button onClick={() => setShowCustomerDropdown(false)} className="text-slate-400 hover:text-slate-600 text-xs font-bold">Close</button>
+                </div>
+                {customerSearchResults.map((cust: any, idx: number) => (
+                  <div 
+                    key={cust.id}
+                    data-cust-idx={idx}
+                    onClick={() => selectCustomer(cust)}
+                    className={`px-4 py-2.5 cursor-pointer flex justify-between items-center transition border-b border-slate-100 ${
+                      focusedCustomerIndex === idx ? 'bg-indigo-100 border-l-4 border-indigo-600 font-bold text-indigo-950' : 'hover:bg-indigo-50/70'
+                    }`}
+                  >
+                    <div>
+                      <p className="font-extrabold text-slate-800 text-sm flex items-center gap-1.5">
+                        {cust.name}
+                        {cust.tierName && (
+                          <span className="bg-amber-100 text-amber-900 text-[10px] px-1.5 py-0.5 rounded font-black border border-amber-200">
+                            {cust.tierName}
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-slate-500 font-semibold mt-0.5">{cust.phone || 'No Phone'}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-xs font-extrabold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-200">
+                        ⭐ {cust.loyaltyPoints || 0} Pts
+                      </span>
+                      {cust.walletBalance !== undefined && cust.walletBalance !== 0 && (
+                        <p className="text-xs font-bold text-blue-600 mt-1">₹{cust.walletBalance}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {customer && (

@@ -89,6 +89,7 @@ export const PosTerminal = () => {
   const cartContainerRef = useRef<HTMLDivElement>(null);
   const activeItemRowRef = useRef<HTMLTableRowElement>(null);
   const isVoiceSearchingRef = useRef(false);
+  const itemQtyRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
 
   const [toastNotification, setToastNotification] = useState<{ message: string; type: 'error' | 'success' | 'info' } | null>(null);
 
@@ -447,6 +448,27 @@ export const PosTerminal = () => {
     finalTotal: 0,
     appliedOfferNames: []
   });
+
+  const focusItemQtyInput = useCallback((targetProductId?: string) => {
+    setTimeout(() => {
+      setCart((currentCart: any) => {
+        const targetId = targetProductId || (
+          selectedCartIndex >= 0 && selectedCartIndex < currentCart.items.length
+            ? currentCart.items[selectedCartIndex]?.productId
+            : currentCart.items[currentCart.items.length - 1]?.productId
+        );
+
+        if (targetId) {
+          const inputEl = itemQtyRefs.current[targetId];
+          if (inputEl) {
+            inputEl.focus();
+            inputEl.select();
+          }
+        }
+        return currentCart;
+      });
+    }, 60);
+  }, [selectedCartIndex]);
   const [suppressOffers, setSuppressOffers] = useState(false);
   const [pointsRedeemed, setPointsRedeemed] = useState<number>(0);
   const pointsDiscount = pointsRedeemed > 0 ? (pointsRedeemed / 10) : 0;
@@ -708,8 +730,19 @@ export const PosTerminal = () => {
         batchId: batch ? batch.id : undefined
       };
 
+      const isWeighableItem = !!(
+        product.isWeighable ||
+        (product.unitOfMeasure && /kg|gram|gm|ltr|liter/i.test(product.unitOfMeasure)) ||
+        (product.uomName && /kg|gram|gm|ltr|liter/i.test(product.uomName)) ||
+        (product.uom && /kg|gram|gm|ltr|liter/i.test(product.uom))
+      );
+
       const updatedItems = [...cart.items, newItem];
       recalculateCart(updatedItems);
+
+      if (isWeighableItem && overrideQty === undefined) {
+        focusItemQtyInput(product.id);
+      }
     }
   };
 
@@ -861,6 +894,15 @@ export const PosTerminal = () => {
   };
 
   const handleProductSearch = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Tab') {
+      if (cart.items.length > 0) {
+        e.preventDefault();
+        setShowProductDropdown(false);
+        focusItemQtyInput();
+        return;
+      }
+    }
+
     if (showProductDropdown && searchResults.length > 0) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -1341,12 +1383,25 @@ export const PosTerminal = () => {
                             <MinusCircle className="w-6 h-6" />
                           </button>
                           <input 
+                            ref={(el) => { itemQtyRefs.current[item.productId] = el; }}
                             type="number"
                             min="1"
                             // GAP-05 FIX: enforce integer quantities for non-weighable products
                             step={item.isWeighable ? 'any' : '1'}
-                            className="font-black text-lg w-16 text-center border border-slate-300 rounded focus:outline-none focus:border-indigo-500 bg-white shadow-xs"
+                            className="font-black text-lg w-16 text-center border border-slate-300 rounded focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-amber-500 bg-white shadow-xs"
                             value={item.qty === '' ? '' : item.qty}
+                            onFocus={(e) => e.target.select()}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.currentTarget.select();
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === 'Tab') {
+                                e.preventDefault();
+                                productInputRef.current?.focus();
+                                productInputRef.current?.select();
+                              }
+                            }}
                             onChange={(e) => {
                               if (e.target.value === '') {
                                 updateItemQtyExact(item.productId, '');

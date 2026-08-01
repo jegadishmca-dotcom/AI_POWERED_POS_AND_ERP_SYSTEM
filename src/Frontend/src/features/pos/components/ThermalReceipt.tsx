@@ -47,7 +47,7 @@ export const ThermalReceipt = React.forwardRef<HTMLDivElement, { invoice: any }>
           <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px', marginTop: '1px' }}>GST :{STORE.gstin}</div>
           <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px' }}>FSSAI : {STORE.fssai}</div>
           <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '11px' }}>1E -1G மாதா கோவில் தெரு</div>
-          <div style={{ textAlign: 'center', fontWeight 800, fontSize: '11px' }}>இளையான்குடி -630702</div>
+          <div style={{ textAlign: 'center', fontWeight: 800, fontSize: '11px' }}>இளையான்குடி -630702</div>
           <div style={{ textAlign: 'center', fontWeight: 900, fontSize: '11px', marginBottom: '4px' }}>CELL:{STORE.phone}</div>
 
           {/* ── INVOICE META BOX ── */}

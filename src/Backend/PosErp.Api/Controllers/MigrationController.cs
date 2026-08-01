@@ -1187,4 +1187,51 @@ public class MigrationController : ControllerBase
             Message = $"Successfully backfilled PreferredSupplierId for {updatedProductsCount} product master items ({newSuppliersCreated} suppliers created) from Sigma 21!"
         });
     }
+
+    [HttpPost("backfill-customer-points-ledger")]
+    public async Task<IActionResult> BackfillCustomerPointsLedger()
+    {
+        var customersWithPoints = await _context.Customers
+            .Where(c => c.RunningLoyaltyPoints > 0)
+            .ToListAsync();
+
+        int openingEntriesCreated = 0;
+
+        foreach (var c in customersWithPoints)
+        {
+            var existingLedger = await _context.LoyaltyLedger.AnyAsync(l => l.CustomerId == c.Id);
+            if (!existingLedger)
+            {
+                var entry = new LoyaltyLedgerEntry
+                {
+                    Id = Guid.NewGuid(),
+                    CustomerId = c.Id,
+                    TransactionType = "OPENING_BALANCE",
+                    ReferenceDocument = "SIGMA21-OPENING",
+                    PointsEarned = c.RunningLoyaltyPoints,
+                    PointsRedeemed = 0m,
+                    Points = c.RunningLoyaltyPoints,
+                    PreviousBalance = 0m,
+                    BalanceAfterTransaction = c.RunningLoyaltyPoints,
+                    RunningPoints = c.RunningLoyaltyPoints,
+                    Remarks = "Opening Loyalty Points migrated from Sigma 21",
+                    CreatedAt = DateTime.UtcNow
+                };
+                _context.LoyaltyLedger.Add(entry);
+                openingEntriesCreated++;
+            }
+        }
+
+        if (openingEntriesCreated > 0)
+        {
+            await _context.SaveChangesAsync(default);
+        }
+
+        return Ok(new
+        {
+            Status = "SUCCESS",
+            OpeningEntriesCreated = openingEntriesCreated,
+            Message = $"Successfully created {openingEntriesCreated} loyalty ledger opening balance entries for migrated customers!"
+        });
+    }
 }

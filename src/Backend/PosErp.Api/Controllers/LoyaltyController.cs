@@ -59,6 +59,58 @@ public class LoyaltyController : ControllerBase
         return Ok(new { message = "Jobs executed successfully", executionTimeMs = sw.ElapsedMilliseconds });
     }
 
+    [HttpGet("customer/{customerId}/ledger")]
+    public async Task<IActionResult> GetCustomerLoyaltyLedger(
+        System.Guid customerId, 
+        [FromServices] PosErp.Application.Interfaces.IApplicationDbContext context)
+    {
+        var entries = await context.LoyaltyLedger
+            .AsNoTracking()
+            .Where(l => l.CustomerId == customerId)
+            .OrderByDescending(l => l.CreatedAt)
+            .Select(l => new
+            {
+                l.Id,
+                l.CreatedAt,
+                l.TransactionType,
+                l.ReferenceDocument,
+                l.PointsEarned,
+                l.PointsRedeemed,
+                l.RunningPoints,
+                l.BalanceAfterTransaction,
+                l.Remarks
+            })
+            .ToListAsync();
+
+        if (entries.Count == 0)
+        {
+            var customer = await context.Customers
+                .AsNoTracking()
+                .FirstOrDefaultAsync(c => c.Id == customerId);
+
+            if (customer != null && customer.RunningLoyaltyPoints > 0)
+            {
+                return Ok(new[]
+                {
+                    new
+                    {
+                        Id = System.Guid.NewGuid(),
+                        CreatedAt = System.DateTime.UtcNow,
+                        TransactionType = "OPENING_BALANCE",
+                        ReferenceDocument = "SIGMA21-OPENING",
+                        PointsEarned = customer.RunningLoyaltyPoints,
+                        PointsRedeemed = 0m,
+                        RunningPoints = customer.RunningLoyaltyPoints,
+                        BalanceAfterTransaction = customer.RunningLoyaltyPoints,
+                        Remarks = "Opening Loyalty Points migrated from Sigma 21"
+                    }
+                });
+            }
+        }
+
+        return Ok(entries);
+    }
+
     [HttpPost("seed-10k-customers")]
     public async Task<IActionResult> SeedCustomers([FromServices] PosErp.Application.Interfaces.IApplicationDbContext context)
     {

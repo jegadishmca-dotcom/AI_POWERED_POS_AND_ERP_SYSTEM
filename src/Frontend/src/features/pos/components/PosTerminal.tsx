@@ -884,17 +884,22 @@ export const PosTerminal = () => {
   };
 
   /**
-   * Feature 2: Handles cart item delete based on the cashierCanDeleteLineItem flag.
-   * - If the current user is a Cashier AND the flag is ON → delete directly + audit log
-   * - Otherwise → require Manager Override PIN (existing flow)
+   * Feature 2 (PERMISSIVE MODE): Handles cart item delete based on the cashierCanDeleteLineItem flag.
+   * When toggle is ON → ALL roles (Owner, Manager, Cashier, Supervisor) delete directly, NO PIN prompt.
+   * When toggle is OFF → Manager Override PIN required for ALL roles (existing security flow).
+   *
+   * Design rationale: The Owner controls the toggle — when they enable it, it signals that the
+   * entire terminal/store environment has sufficient accountability (CCTV, supervisor presence, etc.)
+   * to allow direct deletion by anyone operating the POS at that counter.
    */
   const handleDeleteCartItem = (item: any) => {
-    if (user?.role === 'Cashier' && cashierCanDeleteLineItem) {
-      // Direct delete — no PIN required — but always audit log (server logs as CASHIER_DIRECT_DELETE_LINE_ITEM)
+    if (cashierCanDeleteLineItem) {
+      // Toggle is ON: direct delete — no PIN required — regardless of role
+      // Server logs action name from JWT role (CASHIER_DIRECT_DELETE_LINE_ITEM or MANAGER_OVERRIDE_VOID_ITEM)
       removeItem(item.productId);
       auditLogLineItemDelete(item);
     } else {
-      // Manager Override PIN required (server logs as MANAGER_OVERRIDE_VOID_ITEM)
+      // Toggle is OFF: Manager Override PIN required for ALL roles
       requestManagerOverride('Void Item', () => {
         removeItem(item.productId);
         auditLogLineItemDelete(item);
@@ -1643,12 +1648,12 @@ export const PosTerminal = () => {
                         <button
                           onClick={() => handleDeleteCartItem(item)}
                           className={`transition p-1 ${
-                            user?.role === 'Cashier' && cashierCanDeleteLineItem
+                            cashierCanDeleteLineItem
                               ? 'text-red-500 hover:text-red-700 hover:bg-red-50 rounded'
                               : 'text-slate-400 hover:text-red-600'
                           }`}
                           title={
-                            user?.role === 'Cashier' && cashierCanDeleteLineItem
+                            cashierCanDeleteLineItem
                               ? 'Delete Item'
                               : 'Void Item (Manager Override Required)'
                           }

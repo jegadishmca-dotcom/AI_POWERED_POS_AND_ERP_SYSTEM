@@ -178,7 +178,7 @@ export const PosPermissions: React.FC = () => {
             <div>
               <p className="font-bold text-slate-800 text-sm">Product Catalog Auto-Translation Engine</p>
               <p className="text-xs text-slate-500">
-                Zoho AI-Level Smart ERP auto-translation engine for Product Catalog creation
+                Enterprise AI-Level Smart ERP auto-translation engine for Product Catalog creation
               </p>
             </div>
             <button

@@ -134,22 +134,6 @@ def generate_marg_invoice():
     doc.build(story)
     print(f"Generated Marg ERP sample invoice.")
 
-def generate_zoho_invoice():
-    pdf_path = "Supplier_invoice/zoho_books_invoice.pdf"
-    doc = SimpleDocTemplate(pdf_path, pagesize=letter, rightMargin=36, leftMargin=36, topMargin=36, bottomMargin=36)
-    story = []
-    styles = getSampleStyleSheet()
-    
-    title_style = ParagraphStyle('T3', parent=styles['Heading1'], fontSize=16, textColor=colors.HexColor('#0D9488'), spaceAfter=6)
-    sub_style = ParagraphStyle('S3', parent=styles['Normal'], fontSize=8, leading=10, textColor=colors.HexColor('#4B5563'))
-    cell_left = ParagraphStyle('CL3', parent=styles['Normal'], fontSize=8, leading=10)
-    cell_left_b = ParagraphStyle('CLB3', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10)
-    cell_right = ParagraphStyle('CR3', parent=styles['Normal'], fontSize=8, leading=10, alignment=2)
-    cell_right_b = ParagraphStyle('CRB3', parent=styles['Normal'], fontName='Helvetica-Bold', fontSize=8, leading=10, alignment=2)
-
-    story.append(Paragraph("<b>MADURAI TRADING HOUSE (Zoho Books Layout)</b>", title_style))
-    story.append(Paragraph("GSTIN: 33ZOHOB1234M1Z5 | Address: GST Road, Guindy, Chennai - 600032", sub_style))
-    story.append(Paragraph("Invoice Ref: INV-ZH-928 | Date: 20-06-2026", sub_style))
     story.append(Spacer(1, 10))
 
     # Note: No Serial Number Column!
@@ -187,7 +171,7 @@ def generate_zoho_invoice():
     story.append(Paragraph("OUTPUT CGST: Rs. 98.40<br/>OUTPUT SGST: Rs. 98.40<br/>ROUND OFF: Rs. -0.10", sub_style))
 
     doc.build(story)
-    print(f"Generated Zoho Books sample invoice.")
+    print(f"Generated Marg ERP sample invoice.")
 
 def generate_vyapar_invoice():
     pdf_path = "Supplier_invoice/vyapar_invoice.pdf"
@@ -247,5 +231,4 @@ def generate_vyapar_invoice():
 if __name__ == "__main__":
     generate_busy_invoice()
     generate_marg_invoice()
-    generate_zoho_invoice()
     generate_vyapar_invoice()

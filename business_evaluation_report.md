@@ -57,7 +57,7 @@ We recommend a **SaaS Subscription Model (Software-as-a-Service)** alongside a *
 
 | Region | Monthly SaaS (per Store) | Annual SaaS (per Store) | One-Time Enterprise License | Local Competitors |
 | :--- | :--- | :--- | :--- | :--- |
-| **India** | ₹1,500 – ₹3,000 | ₹15,000 – ₹30,000 | ₹45,000 – ₹90,000 *(+15% AMC)* | Marg ERP, Vyapar, Zoho Retail |
+| **India** | ₹1,500 – ₹3,000 | ₹15,000 – ₹30,000 | ₹45,000 – ₹90,000 *(+15% AMC)* | Marg ERP, Vyapar, Retail ERPs |
 | **Singapore** | SGD $75 – SGD $150 | SGD $750 – SGD $1,500 | SGD $2,000 – SGD $4,500 | Lightspeed, Vend, Shopify POS |
 | **UAE** | AED 200 – AED 450 | AED 2,000 – AED 4,500 | AED 6,000 – AED 12,000 | Tally Prime, Focus Softnet |
 | **U.K.** | £50 – £120 | £500 – £1,200 | £1,500 – £3,500 | EPOS Now, Lightspeed Retail |

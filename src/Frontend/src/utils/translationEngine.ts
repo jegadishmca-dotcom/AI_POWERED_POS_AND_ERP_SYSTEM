@@ -1,5 +1,5 @@
 /**
- * Zoho AI & Global Retail Standard Auto-Translation & Transliteration Engine
+ * Enterprise AI & Global Retail Standard Auto-Translation & Transliteration Engine
  * 
  * Commercial Supermarket NMT Architecture:
  * 1. Retail Quantity/Unit Tokenization (preserves and translates 1Kg -> 1 கிலோ, 500g -> 500 கிராம்).

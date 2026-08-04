@@ -203,7 +203,7 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
   const dateStr  = invoice.businessDate ? new Date(invoice.businessDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN');
   const timeStr  = invoice.businessDate ? new Date(invoice.businessDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // Build items boxed table rows with single-line guarantee
+  // Build items rows with global ERP standard 1-line formatting
   let itemsRowsHtml = '';
   (invoice.items || []).forEach((item: any, idx: number) => {
     const qty  = safe(item.quantity, safe(item.qty));
@@ -215,13 +215,13 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
     const displayName = getItemDisplayName(item, langMode);
 
     itemsRowsHtml += `
-      <tr>
-        <td style="border:1.5px solid #000; text-align:center; padding:2px 1px; font-weight:700; font-size:10px; vertical-align:middle; white-space:nowrap;">${idx + 1}</td>
-        <td style="border:1.5px solid #000; padding:2px 2px; font-weight:700; font-size:10px; vertical-align:middle; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;" title="${displayName}">${displayName}</td>
-        <td style="border:1.5px solid #000; text-align:center; padding:2px 1px; font-weight:700; font-size:10px; vertical-align:middle; white-space:nowrap;">${qty}</td>
-        <td style="border:1.5px solid #000; text-align:center; padding:2px 1px; font-weight:700; font-size:10px; vertical-align:middle; white-space:nowrap;">${mrpVal}</td>
-        <td style="border:1.5px solid #000; text-align:right; padding:2px 1px; font-weight:700; font-size:10px; vertical-align:middle; white-space:nowrap;">${fmt(item.unitPrice)}</td>
-        <td style="border:1.5px solid #000; text-align:right; padding:2px 1px; font-weight:800; font-size:10.5px; vertical-align:middle; white-space:nowrap;">${fmt(lineAmt)}</td>
+      <tr style="border-bottom: 1px solid #000;">
+        <td style="text-align:center; padding:3px 1px; font-weight:700; font-size:10px; vertical-align:middle; border-right: 1px solid #000;">${idx + 1}</td>
+        <td style="text-align:left; padding:3px 3px; font-weight:800; font-size:10.5px; vertical-align:middle; border-right: 1px solid #000;" title="${displayName}">${displayName}</td>
+        <td style="text-align:center; padding:3px 1px; font-weight:800; font-size:10px; vertical-align:middle; border-right: 1px solid #000;">${qty}</td>
+        <td style="text-align:right; padding:3px 2px; font-weight:700; font-size:10px; vertical-align:middle; border-right: 1px solid #000;">${mrpVal}</td>
+        <td style="text-align:right; padding:3px 2px; font-weight:700; font-size:10px; vertical-align:middle; border-right: 1px solid #000;">${fmt(item.unitPrice)}</td>
+        <td style="text-align:right; padding:3px 3px; font-weight:900; font-size:11px; vertical-align:middle;">${fmt(lineAmt)}</td>
       </tr>`;
   });
 
@@ -261,7 +261,7 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
       .receipt-container {
         width: 72mm !important;
         margin: 0 auto !important;
-        padding: 2mm 3mm !important;
+        padding: 2mm 1mm !important;
       }
     }
     * {
@@ -269,7 +269,6 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
       margin: 0;
       padding: 0;
       font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
-      font-weight: 800; /* Extra bold for maximum thermal print density */
       color: #000 !important;
     }
     body {
@@ -285,56 +284,93 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
     .receipt-container {
       width: 72mm;
       margin: 0 auto;
-      padding: 2mm 3mm;
-      font-size: 11.5px;
+      padding: 2mm 1mm;
+      font-size: 11px;
       line-height: 1.25;
       background: #fff;
     }
     .text-center { text-align: center; }
     .text-right { text-align: right; }
-    .font-bold { font-weight: 900; }
-    .border-table { border-collapse: collapse; width: 100%; border: 2px solid #000; }
-    .border-table th, .border-table td { border: 1.5px solid #000; padding: 3px 3px; font-size: 11px; font-weight: 800; }
+    .text-left { text-align: left; }
+    
+    /* Strict Enterprise ERP Alignment Geometry */
+    table.receipt-table {
+      width: 100% !important;
+      max-width: 100% !important;
+      table-layout: fixed !important;
+      border-collapse: collapse !important;
+      margin: 0 0 5px 0 !important;
+    }
+    table.receipt-table td, table.receipt-table th {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      word-break: break-all;
+    }
+    
+    .border-box {
+      border: 1.5px solid #000;
+    }
+    .divider-dash {
+      border-top: 1px dashed #000;
+      margin: 4px 0;
+    }
+    .divider-solid {
+      border-top: 1.5px solid #000;
+      margin: 4px 0;
+    }
   </style>
 </head>
 <body>
   <div class="receipt-container">
-  <!-- HEADER -->
-  <div class="text-center font-bold" style="font-size: 17px; margin-top: 2px;">${STORE.nameTamil}</div>
-  <div class="text-center font-bold" style="font-size: 11px; margin-top: 1px;">GST :${STORE.gstin}</div>
-  <div class="text-center font-bold" style="font-size: 11px;">FSSAI : ${STORE.fssai}</div>
-  <div class="text-center font-bold" style="font-size: 11px;">1E -1G மாதா கோவில் தெரு</div>
-  <div class="text-center font-bold" style="font-size: 11px;">இளையான்குடி -630702</div>
-  <div class="text-center font-bold" style="font-size: 11px; margin-bottom: 4px;">CELL:${STORE.phone}</div>
 
-  <!-- METADATA BOX -->
-  <table class="border-table" style="margin-bottom: 4px;">
+  <!-- STORE HEADER -->
+  <div class="text-center font-black" style="font-size: 18px; line-height: 1.1; margin-top: 1px;">${STORE.nameTamil}</div>
+  <div class="text-center font-black" style="font-size: 11px; letter-spacing: 0.5px; margin-top: 1px; margin-bottom: 2px;">${STORE.nameEn}</div>
+  <div class="text-center" style="font-size: 10px; font-weight: 700; line-height: 1.3;">
+    ${STORE.address} ${STORE.city}<br/>
+    GSTIN: ${STORE.gstin} | FSSAI: ${STORE.fssai}<br/>
+    Ph: ${STORE.phone}
+  </div>
+
+  <div class="divider-solid"></div>
+  <div class="text-center font-black" style="font-size: 12px; letter-spacing: 1px; margin: 2px 0 4px 0;">TAX INVOICE</div>
+
+  <!-- METADATA BOX (Perfect 2-Column Key-Value Alignment) -->
+  <table class="receipt-table border-box">
     <tr>
-      <td width="55%" style="font-weight: 900;">
-        Bill No : &nbsp; ${invoice.invoiceNumber || '-'}<br/>
-        <span style="font-size: 11.5px; font-weight: 900;">${invoice.cashierName || 'USER3'}</span>
+      <td style="width: 58%; padding: 4px 5px; border-right: 1.5px solid #000; vertical-align: top;">
+        <span style="font-size: 8.5px; font-weight: 800; color: #444; display: block; text-transform: uppercase;">Bill No</span>
+        <strong style="font-size: 11px; font-weight: 900;">${invoice.invoiceNumber || '-'}</strong><br/>
+        <span style="font-size: 10px; font-weight: 800;">Cashier: ${invoice.cashierName || 'Cashier'}</span>
       </td>
-      <td width="45%" style="font-weight: 900;">
-        Date : ${dateStr}<br/>
-        Time : ${timeStr}
+      <td style="width: 42%; padding: 4px 5px; vertical-align: top;">
+        <span style="font-size: 8.5px; font-weight: 800; color: #444; display: block; text-transform: uppercase;">Date & Time</span>
+        <strong style="font-size: 10.5px; font-weight: 800;">${dateStr}</strong><br/>
+        <span style="font-size: 10.5px; font-weight: 800;">${timeStr}</span>
       </td>
     </tr>
-    <tr>
-      <td style="font-weight: 900;">NAME : ${invoice.customerName || ''}</td>
-      <td style="font-weight: 900;">CELL : ${invoice.customerPhone || ''}</td>
-    </tr>
+    ${invoice.customerName ? `
+    <tr style="border-top: 1px solid #000;">
+      <td style="padding: 3px 5px; border-right: 1.5px solid #000;">
+        <strong style="font-weight: 800;">NAME:</strong> ${invoice.customerName}
+      </td>
+      <td style="padding: 3px 5px;">
+        <strong style="font-weight: 800;">CELL:</strong> ${invoice.customerPhone || '-'}
+      </td>
+    </tr>` : ''}
   </table>
 
-  <!-- ITEMS BOXED TABLE -->
-  <table class="border-table" style="margin-bottom: 4px;">
+  <!-- ITEMS BOXED TABLE (Strict Table-Layout Fixed Alignment) -->
+  <table class="receipt-table border-box">
     <thead>
-      <tr>
-        <th style="width: 7%; text-align: center; font-weight: 800; font-size: 10px; padding: 2px 1px;">S.No</th>
-        <th style="width: 45%; text-align: center; font-weight: 800; font-size: 10px; padding: 2px 1px;">Items</th>
-        <th style="width: 9%; text-align: center; font-weight: 800; font-size: 10px; padding: 2px 1px;">Qty</th>
-        <th style="width: 11%; text-align: center; font-weight: 800; font-size: 10px; padding: 2px 1px;">MRP</th>
-        <th style="width: 13%; text-align: center; font-weight: 800; font-size: 10px; padding: 2px 1px;">Rate</th>
-        <th style="width: 15%; text-align: center; font-weight: 800; font-size: 10.5px; padding: 2px 1px;">Amt</th>
+      <tr style="background: #f0f0f0; border-bottom: 1.5px solid #000;">
+        <th style="width: 7%; text-align: center; font-weight: 900; font-size: 10px; padding: 4px 1px; border-right: 1px solid #000;">#</th>
+        <th style="width: 44%; text-align: left; font-weight: 900; font-size: 10px; padding: 4px 3px; border-right: 1px solid #000;">Items</th>
+        <th style="width: 10%; text-align: center; font-weight: 900; font-size: 10px; padding: 4px 1px; border-right: 1px solid #000;">Qty</th>
+        <th style="width: 12%; text-align: right; font-weight: 900; font-size: 10px; padding: 4px 2px; border-right: 1px solid #000;">MRP</th>
+        <th style="width: 13%; text-align: right; font-weight: 900; font-size: 10px; padding: 4px 2px; border-right: 1px solid #000;">Rate</th>
+        <th style="width: 14%; text-align: right; font-weight: 900; font-size: 10.5px; padding: 4px 3px;">Amt</th>
       </tr>
     </thead>
     <tbody>
@@ -342,38 +378,42 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
     </tbody>
   </table>
 
-  <!-- TOTAL BOX -->
-  <table class="border-table" style="margin-bottom: 4px;">
+  <!-- TOTAL BANNER (High Impact Bold Alignment) -->
+  <table class="receipt-table border-box">
     <tr>
-      <td width="50%" class="text-center" style="font-size: 18px; font-weight: 900; padding: 5px 4px;">
+      <td style="width: 45%; padding: 6px 8px; font-size: 17px; font-weight: 900; text-align: left; vertical-align: middle; border-right: 1.5px solid #000;">
         TOTAL
       </td>
-      <td width="50%" class="text-right" style="font-size: 22px; font-weight: 900; padding: 5px 4px;">
+      <td style="width: 55%; padding: 6px 8px; font-size: 23px; font-weight: 900; text-align: right; vertical-align: middle;">
         ${fmt(rounded)}
       </td>
     </tr>
   </table>
 
-  <!-- SUMMARY & POINTS -->
-  <table style="width: 100%; font-size: 11px; font-weight: 900; margin-bottom: 4px; border-collapse: collapse;">
+  <!-- SUMMARY & POINTS BREAKDOWN -->
+  <table class="receipt-table" style="font-size: 10.5px; font-weight: 800; margin-top: 2px;">
     <tr>
-      <td width="55%">OLD POINTS : ${oldPtsStr}</td>
-      <td width="45%" class="text-right">RCVD : ${rcvdStr}</td>
+      <td style="width: 55%; text-align: left; padding: 1.5px 0;">OLD POINTS : ${oldPtsStr}</td>
+      <td style="width: 45%; text-align: right; padding: 1.5px 0;">RCVD : ${rcvdStr}</td>
     </tr>
     <tr>
-      <td width="55%">TODAY PTS : ${earnedStr}</td>
-      <td width="45%" class="text-right">RFND : ${rfndStr}</td>
+      <td style="width: 55%; text-align: left; padding: 1.5px 0;">TODAY PTS : ${earnedStr}</td>
+      <td style="width: 45%; text-align: right; padding: 1.5px 0;">RFND : ${rfndStr}</td>
     </tr>
     <tr>
-      <td width="55%">TOTAL PTS : ${balanceStr}</td>
-      <td width="45%"></td>
+      <td style="width: 55%; text-align: left; padding: 1.5px 0;">TOTAL PTS : ${balanceStr}</td>
+      <td style="width: 45%; text-align: right; padding: 1.5px 0;">MODE : ${invoice.paymentMode || 'CASH'}</td>
     </tr>
   </table>
 
   <!-- FOOTER TAMIL SLOGAN -->
-  <div class="text-center" style="font-size: 15px; font-weight: 900; margin-top: 6px; margin-bottom: 4px; line-height: 1.3;">
+  <div class="divider-dash"></div>
+  <div class="text-center" style="font-size: 14px; font-weight: 900; margin-top: 4px; margin-bottom: 3px; line-height: 1.35;">
     அனைத்தும் வாங்க<br/>
     ஆப்பிளுக்கு வாங்க
+  </div>
+  <div class="text-center" style="font-size: 10px; font-weight: 700; color: #222; margin-top: 2px;">
+    Thank you for shopping with us! Visit Again!
   </div>
   </div>
 

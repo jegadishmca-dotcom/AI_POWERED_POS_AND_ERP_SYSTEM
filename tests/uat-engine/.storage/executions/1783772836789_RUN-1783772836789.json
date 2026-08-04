@@ -1,0 +1,14 @@
+{
+  "id": "RUN-1783772836789",
+  "timestamp": 1783772836789,
+  "scenarios": [
+    {
+      "scenarioId": "SCENARIO-SALES-001-HAPPY",
+      "status": "PASSED"
+    },
+    {
+      "scenarioId": "SCENARIO-SALES-001-FAIL",
+      "status": "FAILED"
+    }
+  ]
+}

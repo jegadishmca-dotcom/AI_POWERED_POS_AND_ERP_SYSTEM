@@ -1,0 +1,165 @@
+{
+  "input": {
+    "capabilityId": "CAP-FIN-001",
+    "workflowId": "WF-FIN-001",
+    "scenarioId": "DAYCLOSE",
+    "persona": "FinanceAdmin",
+    "variant": "Standard",
+    "timeline": [],
+    "validationResults": [
+      {
+        "rule": "DayCloseValidationRule",
+        "status": "FAILED"
+      }
+    ],
+    "evidencePath": "",
+    "failureFingerprint": "F-FIN-001",
+    "historicalRuns": [],
+    "trendData": {},
+    "baselines": {},
+    "metrics": {
+      "durationMs": 9000
+    },
+    "artifacts": []
+  },
+  "normalized": true,
+  "priority": {
+    "type": "PRIORITY",
+    "value": "P0",
+    "explainability": {
+      "decision": "P0",
+      "evidence": [
+        "Capability ID: CAP-FIN-001"
+      ],
+      "reason": "Priority derived deterministically from business capability risk mapping",
+      "confidence": {
+        "deterministic": 100,
+        "ai": 0
+      }
+    }
+  },
+  "cluster": {
+    "type": "CLUSTER",
+    "value": "F-FIN-001",
+    "explainability": {
+      "decision": "Cluster F-FIN-001",
+      "evidence": [],
+      "reason": "Deterministic fingerprint",
+      "confidence": {
+        "deterministic": 100,
+        "ai": 0
+      }
+    }
+  },
+  "regression": {
+    "type": "REGRESSION",
+    "value": true,
+    "explainability": {
+      "decision": "New Regression Detected",
+      "evidence": [
+        "Historical runs matching fingerprint: 0"
+      ],
+      "reason": "Deterministic fingerprint comparison against historical baseline",
+      "confidence": {
+        "deterministic": 100,
+        "ai": 0
+      }
+    }
+  },
+  "businessImpact": {
+    "type": "BUSINESS_IMPACT",
+    "value": "High",
+    "explainability": {
+      "decision": "High Impact",
+      "evidence": [
+        "Failed during: WF-FIN-001"
+      ],
+      "reason": "Core business workflow interrupted",
+      "confidence": {
+        "deterministic": 90,
+        "ai": 0
+      }
+    }
+  },
+  "suggestedOwner": {
+    "type": "OWNERSHIP",
+    "value": {
+      "team": "Finance",
+      "reason": "Capability CAP-FIN-001 falls under Finance domain."
+    },
+    "explainability": {
+      "decision": "Finance",
+      "evidence": [
+        "Workflow: WF-FIN-001"
+      ],
+      "reason": "Routed via deterministic capability-to-team matrix",
+      "confidence": {
+        "deterministic": 100,
+        "ai": 0
+      }
+    }
+  },
+  "releaseRisk": {
+    "type": "RELEASE_RISK",
+    "value": "Blocker",
+    "explainability": {
+      "decision": "Blocker",
+      "evidence": [
+        "Impact: High",
+        "Regression: true"
+      ],
+      "reason": "Computed from Business Criticality + Capability Risk + Regression state",
+      "confidence": {
+        "deterministic": 100,
+        "ai": 0
+      }
+    }
+  },
+  "capabilityImpact": {
+    "type": "CAPABILITY_IMPACT",
+    "value": "CAP-FIN-001",
+    "explainability": {
+      "decision": "Impacted",
+      "evidence": [],
+      "reason": "Direct mapping",
+      "confidence": {
+        "deterministic": 100,
+        "ai": 0
+      }
+    }
+  },
+  "hypotheses": [
+    {
+      "id": "HYP-01",
+      "title": "Validation rule failed in execution pipeline",
+      "probability": 0.8,
+      "evidenceStrength": 0.9,
+      "historicalSupport": 0.7,
+      "score": 0.504,
+      "affectedRules": [
+        "GstCalculationRule"
+      ],
+      "affectedWorkflows": [
+        "WF-FIN-001"
+      ],
+      "affectedCapabilities": [
+        "CAP-FIN-001"
+      ],
+      "explainability": {
+        "decision": "Rule Failure",
+        "evidence": [
+          "ValidationResults contain errors"
+        ],
+        "reason": "Deterministic extraction from engine payload",
+        "confidence": {
+          "deterministic": 90,
+          "ai": 0
+        }
+      }
+    }
+  ],
+  "recommendations": [
+    "Inspect GstCalculationRule",
+    "Check precondition data for WF-FIN-001"
+  ]
+}

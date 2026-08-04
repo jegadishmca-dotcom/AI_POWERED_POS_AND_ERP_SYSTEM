@@ -1,0 +1,15 @@
+{
+  "id": "FAIL-1783772836789",
+  "timestamp": 1783772836789,
+  "scenarioId": "SCENARIO-SALES-001-FAIL",
+  "error": "Payment declined timeout",
+  "fingerprint": {
+    "hash": "F-8A9B2C",
+    "workflow": "WF-SALES-001",
+    "scenario": "SCENARIO-SALES-001-FAIL",
+    "capability": "CAP-SALES-001",
+    "ruleFailures": [],
+    "validationResults": [],
+    "evidenceHash": "EV-123"
+  }
+}

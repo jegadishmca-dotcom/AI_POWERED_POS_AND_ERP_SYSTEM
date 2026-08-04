@@ -5,6 +5,7 @@ import { PaymentModal } from './PaymentModal';
 import { searchProducts } from '../../catalog/api/catalog.api';
 import { searchCustomers, registerCustomer } from '../../crm/api/crm.api';
 import { createInvoice, closeShift, getZReport, getProductBatches, getCurrentSession, openSession, calculateCart, getActiveBusinessDate, openBusinessDate, holdInvoice } from '../api/pos.api';
+import { getPosPermissions } from '../../settings/api/settings.api';
 import { printReceipt } from '../utils/printReceipt';
 import { printZReport } from '../utils/printZReport';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
@@ -22,6 +23,7 @@ import { posDb } from '../db/pos.db';
 import { useAuthStore } from '../../auth/store/auth.store';
 import { syncInvoices } from '../api/pos.sync';
 import { safeRandomUUID } from '../../../utils/uuid';
+import { api } from '../../../utils/api';
 
 export const PosTerminal = () => {
   const [customer, setCustomer] = useState<any>(null);
@@ -116,6 +118,9 @@ export const PosTerminal = () => {
   const terminalId = localStorage.getItem('pos_terminal_id') || '';
   const cashierId = user?.id || '';
 
+  // Feature 2: Cashier line-item delete toggle — loaded from backend on mount
+  const [cashierCanDeleteLineItem, setCashierCanDeleteLineItem] = useState(false);
+
   // Business Date State
   const [isBusinessDateOpen, setBusinessDateOpen] = useState(true);
   const [activeBusinessDate, setActiveBusinessDate] = useState<string | null>(null);
@@ -165,6 +170,15 @@ export const PosTerminal = () => {
           } else {
             setOpenShiftModalOpen(true);
           }
+        }
+
+        // Feature 2: Load cashier delete permission flag in parallel with shift check
+        try {
+          const posPerms = await getPosPermissions();
+          setCashierCanDeleteLineItem(posPerms.cashierCanDeleteLineItem);
+        } catch {
+          // Non-critical — default stays false (manager PIN required)
+          console.warn('Could not load POS permissions, defaulting cashierCanDeleteLineItem=false');
         }
       } catch (err) {
         console.error('Failed to fetch business date status', err);
@@ -729,14 +743,26 @@ export const PosTerminal = () => {
       console.warn('Failed to fetch batches', err);
     }
 
-    if (fetchedBatches && fetchedBatches.length >= 2) {
+    // Feature 1 (Price Change Module): Filter out price-change batches (AvailableQuantity = 0)
+    // from the POS batch selection popup. These batches exist purely to record a price-change
+    // event and have no physical stock. The product's current MRP/SellingPrice (already updated
+    // on the Product master record) is used for pricing — not the batch.
+    const stockBatches = fetchedBatches.filter((b: any) =>
+      b.availableQuantity !== undefined
+        ? b.availableQuantity > 0
+        : b.currentStock !== undefined
+          ? b.currentStock > 0
+          : true // if qty field name unknown, include (safe fallback)
+    );
+
+    if (stockBatches.length >= 2) {
       setSelectedBatchIndex(0);
-      setBatchModalData({ product, batches: fetchedBatches, overrideQty });
+      setBatchModalData({ product, batches: stockBatches, overrideQty });
       return;
     }
 
-    const chosenBatch = (fetchedBatches && fetchedBatches.length === 1) ? fetchedBatches[0] : null;
-    addSingleProductToCartDirect(product, chosenBatch, overrideQty, fetchedBatches);
+    const chosenBatch = stockBatches.length === 1 ? stockBatches[0] : null;
+    addSingleProductToCartDirect(product, chosenBatch, overrideQty, stockBatches);
   };
 
   const addSingleProductToCartDirect = (product: any, batch?: any, overrideQty?: number, allBatches?: any[]) => {
@@ -821,6 +847,59 @@ export const PosTerminal = () => {
   const removeItem = (productId: string) => {
     const updatedItems = cart.items.filter((item: any) => item.productId !== productId);
     recalculateCart(updatedItems);
+  };
+
+  /**
+   * Feature 2: Audit-logs a cashier-initiated line-item deletion.
+   * Calls POST /api/pos/audit/line-item-delete (server-side IAuditLoggingService).
+   * Called whenever a cart item is deleted — with OR without a manager PIN.
+   *
+   * SECURITY: wasManagerOverride is NOT sent to the server. The server derives the audit
+   * action name (CASHIER_DIRECT_DELETE_LINE_ITEM vs MANAGER_OVERRIDE_VOID_ITEM) from the
+   * caller's JWT role claim, which is cryptographically signed and cannot be forged.
+   *
+   * CART PRICE BEHAVIOR (Feature 1 design decision — documented here):
+   * Item prices in the cart are FROZEN at the time the item was added to the cart
+   * (unitPrice is captured from the batch/product at add-time). If a price change
+   * is applied via the Price Change Module while this cart is open, the already-added
+   * items are NOT live-updated. The cashier must remove and re-scan to get the
+   * new price. This is intentional: it prevents unexpected price changes mid-transaction
+   * and matches standard retail POS behaviour.
+   */
+  const auditLogLineItemDelete = async (item: any) => {
+    try {
+      await api.post('/api/pos/audit/line-item-delete', {
+        productId: item.productId,
+        productName: item.name,
+        quantity: item.qty,
+        unitPrice: item.unitPrice,
+        // wasManagerOverride intentionally omitted: server derives this from JWT role
+        terminalId,
+        cartRef: safeRandomUUID() // transaction reference (best-effort if cart not yet saved)
+      });
+    } catch (err) {
+      // Non-critical: log locally but don't block the delete action
+      console.warn('Failed to audit log line item delete', err);
+    }
+  };
+
+  /**
+   * Feature 2: Handles cart item delete based on the cashierCanDeleteLineItem flag.
+   * - If the current user is a Cashier AND the flag is ON → delete directly + audit log
+   * - Otherwise → require Manager Override PIN (existing flow)
+   */
+  const handleDeleteCartItem = (item: any) => {
+    if (user?.role === 'Cashier' && cashierCanDeleteLineItem) {
+      // Direct delete — no PIN required — but always audit log (server logs as CASHIER_DIRECT_DELETE_LINE_ITEM)
+      removeItem(item.productId);
+      auditLogLineItemDelete(item);
+    } else {
+      // Manager Override PIN required (server logs as MANAGER_OVERRIDE_VOID_ITEM)
+      requestManagerOverride('Void Item', () => {
+        removeItem(item.productId);
+        auditLogLineItemDelete(item);
+      });
+    }
   };
 
   // Barcode Scanner Integration
@@ -1561,7 +1640,19 @@ export const PosTerminal = () => {
                         <p className="font-black text-xl text-slate-900">₹{item.finalLineTotal.toFixed(2)}</p>
                       </td>
                       <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
-                        <button onClick={() => requestManagerOverride('Void Item', () => removeItem(item.productId))} className="text-slate-400 hover:text-red-600 transition p-1" title="Void Item (Manager)">
+                        <button
+                          onClick={() => handleDeleteCartItem(item)}
+                          className={`transition p-1 ${
+                            user?.role === 'Cashier' && cashierCanDeleteLineItem
+                              ? 'text-red-500 hover:text-red-700 hover:bg-red-50 rounded'
+                              : 'text-slate-400 hover:text-red-600'
+                          }`}
+                          title={
+                            user?.role === 'Cashier' && cashierCanDeleteLineItem
+                              ? 'Delete Item'
+                              : 'Void Item (Manager Override Required)'
+                          }
+                        >
                           <Trash2 className="w-5 h-5" />
                         </button>
                       </td>

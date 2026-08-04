@@ -625,6 +625,68 @@ public class SettingsController : ControllerBase
         await _emailService.SendEmailAsync(to, subject, htmlBody);
         return Ok(new { success = true });
     }
+
+    // ── POS Permissions Feature Flags ─────────────────────────────────────────
+
+    /// <summary>
+    /// Feature 2: Returns POS-level permission flags (e.g. cashier delete toggle).
+    /// GET /api/settings/features/pos-permissions
+    ///
+    /// AUTHORIZATION: Open to any authenticated role (including Cashier) because
+    /// PosTerminal.tsx calls this on startup to load the cashierCanDeleteLineItem flag.
+    /// The class-level [Authorize(Roles = "Manager,Owner")] is intentionally overridden
+    /// here. Only the POST (write) endpoint remains Manager/Owner-only.
+    /// </summary>
+    [HttpGet("features/pos-permissions")]
+    [Authorize] // Any authenticated user — Cashier must be able to read this flag at POS startup
+    public IActionResult GetPosPermissions()
+    {
+        var permissions = PosPermissionsManager.GetPermissions();
+        return Ok(new
+        {
+            cashierCanDeleteLineItem = permissions.CashierCanDeleteLineItem
+        });
+    }
+
+    /// <summary>
+    /// Feature 2: Updates POS-level permission flags.
+    /// POST /api/settings/features/pos-permissions
+    /// Changes are audit-logged for traceability.
+    /// </summary>
+    [HttpPost("features/pos-permissions")]
+    public async Task<IActionResult> UpdatePosPermissions([FromBody] PosPermissionsRequest request)
+    {
+        if (request == null)
+            return BadRequest(new { message = "Request payload is required." });
+
+        var oldPermissions = PosPermissionsManager.GetPermissions();
+        var newPermissions = new PosPermissions
+        {
+            CashierCanDeleteLineItem = request.CashierCanDeleteLineItem
+        };
+        PosPermissionsManager.SavePermissions(newPermissions);
+
+        var userIdClaim = User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
+        Guid? userId = Guid.TryParse(userIdClaim, out var guid) ? guid : null;
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        await _auditLoggingService.LogActionAsync(
+            userId,
+            "UPDATE_POS_PERMISSIONS",
+            "PosPermissions",
+            "cashierCanDeleteLineItem",
+            oldPermissions,
+            newPermissions,
+            ipAddress,
+            default);
+
+        return Ok(new
+        {
+            success = true,
+            message = "POS permission settings saved. Changes take effect immediately.",
+            cashierCanDeleteLineItem = newPermissions.CashierCanDeleteLineItem
+        });
+    }
 }
 
 public record SystemAlertRequest(string AlertSource, string Message);
@@ -665,3 +727,5 @@ public record TerminalRequest(
 public record ComplianceFeaturesDto(
     bool EInvoiceEnabled,
     bool EWayBillEnabled);
+
+public record PosPermissionsRequest(bool CashierCanDeleteLineItem);

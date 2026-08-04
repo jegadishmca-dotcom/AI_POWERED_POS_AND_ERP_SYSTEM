@@ -145,12 +145,22 @@ public class AuthController : ControllerBase
 
     private void SetRefreshTokenCookie(string token)
     {
+        // SESSION COOKIE: No Expires property set.
+        // This makes the cookie a session-scoped cookie, which the browser automatically
+        // deletes when the browser is fully closed. This ensures that closing and reopening
+        // the browser always requires the user to log in again.
+        //
+        // NOTE: The refresh token record in the database still has a 7-day validity window.
+        // The session cookie approach narrows but does not fully eliminate the bypass risk,
+        // since some browsers and OS session-restore features can keep session cookies alive
+        // across a browser restart. The ProtectedRoute.tsx mount-time validation provides
+        // an additional layer of defence.
         var cookieOptions = new CookieOptions
         {
             HttpOnly = true,
             Secure = true,
-            SameSite = SameSiteMode.Strict,
-            Expires = DateTime.UtcNow.AddDays(7)
+            SameSite = SameSiteMode.Strict
+            // No Expires = session cookie
         };
         Response.Cookies.Append("refreshToken", token, cookieOptions);
     }

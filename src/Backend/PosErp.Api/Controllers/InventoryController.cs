@@ -614,4 +614,174 @@ public class InventoryController : ControllerBase
         result.Add(currentToken.ToString().Trim(' ', '"'));
         return result;
     }
+
+    // ── Feature 1: Price Change Module ─────────────────────────────────────────
+
+    /// <summary>
+    /// Creates a new ProductBatch record that represents a price change for an existing product.
+    /// The batch has AvailableQuantity = 0 (no physical stock) and is marked as a price-change
+    /// batch via GrnReference = "PRICE-CHANGE". The Product.Mrp and Product.SellingPrice are
+    /// updated immediately so POS scans pick up the new price at next scan.
+    ///
+    /// CART PRICE BEHAVIOR: Items already in an open POS cart at the time of a price change
+    /// retain the price at which they were added (unitPrice is frozen at add-time). The cashier
+    /// must remove and re-scan the item to get the new price. This matches standard retail POS
+    /// behaviour and prevents mid-transaction price surprises.
+    ///
+    /// AUDIT: ChangedByUserId = JWT sub claim; ChangedAt = ProductBatch.CreatedAt (UTC).
+    ///
+    /// POST /api/inventory/price-change
+    /// </summary>
+    [HttpPost("price-change")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
+    public async Task<IActionResult> CreatePriceChange(
+        [FromBody] PriceChangeRequest request,
+        [FromServices] IApplicationDbContext db,
+        [FromServices] PosErp.Application.Features.Audit.Services.IAuditLoggingService auditLogger,
+        CancellationToken cancellationToken)
+    {
+        if (request == null)
+            return BadRequest(new { message = "Request payload is required." });
+
+        if (request.NewMrp <= 0 || request.NewSellingPrice <= 0)
+            return BadRequest(new { message = "New MRP and Selling Price must be greater than zero." });
+
+        if (request.NewSellingPrice > request.NewMrp)
+            return BadRequest(new { message = "Selling Price cannot exceed MRP." });
+
+        var product = await db.Products.FirstOrDefaultAsync(p => p.Id == request.ProductId && !p.IsDeleted, cancellationToken);
+        if (product == null)
+            return NotFound(new { message = "Product not found." });
+
+        // Capture old values for audit log
+        var oldMrp = product.Mrp;
+        var oldSellingPrice = product.SellingPrice;
+
+        // Extract the caller's user ID for attribution (ChangedByUserId)
+        var callerIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+        Guid? callerId = Guid.TryParse(callerIdStr, out var parsedId) ? parsedId : null;
+
+        // Create a new batch record to track this price-change event.
+        // AvailableQuantity = 0 — this is a price-change batch, not a stock receipt.
+        // GrnReference = "PRICE-CHANGE" — distinguishes it from GRN batches.
+        // The POS batch selection popup must filter out batches where AvailableQuantity = 0
+        // (confirmed design decision) so this batch will NOT appear in the checkout picker.
+        var batchLabel = !string.IsNullOrWhiteSpace(request.BatchLabel)
+            ? request.BatchLabel
+            : $"PC-{DateTime.UtcNow:yyyyMMdd-HHmm}";
+
+        var newBatch = new ProductBatch
+        {
+            Id = Guid.NewGuid(),
+            ProductId = request.ProductId,
+            StoreId = product.StoreId,
+            BatchNumber = batchLabel,
+            Mrp = request.NewMrp,
+            CostPrice = oldSellingPrice, // preserve prior selling price as cost reference
+            AvailableQuantity = 0,       // price-change batch — no physical stock
+            GrnReference = $"PRICE-CHANGE | Reason: {request.Reason} | ChangedBy: {callerIdStr ?? "unknown"}",
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+        };
+        db.ProductBatches.Add(newBatch);
+
+        // Update the product master price immediately
+        product.Mrp = request.NewMrp;
+        product.SellingPrice = request.NewSellingPrice;
+
+        // CONCURRENCY: Last-write-wins by intentional design. If two Managers submit a price
+        // change for the same product simultaneously, the second SaveChangesAsync will overwrite
+        // the first on Product.Mrp / Product.SellingPrice. Both writes still create separate
+        // ProductBatch records so neither price-change event is lost from the audit history.
+        // For a single-store operation with one active manager at a time, this is acceptable.
+        // If concurrent manager editing becomes a concern, add a RowVersion shadow-property to
+        // Product and configure EF Core optimistic concurrency (no migration needed for shadow props).
+        await db.SaveChangesAsync(cancellationToken);
+
+        // Audit log the price change with full attribution
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        await auditLogger.LogActionAsync(
+            userId: callerId,
+            action: "PRICE_CHANGE",
+            entityName: "Product",
+            entityId: product.Id.ToString(),
+            oldValues: new { Mrp = oldMrp, SellingPrice = oldSellingPrice },
+            newValues: new
+            {
+                Mrp = request.NewMrp,
+                SellingPrice = request.NewSellingPrice,
+                BatchId = newBatch.Id,
+                BatchLabel = batchLabel,
+                Reason = request.Reason,
+                ChangedAt = newBatch.CreatedAt
+            },
+            ipAddress: ipAddress,
+            cancellationToken: cancellationToken);
+
+        return Ok(new
+        {
+            success = true,
+            message = $"Price updated for '{product.Name}'. New MRP: {request.NewMrp:F2}, Selling Price: {request.NewSellingPrice:F2}.",
+            batchId = newBatch.Id,
+            productId = product.Id,
+            productName = product.Name,
+            newMrp = request.NewMrp,
+            newSellingPrice = request.NewSellingPrice,
+            changedAt = newBatch.CreatedAt,
+            changedByUserId = callerId
+        });
+    }
+
+    /// <summary>
+    /// Returns all price batches (price history) for a product, ordered by CreatedAt descending.
+    /// Includes both GRN-sourced batches and price-change batches (AvailableQuantity = 0).
+    /// GET /api/inventory/price-history/{productId}
+    /// </summary>
+    [HttpGet("price-history/{productId}")]
+    [Authorize(Roles = "Admin,Manager,Owner")]
+    public async Task<IActionResult> GetPriceHistory(
+        Guid productId,
+        [FromServices] IApplicationDbContext db,
+        CancellationToken cancellationToken)
+    {
+        var product = await db.Products.FirstOrDefaultAsync(p => p.Id == productId && !p.IsDeleted, cancellationToken);
+        if (product == null)
+            return NotFound(new { message = "Product not found." });
+
+        var batches = await db.ProductBatches
+            .Where(b => b.ProductId == productId)
+            .OrderByDescending(b => b.CreatedAt)
+            .Select(b => new
+            {
+                b.Id,
+                b.BatchNumber,
+                b.Mrp,
+                CostPrice = b.CostPrice,
+                b.AvailableQuantity,
+                b.GrnReference,
+                b.CreatedAt,
+                b.IsActive,
+                IsPriceChangeBatch = b.GrnReference != null && b.GrnReference.StartsWith("PRICE-CHANGE")
+            })
+            .ToListAsync(cancellationToken);
+
+        return Ok(new
+        {
+            productId = product.Id,
+            productName = product.Name,
+            currentMrp = product.Mrp,
+            currentSellingPrice = product.SellingPrice,
+            batches
+        });
+    }
 }
+
+public record PriceChangeRequest(
+    Guid ProductId,
+    decimal NewMrp,
+    decimal NewSellingPrice,
+    string Reason,
+    string? BatchLabel = null
+);
+

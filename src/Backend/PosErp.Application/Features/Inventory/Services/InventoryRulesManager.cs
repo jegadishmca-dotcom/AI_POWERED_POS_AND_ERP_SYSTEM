@@ -13,7 +13,13 @@ public class InventoryRules
 
 public static class InventoryRulesManager
 {
-    private static readonly string FilePath = Path.Combine(AppContext.BaseDirectory, "inventory_rules.json");
+    // PERSISTENCE FIX: Use SYSTEM_CONFIG_DIR env var so the file lands in /app/config
+    // (mounted as the pos_config Docker volume) instead of AppContext.BaseDirectory
+    // (/app, which is ephemeral and wiped on container rebuild).
+    // Falls back to AppContext.BaseDirectory for local dev (SYSTEM_CONFIG_DIR not set).
+    private static readonly string FilePath = Path.Combine(
+        Environment.GetEnvironmentVariable("SYSTEM_CONFIG_DIR") ?? AppContext.BaseDirectory,
+        "inventory_rules.json");
     private static readonly object LockObj = new();
 
     // CQ-01 FIX: Cache the rules in-memory so we don't read from disk on every stock ledger write.

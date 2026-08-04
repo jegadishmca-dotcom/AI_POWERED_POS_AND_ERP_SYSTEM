@@ -89,3 +89,39 @@ export const updateComplianceFeatures = async (payload: ComplianceFeaturesDto): 
   const response = await api.post('/api/settings/features/compliance', payload);
   return response.data;
 };
+
+// ── POS Permissions Feature Toggle APIs ──────────────────────────────────────
+
+export interface PosPermissionsDto {
+  cashierCanDeleteLineItem: boolean;
+}
+
+export const getPosPermissions = async (): Promise<PosPermissionsDto> => {
+  const response = await api.get('/api/settings/features/pos-permissions');
+  return response.data;
+};
+
+export const updatePosPermissions = async (payload: PosPermissionsDto): Promise<any> => {
+  const response = await api.post('/api/settings/features/pos-permissions', payload);
+  return response.data;
+};
+
+// ── Price Change APIs (Feature 1) ────────────────────────────────────────────
+
+export interface PriceChangePayload {
+  productId: string;
+  newMrp: number;
+  newSellingPrice: number;
+  reason: string;
+  batchLabel?: string;
+}
+
+export const submitPriceChange = async (payload: PriceChangePayload): Promise<any> => {
+  const response = await api.post('/api/inventory/price-change', payload);
+  return response.data;
+};
+
+export const getProductPriceHistory = async (productId: string): Promise<any[]> => {
+  const response = await api.get(`/api/inventory/price-history/${productId}`);
+  return response.data;
+};

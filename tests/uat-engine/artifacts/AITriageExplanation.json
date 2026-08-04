@@ -1,0 +1,74 @@
+{
+  "Executive": {
+    "summary": "This is a synthesized explanation of the failure in WF-SALES-001.",
+    "businessImpact": "High",
+    "rootCauseHypotheses": [
+      "Validation rule failed in execution pipeline (Probability: 0.8)"
+    ],
+    "supportingEvidence": [
+      "Workflow: WF-SALES-001",
+      "Capability ID: CAP-SALES-001"
+    ],
+    "confidence": "100% deterministic confidence.",
+    "recommendedInvestigation": "Check the logs for GstCalculationRule.",
+    "affectedCapability": "CAP-SALES-001",
+    "affectedWorkflow": "WF-SALES-001",
+    "affectedRules": [
+      "GstCalculationRule"
+    ]
+  },
+  "Developer": {
+    "summary": "This is a synthesized explanation of the failure in WF-SALES-001.",
+    "businessImpact": "High",
+    "rootCauseHypotheses": [
+      "Validation rule failed in execution pipeline (Probability: 0.8)"
+    ],
+    "supportingEvidence": [
+      "Workflow: WF-SALES-001",
+      "Capability ID: CAP-SALES-001"
+    ],
+    "confidence": "100% deterministic confidence.",
+    "recommendedInvestigation": "Check the logs for GstCalculationRule.",
+    "affectedCapability": "CAP-SALES-001",
+    "affectedWorkflow": "WF-SALES-001",
+    "affectedRules": [
+      "GstCalculationRule"
+    ]
+  },
+  "QA": {
+    "summary": "QA Report: Scenario SCENARIO-SALES-001-FAIL failed while executing as persona Cashier.",
+    "businessImpact": "High",
+    "rootCauseHypotheses": [
+      "Validation rule failed in execution pipeline (Probability: 0.8)"
+    ],
+    "supportingEvidence": [
+      "Workflow: WF-SALES-001",
+      "Capability ID: CAP-SALES-001"
+    ],
+    "confidence": "100% deterministic confidence.",
+    "recommendedInvestigation": "Reproduce the scenario locally. Check evidence at /evidence/fail-123.png.",
+    "affectedCapability": "CAP-SALES-001",
+    "affectedWorkflow": "WF-SALES-001",
+    "affectedRules": [
+      "GstCalculationRule"
+    ]
+  },
+  "ReleaseManager": {
+    "summary": "This is a synthesized explanation of the failure in WF-SALES-001.",
+    "businessImpact": "High",
+    "rootCauseHypotheses": [
+      "Validation rule failed in execution pipeline (Probability: 0.8)"
+    ],
+    "supportingEvidence": [
+      "Workflow: WF-SALES-001",
+      "Capability ID: CAP-SALES-001"
+    ],
+    "confidence": "100% deterministic confidence.",
+    "recommendedInvestigation": "Check the logs for GstCalculationRule.",
+    "affectedCapability": "CAP-SALES-001",
+    "affectedWorkflow": "WF-SALES-001",
+    "affectedRules": [
+      "GstCalculationRule"
+    ]
+  }
+}

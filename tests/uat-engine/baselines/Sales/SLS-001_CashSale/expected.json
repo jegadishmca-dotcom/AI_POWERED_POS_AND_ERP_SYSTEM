@@ -1,0 +1,33 @@
+{
+  "scenarioId": "SLS-001",
+  "scenarioName": "Cash Sale",
+  "version": "1.0",
+  "status": "BASELINE",
+
+  "customer": {
+    "name": "Jegadish Mathiyazhagan",
+    "phone": "9597344096"
+  },
+
+  "terminal": "LOCAL POS 01",
+  "cashier": "Jegadish M",
+
+  "payment": {
+    "method": "Cash"
+  },
+"items": [
+  {
+    "name": "Toned Milk Pack",
+    "qty": 1,
+    "unitPrice": 28.00,
+    "lineTotal": 28.00,
+    "gstPercent": 0
+  }
+],
+
+"totals": {
+  "subTotal": 28.00,
+  "gst": 0.00,
+  "grandTotal": 28.00
+}
+}

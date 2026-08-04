@@ -819,7 +819,79 @@ public class PosController : ControllerBase
 
         return Ok(new { success = true, message = "Held invoice deleted/removed." });
     }
+
+    /// <summary>
+    /// Feature 2: Audit log endpoint for cashier-initiated or manager-override line item deletions.
+    /// POST /api/pos/audit/line-item-delete
+    ///
+    /// SECURITY: The WasManagerOverride flag is NOT accepted from the client. It is derived
+    /// SERVER-SIDE from the caller's JWT role claim:
+    ///   - Cashier  calling this endpoint → CASHIER_DIRECT_DELETE_LINE_ITEM
+    ///   - Manager/Owner calling this endpoint → MANAGER_OVERRIDE_VOID_ITEM
+    ///
+    /// A Cashier cannot forge a "manager override" audit record by passing a boolean in the
+    /// request body, because the JWT role is cryptographically signed by the server.
+    /// </summary>
+    [HttpPost("audit/line-item-delete")]
+    public async Task<IActionResult> AuditLineItemDelete([FromBody] LineItemDeleteAuditRequest request)
+    {
+        if (request == null)
+            return BadRequest(new { message = "Request payload is required." });
+
+        var callerIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+            ?? User.FindFirst("sub")?.Value;
+        Guid? callerId = Guid.TryParse(callerIdStr, out var parsedId) ? parsedId : null;
+        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        // SECURITY FIX: Derive the action name from the JWT role claim — not from a client-supplied
+        // boolean. The JWT is signed server-side and cannot be tampered with by the browser.
+        // A Cashier cannot send wasManagerOverride=true to disguise a direct deletion as an override.
+        var callerRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
+                      ?? User.FindFirst("role")?.Value
+                      ?? string.Empty;
+        var isCashier = string.Equals(callerRole, "Cashier", StringComparison.OrdinalIgnoreCase);
+        var auditAction = isCashier
+            ? "CASHIER_DIRECT_DELETE_LINE_ITEM"
+            : "MANAGER_OVERRIDE_VOID_ITEM";
+
+        await _auditLogger.LogActionAsync(
+            userId: callerId,
+            action: auditAction,
+            entityName: "CartLineItem",
+            entityId: request.ProductId.ToString(),
+            oldValues: new
+            {
+                request.ProductId,
+                request.ProductName,
+                request.Quantity,
+                request.UnitPrice,
+            },
+            newValues: new
+            {
+                Deleted = true,
+                DerivedFromRole = callerRole, // server-derived, not client-supplied
+                request.TerminalId,
+                request.CartRef,
+                DeletedAt = DateTime.UtcNow
+            },
+            ipAddress: ipAddress,
+            cancellationToken: default);
+
+        return Ok(new { success = true, action = auditAction });
+    }
 }
+
+public record LineItemDeleteAuditRequest(
+    Guid ProductId,
+    string ProductName,
+    decimal Quantity,
+    decimal UnitPrice,
+    // NOTE: WasManagerOverride intentionally removed from request body — the action name
+    // is now derived server-side from the caller's JWT role (see AuditLineItemDelete above).
+    string TerminalId,
+    string CartRef
+);
+
 
 public class HoldInvoiceRequest
 {

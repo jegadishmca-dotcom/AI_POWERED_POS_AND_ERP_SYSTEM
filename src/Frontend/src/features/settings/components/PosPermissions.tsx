@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   ShieldCheck, AlertTriangle, CheckCircle2, Loader2,
-  ToggleLeft, ToggleRight, Trash2, Info
+  ToggleLeft, ToggleRight, Trash2, Info, Globe
 } from 'lucide-react';
 import { getPosPermissions, updatePosPermissions, PosPermissionsDto } from '../api/settings.api';
 
@@ -113,10 +113,136 @@ export const PosPermissions: React.FC = () => {
         onChange={(v) => handleToggle('cashierCanDeleteLineItem', v)}
       />
 
+      {/* Section Divider */}
+      <div className="my-8 border-t border-slate-200" />
+
+      {/* Multi-Language & Receipt Print Settings */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+          <Globe className="w-5 h-5" />
+        </div>
+        <div>
+          <h3 className="font-bold text-slate-800">Multi-Language & Receipt Print Configuration</h3>
+          <p className="text-xs text-slate-400">
+            Global ERP standard for multi-lingual store receipt printing & automatic product catalog translation
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {/* Receipt Product Language */}
+        <div className="p-5 rounded-xl border border-slate-200 bg-slate-50">
+          <label className="block font-bold text-slate-800 text-sm mb-1">
+            Receipt Product Language Mode
+          </label>
+          <p className="text-xs text-slate-500 mb-3">
+            Choose which product name language is printed on thermal POS billing receipts
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {[
+              { id: 'secondary', label: 'Secondary / Tamil (Default)', desc: 'Prints regional Tamil product name' },
+              { id: 'primary', label: 'Primary / English', desc: 'Prints standard English product name' },
+              { id: 'both', label: 'Dual (English + Tamil)', desc: 'Prints English / Tamil dual names' },
+            ].map(opt => (
+              <button
+                key={opt.id}
+                type="button"
+                disabled={saving}
+                onClick={async () => {
+                  setSaving(true);
+                  const updated = { ...permissions, receiptProductLanguage: opt.id as any };
+                  setPermissions(updated);
+                  try {
+                    await updatePosPermissions(updated);
+                    setMessage({ text: `Receipt language updated to ${opt.label}.`, type: 'success' });
+                  } catch {
+                    setPermissions(permissions);
+                  } finally { setSaving(false); }
+                }}
+                className={`p-3 rounded-lg border text-left transition-all ${
+                  (permissions.receiptProductLanguage || 'secondary') === opt.id
+                    ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-900 font-bold'
+                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                }`}
+              >
+                <p className="text-xs font-bold mb-0.5">{opt.label}</p>
+                <p className="text-[11px] text-slate-500 font-normal">{opt.desc}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Product Catalog Auto-Translation Settings */}
+        <div className="p-5 rounded-xl border border-slate-200 bg-slate-50 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-bold text-slate-800 text-sm">Product Catalog Auto-Translation Engine</p>
+              <p className="text-xs text-slate-500">
+                Zoho AI-Level Smart ERP auto-translation engine for Product Catalog creation
+              </p>
+            </div>
+            <button
+              type="button"
+              disabled={saving}
+              onClick={async () => {
+                setSaving(true);
+                const val = !permissions.enableCatalogAutoTranslation;
+                const updated = { ...permissions, enableCatalogAutoTranslation: val };
+                setPermissions(updated);
+                try {
+                  await updatePosPermissions(updated);
+                  setMessage({ text: `Catalog auto-translation ${val ? 'enabled' : 'disabled'}.`, type: 'success' });
+                } catch { setPermissions(permissions); } finally { setSaving(false); }
+              }}
+              className="focus:outline-none"
+            >
+              {permissions.enableCatalogAutoTranslation !== false ? (
+                <ToggleRight className="w-10 h-10 text-emerald-500" />
+              ) : (
+                <ToggleLeft className="w-10 h-10 text-slate-300" />
+              )}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t border-slate-200">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1">
+                Target Translation Language
+              </label>
+              <select
+                disabled={saving || permissions.enableCatalogAutoTranslation === false}
+                className="w-full text-xs font-bold p-2.5 bg-white border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-emerald-500"
+                value={permissions.catalogTargetLanguage || 'ta'}
+                onChange={async (e) => {
+                  const val = e.target.value as any;
+                  setSaving(true);
+                  const updated = { ...permissions, catalogTargetLanguage: val };
+                  setPermissions(updated);
+                  try {
+                    await updatePosPermissions(updated);
+                    setMessage({ text: `Target catalog language updated.`, type: 'success' });
+                  } catch { setPermissions(permissions); } finally { setSaving(false); }
+                }}
+              >
+                <option value="ta">Tamil (தமிழ்) — Default (Tamil Nadu)</option>
+                <option value="hi">Hindi (हिन्दी) — North India</option>
+                <option value="ar">Arabic (العربية) — Middle East / GCC</option>
+                <option value="ms">Malay (Bahasa Melayu) — SE Asia</option>
+                <option value="es">Spanish (Español) — Global</option>
+              </select>
+            </div>
+            <div className="text-xs text-slate-500 flex items-center bg-blue-50/60 p-3 rounded-lg border border-blue-100">
+              <Info className="w-4 h-4 text-blue-600 mr-2 shrink-0" />
+              As you type English product names (e.g. Salt 1Kg), the engine tokenizes unit shorthand and populates meaningful secondary names (e.g. உப்பு 1 கிலோ).
+            </div>
+          </div>
+        </div>
+      </div>
+
       {saving && (
         <div className="mt-4 flex items-center gap-2 text-xs text-indigo-600 font-semibold">
           <Loader2 className="w-4 h-4 animate-spin" />
-          Saving...
+          Saving settings...
         </div>
       )}
     </div>

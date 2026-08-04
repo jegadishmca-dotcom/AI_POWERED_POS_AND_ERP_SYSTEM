@@ -786,6 +786,7 @@ export const PosTerminal = () => {
         id: safeRandomUUID(),
         productId: product.id,
         name: product.name,
+        nameTamil: product.tamilName || product.nameTamil || product.secondaryName || null,
         mrp: mrp,
         qty: qtyToAdd,
         unitPrice: sellingPrice,
@@ -1578,7 +1579,12 @@ export const PosTerminal = () => {
                         )}
                       </td>
                       <td className="p-3 border-r border-slate-300">
-                        <p className="font-extrabold text-slate-800 text-sm">{item.name}</p>
+                        <p className="font-extrabold text-slate-800 text-sm leading-snug">{item.name}</p>
+                        {(item.nameTamil || item.secondaryName || item.tamilName) && (
+                          <p className="text-xs font-bold text-emerald-800 font-tamil mt-0.5">
+                            {item.nameTamil || item.secondaryName || item.tamilName}
+                          </p>
+                        )}
                         {item.appliedOfferName && (
                           <p className="text-xs text-emerald-700 flex items-center font-bold bg-emerald-100/80 w-max px-2 py-0.5 rounded mt-1 border border-emerald-300">
                             <Tag className="w-3 h-3 mr-1" /> {item.appliedOfferName}

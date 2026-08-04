@@ -644,12 +644,15 @@ public class SettingsController : ControllerBase
         var permissions = PosPermissionsManager.GetPermissions();
         return Ok(new
         {
-            cashierCanDeleteLineItem = permissions.CashierCanDeleteLineItem
+            cashierCanDeleteLineItem = permissions.CashierCanDeleteLineItem,
+            receiptProductLanguage = permissions.ReceiptProductLanguage ?? "secondary",
+            enableCatalogAutoTranslation = permissions.EnableCatalogAutoTranslation,
+            catalogTargetLanguage = permissions.CatalogTargetLanguage ?? "ta"
         });
     }
 
     /// <summary>
-    /// Feature 2: Updates POS-level permission flags.
+    /// Feature 2: Updates POS-level permission & multi-language settings.
     /// POST /api/settings/features/pos-permissions
     /// Changes are audit-logged for traceability.
     /// </summary>
@@ -662,7 +665,10 @@ public class SettingsController : ControllerBase
         var oldPermissions = PosPermissionsManager.GetPermissions();
         var newPermissions = new PosPermissions
         {
-            CashierCanDeleteLineItem = request.CashierCanDeleteLineItem
+            CashierCanDeleteLineItem = request.CashierCanDeleteLineItem,
+            ReceiptProductLanguage = request.ReceiptProductLanguage ?? oldPermissions.ReceiptProductLanguage ?? "secondary",
+            EnableCatalogAutoTranslation = request.EnableCatalogAutoTranslation ?? oldPermissions.EnableCatalogAutoTranslation,
+            CatalogTargetLanguage = request.CatalogTargetLanguage ?? oldPermissions.CatalogTargetLanguage ?? "ta"
         };
         PosPermissionsManager.SavePermissions(newPermissions);
 
@@ -683,8 +689,11 @@ public class SettingsController : ControllerBase
         return Ok(new
         {
             success = true,
-            message = "POS permission settings saved. Changes take effect immediately.",
-            cashierCanDeleteLineItem = newPermissions.CashierCanDeleteLineItem
+            message = "POS permission & multi-language settings saved. Changes take effect immediately.",
+            cashierCanDeleteLineItem = newPermissions.CashierCanDeleteLineItem,
+            receiptProductLanguage = newPermissions.ReceiptProductLanguage,
+            enableCatalogAutoTranslation = newPermissions.EnableCatalogAutoTranslation,
+            catalogTargetLanguage = newPermissions.CatalogTargetLanguage
         });
     }
 }
@@ -728,4 +737,8 @@ public record ComplianceFeaturesDto(
     bool EInvoiceEnabled,
     bool EWayBillEnabled);
 
-public record PosPermissionsRequest(bool CashierCanDeleteLineItem);
+public record PosPermissionsRequest(
+    bool CashierCanDeleteLineItem,
+    string? ReceiptProductLanguage = null,
+    bool? EnableCatalogAutoTranslation = null,
+    string? CatalogTargetLanguage = null);

@@ -1,4 +1,4 @@
-import { api } from '@/utils/api';
+import { getPosPermissions } from '../../settings/api/settings.api';
 
 const STORE = {
   nameTamil: 'ஆப்பிள் சூப்பர் மார்க்கெட்',
@@ -17,7 +17,27 @@ const row   = (l: string, r: string, bold = false) =>
   `<span>${l}</span><span>${r}</span></div>`;
 const hr    = () => `<hr style="border:none;border-top:1px dashed #000;margin:4px 0;"/>`;
 
-function generateReceiptText(invoice: any, terminalCode: string): string {
+/**
+ * Resolves item product name based on global receipt language setting:
+ * - 'secondary' (default): Regional (Tamil) name if available, fallback to English.
+ * - 'primary': Standard English product name.
+ * - 'both': Dual English / Tamil names.
+ */
+function getItemDisplayName(item: any, langMode: string = 'secondary'): string {
+  const primary = item.name || item.productName || '';
+  const secondary = item.nameTamil || item.secondaryName || item.tamilName || '';
+
+  if (langMode === 'primary') {
+    return primary || secondary || '-';
+  }
+  if (langMode === 'both') {
+    return secondary ? `${primary} / ${secondary}` : (primary || '-');
+  }
+  // Default 'secondary': Regional (Tamil) product name
+  return secondary || primary || '-';
+}
+
+function generateReceiptText(invoice: any, terminalCode: string, langMode: string = 'secondary'): string {
   const rounded   = Math.round(safe(invoice.totalAmount));
   const roundOff  = +(rounded - safe(invoice.totalAmount)).toFixed(2);
   const cashAmt   = safe(invoice.cashAmount);
@@ -60,7 +80,7 @@ function generateReceiptText(invoice: any, terminalCode: string): string {
     const disc = safe(item.discountAmount);
     const lineAmt = safe(item.unitPrice) * qty - disc;
 
-    let name = item.name || item.productName || '-';
+    let name = getItemDisplayName(item, langMode);
     if (name.length > 20) name = name.substring(0, 19) + ".";
 
     const qtyStr = qty.toString();
@@ -161,7 +181,7 @@ function generateReceiptText(invoice: any, terminalCode: string): string {
   return sb;
 }
 
-function triggerSystemPrint(invoice: any, terminalCode: string) {
+function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string = 'secondary') {
   const rounded   = Math.round(safe(invoice.totalAmount));
   const roundOff  = +(rounded - safe(invoice.totalAmount)).toFixed(2);
   const cashAmt   = safe(invoice.cashAmount);
@@ -174,7 +194,7 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   const dateStr  = invoice.businessDate ? new Date(invoice.businessDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN');
   const timeStr  = invoice.businessDate ? new Date(invoice.businessDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-  // Build items boxed table rows
+  // Build items boxed table rows with single-line guarantee
   let itemsRowsHtml = '';
   (invoice.items || []).forEach((item: any, idx: number) => {
     const qty  = safe(item.quantity, safe(item.qty));
@@ -183,14 +203,16 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
     const mrp = safe(item.mrp || item.unitPrice);
     const mrpVal = mrp > 0 ? Math.round(mrp).toString() : '-';
 
+    const displayName = getItemDisplayName(item, langMode);
+
     itemsRowsHtml += `
       <tr>
-        <td style="border:1.5px solid #000; text-align:center; padding:3px 2px; font-weight:800; font-size:11px; vertical-align:middle;">${idx + 1}</td>
-        <td style="border:1.5px solid #000; padding:3px 3px; font-weight:800; font-size:11px; vertical-align:middle; text-transform:uppercase;">${item.name || item.productName || '-'}</td>
-        <td style="border:1.5px solid #000; text-align:center; padding:3px 2px; font-weight:800; font-size:11px; vertical-align:middle;">${qty}</td>
-        <td style="border:1.5px solid #000; text-align:center; padding:3px 2px; font-weight:800; font-size:11px; vertical-align:middle;">${mrpVal}</td>
-        <td style="border:1.5px solid #000; text-align:right; padding:3px 2px; font-weight:800; font-size:11px; vertical-align:middle;">${fmt(item.unitPrice)}</td>
-        <td style="border:1.5px solid #000; text-align:right; padding:3px 2px; font-weight:900; font-size:11.5px; vertical-align:middle;">${fmt(lineAmt)}</td>
+        <td style="border:1.5px solid #000; text-align:center; padding:2px 1px; font-weight:700; font-size:10px; vertical-align:middle; white-space:nowrap;">${idx + 1}</td>
+        <td style="border:1.5px solid #000; padding:2px 2px; font-weight:700; font-size:10px; vertical-align:middle; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:130px;" title="${displayName}">${displayName}</td>
+        <td style="border:1.5px solid #000; text-align:center; padding:2px 1px; font-weight:700; font-size:10px; vertical-align:middle; white-space:nowrap;">${qty}</td>
+        <td style="border:1.5px solid #000; text-align:center; padding:2px 1px; font-weight:700; font-size:10px; vertical-align:middle; white-space:nowrap;">${mrpVal}</td>
+        <td style="border:1.5px solid #000; text-align:right; padding:2px 1px; font-weight:700; font-size:10px; vertical-align:middle; white-space:nowrap;">${fmt(item.unitPrice)}</td>
+        <td style="border:1.5px solid #000; text-align:right; padding:2px 1px; font-weight:800; font-size:10.5px; vertical-align:middle; white-space:nowrap;">${fmt(lineAmt)}</td>
       </tr>`;
   });
 
@@ -298,12 +320,12 @@ function triggerSystemPrint(invoice: any, terminalCode: string) {
   <table class="border-table" style="margin-bottom: 4px;">
     <thead>
       <tr>
-        <th style="width: 8%; text-align: center; font-weight: 900; font-size: 11px; padding: 3px 2px;">S.No</th>
-        <th style="width: 42%; text-align: center; font-weight: 900; font-size: 11px; padding: 3px 2px;">Items</th>
-        <th style="width: 8%; text-align: center; font-weight: 900; font-size: 11px; padding: 3px 2px;">Qty</th>
-        <th style="width: 11%; text-align: center; font-weight: 900; font-size: 11px; padding: 3px 2px;">MRP</th>
-        <th style="width: 15%; text-align: center; font-weight: 900; font-size: 11px; padding: 3px 2px;">Rate</th>
-        <th style="width: 16%; text-align: center; font-weight: 900; font-size: 12px; padding: 3px 2px;">Amt</th>
+        <th style="width: 7%; text-align: center; font-weight: 800; font-size: 10px; padding: 2px 1px;">S.No</th>
+        <th style="width: 45%; text-align: center; font-weight: 800; font-size: 10px; padding: 2px 1px;">Items</th>
+        <th style="width: 9%; text-align: center; font-weight: 800; font-size: 10px; padding: 2px 1px;">Qty</th>
+        <th style="width: 11%; text-align: center; font-weight: 800; font-size: 10px; padding: 2px 1px;">MRP</th>
+        <th style="width: 13%; text-align: center; font-weight: 800; font-size: 10px; padding: 2px 1px;">Rate</th>
+        <th style="width: 15%; text-align: center; font-weight: 800; font-size: 10.5px; padding: 2px 1px;">Amt</th>
       </tr>
     </thead>
     <tbody>
@@ -370,6 +392,16 @@ export async function printReceipt(invoice: any): Promise<void> {
 
   const terminalCode = (() => { try { return localStorage.getItem('pos_terminal_code') || 'POS-01'; } catch { return 'POS-01'; } })();
 
+  let receiptLangMode = 'secondary';
+  try {
+    const perms = await getPosPermissions();
+    if (perms && perms.receiptProductLanguage) {
+      receiptLangMode = perms.receiptProductLanguage;
+    }
+  } catch (err) {
+    console.warn('Could not fetch receipt language setting, using default (secondary/Tamil)', err);
+  }
+
   const savedConfig = localStorage.getItem('pos_printer_config');
   let config: any = { receiptMode: 'system', receiptIp: '', receiptBaudRate: 9600 };
   if (savedConfig) {
@@ -383,7 +415,7 @@ export async function printReceipt(invoice: any): Promise<void> {
   if (config.receiptMode === 'usb') {
     if (!('serial' in navigator)) {
       alert('Web Serial API is not supported in this browser. Please use Chrome.');
-      triggerSystemPrint(invoice, terminalCode);
+      triggerSystemPrint(invoice, terminalCode, receiptLangMode);
       return;
     }
     try {
@@ -400,7 +432,7 @@ export async function printReceipt(invoice: any): Promise<void> {
       const writer = port.writable.getWriter();
       const encoder = new TextEncoder();
       
-      const textContent = generateReceiptText(invoice, terminalCode);
+      const textContent = generateReceiptText(invoice, terminalCode, receiptLangMode);
       
       // Init ESC/POS
       await writer.write(new Uint8Array([0x1B, 0x40]));
@@ -414,7 +446,7 @@ export async function printReceipt(invoice: any): Promise<void> {
     } catch (err: any) {
       console.error('USB print failed:', err);
       alert('USB print failed: ' + (err.message || err) + '. Falling back to system print.');
-      triggerSystemPrint(invoice, terminalCode);
+      triggerSystemPrint(invoice, terminalCode, receiptLangMode);
     }
   } else if (config.receiptMode === 'network') {
     try {

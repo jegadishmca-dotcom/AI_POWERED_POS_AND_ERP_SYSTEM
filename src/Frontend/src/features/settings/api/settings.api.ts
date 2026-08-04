@@ -94,6 +94,9 @@ export const updateComplianceFeatures = async (payload: ComplianceFeaturesDto): 
 
 export interface PosPermissionsDto {
   cashierCanDeleteLineItem: boolean;
+  receiptProductLanguage?: 'secondary' | 'primary' | 'both';
+  enableCatalogAutoTranslation?: boolean;
+  catalogTargetLanguage?: 'ta' | 'hi' | 'ar' | 'ms' | 'es';
 }
 
 export const getPosPermissions = async (): Promise<PosPermissionsDto> => {

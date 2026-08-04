@@ -4,21 +4,25 @@ using System.Text.Json;
 
 namespace PosErp.Application.Features.Inventory.Services;
 
-/// <summary>
-/// POS-level permission flags controlled by the store Owner/Manager.
-/// Stored as a JSON file (same pattern as InventoryRulesManager) — no DB migration required.
-/// </summary>
 public class PosPermissions
 {
-    /// <summary>
-    /// When true, a cashier can delete a line item from the active billing cart
-    /// without a Manager Override PIN.
-    /// 
-    /// AUDIT NOTE: Every deletion performed under this permission is written to
-    /// the audit log (AuditLogs table) by the frontend even when no PIN is
-    /// required, preserving an audit trail despite the relaxed control.
-    /// </summary>
     public bool CashierCanDeleteLineItem { get; set; } = false;
+
+    /// <summary>
+    /// Receipt product language mode: "secondary" (e.g. Tamil), "primary" (English), or "both" (English + Secondary).
+    /// Default is "secondary" to print Tamil names on receipt by default, but fully configurable.
+    /// </summary>
+    public string ReceiptProductLanguage { get; set; } = "secondary";
+
+    /// <summary>
+    /// When true, automatically translates English product names into the target language during product creation.
+    /// </summary>
+    public bool EnableCatalogAutoTranslation { get; set; } = true;
+
+    /// <summary>
+    /// Target language for product catalog auto-translation: "ta" (Tamil), "hi" (Hindi), "ar" (Arabic), "ms" (Malay), "es" (Spanish).
+    /// </summary>
+    public string CatalogTargetLanguage { get; set; } = "ta";
 }
 
 /// <summary>

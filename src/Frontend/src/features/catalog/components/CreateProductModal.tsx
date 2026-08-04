@@ -1,6 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { X, Loader2, Save } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Loader2, Save, Sparkles } from 'lucide-react';
 import { createProduct, updateProduct, getTaxSlabs, TaxSlab, getUoms, getCategories, Category, UnitOfMeasure } from '../api/catalog.api';
+import { getPosPermissions } from '../../settings/api/settings.api';
+import { translateProductName } from '../../../utils/translationEngine';
 import { useQueryClient } from '@tanstack/react-query';
 
 interface CreateProductModalProps {
@@ -28,14 +30,64 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Auto-Translation States & Settings
+  const [enableAutoTrans, setEnableAutoTrans] = useState(true);
+  const [targetLang, setTargetLang] = useState('ta');
+  const [isTranslating, setIsTranslating] = useState(false);
+  const isManualEditRef = useRef(false);
+
   useEffect(() => {
     getTaxSlabs().then(setTaxSlabs).catch(console.error);
     getCategories().then(setCategories).catch(console.error);
     getUoms().then(setUoms).catch(console.error);
+    getPosPermissions()
+      .then(p => {
+        if (p.enableCatalogAutoTranslation !== undefined) setEnableAutoTrans(p.enableCatalogAutoTranslation);
+        if (p.catalogTargetLanguage) setTargetLang(p.catalogTargetLanguage);
+      })
+      .catch(() => {});
   }, []);
+
+  // Debounced Auto-Translation Effect on Product Name Change
+  useEffect(() => {
+    if (!name.trim() || !enableAutoTrans || isManualEditRef.current) return;
+
+    const timer = setTimeout(async () => {
+      setIsTranslating(true);
+      try {
+        const translated = await translateProductName(name, targetLang);
+        if (translated && !isManualEditRef.current) {
+          setTamilName(translated);
+        }
+      } catch (err) {
+        console.warn('Auto translation failed', err);
+      } finally {
+        setIsTranslating(false);
+      }
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [name, enableAutoTrans, targetLang]);
+
+  const handleManualTranslate = async () => {
+    if (!name.trim()) return;
+    setIsTranslating(true);
+    try {
+      const translated = await translateProductName(name, targetLang);
+      if (translated) {
+        setTamilName(translated);
+        isManualEditRef.current = false;
+      }
+    } catch (err) {
+      console.warn('Manual translation failed', err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen) {
+      isManualEditRef.current = false;
       if (editingProduct) {
         setProductCode(editingProduct.productCode || '');
         setName(editingProduct.name || '');
@@ -221,12 +273,34 @@ export const CreateProductModal: React.FC<CreateProductModalProps> = ({ isOpen, 
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider mb-1">Tamil Name (Optional)</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Tamil / Regional Name (Secondary Language)
+              </label>
+              <button
+                type="button"
+                onClick={handleManualTranslate}
+                disabled={isTranslating || !name.trim()}
+                className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition disabled:opacity-40"
+                title="Re-run Auto Translation"
+              >
+                {isTranslating ? (
+                  <Loader2 className="w-3 h-3 animate-spin text-emerald-400" />
+                ) : (
+                  <Sparkles className="w-3 h-3 text-emerald-400" />
+                )}
+                {isTranslating ? 'Translating...' : 'Auto-Translate'}
+              </button>
+            </div>
             <input
               type="text"
+              placeholder="e.g. உப்பு 1 கிலோ"
               className="w-full px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-white placeholder-slate-600 focus:outline-none focus:border-blue-500 text-sm font-tamil"
               value={tamilName}
-              onChange={(e) => setTamilName(e.target.value)}
+              onChange={(e) => {
+                isManualEditRef.current = true;
+                setTamilName(e.target.value);
+              }}
             />
           </div>
 

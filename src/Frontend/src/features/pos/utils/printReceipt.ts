@@ -217,11 +217,11 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
     itemsRowsHtml += `
       <tr style="border-bottom: 1px solid #000;">
         <td style="text-align:center; padding:3px 1px; font-weight:700; font-size:10px; vertical-align:middle; border-right: 1px solid #000;">${idx + 1}</td>
-        <td style="text-align:left; padding:3px 3px; font-weight:800; font-size:10.5px; vertical-align:middle; border-right: 1px solid #000;" title="${displayName}">${displayName}</td>
-        <td style="text-align:center; padding:3px 1px; font-weight:800; font-size:10px; vertical-align:middle; border-right: 1px solid #000;">${qty}</td>
-        <td style="text-align:right; padding:3px 2px; font-weight:700; font-size:10px; vertical-align:middle; border-right: 1px solid #000;">${mrpVal}</td>
-        <td style="text-align:right; padding:3px 2px; font-weight:700; font-size:10px; vertical-align:middle; border-right: 1px solid #000;">${fmt(item.unitPrice)}</td>
-        <td style="text-align:right; padding:3px 3px; font-weight:900; font-size:11px; vertical-align:middle;">${fmt(lineAmt)}</td>
+        <td style="text-align:left; padding:3px 3px; font-weight:800; font-size:10px; vertical-align:middle; border-right: 1px solid #000; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${displayName}">${displayName}</td>
+        <td style="text-align:center; padding:3px 1px; font-weight:800; font-size:10px; vertical-align:middle; border-right: 1px solid #000; white-space:nowrap;">${qty}</td>
+        <td style="text-align:right; padding:3px 2px; font-weight:700; font-size:10px; vertical-align:middle; border-right: 1px solid #000; white-space:nowrap;">${mrpVal}</td>
+        <td style="text-align:right; padding:3px 2px; font-weight:700; font-size:10px; vertical-align:middle; border-right: 1px solid #000; white-space:nowrap;">${fmt(item.unitPrice)}</td>
+        <td style="text-align:right; padding:3px 3px; font-weight:900; font-size:10.5px; vertical-align:middle; white-space:nowrap;">${fmt(lineAmt)}</td>
       </tr>`;
   });
 
@@ -302,10 +302,8 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
       margin: 0 0 5px 0 !important;
     }
     table.receipt-table td, table.receipt-table th {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      word-break: break-all;
+      padding: 3px 2px;
+      vertical-align: middle;
     }
     
     .border-box {
@@ -341,8 +339,8 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
     <tr>
       <td style="width: 58%; padding: 4px 5px; border-right: 1.5px solid #000; vertical-align: top;">
         <span style="font-size: 8.5px; font-weight: 800; color: #444; display: block; text-transform: uppercase;">Bill No</span>
-        <strong style="font-size: 11px; font-weight: 900;">${invoice.invoiceNumber || '-'}</strong><br/>
-        <span style="font-size: 10px; font-weight: 800;">Cashier: ${invoice.cashierName || 'Cashier'}</span>
+        <strong style="font-size: 10px; font-weight: 900; font-family: monospace; word-break: break-all; display: block; line-height: 1.2;">${invoice.invoiceNumber || '-'}</strong>
+        <span style="font-size: 10px; font-weight: 800; display: block; margin-top: 2px;">Cashier: ${invoice.cashierName || 'Cashier'}</span>
       </td>
       <td style="width: 42%; padding: 4px 5px; vertical-align: top;">
         <span style="font-size: 8.5px; font-weight: 800; color: #444; display: block; text-transform: uppercase;">Date & Time</span>
@@ -352,25 +350,25 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
     </tr>
     ${invoice.customerName ? `
     <tr style="border-top: 1px solid #000;">
-      <td style="padding: 3px 5px; border-right: 1.5px solid #000;">
+      <td style="padding: 3px 5px; border-right: 1.5px solid #000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
         <strong style="font-weight: 800;">NAME:</strong> ${invoice.customerName}
       </td>
-      <td style="padding: 3px 5px;">
+      <td style="padding: 3px 5px; white-space: nowrap;">
         <strong style="font-weight: 800;">CELL:</strong> ${invoice.customerPhone || '-'}
       </td>
     </tr>` : ''}
   </table>
 
-  <!-- ITEMS BOXED TABLE (Strict Table-Layout Fixed Alignment) -->
+  <!-- ITEMS BOXED TABLE (Strict Table-Layout Fixed Alignment - Full Decimal Display) -->
   <table class="receipt-table border-box">
     <thead>
       <tr style="background: #f0f0f0; border-bottom: 1.5px solid #000;">
-        <th style="width: 7%; text-align: center; font-weight: 900; font-size: 10px; padding: 4px 1px; border-right: 1px solid #000;">#</th>
-        <th style="width: 44%; text-align: left; font-weight: 900; font-size: 10px; padding: 4px 3px; border-right: 1px solid #000;">Items</th>
+        <th style="width: 6%; text-align: center; font-weight: 900; font-size: 10px; padding: 4px 1px; border-right: 1px solid #000;">#</th>
+        <th style="width: 38%; text-align: left; font-weight: 900; font-size: 10px; padding: 4px 3px; border-right: 1px solid #000;">Items</th>
         <th style="width: 10%; text-align: center; font-weight: 900; font-size: 10px; padding: 4px 1px; border-right: 1px solid #000;">Qty</th>
-        <th style="width: 12%; text-align: right; font-weight: 900; font-size: 10px; padding: 4px 2px; border-right: 1px solid #000;">MRP</th>
-        <th style="width: 13%; text-align: right; font-weight: 900; font-size: 10px; padding: 4px 2px; border-right: 1px solid #000;">Rate</th>
-        <th style="width: 14%; text-align: right; font-weight: 900; font-size: 10.5px; padding: 4px 3px;">Amt</th>
+        <th style="width: 13%; text-align: right; font-weight: 900; font-size: 10px; padding: 4px 2px; border-right: 1px solid #000;">MRP</th>
+        <th style="width: 15%; text-align: right; font-weight: 900; font-size: 10px; padding: 4px 2px; border-right: 1px solid #000;">Rate</th>
+        <th style="width: 18%; text-align: right; font-weight: 900; font-size: 10.5px; padding: 4px 3px;">Amt</th>
       </tr>
     </thead>
     <tbody>

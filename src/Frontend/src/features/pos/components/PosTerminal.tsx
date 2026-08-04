@@ -816,9 +816,11 @@ export const PosTerminal = () => {
       const updatedItems = [...cart.items, newItem];
       recalculateCart(updatedItems);
 
-      if (isWeighableItem && overrideQty === undefined) {
-        focusItemQtyInput(product.id);
-      }
+      // Per user request: Focus remains on the "Scan Barcode or Type Product Name" input by default.
+      // Cashier presses TAB key when they want to edit the Qty of the last item.
+      setTimeout(() => {
+        productInputRef.current?.focus();
+      }, 50);
     }
   };
 
@@ -914,6 +916,7 @@ export const PosTerminal = () => {
         const product = results.find(p => p.primaryBarcode === barcode || p.productCode === barcode);
         if (product) {
             addProductToCart(product, weight);
+            setTimeout(() => productInputRef.current?.focus(), 50);
         } else {
             showToastNotification(`Barcode not found: "${barcode}"`, 'error');
             setProductQuery('');
@@ -1084,6 +1087,7 @@ export const PosTerminal = () => {
           setSearchResults([]);
           setShowProductDropdown(false);
           setFocusedProductIndex(-1);
+          setTimeout(() => productInputRef.current?.focus(), 50);
           return;
         }
 
@@ -1095,6 +1099,7 @@ export const PosTerminal = () => {
           setSearchResults([]);
           setShowProductDropdown(false);
           setFocusedProductIndex(-1);
+          setTimeout(() => productInputRef.current?.focus(), 50);
           return;
         }
 
@@ -1106,6 +1111,7 @@ export const PosTerminal = () => {
           setSearchResults([]);
           setShowProductDropdown(false);
           setFocusedProductIndex(-1);
+          setTimeout(() => productInputRef.current?.focus(), 50);
           return;
         }
 
@@ -1506,6 +1512,7 @@ export const PosTerminal = () => {
                     setSearchResults([]);
                     setShowProductDropdown(false);
                     setFocusedProductIndex(-1);
+                    setTimeout(() => productInputRef.current?.focus(), 50);
                   }}
                   className={`px-4 py-2.5 cursor-pointer flex justify-between items-center transition ${focusedProductIndex === idx ? 'bg-blue-100 border-l-4 border-blue-500' : 'hover:bg-blue-50 border-b border-slate-100'}`}
                 >

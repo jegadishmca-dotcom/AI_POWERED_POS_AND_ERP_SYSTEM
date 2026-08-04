@@ -1,4 +1,5 @@
 import { getPosPermissions } from '../../settings/api/settings.api';
+import { translateProductNameSync } from '../../../utils/translationEngine';
 
 const STORE = {
   nameTamil: 'ஆப்பிள் சூப்பர் மார்க்கெட்',
@@ -25,7 +26,15 @@ const hr    = () => `<hr style="border:none;border-top:1px dashed #000;margin:4p
  */
 function getItemDisplayName(item: any, langMode: string = 'secondary'): string {
   const primary = item.name || item.productName || '';
-  const secondary = item.nameTamil || item.secondaryName || item.tamilName || '';
+  let secondary = item.nameTamil || item.secondaryName || item.tamilName || '';
+
+  // Synchronous dictionary fallback if secondary name is missing on older items
+  if (!secondary && primary) {
+    const autoTrans = translateProductNameSync(primary, 'ta');
+    if (autoTrans && autoTrans !== primary) {
+      secondary = autoTrans;
+    }
+  }
 
   if (langMode === 'primary') {
     return primary || secondary || '-';

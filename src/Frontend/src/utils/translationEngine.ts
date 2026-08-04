@@ -78,6 +78,9 @@ const TAMIL_GROCERY_DICT: Record<string, string> = {
   'RAVA': 'ரவை',
   'SEMAI': 'சேமியா',
   'DAL': 'பருப்பு',
+  'PARUPU': 'பருப்பு',
+  'PASI PARUPU': 'பாசிப் பருப்பு',
+  'PASI PARUPPU': 'பாசிப் பருப்பு',
   'TOOR DAL': 'துவரம் பருப்பு',
   'URAD DAL': 'உளுந்தம் பருப்பு',
   'MOONG DAL': 'பாசிப் பருப்பு',
@@ -127,6 +130,53 @@ const HINDI_GROCERY_DICT: Record<string, string> = {
   'ALMOND': 'बादाम',
   'DATES': 'खजूर',
 };
+
+/**
+ * Synchronous local dictionary translation fallback for receipt rendering.
+ */
+export function translateProductNameSync(
+  englishName: string,
+  targetLang: string = 'ta'
+): string {
+  if (!englishName || !englishName.trim()) return '';
+
+  const cleanName = englishName.trim();
+  const unitPatterns = targetLang === 'hi' ? HI_UNITS : TA_UNITS;
+  let translatedUnits: string[] = [];
+
+  let textForDict = cleanName;
+  unitPatterns.forEach(([pattern, replacement]) => {
+    textForDict = textForDict.replace(pattern, (match) => {
+      const translated = match.replace(pattern, replacement);
+      translatedUnits.push(translated);
+      return ' __UNIT__ ';
+    });
+  });
+
+  const dict = targetLang === 'hi' ? HINDI_GROCERY_DICT : TAMIL_GROCERY_DICT;
+  const upperDictInput = textForDict.replace(/\s+/g, ' ').trim().toUpperCase();
+
+  let commodityTranslated = '';
+
+  if (dict[upperDictInput]) {
+    commodityTranslated = dict[upperDictInput];
+  } else {
+    const tokens = upperDictInput.split(' ');
+    const translatedTokens = tokens.map((token) => {
+      if (token === '__UNIT__') return '__UNIT__';
+      if (dict[token]) return dict[token];
+      return token;
+    });
+    commodityTranslated = translatedTokens.join(' ');
+  }
+
+  let unitIndex = 0;
+  let resultName = commodityTranslated.replace(/__UNIT__/g, () => {
+    return translatedUnits[unitIndex++] || '';
+  });
+
+  return resultName.trim();
+}
 
 // ─── Auto-Translation Core Logic ──────────────────────────────────────────────
 

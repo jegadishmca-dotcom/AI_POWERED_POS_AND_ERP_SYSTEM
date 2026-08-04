@@ -197,6 +197,29 @@ function generateReceiptText(invoice: any, terminalCode: string, langMode: strin
   return sb;
 }
 
+function formatDisplayBillNo(rawNum: string, terminalCode: string = ''): string {
+  if (!rawNum) return '-';
+  const clean = rawNum.trim();
+  
+  // Extract last 4 digits sequence number
+  const seqMatch = clean.match(/(\d{4})$/);
+  const seq = seqMatch ? seqMatch[1] : '';
+
+  let posPrefix = 'LOCAL POS 01';
+  if (terminalCode && terminalCode.trim()) {
+    posPrefix = terminalCode.replace(/^POS-/i, 'LOCAL POS ');
+  } else if (/LOCAL POS \d+/i.test(clean)) {
+    const match = clean.match(/LOCAL POS \d+/i);
+    if (match) posPrefix = match[0].toUpperCase();
+  }
+
+  if (seq) {
+    return `${posPrefix}-${seq}`;
+  }
+  
+  return clean.replace(/^INV-?/i, '');
+}
+
 function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string = 'secondary') {
   const rounded   = Math.round(safe(invoice.totalAmount));
   const roundOff  = +(rounded - safe(invoice.totalAmount)).toFixed(2);
@@ -209,6 +232,7 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
 
   const dateStr  = invoice.businessDate ? new Date(invoice.businessDate).toLocaleDateString('en-IN') : new Date().toLocaleDateString('en-IN');
   const timeStr  = invoice.businessDate ? new Date(invoice.businessDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const displayBillNo = formatDisplayBillNo(invoice.invoiceNumber, terminalCode);
 
   // Build items rows with global ERP standard 1-line formatting
   let itemsRowsHtml = '';
@@ -357,7 +381,7 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
     <tr>
       <td style="width: 58%; padding: 4px 5px; border-right: 1.5px solid #000; vertical-align: top;">
         <span style="font-size: 8.5px; font-weight: 800; color: #444; display: block; text-transform: uppercase;">Bill No</span>
-        <strong style="font-size: 10px; font-weight: 900; font-family: monospace; word-break: break-all; display: block; line-height: 1.2;">${invoice.invoiceNumber || '-'}</strong>
+        <strong style="font-size: 11px; font-weight: 900; font-family: monospace; display: block; line-height: 1.2;">${displayBillNo}</strong>
         <span style="font-size: 10px; font-weight: 800; display: block; margin-top: 2px;">Cashier: ${invoice.cashierName || 'Cashier'}</span>
       </td>
       <td style="width: 42%; padding: 4px 5px; vertical-align: top;">
@@ -426,13 +450,13 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
   ${(earned > 0 || oldPts > 0 || balance > 0) ? `
   <div style="margin-top: 4px; border: 1.5px solid #000; padding: 4px 5px; border-radius: 2px; text-align: center; background: #fafafa;">
     <div style="font-weight: 900; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #000; padding-bottom: 2px; margin-bottom: 3px;">
-      ★ Store Loyalty Rewards
+      ★ STORE LOYALTY REWARDS
     </div>
     <table class="receipt-table" style="font-size: 9.5px; font-weight: 800; margin: 0;">
       <tr>
         <td style="text-align: left; width: 33%;">Opening: <strong>${oldPtsStr}</strong></td>
         <td style="text-align: center; width: 34%;">Earned: <strong>+${earnedStr}</strong></td>
-        <td style="text-align: right; width: 33%;">Balance: <strong>${balanceStr} Pts</strong></td>
+        <td style="text-align: right; width: 33%;">Balance: <strong>${balanceStr}</strong></td>
       </tr>
     </table>
   </div>` : ''}

@@ -171,14 +171,21 @@ function generateReceiptText(invoice: any, terminalCode: string, langMode: strin
     sb += "All items: Nil Rated / Exempt\n";
   }
 
-  if (invoice.customerName) {
+  const earned  = safe(invoice.loyaltyPointsEarned);
+  const balance = safe(invoice.loyaltyPointsBalance);
+  const oldPts  = Math.max(0, balance - earned);
+
+  sb += "----------------------------------------\n";
+  sb += `Payment Method   : ${(invoice.paymentMode || 'CASH').toUpperCase()}\n`;
+  sb += `Amount Tendered  : Rs. ${fmt(tendered > 0 ? tendered : rounded)}\n`;
+  sb += `Change Returned  : Rs. ${fmt(change)}\n`;
+
+  if (earned > 0 || oldPts > 0 || balance > 0) {
     sb += "----------------------------------------\n";
-    const earned  = safe(invoice.loyaltyPointsEarned);
-    const balance = safe(invoice.loyaltyPointsBalance);
-    const oldPts  = Math.max(0, balance - earned);
-    sb += `OLD POINTS : ${oldPts.toFixed(2).padEnd(10, ' ')} CASH RECEIVED : ${fmt(tendered)}\n`;
-    sb += `TODAY PTS  : ${earned.toFixed(2).padEnd(10, ' ')} REFUND        : ${fmt(change)}\n`;
-    sb += `TOTAL PTS  : ${balance.toFixed(2).padEnd(10, ' ')}\n`;
+    sb += "        LOYALTY REWARDS PROGRAM         \n";
+    sb += `Opening Balance  : ${oldPts.toFixed(2)} Pts\n`;
+    sb += `Points Earned    : +${earned.toFixed(2)} Pts\n`;
+    sb += `Closing Balance  : ${balance.toFixed(2)} Pts\n`;
   }
 
   sb += "----------------------------------------\n";
@@ -234,6 +241,17 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
   const balanceStr = balance.toFixed(2);
   const rcvdStr    = fmt(tendered > 0 ? tendered : rounded);
   const rfndStr    = fmt(change);
+
+  // Modern Payment Mode formatting
+  let payModeDisplay = (invoice.paymentMode || 'CASH').toUpperCase();
+  if (cashAmt > 0 && (upiAmt > 0 || cardAmt > 0 || walletAmt > 0)) {
+    const parts = [];
+    if (cashAmt > 0) parts.push('Cash');
+    if (upiAmt > 0) parts.push('UPI');
+    if (cardAmt > 0) parts.push('Card');
+    if (walletAmt > 0) parts.push('Wallet');
+    payModeDisplay = `SPLIT (${parts.join('/')})`;
+  }
 
   const html = `<!DOCTYPE html>
 <html lang="ta">
@@ -383,26 +401,41 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
         TOTAL
       </td>
       <td style="width: 55%; padding: 6px 8px; font-size: 23px; font-weight: 900; text-align: right; vertical-align: middle;">
-        ${fmt(rounded)}
+        ₹${fmt(rounded)}
       </td>
     </tr>
   </table>
 
-  <!-- SUMMARY & POINTS BREAKDOWN -->
-  <table class="receipt-table" style="font-size: 10.5px; font-weight: 800; margin-top: 2px;">
+  <!-- MODERN ENTERPRISE PAYMENT SUMMARY -->
+  <table class="receipt-table" style="font-size: 10.5px; font-weight: 800; margin-top: 4px; margin-bottom: 2px;">
     <tr>
-      <td style="width: 55%; text-align: left; padding: 1.5px 0;">OLD POINTS : ${oldPtsStr}</td>
-      <td style="width: 45%; text-align: right; padding: 1.5px 0;">RCVD : ${rcvdStr}</td>
+      <td style="width: 55%; text-align: left; padding: 1.5px 0;">Payment Method</td>
+      <td style="width: 45%; text-align: right; padding: 1.5px 0; font-weight: 900;">${payModeDisplay}</td>
     </tr>
     <tr>
-      <td style="width: 55%; text-align: left; padding: 1.5px 0;">TODAY PTS : ${earnedStr}</td>
-      <td style="width: 45%; text-align: right; padding: 1.5px 0;">RFND : ${rfndStr}</td>
+      <td style="width: 55%; text-align: left; padding: 1.5px 0;">Amount Tendered</td>
+      <td style="width: 45%; text-align: right; padding: 1.5px 0; font-weight: 900;">₹${rcvdStr}</td>
     </tr>
     <tr>
-      <td style="width: 55%; text-align: left; padding: 1.5px 0;">TOTAL PTS : ${balanceStr}</td>
-      <td style="width: 45%; text-align: right; padding: 1.5px 0;">MODE : ${invoice.paymentMode || 'CASH'}</td>
+      <td style="width: 55%; text-align: left; padding: 1.5px 0;">Change Returned</td>
+      <td style="width: 45%; text-align: right; padding: 1.5px 0; font-weight: 900;">₹${rfndStr}</td>
     </tr>
   </table>
+
+  <!-- MODERN LOYALTY REWARDS CARD -->
+  ${(earned > 0 || oldPts > 0 || balance > 0) ? `
+  <div style="margin-top: 4px; border: 1.5px solid #000; padding: 4px 5px; border-radius: 2px; text-align: center; background: #fafafa;">
+    <div style="font-weight: 900; font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #000; padding-bottom: 2px; margin-bottom: 3px;">
+      ★ Store Loyalty Rewards
+    </div>
+    <table class="receipt-table" style="font-size: 9.5px; font-weight: 800; margin: 0;">
+      <tr>
+        <td style="text-align: left; width: 33%;">Opening: <strong>${oldPtsStr}</strong></td>
+        <td style="text-align: center; width: 34%;">Earned: <strong>+${earnedStr}</strong></td>
+        <td style="text-align: right; width: 33%;">Balance: <strong>${balanceStr} Pts</strong></td>
+      </tr>
+    </table>
+  </div>` : ''}
 
   <!-- FOOTER TAMIL SLOGAN -->
   <div class="divider-dash"></div>

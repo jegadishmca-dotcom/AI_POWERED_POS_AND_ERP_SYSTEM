@@ -667,9 +667,19 @@ public class InventoryController : ControllerBase
         // GrnReference = "PRICE-CHANGE" — distinguishes it from GRN batches.
         // The POS batch selection popup must filter out batches where AvailableQuantity = 0
         // (confirmed design decision) so this batch will NOT appear in the checkout picker.
-        var batchLabel = !string.IsNullOrWhiteSpace(request.BatchLabel)
+        // Format safe GrnReference & BatchLabel to NEVER exceed 90 chars (preventing 22001 varchar limit)
+        var rawReason = (request.Reason ?? "").Trim();
+        var safeReason = rawReason.Length > 50 ? rawReason.Substring(0, 47) + "..." : rawReason;
+        var safeGrnRef = $"PRICE-CHANGE | {safeReason}";
+        if (safeGrnRef.Length > 90)
+        {
+            safeGrnRef = safeGrnRef.Substring(0, 87) + "...";
+        }
+
+        var rawLabel = !string.IsNullOrWhiteSpace(request.BatchLabel)
             ? request.BatchLabel
             : $"PC-{DateTime.UtcNow:yyyyMMdd-HHmm}";
+        var batchLabel = rawLabel.Length > 40 ? rawLabel.Substring(0, 40) : rawLabel;
 
         var newBatch = new ProductBatch
         {
@@ -680,7 +690,7 @@ public class InventoryController : ControllerBase
             Mrp = request.NewMrp,
             CostPrice = oldSellingPrice, // preserve prior selling price as cost reference
             AvailableQuantity = 0,       // price-change batch — no physical stock
-            GrnReference = $"PRICE-CHANGE | Reason: {request.Reason} | ChangedBy: {callerIdStr ?? "unknown"}",
+            GrnReference = safeGrnRef,
             IsActive = true,
             CreatedAt = DateTime.UtcNow
         };
@@ -690,30 +700,38 @@ public class InventoryController : ControllerBase
         product.Mrp = request.NewMrp;
         product.SellingPrice = request.NewSellingPrice;
 
-        // CONCURRENCY: Last-write-wins by intentional design. If two Managers submit a price
-        // change for the same product simultaneously, the second SaveChangesAsync will overwrite
-        // the first on Product.Mrp / Product.SellingPrice. Both writes still create separate
-        // ProductBatch records so neither price-change event is lost from the audit history.
-        // For a single-store operation with one active manager at a time, this is acceptable.
-        // If concurrent manager editing becomes a concern, add a RowVersion shadow-property to
-        // Product and configure EF Core optimistic concurrency (no migration needed for shadow props).
-        await db.SaveChangesAsync(cancellationToken);
+        try
+        {
+            await db.SaveChangesAsync(cancellationToken);
+        }
+        catch (DbUpdateException dbEx)
+        {
+            // Fail-safe: if database constraints fail on long text fields, strip GrnReference to "PRICE-CHANGE" and retry
+            newBatch.GrnReference = "PRICE-CHANGE";
+            await db.SaveChangesAsync(cancellationToken);
+        }
 
-        // Audit log the price change with full attribution
-        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        // Audit log the price change with full attribution (untruncated reason stored in JSON details)
+        var forwardedFor = HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        var realIp = HttpContext.Request.Headers["X-Real-IP"].FirstOrDefault();
+        var ipAddress = !string.IsNullOrWhiteSpace(forwardedFor) ? forwardedFor.Split(',')[0].Trim()
+                      : !string.IsNullOrWhiteSpace(realIp) ? realIp.Trim()
+                      : HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
         await auditLogger.LogActionAsync(
             userId: callerId,
             action: "PRICE_CHANGE",
             entityName: "Product",
             entityId: product.Id.ToString(),
-            oldValues: new { Mrp = oldMrp, SellingPrice = oldSellingPrice },
+            oldValues: new { Mrp = oldMrp, SellingPrice = oldSellingPrice, ProductName = product.Name },
             newValues: new
             {
                 Mrp = request.NewMrp,
                 SellingPrice = request.NewSellingPrice,
+                ProductName = product.Name,
+                Reason = rawReason,
                 BatchId = newBatch.Id,
                 BatchLabel = batchLabel,
-                Reason = request.Reason,
                 ChangedAt = newBatch.CreatedAt
             },
             ipAddress: ipAddress,

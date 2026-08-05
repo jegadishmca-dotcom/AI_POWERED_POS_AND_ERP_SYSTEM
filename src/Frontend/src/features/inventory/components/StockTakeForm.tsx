@@ -46,6 +46,7 @@ export const StockTakeForm = () => {
     searchQuery: string;
     searchResults: any[];
     batches: any[];
+    highlightIndex?: number;
   }[]>([]);
 
   const fetchTakes = async () => {
@@ -86,6 +87,7 @@ export const StockTakeForm = () => {
         searchQuery: '',
         searchResults: [],
         batches: [],
+        highlightIndex: 0,
       },
     ]);
   };
@@ -93,6 +95,7 @@ export const StockTakeForm = () => {
   const handleProductSearch = async (idx: number, query: string) => {
     const newItems = [...formItems];
     newItems[idx].searchQuery = query;
+    newItems[idx].highlightIndex = 0;
 
     if (!query.trim()) {
       newItems[idx].searchResults = [];
@@ -102,7 +105,8 @@ export const StockTakeForm = () => {
 
     try {
       const results = await searchProducts(query);
-      newItems[idx].searchResults = results;
+      newItems[idx].searchResults = results || [];
+      newItems[idx].highlightIndex = 0;
       setFormItems(newItems);
     } catch (err) {
       console.error('Search products failed', err);
@@ -114,6 +118,7 @@ export const StockTakeForm = () => {
     newItems[idx].productId = product.id;
     newItems[idx].productName = product.name;
     newItems[idx].searchResults = [];
+    newItems[idx].highlightIndex = 0;
     newItems[idx].searchQuery = product.name;
 
     try {
@@ -122,7 +127,7 @@ export const StockTakeForm = () => {
       if (batchesList && batchesList.length > 0) {
         newItems[idx].batchId = batchesList[0].id;
         newItems[idx].batchNumber = batchesList[0].batchNumber;
-        newItems[idx].systemQuantity = batchesList[0].currentStock;
+        newItems[idx].systemQuantity = batchesList[0].availableQuantity ?? batchesList[0].currentStock ?? 0;
       } else {
         newItems[idx].batchId = '';
         newItems[idx].batchNumber = 'NO BATCH';
@@ -135,13 +140,52 @@ export const StockTakeForm = () => {
     setFormItems(newItems);
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
+    const item = formItems[idx];
+    if (!item.searchResults || item.searchResults.length === 0) return;
+
+    const currentHighlight = item.highlightIndex ?? 0;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIndex = Math.min(currentHighlight + 1, item.searchResults.length - 1);
+      const newItems = [...formItems];
+      newItems[idx].highlightIndex = nextIndex;
+      setFormItems(newItems);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevIndex = Math.max(currentHighlight - 1, 0);
+      const newItems = [...formItems];
+      newItems[idx].highlightIndex = prevIndex;
+      setFormItems(newItems);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const selectedProd = item.searchResults[currentHighlight];
+      if (selectedProd) {
+        selectProduct(idx, selectedProd);
+        setTimeout(() => {
+          const physInput = document.getElementById(`physical-count-input-${idx}`);
+          if (physInput) {
+            (physInput as HTMLInputElement).focus();
+            (physInput as HTMLInputElement).select();
+          }
+        }, 50);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      const newItems = [...formItems];
+      newItems[idx].searchResults = [];
+      setFormItems(newItems);
+    }
+  };
+
   const handleBatchChange = (idx: number, batchId: string) => {
     const newItems = [...formItems];
     const selectedBatch = newItems[idx].batches.find((b) => b.id === batchId);
     if (selectedBatch) {
       newItems[idx].batchId = selectedBatch.id;
       newItems[idx].batchNumber = selectedBatch.batchNumber;
-      newItems[idx].systemQuantity = selectedBatch.currentStock;
+      newItems[idx].systemQuantity = selectedBatch.availableQuantity ?? selectedBatch.currentStock ?? 0;
     }
     setFormItems(newItems);
   };
@@ -206,15 +250,16 @@ export const StockTakeForm = () => {
     }
 
     try {
+      const isoScheduledDate = new Date(scheduledDate).toISOString();
       const payload = {
         id: editingTakeId,
         storeId: null,
-        scheduledDate: scheduledDate,
+        scheduledDate: isoScheduledDate,
         status: status,
         items: validItems.map((i) => ({
           productId: i.productId,
-          batchId: i.batchId || null,
-          physicalQuantity: i.physicalQuantity,
+          batchId: i.batchId && i.batchId !== '00000000-0000-0000-0000-000000000000' ? i.batchId : null,
+          physicalQuantity: Number(i.physicalQuantity) || 0,
         })),
       };
 
@@ -224,9 +269,10 @@ export const StockTakeForm = () => {
       setEditingTakeId(null);
       setShowNewForm(false);
       fetchTakes();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Save/Submit stock take failed', err);
-      alert('Failed to save or submit stock take.');
+      const backendMsg = err.response?.data?.message || err.response?.data?.title || err.response?.data || err.message;
+      alert('Failed to save or submit stock take: ' + (typeof backendMsg === 'string' ? backendMsg : JSON.stringify(backendMsg)));
     }
   };
 
@@ -569,25 +615,38 @@ export const StockTakeForm = () => {
                           className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-semibold bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
                           value={item.searchQuery}
                           onChange={(e) => handleProductSearch(idx, e.target.value)}
+                          onKeyDown={(e) => handleKeyDown(e, idx)}
                         />
                       </div>
                       
                       {/* Search Overlay */}
                       {item.searchResults.length > 0 && (
-                        <div className="absolute left-3 right-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl mt-1 z-50 max-h-48 overflow-y-auto">
-                          {item.searchResults.map((p) => (
-                            <div 
-                              key={p.id}
-                              onClick={() => selectProduct(idx, p)}
-                              className="px-4 py-2 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950 flex justify-between items-center text-xs font-semibold text-slate-800 dark:text-slate-200"
-                            >
-                              <div>
-                                <p className="font-bold text-slate-800 dark:text-white">{p.name}</p>
-                                <p className="text-[10px] text-slate-400 dark:text-slate-500">Code: {p.productCode}</p>
+                        <div className="absolute left-3 right-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl mt-1 z-50 max-h-56 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800">
+                          {item.searchResults.map((p, pIdx) => {
+                            const isHighlighted = pIdx === (item.highlightIndex ?? 0);
+                            return (
+                              <div 
+                                key={p.id}
+                                onClick={() => selectProduct(idx, p)}
+                                onMouseEnter={() => {
+                                  const updated = [...formItems];
+                                  updated[idx].highlightIndex = pIdx;
+                                  setFormItems(updated);
+                                }}
+                                className={`px-4 py-2.5 cursor-pointer flex justify-between items-center text-xs font-semibold transition-colors ${
+                                  isHighlighted
+                                    ? 'bg-indigo-600 text-white font-bold shadow-sm'
+                                    : 'hover:bg-indigo-50 dark:hover:bg-indigo-950 text-slate-800 dark:text-slate-200'
+                                }`}
+                              >
+                                <div>
+                                  <p className={`font-bold ${isHighlighted ? 'text-white' : 'text-slate-800 dark:text-white'}`}>{p.name}</p>
+                                  <p className={`text-[10px] ${isHighlighted ? 'text-indigo-200' : 'text-slate-400 dark:text-slate-500'}`}>Code: {p.productCode}</p>
+                                </div>
+                                <span className={`font-extrabold ${isHighlighted ? 'text-white' : 'text-indigo-650 dark:text-indigo-400'}`}>₹{p.sellingPrice.toFixed(2)}</span>
                               </div>
-                              <span className="text-indigo-650 dark:text-indigo-400 font-bold">₹{p.sellingPrice.toFixed(2)}</span>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </td>
@@ -619,6 +678,7 @@ export const StockTakeForm = () => {
                     {/* Physical Count */}
                     <td className="p-3 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
                       <input 
+                        id={`physical-count-input-${idx}`}
                         type="number"
                         placeholder="0"
                         className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-center font-black text-sm outline-none focus:ring-2 focus:ring-indigo-500 bg-white dark:bg-slate-950 text-slate-900 dark:text-white"

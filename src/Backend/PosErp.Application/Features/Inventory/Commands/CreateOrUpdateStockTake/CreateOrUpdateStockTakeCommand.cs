@@ -37,6 +37,7 @@ public class CreateOrUpdateStockTakeCommandHandler : IRequestHandler<CreateOrUpd
     public async Task<Guid> Handle(CreateOrUpdateStockTakeCommand request, CancellationToken cancellationToken)
     {
         StockTakeHeader take;
+        var utcScheduledDate = DateTime.SpecifyKind(request.ScheduledDate, DateTimeKind.Utc);
 
         if (request.Id.HasValue)
         {
@@ -49,7 +50,7 @@ public class CreateOrUpdateStockTakeCommandHandler : IRequestHandler<CreateOrUpd
             if (take.Status != "DRAFT") throw new Exception("Only DRAFT Stock Takes can be updated.");
 
             take.StoreId = request.StoreId;
-            take.ScheduledDate = request.ScheduledDate;
+            take.ScheduledDate = utcScheduledDate;
             take.Status = request.Status;
 
             // Clear old items (EF Core will delete them)
@@ -62,7 +63,7 @@ public class CreateOrUpdateStockTakeCommandHandler : IRequestHandler<CreateOrUpd
             {
                 StoreId = request.StoreId,
                 TakeNumber = $"STK-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 4).ToUpper()}",
-                ScheduledDate = request.ScheduledDate,
+                ScheduledDate = utcScheduledDate,
                 Status = request.Status,
                 CreatedAt = DateTime.UtcNow
             };
@@ -73,23 +74,34 @@ public class CreateOrUpdateStockTakeCommandHandler : IRequestHandler<CreateOrUpd
         {
             // Compute live system stock for this product/batch
             decimal systemQty = 0;
-            if (item.BatchId.HasValue)
+            if (item.BatchId.HasValue && item.BatchId.Value != Guid.Empty)
             {
-                systemQty = await _context.StockLedger
-                    .Where(sl => sl.ProductId == item.ProductId && sl.BatchId == item.BatchId)
-                    .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+                var batch = await _context.ProductBatches
+                    .FirstOrDefaultAsync(b => b.Id == item.BatchId.Value, cancellationToken);
+                if (batch != null)
+                {
+                    systemQty = batch.AvailableQuantity;
+                }
+                else
+                {
+                    systemQty = await _context.StockLedger
+                        .Where(sl => sl.ProductId == item.ProductId && sl.BatchId == item.BatchId)
+                        .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+                }
             }
             else
             {
                 systemQty = await _context.StockLedger
-                    .Where(sl => sl.ProductId == item.ProductId && sl.BatchId == null)
+                    .Where(sl => sl.ProductId == item.ProductId)
                     .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
             }
 
             var newItem = new StockTakeItem
             {
+                Id = Guid.NewGuid(),
+                StockTakeHeaderId = take.Id,
                 ProductId = item.ProductId,
-                BatchId = item.BatchId,
+                BatchId = (item.BatchId.HasValue && item.BatchId.Value != Guid.Empty) ? item.BatchId : null,
                 SystemQuantity = systemQty,
                 PhysicalQuantity = item.PhysicalQuantity
             };

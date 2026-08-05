@@ -22,6 +22,7 @@ export const PosPermissions: React.FC = () => {
     try {
       const data = await getPosPermissions();
       setPermissions(data);
+      localStorage.setItem('pos_permissions_cache', JSON.stringify(data));
     } catch {
       setPermissions({ cashierCanDeleteLineItem: false });
       setMessage({
@@ -38,6 +39,7 @@ export const PosPermissions: React.FC = () => {
     setMessage(null);
     const updated = { ...permissions, [key]: newValue };
     setPermissions(updated); // optimistic update
+    localStorage.setItem('pos_permissions_cache', JSON.stringify(updated));
     try {
       await updatePosPermissions(updated);
       setMessage({
@@ -47,6 +49,7 @@ export const PosPermissions: React.FC = () => {
     } catch (err: any) {
       // Roll back on failure
       setPermissions(permissions);
+      localStorage.setItem('pos_permissions_cache', JSON.stringify(permissions));
       setMessage({
         text: err?.response?.data?.message || 'Failed to save settings.',
         type: 'error',

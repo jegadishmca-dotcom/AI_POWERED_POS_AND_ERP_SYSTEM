@@ -118,8 +118,58 @@ export const PosTerminal = () => {
   const terminalId = localStorage.getItem('pos_terminal_id') || '';
   const cashierId = user?.id || '';
 
-  // Feature 2: Cashier line-item delete toggle — loaded from backend on mount
-  const [cashierCanDeleteLineItem, setCashierCanDeleteLineItem] = useState(false);
+  // Feature 2: Cashier line-item delete toggle — loaded from backend/localStorage cache
+  const [cashierCanDeleteLineItem, setCashierCanDeleteLineItem] = useState<boolean>(() => {
+    try {
+      const cached = localStorage.getItem('pos_permissions_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (typeof parsed.cashierCanDeleteLineItem === 'boolean') {
+          return parsed.cashierCanDeleteLineItem;
+        }
+      }
+    } catch {}
+    return false;
+  });
+
+  const refreshPosPermissions = useCallback(async () => {
+    try {
+      const posPerms = await getPosPermissions();
+      if (posPerms && typeof posPerms.cashierCanDeleteLineItem === 'boolean') {
+        setCashierCanDeleteLineItem(posPerms.cashierCanDeleteLineItem);
+        localStorage.setItem('pos_permissions_cache', JSON.stringify(posPerms));
+      }
+    } catch (err) {
+      console.warn('Could not load POS permissions from API', err);
+    }
+  }, []);
+
+  // Independent Unconditional POS Permissions Sync Engine
+  useEffect(() => {
+    refreshPosPermissions();
+
+    const handleFocus = () => refreshPosPermissions();
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === 'pos_permissions_cache' && e.newValue) {
+        try {
+          const parsed = JSON.parse(e.newValue);
+          if (typeof parsed.cashierCanDeleteLineItem === 'boolean') {
+            setCashierCanDeleteLineItem(parsed.cashierCanDeleteLineItem);
+          }
+        } catch {}
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('storage', handleStorage);
+    const interval = setInterval(refreshPosPermissions, 10000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('storage', handleStorage);
+      clearInterval(interval);
+    };
+  }, [refreshPosPermissions]);
 
   // Business Date State
   const [isBusinessDateOpen, setBusinessDateOpen] = useState(true);
@@ -170,15 +220,6 @@ export const PosTerminal = () => {
           } else {
             setOpenShiftModalOpen(true);
           }
-        }
-
-        // Feature 2: Load cashier delete permission flag in parallel with shift check
-        try {
-          const posPerms = await getPosPermissions();
-          setCashierCanDeleteLineItem(posPerms.cashierCanDeleteLineItem);
-        } catch {
-          // Non-critical — default stays false (manager PIN required)
-          console.warn('Could not load POS permissions, defaulting cashierCanDeleteLineItem=false');
         }
       } catch (err) {
         console.error('Failed to fetch business date status', err);
@@ -837,9 +878,17 @@ export const PosTerminal = () => {
   };
 
   const updateItemQty = (productId: string, delta: number) => {
+    const targetItem = cart.items.find((item: any) => item.productId === productId);
+    if (!targetItem) return;
+
+    if (targetItem.qty + delta <= 0) {
+      handleDeleteCartItem(targetItem);
+      return;
+    }
+
     const updatedItems = cart.items.map((item: any) => {
       if (item.productId === productId) {
-        const newQty = Math.max(1, item.qty + delta);
+        const newQty = item.qty + delta;
         return { ...item, qty: newQty, lineTotal: newQty * item.unitPrice };
       }
       return item;

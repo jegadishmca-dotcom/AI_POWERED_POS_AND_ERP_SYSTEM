@@ -140,6 +140,15 @@ export const StockTakeForm = () => {
     setFormItems(newItems);
   };
 
+  const scrollToHighlightedItem = (rowIdx: number, itemIdx: number) => {
+    setTimeout(() => {
+      const itemEl = document.getElementById(`search-item-${rowIdx}-${itemIdx}`);
+      if (itemEl) {
+        itemEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }, 15);
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, idx: number) => {
     const item = formItems[idx];
     if (!item.searchResults || item.searchResults.length === 0) return;
@@ -152,12 +161,14 @@ export const StockTakeForm = () => {
       const newItems = [...formItems];
       newItems[idx].highlightIndex = nextIndex;
       setFormItems(newItems);
+      scrollToHighlightedItem(idx, nextIndex);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
       const prevIndex = Math.max(currentHighlight - 1, 0);
       const newItems = [...formItems];
       newItems[idx].highlightIndex = prevIndex;
       setFormItems(newItems);
+      scrollToHighlightedItem(idx, prevIndex);
     } else if (e.key === 'Enter') {
       e.preventDefault();
       const selectedProd = item.searchResults[currentHighlight];
@@ -627,6 +638,7 @@ export const StockTakeForm = () => {
                             return (
                               <div 
                                 key={p.id}
+                                id={`search-item-${idx}-${pIdx}`}
                                 onClick={() => selectProduct(idx, p)}
                                 onMouseEnter={() => {
                                   const updated = [...formItems];

@@ -83,7 +83,7 @@ public class GetProductBatchesQueryHandler : IRequestHandler<GetProductBatchesQu
 
                     resultDict[bc.BarcodeValue.Trim()] = new ProductBatchDto
                     {
-                        Id = bc.Id,
+                        Id = Guid.Empty, // Set Guid.Empty so barcode fallbacks don't pass ProductBarcode.Id as ProductBatch.Id
                         BatchNumber = bc.BarcodeValue.Trim(),
                         ExpiryDate = null,
                         CurrentStock = currentStock,

@@ -72,12 +72,23 @@ public class CreateOrUpdateStockTakeCommandHandler : IRequestHandler<CreateOrUpd
 
         foreach (var item in request.Items)
         {
-            // Compute live system stock for this product/batch
-            decimal systemQty = 0;
+            Guid? validBatchId = null;
             if (item.BatchId.HasValue && item.BatchId.Value != Guid.Empty)
             {
+                var batchExists = await _context.ProductBatches
+                    .AnyAsync(b => b.Id == item.BatchId.Value, cancellationToken);
+                if (batchExists)
+                {
+                    validBatchId = item.BatchId.Value;
+                }
+            }
+
+            // Compute live system stock for this product/batch
+            decimal systemQty = 0;
+            if (validBatchId.HasValue)
+            {
                 var batch = await _context.ProductBatches
-                    .FirstOrDefaultAsync(b => b.Id == item.BatchId.Value, cancellationToken);
+                    .FirstOrDefaultAsync(b => b.Id == validBatchId.Value, cancellationToken);
                 if (batch != null)
                 {
                     systemQty = batch.AvailableQuantity;
@@ -85,7 +96,7 @@ public class CreateOrUpdateStockTakeCommandHandler : IRequestHandler<CreateOrUpd
                 else
                 {
                     systemQty = await _context.StockLedger
-                        .Where(sl => sl.ProductId == item.ProductId && sl.BatchId == item.BatchId)
+                        .Where(sl => sl.ProductId == item.ProductId && sl.BatchId == validBatchId.Value)
                         .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
                 }
             }
@@ -101,7 +112,7 @@ public class CreateOrUpdateStockTakeCommandHandler : IRequestHandler<CreateOrUpd
                 Id = Guid.NewGuid(),
                 StockTakeHeaderId = take.Id,
                 ProductId = item.ProductId,
-                BatchId = (item.BatchId.HasValue && item.BatchId.Value != Guid.Empty) ? item.BatchId : null,
+                BatchId = validBatchId,
                 SystemQuantity = systemQty,
                 PhysicalQuantity = item.PhysicalQuantity
             };

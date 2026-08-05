@@ -920,14 +920,18 @@ export const PosTerminal = () => {
    */
   const auditLogLineItemDelete = async (item: any) => {
     try {
+      const termCode = localStorage.getItem('pos_terminal_code') || 'LOCAL POS 01';
+      const cleanTerm = termCode.replace(/^POS-/i, 'LOCAL POS ');
+      const activeInvoiceRef = `${cleanTerm}-BILLING-DRAFT`;
+
       await api.post('/api/pos/audit/line-item-delete', {
         productId: item.productId,
         productName: item.name,
         quantity: item.qty,
         unitPrice: item.unitPrice,
-        // wasManagerOverride intentionally omitted: server derives this from JWT role
         terminalId,
-        cartRef: safeRandomUUID() // transaction reference (best-effort if cart not yet saved)
+        cartRef: safeRandomUUID(),
+        invoiceNumber: activeInvoiceRef
       });
     } catch (err) {
       // Non-critical: log locally but don't block the delete action

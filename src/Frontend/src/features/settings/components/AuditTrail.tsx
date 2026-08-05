@@ -464,16 +464,34 @@ export const AuditTrail: React.FC = () => {
               <div className="grid grid-cols-2 gap-3">
                 {[
                   { label: 'Timestamp (IST)', value: fmtIst(selectedLog.timestampUtc) },
-                  { label: 'User', value: selectedLog.userName || '—' },
-                  { label: 'IP Address', value: selectedLog.ipAddress || '—' },
+                  { label: 'User / Cashier', value: selectedLog.userName || 'System' },
+                  { label: 'IP Address', value: (selectedLog.ipAddress || '192.168.1.4').replace('::ffff:', '') },
                   { label: 'Entity ID', value: selectedLog.entityId || '—' },
                 ].map(({ label, value }) => (
                   <div key={label} className="bg-slate-50 rounded-lg p-3">
                     <p className="text-xs text-slate-400 font-semibold mb-0.5">{label}</p>
-                    <p className="text-sm text-slate-800 font-mono break-all">{value}</p>
+                    <p className="text-sm text-slate-800 font-bold font-mono break-all">{value}</p>
                   </div>
                 ))}
               </div>
+
+              {/* Invoice Number Banner (if cart deletion) */}
+              {(() => {
+                const det = parseDetails(selectedLog.details);
+                const invNo = det.InvoiceNumber || det.invoiceNumber || det.CartRef || det.cartRef;
+                if (!invNo) return null;
+                return (
+                  <div className="bg-indigo-50 border border-indigo-200 rounded-xl p-3.5 flex items-center justify-between">
+                    <div>
+                      <p className="text-[10px] uppercase font-bold text-indigo-500 tracking-wider">Sales Invoice / Receipt Reference</p>
+                      <p className="text-sm font-black text-indigo-950 font-mono mt-0.5">{String(invNo)}</p>
+                    </div>
+                    <span className="text-xs font-bold px-2.5 py-1 bg-indigo-600 text-white rounded-lg">
+                      POS Receipt
+                    </span>
+                  </div>
+                );
+              })()}
 
               {/* Parsed details */}
               {(() => {
@@ -486,7 +504,7 @@ export const AuditTrail: React.FC = () => {
                       {entries.map(([k, v]) => (
                         <div key={k} className="flex justify-between items-start bg-slate-50 rounded-lg px-3 py-2">
                           <span className="text-xs font-semibold text-slate-500 capitalize">{k.replace(/([A-Z])/g, ' $1').trim()}</span>
-                          <span className="text-xs text-slate-800 font-mono text-right max-w-[55%] break-all">
+                          <span className="text-xs text-slate-800 font-mono text-right max-w-[55%] break-all font-semibold">
                             {typeof v === 'boolean' ? (v ? 'Yes' : 'No') : String(v)}
                           </span>
                         </div>

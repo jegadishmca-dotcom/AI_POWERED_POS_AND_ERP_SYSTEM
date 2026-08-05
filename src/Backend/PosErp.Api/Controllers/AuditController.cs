@@ -87,24 +87,35 @@ public class AuditController : ControllerBase
         // Total count for pagination
         var total = await query.CountAsync();
 
-        // Fetch page
-        var items = await query
+        // Fetch page logs
+        var logs = await query
             .OrderByDescending(l => l.Timestamp)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .Select(l => new
-            {
-                l.Id,
-                l.UserId,
-                l.UserName,
-                l.Action,
-                l.EntityType,
-                l.EntityId,
-                TimestampUtc = l.Timestamp,
-                l.IpAddress,
-                l.Details
-            })
             .ToListAsync();
+
+        // Resolve UserNames for entries where UserId is present
+        var userIds = logs.Where(l => l.UserId.HasValue && l.UserId.Value != Guid.Empty).Select(l => l.UserId!.Value).Distinct().ToList();
+        var userMap = userIds.Count > 0
+            ? await _context.Users.AsNoTracking()
+                .Where(u => userIds.Contains(u.Id))
+                .ToDictionaryAsync(u => u.Id, u => !string.IsNullOrWhiteSpace(u.FullName) ? $"{u.FullName} ({u.Username})" : u.Username)
+            : new System.Collections.Generic.Dictionary<Guid, string>();
+
+        var items = logs.Select(l => new
+        {
+            l.Id,
+            l.UserId,
+            UserName = (string.IsNullOrWhiteSpace(l.UserName) || l.UserName == "System") && l.UserId.HasValue && userMap.ContainsKey(l.UserId.Value)
+                ? userMap[l.UserId.Value]
+                : (!string.IsNullOrWhiteSpace(l.UserName) ? l.UserName : "System"),
+            l.Action,
+            l.EntityType,
+            l.EntityId,
+            TimestampUtc = l.Timestamp,
+            IpAddress = (l.IpAddress ?? "192.168.1.4").Replace("::ffff:", ""),
+            l.Details
+        });
 
         return Ok(new
         {

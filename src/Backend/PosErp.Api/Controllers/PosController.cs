@@ -839,13 +839,16 @@ public class PosController : ControllerBase
             return BadRequest(new { message = "Request payload is required." });
 
         var callerIdStr = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
-            ?? User.FindFirst("sub")?.Value;
+            ?? User.FindFirst("sub")?.Value
+            ?? User.FindFirst(System.IdentityModel.Tokens.Jwt.JwtRegisteredClaimNames.Sub)?.Value;
         Guid? callerId = Guid.TryParse(callerIdStr, out var parsedId) ? parsedId : null;
-        var ipAddress = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
 
-        // SECURITY FIX: Derive the action name from the JWT role claim — not from a client-supplied
-        // boolean. The JWT is signed server-side and cannot be tampered with by the browser.
-        // A Cashier cannot send wasManagerOverride=true to disguise a direct deletion as an override.
+        var forwardedFor = HttpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
+        var realIp = HttpContext.Request.Headers["X-Real-IP"].FirstOrDefault();
+        var ipAddress = !string.IsNullOrWhiteSpace(forwardedFor) ? forwardedFor.Split(',')[0].Trim()
+                      : !string.IsNullOrWhiteSpace(realIp) ? realIp.Trim()
+                      : HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
         var callerRole = User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value
                       ?? User.FindFirst("role")?.Value
                       ?? string.Empty;
@@ -853,6 +856,10 @@ public class PosController : ControllerBase
         var auditAction = isCashier
             ? "CASHIER_DIRECT_DELETE_LINE_ITEM"
             : "MANAGER_OVERRIDE_VOID_ITEM";
+
+        var invoiceNo = !string.IsNullOrWhiteSpace(request.InvoiceNumber)
+            ? request.InvoiceNumber
+            : (!string.IsNullOrWhiteSpace(request.CartRef) ? $"CART-{request.CartRef.Substring(0, Math.Min(8, request.CartRef.Length))}" : "IN-PROGRESS-BILL");
 
         await _auditLogger.LogActionAsync(
             userId: callerId,
@@ -865,11 +872,13 @@ public class PosController : ControllerBase
                 request.ProductName,
                 request.Quantity,
                 request.UnitPrice,
+                InvoiceNumber = invoiceNo
             },
             newValues: new
             {
                 Deleted = true,
-                DerivedFromRole = callerRole, // server-derived, not client-supplied
+                DerivedFromRole = callerRole,
+                InvoiceNumber = invoiceNo,
                 request.TerminalId,
                 request.CartRef,
                 DeletedAt = DateTime.UtcNow
@@ -877,7 +886,7 @@ public class PosController : ControllerBase
             ipAddress: ipAddress,
             cancellationToken: default);
 
-        return Ok(new { success = true, action = auditAction });
+        return Ok(new { success = true, action = auditAction, invoiceNumber = invoiceNo });
     }
 }
 
@@ -886,10 +895,9 @@ public record LineItemDeleteAuditRequest(
     string ProductName,
     decimal Quantity,
     decimal UnitPrice,
-    // NOTE: WasManagerOverride intentionally removed from request body — the action name
-    // is now derived server-side from the caller's JWT role (see AuditLineItemDelete above).
     string TerminalId,
-    string CartRef
+    string CartRef,
+    string? InvoiceNumber
 );
 
 

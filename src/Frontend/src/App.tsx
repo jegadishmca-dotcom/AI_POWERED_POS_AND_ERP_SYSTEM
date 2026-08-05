@@ -50,6 +50,7 @@ import { BusinessDateDashboard } from './features/pos/components/BusinessDateDas
 import { Suppliers } from './features/purchasing/routes/Suppliers';
 import { PurchaseOrders } from './features/purchasing/routes/PurchaseOrders';
 import { Settings } from './pages/Settings';
+import { PriceChangeModule } from './features/catalog/components/PriceChangeModule';
 import { OffersManager } from './features/offers/components/OffersManager';
 import { Customers } from './features/crm/routes/Customers';
 import { AiInvoiceImport } from './features/inventory/components/AiInvoiceImport';
@@ -115,12 +116,13 @@ const AppLayout: React.FC = () => {
   };
 
   const navItems = [
+    // ERP Core Modules (Product Catalog & Operations)
     { path: '/dashboard', name: 'Dashboard', icon: LayoutDashboard, roles: ['Owner', 'Manager'], category: 'general' },
-    { path: '/reports', name: 'Reports & Insights', icon: BarChart3, roles: ['Owner', 'Manager'], category: 'general' },
     { path: '/pos', name: 'POS Billing', icon: ShoppingCart, roles: ['Owner', 'Manager', 'Cashier'], category: 'general' },
     { path: '/shift-report', name: 'Shift & Sales Report', icon: ClipboardCheck, roles: ['Cashier'], category: 'general' },
-    { path: '/eod', name: 'End of Day (EOD)', icon: ClipboardCheck, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/eod', name: 'End of Day (EOD)', icon: CalendarClock, roles: ['Owner', 'Manager'], category: 'general' },
     { path: '/products', name: 'Product Catalog', icon: Package, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/price-management', name: 'Price Management', icon: Tag, roles: ['Owner', 'Manager'], category: 'general' }, // Moved under Product Catalog!
     { path: '/grn', name: 'Goods Receipt (GRN)', icon: ClipboardCheck, roles: ['Owner', 'Manager'], category: 'general' },
     { path: '/suppliers', name: 'Supplier Master', icon: UserIcon, roles: ['Owner', 'Manager'], category: 'general' },
     { path: '/purchase-orders', name: 'Purchase Orders', icon: ClipboardCheck, roles: ['Owner', 'Manager'], category: 'general' },
@@ -129,7 +131,27 @@ const AppLayout: React.FC = () => {
     { path: '/stock-ledger', name: 'Stock Ledger', icon: History, roles: ['Owner', 'Manager'], category: 'general' },
     { path: '/stock-position', name: 'Stock Position', icon: Layers, roles: ['Owner', 'Manager'], category: 'general' },
     { path: '/warehouses', name: 'Warehouses & Bins', icon: MapPin, roles: ['Owner', 'Manager'], category: 'general' },
-    { path: '/settings', name: 'Settings', icon: SettingsIcon, roles: ['Owner', 'Manager'], category: 'general' },
+    { path: '/reports', name: 'Reports & Insights', icon: BarChart3, roles: ['Owner', 'Manager'], category: 'general' },
+
+    // CRM & Marketing
+    { path: '/customers', name: 'CRM Master', icon: Users, roles: ['Owner', 'Manager'], category: 'crm' },
+    { path: '/offers', name: 'Offers & Promotions', icon: Tag, roles: ['Owner', 'Manager'], category: 'crm' },
+
+    // Finance & Accounting
+    { path: '/finance/dashboard', name: 'Finance Dashboard', icon: PieChart, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/accounts', name: 'Chart of Accounts', icon: Landmark, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/journals', name: 'Journal Entries', icon: FileText, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/trial-balance', name: 'Trial Balance', icon: Wallet, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/profit-and-loss', name: 'Profit & Loss', icon: BarChart3, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/balance-sheet', name: 'Balance Sheet', icon: Landmark, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/supplier-bills', name: 'Supplier Bills (AP)', icon: FileText, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/supplier-payments', name: 'Supplier Payments', icon: Banknote, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/supplier-ledger', name: 'Supplier Ledger', icon: BookOpen, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/ap-aging', name: 'AP Aging', icon: CalendarClock, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/customer-receipts', name: 'Customer Receipts (AR)', icon: Banknote, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/customer-ledger', name: 'Customer Ledger', icon: BookOpen, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/ar-aging', name: 'AR Aging', icon: CalendarClock, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
+    { path: '/finance/credit-limit', name: 'Credit Monitoring', icon: ShieldAlert, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
 
     // AI Co-Pilot Hub
     { path: '/ai/chat', name: 'AI Co-pilot Chat', icon: Bot, roles: ['Owner', 'Manager'], category: 'ai' },
@@ -138,29 +160,8 @@ const AppLayout: React.FC = () => {
     { path: '/ai/invoice-extractor', name: 'AI Invoice Extractor', icon: Sparkles, roles: ['Owner', 'Manager'], category: 'ai' },
     { path: '/ai/loss-prevention', name: 'AI Fraud Detection', icon: ShieldAlert, roles: ['Owner', 'Manager'], category: 'ai' },
 
-    // Finance Phase F1
-    { path: '/finance/dashboard', name: 'Finance Dashboard', icon: PieChart, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-    { path: '/finance/accounts', name: 'Chart of Accounts', icon: Landmark, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-    { path: '/finance/journals', name: 'Journal Entries', icon: FileText, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-    { path: '/finance/trial-balance', name: 'Trial Balance', icon: Wallet, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-    { path: '/finance/profit-and-loss', name: 'Profit & Loss', icon: BarChart3, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-    { path: '/finance/balance-sheet', name: 'Balance Sheet', icon: Landmark, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-
-    // Finance Phase F2 - AP
-    { path: '/finance/supplier-bills', name: 'Supplier Bills (AP)', icon: FileText, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-    { path: '/finance/supplier-payments', name: 'Supplier Payments', icon: Banknote, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-    { path: '/finance/supplier-ledger', name: 'Supplier Ledger', icon: BookOpen, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-    { path: '/finance/ap-aging', name: 'AP Aging', icon: CalendarClock, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-
-    // Finance Phase F2 - AR
-    { path: '/finance/customer-receipts', name: 'Customer Receipts (AR)', icon: Banknote, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-    { path: '/finance/customer-ledger', name: 'Customer Ledger', icon: BookOpen, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-    { path: '/finance/ar-aging', name: 'AR Aging', icon: CalendarClock, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-    { path: '/finance/credit-limit', name: 'Credit Monitoring', icon: ShieldAlert, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
-    
-    // CRM & Marketing
-    { path: '/customers', name: 'CRM Master', icon: Users, roles: ['Owner', 'Manager'], category: 'crm' },
-    { path: '/offers', name: 'Offers & Promotions', icon: Tag, roles: ['Owner', 'Manager'], category: 'crm' },
+    // System Administration (NEW MENU CATEGORY)
+    { path: '/settings', name: 'System Settings', icon: SettingsIcon, roles: ['Owner', 'Manager'], category: 'admin' },
   ];
 
   const userRole = user?.role || 'Staff';
@@ -169,29 +170,44 @@ const AppLayout: React.FC = () => {
   );
 
   const generalItems = filteredNavItems.filter(item => item.category === 'general');
-  const aiItems = filteredNavItems.filter(item => item.category === 'ai');
-  const financeItems = filteredNavItems.filter(item => item.category === 'finance');
   const crmItems = filteredNavItems.filter(item => item.category === 'crm');
+  const financeItems = filteredNavItems.filter(item => item.category === 'finance');
+  const aiItems = filteredNavItems.filter(item => item.category === 'ai');
+  const adminItems = filteredNavItems.filter(item => item.category === 'admin');
 
   return (
     <div className="flex h-screen bg-slate-100 dark:bg-slate-900 font-sans transition-colors duration-200 overflow-hidden">
       {/* Sidebar */}
-      <aside className={`transition-all duration-350 ${sidebarCollapsed ? 'w-0 overflow-hidden opacity-0' : 'w-64 opacity-100'} bg-slate-900 text-white flex flex-col shadow-xl z-20`}>
+      <aside className={`transition-all duration-350 ${sidebarCollapsed ? 'w-0 overflow-hidden opacity-0' : 'w-64 opacity-100'} bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white flex flex-col shadow-2xl z-20 border-r border-slate-800/80`}>
         {/* Brand Header */}
-        <div className="h-16 flex items-center px-6 bg-slate-950 border-b border-slate-800">
-          <Terminal className="w-6 h-6 mr-3 text-indigo-400" />
-          <span className="font-extrabold text-lg bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent">
-            Supermarket ERP
-          </span>
+        <div className="h-16 flex items-center justify-between px-5 bg-slate-950/90 border-b border-slate-800/80 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-gradient-to-tr from-indigo-600 to-violet-500 shadow-md shadow-indigo-500/20 text-white">
+              <Terminal className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="font-black text-base bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent block leading-tight">
+                Supermarket ERP
+              </span>
+              <span className="text-[9px] font-extrabold uppercase tracking-widest text-indigo-400 block">
+                Enterprise AI Edition
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* Sidebar Nav */}
-        <nav className="flex-1 px-4 py-4 space-y-6 overflow-y-auto">
-          {/* General Section */}
+        <nav className="flex-1 px-3 py-4 space-y-6 overflow-y-auto custom-scrollbar">
+          {/* ERP Core Modules */}
           <div className="space-y-1">
-            <span className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-2">
-              ERP Core Modules
-            </span>
+            <div className="px-3 flex items-center justify-between mb-2">
+              <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                ERP Core Modules
+              </span>
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
+                Core
+              </span>
+            </div>
             {generalItems.map(item => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path;
@@ -199,14 +215,17 @@ const AppLayout: React.FC = () => {
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                  className={`group relative flex items-center px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                     isActive 
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/30' 
-                      : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                      ? 'bg-gradient-to-r from-indigo-600 to-indigo-700 text-white shadow-lg shadow-indigo-600/30 font-black' 
+                      : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-100'
                   }`}
                 >
-                  <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                  {item.name}
+                  {isActive && (
+                    <span className="absolute left-0 top-2 bottom-2 w-1 bg-indigo-300 rounded-r-md" />
+                  )}
+                  <Icon className={`w-4 h-4 mr-3 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-indigo-300'}`} />
+                  <span className="truncate">{item.name}</span>
                 </Link>
               );
             })}
@@ -215,9 +234,14 @@ const AppLayout: React.FC = () => {
           {/* CRM & Marketing Section */}
           {crmItems.length > 0 && (
             <div className="space-y-1">
-              <span className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider block mt-4 mb-2">
-                CRM & Marketing
-              </span>
+              <div className="px-3 flex items-center justify-between mt-4 mb-2">
+                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                  CRM & Marketing
+                </span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-400 border border-rose-500/20">
+                  Growth
+                </span>
+              </div>
               {crmItems.map(item => {
                 const Icon = item.icon;
                 const isActive = location.pathname.startsWith(item.path);
@@ -225,14 +249,17 @@ const AppLayout: React.FC = () => {
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    className={`group relative flex items-center px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                       isActive 
-                        ? 'bg-rose-600 text-white shadow-lg shadow-rose-600/30' 
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        ? 'bg-gradient-to-r from-rose-600 to-rose-700 text-white shadow-lg shadow-rose-600/30 font-black' 
+                        : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-100'
                     }`}
                   >
-                    <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                    {item.name}
+                    {isActive && (
+                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-rose-300 rounded-r-md" />
+                    )}
+                    <Icon className={`w-4 h-4 mr-3 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-rose-300'}`} />
+                    <span className="truncate">{item.name}</span>
                   </Link>
                 );
               })}
@@ -242,9 +269,14 @@ const AppLayout: React.FC = () => {
           {/* Finance Section */}
           {financeItems.length > 0 && (
             <div className="space-y-1">
-              <span className="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider block mt-4 mb-2">
-                Finance & Accounting
-              </span>
+              <div className="px-3 flex items-center justify-between mt-4 mb-2">
+                <span className="text-[10px] font-extrabold text-slate-400 uppercase tracking-wider block">
+                  Finance & Accounting
+                </span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                  Ledger
+                </span>
+              </div>
               {financeItems.map(item => {
                 const Icon = item.icon;
                 const isActive = location.pathname.startsWith(item.path);
@@ -252,14 +284,17 @@ const AppLayout: React.FC = () => {
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    className={`group relative flex items-center px-3.5 py-2 rounded-xl text-xs font-bold transition-all duration-200 ${
                       isActive 
-                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        ? 'bg-gradient-to-r from-emerald-600 to-teal-700 text-white shadow-lg shadow-emerald-600/30 font-black' 
+                        : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-100'
                     }`}
                   >
-                    <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                    {item.name}
+                    {isActive && (
+                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-emerald-300 rounded-r-md" />
+                    )}
+                    <Icon className={`w-4 h-4 mr-3 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-emerald-300'}`} />
+                    <span className="truncate">{item.name}</span>
                   </Link>
                 );
               })}
@@ -269,10 +304,15 @@ const AppLayout: React.FC = () => {
           {/* AI Co-Pilot Section */}
           {aiItems.length > 0 && (
             <div className="space-y-1">
-              <div className="px-4 flex items-center gap-1.5 mb-2">
-                <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
-                <span className="text-[10px] font-extrabold text-indigo-400 uppercase tracking-wider block">
-                  AI Co-Pilot Hub
+              <div className="px-3 flex items-center justify-between mt-4 mb-2">
+                <div className="flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-indigo-400 animate-pulse" />
+                  <span className="text-[10px] font-extrabold text-indigo-400 uppercase tracking-wider block">
+                    AI Co-Pilot Hub
+                  </span>
+                </div>
+                <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 animate-pulse">
+                  Smart AI
                 </span>
               </div>
               {aiItems.map(item => {
@@ -282,14 +322,52 @@ const AppLayout: React.FC = () => {
                   <Link
                     key={item.path}
                     to={item.path}
-                    className={`flex items-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
+                    className={`group relative flex items-center px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
                       isActive 
-                        ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-600/30' 
-                        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+                        ? 'bg-gradient-to-r from-indigo-600 via-purple-600 to-violet-600 text-white shadow-lg shadow-indigo-600/30 font-black' 
+                        : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-100'
                     }`}
                   >
-                    <Icon className={`w-5 h-5 mr-3 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                    {item.name}
+                    {isActive && (
+                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-violet-300 rounded-r-md" />
+                    )}
+                    <Icon className={`w-4 h-4 mr-3 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-indigo-300'}`} />
+                    <span className="truncate">{item.name}</span>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+
+          {/* System Administration (NEW PARENT MENU) */}
+          {adminItems.length > 0 && (
+            <div className="space-y-1 pt-2 border-t border-slate-800/80">
+              <div className="px-3 flex items-center justify-between mt-2 mb-2">
+                <span className="text-[10px] font-extrabold text-amber-400/90 uppercase tracking-wider block">
+                  System Administration
+                </span>
+                <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  Admin
+                </span>
+              </div>
+              {adminItems.map(item => {
+                const Icon = item.icon;
+                const isActive = location.pathname === item.path;
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`group relative flex items-center px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${
+                      isActive 
+                        ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-lg shadow-amber-600/30 font-black' 
+                        : 'text-slate-400 hover:bg-slate-800/80 hover:text-slate-100'
+                    }`}
+                  >
+                    {isActive && (
+                      <span className="absolute left-0 top-2 bottom-2 w-1 bg-amber-300 rounded-r-md" />
+                    )}
+                    <Icon className={`w-4 h-4 mr-3 transition-transform group-hover:scale-110 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-amber-300'}`} />
+                    <span className="truncate">{item.name}</span>
                   </Link>
                 );
               })}
@@ -297,25 +375,29 @@ const AppLayout: React.FC = () => {
           )}
         </nav>
 
-
-        {/* User Card */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center min-w-0">
-              <div className="w-9 h-9 rounded-full bg-indigo-600 flex items-center justify-center text-white font-bold shrink-0 shadow">
-                {user?.fullName?.charAt(0) || 'U'}
+        {/* User Profile Footer */}
+        <div className="p-3 border-t border-slate-800/80 bg-slate-950/90 backdrop-blur-md">
+          <div className="flex items-center justify-between bg-slate-900/80 p-2 rounded-xl border border-slate-800">
+            <div className="flex items-center min-w-0 gap-2.5">
+              <div className="relative">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-violet-600 flex items-center justify-center text-white font-extrabold text-xs shadow-md shrink-0">
+                  {user?.fullName?.charAt(0) || 'U'}
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-slate-950" />
               </div>
-              <div className="ml-3 min-w-0">
-                <p className="text-sm font-bold text-white truncate">{user?.fullName || 'Active User'}</p>
-                <p className="text-xs text-indigo-400 truncate">{user?.role || 'Staff'}</p>
+              <div className="min-w-0">
+                <p className="text-xs font-extrabold text-slate-100 truncate leading-tight">{user?.fullName || 'Active User'}</p>
+                <span className="text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.2 rounded border border-indigo-500/20 inline-block mt-0.5">
+                  {user?.role || 'Staff'}
+                </span>
               </div>
             </div>
             <button 
               onClick={handleLogout}
-              className="p-2 text-slate-400 hover:text-red-400 hover:bg-slate-800 rounded-lg transition-all duration-150"
+              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded-lg transition-all duration-150"
               title="Sign Out"
             >
-              <LogOut className="w-5 h-5" />
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </div>
@@ -430,6 +512,13 @@ const AppLayout: React.FC = () => {
             } />
             <Route path="/products" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <Products />
+            } />
+            <Route path="/price-management" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : (
+                <div className="p-8">
+                  <PriceChangeModule />
+                </div>
+              )
             } />
             <Route path="/grn" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <GrnForm />

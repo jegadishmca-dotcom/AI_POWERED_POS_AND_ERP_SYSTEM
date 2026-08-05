@@ -14,7 +14,7 @@ import { EmailConfig } from '../features/settings/components/EmailConfig';
 import { EnvironmentConfig } from '../features/settings/components/EnvironmentConfig';
 import { AuditTrail } from '../features/settings/components/AuditTrail';
 
-type SettingsTab = 'connection' | 'printers' | 'terminals' | 'users' | 'security' | 'inventoryRules' | 'emailSetup' | 'environment' | 'compliance' | 'posPermissions' | 'priceChange' | 'auditTrail';
+type SettingsTab = 'connection' | 'printers' | 'terminals' | 'users' | 'security' | 'inventoryRules' | 'emailSetup' | 'environment' | 'compliance' | 'posPermissions' | 'auditTrail';
 
 export const Settings: React.FC = () => {
   const { user } = useAuthStore();
@@ -29,7 +29,6 @@ export const Settings: React.FC = () => {
     { id: 'users', label: 'Staff Accounts', icon: <Users className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
     { id: 'inventoryRules', label: 'Inventory Rules', icon: <Database className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
     { id: 'posPermissions', label: 'POS Permissions', icon: <ShieldAlert className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
-    { id: 'priceChange', label: 'Price Management', icon: <Tag className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
     { id: 'auditTrail', label: 'Audit Trail', icon: <ScrollText className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
     { id: 'emailSetup', label: 'Email Setup', icon: <Mail className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
     { id: 'environment', label: 'Environment Mode', icon: <Database className="w-4 h-4" />, roles: ['Owner', 'Manager', 'Developer'] },
@@ -49,8 +48,8 @@ export const Settings: React.FC = () => {
           <SettingsIcon className="w-6 h-6" />
         </div>
         <div>
-          <h1 className="text-3xl font-black text-slate-800">System Configuration</h1>
-          <p className="text-sm text-slate-500">Configure connection targets, devices, terminals, and user permissions</p>
+          <h1 className="text-3xl font-black text-slate-800">System Administration & Settings</h1>
+          <p className="text-sm text-slate-500">Configure connection targets, devices, terminals, audit trail, and user permissions</p>
         </div>
       </div>
 
@@ -81,7 +80,6 @@ export const Settings: React.FC = () => {
           {currentTab === 'users' && <UserManagement />}
           {currentTab === 'inventoryRules' && <InventorySafeguards />}
           {currentTab === 'posPermissions' && <PosPermissions />}
-          {currentTab === 'priceChange' && <PriceChangeModule />}
           {currentTab === 'auditTrail' && <AuditTrail />}
           {currentTab === 'emailSetup' && <EmailConfig />}
           {currentTab === 'environment' && <EnvironmentConfig />}

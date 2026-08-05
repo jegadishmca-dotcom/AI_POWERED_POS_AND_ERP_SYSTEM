@@ -1,3 +1,4 @@
+import { api } from '../../../utils/api';
 import { getPosPermissions } from '../../settings/api/settings.api';
 import { translateProductNameSync } from '../../../utils/translationEngine';
 

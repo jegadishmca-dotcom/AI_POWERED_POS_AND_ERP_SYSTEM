@@ -1,5 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { Save, ShieldAlert, Plus, Trash2, CheckCircle, XCircle, Clock, Eye, AlertCircle, FileSpreadsheet, PlusCircle, Search } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  Save, ShieldAlert, Plus, Trash2, CheckCircle, XCircle, Clock, Eye, 
+  AlertCircle, FileSpreadsheet, PlusCircle, Search, ChevronDown, ChevronUp,
+  Package, ArrowDownRight, ArrowUpRight, DollarSign, Layers, RefreshCw
+} from 'lucide-react';
 import { getStockAdjustments, createStockAdjustment, approveStockAdjustment, rejectStockAdjustment, StockAdjustment } from '../api/stockAdjustment.api';
 import { searchProducts } from '../../catalog/api/catalog.api';
 import { getProductBatches } from '../../pos/api/pos.api';
@@ -34,16 +38,31 @@ export const StockAdjustmentForm = () => {
 
   // Form builder state
   const [showNewForm, setShowNewForm] = useState(false);
-  const [reason, setReason] = useState('DAMAGE');
+  const [reason, setReason] = useState<'DAMAGE' | 'EXPIRED' | 'THEFT' | 'FOUND' | 'MARKET_PURCHASE'>('DAMAGE');
+  const [isProtocolBannerCollapsed, setIsProtocolBannerCollapsed] = useState(false);
+
+  // Top Eye-Level Quick-Add Entry Bar state
+  const [quickSearchQuery, setQuickSearchQuery] = useState('');
+  const [quickSearchResults, setQuickSearchResults] = useState<any[]>([]);
+  const [quickSearchHighlightIndex, setQuickSearchHighlightIndex] = useState(0);
+  const [quickSelectedProduct, setQuickSelectedProduct] = useState<any | null>(null);
+  const [quickBatches, setQuickBatches] = useState<any[]>([]);
+  const [quickBatchId, setQuickBatchId] = useState('');
+  const [quickBatchNumber, setQuickBatchNumber] = useState('');
+  const [quickCurrentStock, setQuickCurrentStock] = useState(0);
+  const [quickUnitCost, setQuickUnitCost] = useState(0);
+  const [quickQty, setQuickQty] = useState(-1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Worksheet Items
   const [formItems, setFormItems] = useState<{
     productId: string;
     productName: string;
+    productCode?: string;
     batchId: string;
     batchNumber: string;
     adjustedQuantity: number;
     unitCost: number;
-    searchQuery: string;
-    searchResults: any[];
     batches: any[];
     currentStock: number;
   }[]>([]);
@@ -64,86 +83,158 @@ export const StockAdjustmentForm = () => {
     fetchAdjustments();
   }, []);
 
-  const handleAddRow = () => {
-    setFormItems([
-      ...formItems,
-      {
-        productId: '',
-        productName: '',
-        batchId: '',
-        batchNumber: '',
-        adjustedQuantity: -1,
-        unitCost: 0,
-        searchQuery: '',
-        searchResults: [],
-        batches: [],
-        currentStock: 0,
-      },
-    ]);
+  // Update default Quick Qty sign based on Reason selection (non-destructive to existing lines)
+  const handleReasonChange = (newReason: 'DAMAGE' | 'EXPIRED' | 'THEFT' | 'FOUND' | 'MARKET_PURCHASE') => {
+    setReason(newReason);
+    if (newReason === 'FOUND' || newReason === 'MARKET_PURCHASE') {
+      if (quickQty < 0) setQuickQty(Math.abs(quickQty) || 1);
+    } else {
+      if (quickQty > 0) setQuickQty(-Math.abs(quickQty) || -1);
+    }
   };
 
-  const handleProductSearch = async (idx: number, query: string) => {
-    const newItems = [...formItems];
-    newItems[idx].searchQuery = query;
-
+  const handleQuickSearch = async (query: string) => {
+    setQuickSearchQuery(query);
     if (!query.trim()) {
-      newItems[idx].searchResults = [];
-      setFormItems(newItems);
+      setQuickSearchResults([]);
+      setQuickSearchHighlightIndex(0);
       return;
     }
-
     try {
       const results = await searchProducts(query);
-      newItems[idx].searchResults = results;
-      setFormItems(newItems);
+      setQuickSearchResults(results || []);
+      setQuickSearchHighlightIndex(0);
     } catch (err) {
-      console.error('Search products failed', err);
+      console.error('Quick product search failed', err);
     }
   };
 
-  const selectProduct = async (idx: number, product: any) => {
-    const newItems = [...formItems];
-    newItems[idx].productId = product.id;
-    newItems[idx].productName = product.name;
-    newItems[idx].unitCost = product.costPrice || product.sellingPrice * 0.7; // Fallback estimate
-    newItems[idx].searchResults = [];
-    newItems[idx].searchQuery = product.name;
+  const selectQuickProduct = async (product: any) => {
+    setQuickSelectedProduct(product);
+    setQuickSearchQuery(product.name);
+    setQuickSearchResults([]);
+    const defaultCost = product.costPrice || product.sellingPrice * 0.7;
+    setQuickUnitCost(defaultCost);
 
     try {
       const batchesList = await getProductBatches(product.id);
-      newItems[idx].batches = batchesList || [];
+      setQuickBatches(batchesList || []);
       if (batchesList && batchesList.length > 0) {
-        newItems[idx].batchId = batchesList[0].id;
-        newItems[idx].batchNumber = batchesList[0].batchNumber;
-        newItems[idx].currentStock = batchesList[0].currentStock;
-        newItems[idx].unitCost = batchesList[0].costPrice || newItems[idx].unitCost;
+        setQuickBatchId(batchesList[0].id);
+        setQuickBatchNumber(batchesList[0].batchNumber);
+        setQuickCurrentStock(batchesList[0].currentStock);
+        setQuickUnitCost(batchesList[0].costPrice || defaultCost);
       } else {
-        newItems[idx].batchId = '';
-        newItems[idx].batchNumber = 'NO BATCH';
-        newItems[idx].currentStock = 0;
+        setQuickBatchId('');
+        setQuickBatchNumber('NO BATCH');
+        setQuickCurrentStock(0);
       }
     } catch (err) {
-      console.error('Fetch product batches failed', err);
+      console.error('Failed to load product batches for quick selection', err);
+    }
+  };
+
+  const handleQuickBatchChange = (batchIdVal: string) => {
+    if (batchIdVal === '__custom__') {
+      setQuickBatchId('');
+      setQuickBatchNumber('');
+      setQuickCurrentStock(0);
+      return;
+    }
+    const selected = quickBatches.find(b => b.id === batchIdVal);
+    if (selected) {
+      setQuickBatchId(selected.id);
+      setQuickBatchNumber(selected.batchNumber);
+      setQuickCurrentStock(selected.currentStock);
+      setQuickUnitCost(selected.costPrice || quickUnitCost);
+    }
+  };
+
+  const scrollToQuickHighlightedItem = (itemIdx: number) => {
+    setTimeout(() => {
+      const itemEl = document.getElementById(`quick-search-item-${itemIdx}`);
+      if (itemEl) {
+        itemEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }, 15);
+  };
+
+  const handleQuickKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (quickSearchResults.length === 0) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const nextIdx = Math.min(quickSearchHighlightIndex + 1, quickSearchResults.length - 1);
+      setQuickSearchHighlightIndex(nextIdx);
+      scrollToQuickHighlightedItem(nextIdx);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      const prevIdx = Math.max(quickSearchHighlightIndex - 1, 0);
+      setQuickSearchHighlightIndex(prevIdx);
+      scrollToQuickHighlightedItem(prevIdx);
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const selected = quickSearchResults[quickSearchHighlightIndex];
+      if (selected) {
+        selectQuickProduct(selected);
+      }
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setQuickSearchResults([]);
+    }
+  };
+
+  const handleQuickAddLine = () => {
+    if (!quickSelectedProduct) {
+      alert('Please search and select a product from the dropdown first.');
+      return;
+    }
+    if (quickQty === 0) {
+      alert('Adjusted quantity cannot be zero.');
+      return;
+    }
+    // Section 5 Rule: Check negative adjustment against current stock
+    if (quickQty < 0 && Math.abs(quickQty) > quickCurrentStock) {
+      alert(`Cannot write off ${Math.abs(quickQty)} units of "${quickSelectedProduct.name}". Current batch stock is only ${quickCurrentStock}.`);
+      return;
     }
 
-    setFormItems(newItems);
-  };
+    const newLine = {
+      productId: quickSelectedProduct.id,
+      productName: quickSelectedProduct.name,
+      productCode: quickSelectedProduct.productCode || '',
+      batchId: quickBatchId,
+      batchNumber: quickBatchNumber || 'NO BATCH',
+      adjustedQuantity: quickQty,
+      unitCost: quickUnitCost,
+      batches: quickBatches,
+      currentStock: quickCurrentStock,
+    };
 
-  const handleBatchChange = (idx: number, batchId: string) => {
-    const newItems = [...formItems];
-    const selectedBatch = newItems[idx].batches.find((b) => b.id === batchId);
-    if (selectedBatch) {
-      newItems[idx].batchId = selectedBatch.id;
-      newItems[idx].batchNumber = selectedBatch.batchNumber;
-      newItems[idx].currentStock = selectedBatch.currentStock;
-      newItems[idx].unitCost = selectedBatch.costPrice || newItems[idx].unitCost;
+    setFormItems([...formItems, newLine]);
+
+    // Reset quick entry bar for continuous scanning
+    setQuickSearchQuery('');
+    setQuickSearchResults([]);
+    setQuickSelectedProduct(null);
+    setQuickBatches([]);
+    setQuickBatchId('');
+    setQuickBatchNumber('');
+    setQuickCurrentStock(0);
+    setQuickUnitCost(0);
+    setQuickQty(reason === 'FOUND' || reason === 'MARKET_PURCHASE' ? 1 : -1);
+
+    if (searchInputRef.current) {
+      searchInputRef.current.focus();
     }
-    setFormItems(newItems);
   };
 
-  const handleRemoveRow = (idx: number) => {
-    setFormItems(formItems.filter((_, i) => i !== idx));
-  };
+  // Live KPI Metric Calculations
+  const totalShrinkageUnits = formItems.filter(i => i.adjustedQuantity < 0).reduce((acc, i) => acc + Math.abs(i.adjustedQuantity), 0);
+  const totalShrinkageValue = formItems.filter(i => i.adjustedQuantity < 0).reduce((acc, i) => acc + (Math.abs(i.adjustedQuantity) * i.unitCost), 0);
+  const totalSurplusUnits = formItems.filter(i => i.adjustedQuantity > 0).reduce((acc, i) => acc + i.adjustedQuantity, 0);
+  const totalSurplusValue = formItems.filter(i => i.adjustedQuantity > 0).reduce((acc, i) => acc + (i.adjustedQuantity * i.unitCost), 0);
+  const netValuationImpact = totalSurplusValue - totalShrinkageValue;
 
   const handleImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -162,12 +253,11 @@ export const StockAdjustmentForm = () => {
         const mappedRows = parsedRows.map((r: any) => ({
           productId: r.productId,
           productName: r.productName,
+          productCode: r.productCode || '',
           batchId: r.batchId === '00000000-0000-0000-0000-000000000000' ? '' : r.batchId,
           batchNumber: r.batchNumber,
           adjustedQuantity: r.adjustedQuantity,
           unitCost: r.unitCost,
-          searchQuery: r.productName,
-          searchResults: [],
           batches: r.batchId && r.batchId !== '00000000-0000-0000-0000-000000000000' ? [{
             id: r.batchId,
             batchNumber: r.batchNumber,
@@ -202,7 +292,7 @@ export const StockAdjustmentForm = () => {
       return;
     }
 
-    // Validation check: ensure negative adjustments don't exceed current batch stock
+    // Section 5 Validation check: ensure negative adjustments don't exceed current batch stock
     for (const item of validItems) {
       if (item.adjustedQuantity < 0 && Math.abs(item.adjustedQuantity) > item.currentStock) {
         alert(`Cannot reduce stock for "${item.productName}" (Batch: ${item.batchNumber}) by ${Math.abs(item.adjustedQuantity)} units. Current batch stock is only ${item.currentStock}.`);
@@ -263,74 +353,101 @@ export const StockAdjustmentForm = () => {
     }
   };
 
+  const handleRemoveRow = (idx: number) => {
+    setFormItems(formItems.filter((_, i) => i !== idx));
+  };
+
   return (
-    <div className="max-w-7xl mx-auto p-6">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 space-y-6">
       
-      {/* Dynamic Header */}
-      <div className="flex justify-between items-center mb-6 border-b border-slate-200 pb-4">
+      {/* Page Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
         <div>
-          <h2 className="text-3xl font-extrabold text-slate-800">Stock Adjustment Manager</h2>
-          <p className="text-sm text-slate-500 mt-1">Review inventory discrepancy logs or record new adjustments.</p>
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-xl bg-indigo-600 text-white shadow-md shadow-indigo-600/30">
+              <Layers className="w-6 h-6" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-2">
+                Stock Adjustment Manager
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                  v1.3 Global Standard
+                </span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                Review inventory discrepancy logs or scan goods to record high-precision stock adjustments.
+              </p>
+            </div>
+          </div>
         </div>
-        {!showNewForm ? (
-          <button 
-            onClick={() => { setShowNewForm(true); handleAddRow(); }}
-            className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg shadow-md font-bold hover:bg-indigo-700 transition"
-          >
-            Create New Adjustment
-          </button>
-        ) : (
-          <button 
-            onClick={() => setShowNewForm(false)}
-            className="px-5 py-2.5 bg-slate-200 text-slate-700 rounded-lg font-bold hover:bg-slate-350 transition"
-          >
-            Back to Dashboard
-          </button>
-        )}
+
+        <div className="flex items-center gap-3">
+          {!showNewForm ? (
+            <button 
+              onClick={() => { setShowNewForm(true); }}
+              className="px-5 py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl shadow-md shadow-indigo-600/20 font-extrabold hover:from-indigo-700 hover:to-violet-700 transition flex items-center gap-2 text-sm"
+            >
+              <Plus className="w-4 h-4" /> Create New Adjustment Sheet
+            </button>
+          ) : (
+            <button 
+              onClick={() => setShowNewForm(false)}
+              className="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold hover:bg-slate-200 dark:hover:bg-slate-600 transition text-sm flex items-center gap-2"
+            >
+              <Layers className="w-4 h-4" /> Back to History Logs
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Split Panel Dashboard */}
+      {/* Main Mode View */}
       {!showNewForm ? (
-        <div className="flex gap-6">
-          
+        /* History & Manager Review View */
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Panel: Adjustments Log */}
-          <div className="w-7/12 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 bg-slate-50 border-b border-slate-200 font-bold text-slate-700 flex justify-between items-center">
-              <span>Adjustment History logs</span>
-              <span className="text-xs bg-slate-200 px-2 py-0.5 rounded text-slate-600">{adjustments.length} logs</span>
+          <div className="w-full lg:w-7/12 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div className="p-4 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 font-bold text-slate-700 dark:text-slate-200 flex justify-between items-center text-sm">
+              <span>Adjustment History Logs</span>
+              <span className="text-xs bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300 px-2.5 py-0.5 rounded-full font-bold">
+                {adjustments.length} logs
+              </span>
             </div>
             
-            <div className="divide-y divide-slate-100 overflow-y-auto max-h-[600px]">
+            <div className="divide-y divide-slate-100 dark:divide-slate-700/60 overflow-y-auto max-h-[600px]">
               {adjustments.length === 0 ? (
-                <div className="p-8 text-center text-slate-400">
-                  <FileSpreadsheet className="w-12 h-12 mx-auto mb-2 stroke-1" />
-                  <p className="font-semibold">No adjustments found</p>
+                <div className="p-12 text-center text-slate-400">
+                  <FileSpreadsheet className="w-12 h-12 mx-auto mb-3 stroke-1 text-slate-300" />
+                  <p className="font-bold text-slate-600 dark:text-slate-300">No adjustment sheets recorded</p>
+                  <p className="text-xs text-slate-400 mt-1">Click "Create New Adjustment Sheet" to write off or add inventory.</p>
                 </div>
               ) : (
                 adjustments.map((a) => (
                   <div 
                     key={a.id} 
                     onClick={() => setSelectedAdjustment(a)}
-                    className={`p-4 cursor-pointer hover:bg-slate-50/50 transition flex justify-between items-center ${selectedAdjustment?.id === a.id ? 'bg-indigo-50/70 border-l-4 border-indigo-600' : ''}`}
+                    className={`p-4 cursor-pointer hover:bg-indigo-50/40 dark:hover:bg-slate-700/50 transition flex justify-between items-center ${selectedAdjustment?.id === a.id ? 'bg-indigo-50/70 dark:bg-slate-700/80 border-l-4 border-indigo-600' : ''}`}
                   >
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-slate-800">{a.adjustmentNumber}</span>
-                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
-                          a.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
-                          a.status === 'REJECTED' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                        <span className="font-black text-slate-800 dark:text-white text-sm">{a.adjustmentNumber}</span>
+                        <span className={`text-[10px] font-black uppercase px-2.5 py-0.5 rounded-full ${
+                          a.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+                          a.status === 'REJECTED' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300' : 
+                          'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                         }`}>
                           {a.status}
                         </span>
                       </div>
                       <p className="text-xs text-slate-400 mt-1">Date: {new Date(a.createdAt).toLocaleString()}</p>
-                      <p className="text-xs text-slate-500 font-bold mt-1">Reason: <span className="bg-slate-100 px-1.5 py-0.5 rounded">{a.reason}</span></p>
+                      <p className="text-xs text-slate-500 dark:text-slate-300 font-bold mt-1">
+                        Reason: <span className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-indigo-600 dark:text-indigo-400">{a.reason}</span>
+                      </p>
                     </div>
                     
                     <div className="text-right">
-                      <p className="text-sm font-extrabold text-slate-700">{a.items.length} Line items</p>
-                      <button className="text-indigo-600 text-xs font-bold hover:underline flex items-center gap-1 mt-2">
-                        <Eye className="w-3.5 h-3.5" /> Details
+                      <p className="text-xs font-black text-slate-700 dark:text-slate-200">{a.items.length} Line items</p>
+                      <button className="text-indigo-600 dark:text-indigo-400 text-xs font-bold hover:underline flex items-center gap-1 mt-2 justify-end">
+                        <Eye className="w-3.5 h-3.5" /> View Sheet
                       </button>
                     </div>
                   </div>
@@ -339,50 +456,53 @@ export const StockAdjustmentForm = () => {
             </div>
           </div>
 
-          {/* Right Panel: Detail Panel & Approval Actions */}
-          <div className="w-5/12">
+          {/* Right Panel: Selected Adjustment Detail */}
+          <div className="w-full lg:w-5/12">
             {selectedAdjustment ? (
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between min-h-[400px]">
+              <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 flex flex-col justify-between min-h-[450px]">
                 <div>
-                  <div className="flex justify-between items-start border-b pb-4 mb-4">
+                  <div className="flex justify-between items-start border-b border-slate-100 dark:border-slate-700 pb-4 mb-4">
                     <div>
-                      <h3 className="font-bold text-xl text-slate-800">{selectedAdjustment.adjustmentNumber}</h3>
-                      <p className="text-xs text-slate-400 mt-1">Submitted on {new Date(selectedAdjustment.createdAt).toLocaleString()}</p>
+                      <h3 className="font-black text-xl text-slate-800 dark:text-white">{selectedAdjustment.adjustmentNumber}</h3>
+                      <p className="text-xs text-slate-400 mt-0.5">Created: {new Date(selectedAdjustment.createdAt).toLocaleString()}</p>
                     </div>
                     <span className={`text-xs font-extrabold px-3 py-1 rounded-full ${
-                      selectedAdjustment.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800' :
-                      selectedAdjustment.status === 'REJECTED' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+                      selectedAdjustment.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300' :
+                      selectedAdjustment.status === 'REJECTED' ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300' : 
+                      'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                     }`}>
                       {selectedAdjustment.status}
                     </span>
                   </div>
 
                   <div className="mb-4">
-                    <p className="text-sm font-semibold text-slate-500">Reason Code</p>
-                    <p className="font-bold text-slate-800 bg-slate-50 p-2 rounded mt-1">{selectedAdjustment.reason}</p>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Adjustment Reason</p>
+                    <p className="font-bold text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700 text-sm mt-1">
+                      {selectedAdjustment.reason}
+                    </p>
                   </div>
 
                   {selectedAdjustment.approvedByName && (
                     <div className="mb-4">
-                      <p className="text-sm font-semibold text-slate-500">Processed By</p>
-                      <p className="font-semibold text-slate-800 mt-1">{selectedAdjustment.approvedByName}</p>
+                      <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Processed By</p>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 text-sm">{selectedAdjustment.approvedByName}</p>
                     </div>
                   )}
 
                   <div className="mb-6">
-                    <p className="text-sm font-bold text-slate-700 mb-2">Adjusted Items</p>
-                    <div className="divide-y divide-slate-100 border rounded-lg overflow-hidden">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Line Item Details</p>
+                    <div className="divide-y divide-slate-100 dark:divide-slate-700/60 border border-slate-200 dark:border-slate-700 rounded-xl overflow-hidden max-h-64 overflow-y-auto">
                       {selectedAdjustment.items.map((item, idx) => (
-                        <div key={idx} className="p-3 bg-slate-50/30 flex justify-between items-center text-sm">
+                        <div key={idx} className="p-3 bg-slate-50/40 dark:bg-slate-900/30 flex justify-between items-center text-xs">
                           <div>
-                            <p className="font-bold text-slate-800">{item.productName || 'Product'}</p>
-                            <p className="text-xs text-slate-400 mt-0.5">Batch: {item.batchNumber || 'N/A'}</p>
+                            <p className="font-bold text-slate-800 dark:text-white">{item.productName || 'Product'}</p>
+                            <p className="text-[10px] text-slate-400 mt-0.5">Batch: {item.batchNumber || 'N/A'}</p>
                           </div>
                           <div className="text-right">
-                            <span className={`font-black text-md ${item.adjustedQuantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            <span className={`font-black text-sm ${item.adjustedQuantity > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                               {item.adjustedQuantity > 0 ? `+${item.adjustedQuantity}` : item.adjustedQuantity}
                             </span>
-                            <p className="text-xs text-slate-400">Cost: ₹{item.unitCost.toFixed(2)}</p>
+                            <p className="text-[10px] text-slate-400">Unit Cost: ₹{item.unitCost.toFixed(2)}</p>
                           </div>
                         </div>
                       ))}
@@ -390,252 +510,488 @@ export const StockAdjustmentForm = () => {
                   </div>
                 </div>
 
-                {/* Manager actions */}
+                {/* Manager Actions */}
                 {selectedAdjustment.status === 'PENDING' && (
-                  <div className="border-t pt-4">
+                  <div className="border-t border-slate-100 dark:border-slate-700 pt-4">
                     {isManager ? (
-                      <div className="flex gap-4">
+                      <div className="flex gap-3">
                         <button 
                           onClick={() => handleReject(selectedAdjustment.id)}
-                          className="flex-1 py-3 bg-red-50 text-red-600 border border-red-200 rounded-xl font-bold hover:bg-red-100 flex items-center justify-center gap-2 transition"
+                          className="flex-1 py-2.5 bg-rose-50 text-rose-600 border border-rose-200 dark:bg-rose-950/40 dark:border-rose-900 dark:text-rose-300 rounded-xl font-bold hover:bg-rose-100 text-xs flex items-center justify-center gap-2 transition"
                         >
-                          <XCircle className="w-5 h-5" /> Reject Write-Off
+                          <XCircle className="w-4 h-4" /> Reject Write-Off
                         </button>
                         <button 
                           onClick={() => handleApprove(selectedAdjustment.id)}
-                          className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-md flex items-center justify-center gap-2 transition"
+                          className="flex-1 py-2.5 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 shadow-md text-xs flex items-center justify-center gap-2 transition"
                         >
-                          <CheckCircle className="w-5 h-5" /> Approve & Adjust
+                          <CheckCircle className="w-4 h-4" /> Approve & Adjust
                         </button>
                       </div>
                     ) : (
-                      <div className="bg-amber-50 text-amber-800 border-l-4 border-amber-500 p-3 rounded text-xs font-semibold flex items-center gap-2">
-                        <Clock className="w-4 h-4" /> Manager approval is required to process this adjustment.
+                      <div className="bg-amber-50 text-amber-800 border-l-4 border-amber-500 p-3 rounded-xl text-xs font-semibold flex items-center gap-2">
+                        <Clock className="w-4 h-4 shrink-0" /> Manager approval is required to process this adjustment sheet.
                       </div>
                     )}
                   </div>
                 )}
               </div>
             ) : (
-              <div className="bg-slate-50 border-2 border-dashed border-slate-200 rounded-xl p-8 text-center text-slate-400 flex flex-col justify-center items-center h-[350px]">
-                <Eye className="w-12 h-12 mb-2 stroke-1" />
-                <p className="font-semibold text-slate-500">Select an adjustment entry</p>
-                <p className="text-xs mt-1">Review its detailed adjustment lines, batch number, and manager status.</p>
+              <div className="bg-white dark:bg-slate-800 border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-2xl p-8 text-center text-slate-400 flex flex-col justify-center items-center h-[350px]">
+                <Eye className="w-12 h-12 mb-2 stroke-1 text-slate-300" />
+                <p className="font-bold text-slate-600 dark:text-slate-300">Select an adjustment entry</p>
+                <p className="text-xs text-slate-400 mt-1">Review its detailed adjustment lines, batch numbers, and manager status.</p>
               </div>
             )}
           </div>
-
         </div>
       ) : (
-        
-        /* Record New Adjustment Form Builders */
-        <div className="bg-white border border-slate-200 shadow-sm rounded-xl p-6">
-          <div className="flex justify-between items-center mb-6 border-b pb-4">
-            <div>
-              <h3 className="text-xl font-extrabold text-slate-800">Record New Adjustment</h3>
-              <p className="text-xs text-slate-400 mt-1">Create a correction sheet for damaged, expired, or found stock.</p>
+        /* Global AI ERP Standard Sheet Creation Form */
+        <div className="space-y-6">
+          
+          {/* LAYER 1: Executive KPI Metrics Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Products</p>
+                <p className="text-2xl font-black text-slate-800 dark:text-white mt-1">{formItems.length}</p>
+                <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Lines in sheet</p>
+              </div>
+              <div className="p-3 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-xl">
+                <Package className="w-5 h-5" />
+              </div>
             </div>
+
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-rose-500">Shrinkage / Damage</p>
+                <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">-{totalShrinkageUnits} <span className="text-xs font-bold">pcs</span></p>
+                <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-0.5">-₹{totalShrinkageValue.toFixed(2)}</p>
+              </div>
+              <div className="p-3 bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 rounded-xl">
+                <ArrowDownRight className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-500">Surplus / Found</p>
+                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">+{totalSurplusUnits} <span className="text-xs font-bold">pcs</span></p>
+                <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">+₹{totalSurplusValue.toFixed(2)}</p>
+              </div>
+              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-xl">
+                <ArrowUpRight className="w-5 h-5" />
+              </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Net Financial Impact</p>
+                <p className={`text-2xl font-black mt-1 ${netValuationImpact >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                  {netValuationImpact >= 0 ? `+₹${netValuationImpact.toFixed(2)}` : `-₹${Math.abs(netValuationImpact).toFixed(2)}`}
+                </p>
+                <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Ledger valuation variance</p>
+              </div>
+              <div className={`p-3 rounded-xl ${netValuationImpact >= 0 ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600' : 'bg-rose-50 dark:bg-rose-950/60 text-rose-600'}`}>
+                <DollarSign className="w-5 h-5" />
+              </div>
+            </div>
+          </div>
+
+          {/* LAYER 2: Protocol Banner & Global Reason Pills Controls */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 space-y-4">
             
-            <button 
-              onClick={handleSubmitAdjustment}
-              className="px-6 py-2.5 bg-indigo-600 text-white rounded-lg shadow-md flex items-center font-bold hover:bg-indigo-700 transition"
-            >
-              <Save className="w-5 h-5 mr-2" /> Submit for Approval
-            </button>
-          </div>
+            {/* Manager Review Protocol Banner (Expandable/Collapsible Alert) */}
+            <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl p-3.5 text-amber-900 dark:text-amber-200 text-xs flex items-start justify-between transition-all">
+              <div className="flex items-start gap-3">
+                <ShieldAlert className="w-4 h-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-extrabold text-amber-900 dark:text-amber-100 flex items-center gap-2">
+                    Manager Review & Audit Protocol Required
+                  </p>
+                  {!isProtocolBannerCollapsed && (
+                    <p className="text-[11px] text-amber-800 dark:text-amber-300 mt-1 leading-relaxed">
+                      All adjustment entries are logged as <strong>PENDING</strong>. Inventory balances on the Stock Ledger will not update until an authorized Manager validates and approves this sheet.
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsProtocolBannerCollapsed(!isProtocolBannerCollapsed)}
+                className="text-amber-700 dark:text-amber-400 hover:text-amber-900 p-1 rounded transition"
+                title={isProtocolBannerCollapsed ? "Expand Info" : "Collapse Info"}
+              >
+                {isProtocolBannerCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+              </button>
+            </div>
 
-          <div className="bg-orange-50 border-l-4 border-orange-500 p-4 mb-6 rounded-r-lg text-orange-800 text-sm flex items-start">
-            <ShieldAlert className="w-5 h-5 mr-3 mt-0.5 flex-shrink-0 text-orange-500" />
-            <div>
-              <p className="font-bold">Manager Review Protocol</p>
-              <p className="text-xs mt-0.5">All adjustment items are logged as PENDING. Quantity updates will not take effect on the Stock Ledger until a Manager validates and approves this request.</p>
+            {/* Reason Code Selector Pills & Top Action Toolbar */}
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 pt-1">
+              
+              {/* Reason Pills */}
+              <div>
+                <label className="block text-[11px] font-extrabold text-slate-400 uppercase tracking-wider mb-2">
+                  Select Sheet Reason Code (Global Scope)
+                </label>
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    { id: 'DAMAGE', label: 'Damage / Broken', colorClass: 'bg-rose-600 text-white shadow-rose-600/30' },
+                    { id: 'EXPIRED', label: 'Expired Stock', colorClass: 'bg-orange-600 text-white shadow-orange-600/30' },
+                    { id: 'THEFT', label: 'Shrinkage / Theft', colorClass: 'bg-purple-600 text-white shadow-purple-600/30' },
+                    { id: 'FOUND', label: 'Surplus / Found', colorClass: 'bg-emerald-600 text-white shadow-emerald-600/30' },
+                    { id: 'MARKET_PURCHASE', label: 'Market Purchase', colorClass: 'bg-blue-600 text-white shadow-blue-600/30' },
+                  ].map(p => {
+                    const isSelected = reason === p.id;
+                    return (
+                      <button
+                        key={p.id}
+                        onClick={() => handleReasonChange(p.id as any)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                          isSelected 
+                            ? `${p.colorClass} shadow-md scale-105` 
+                            : 'bg-slate-100 dark:bg-slate-700/60 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                        }`}
+                      >
+                        {p.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Action Toolbar */}
+              <div className="flex items-center gap-3 self-end lg:self-center">
+                <button 
+                  onClick={downloadTemplate}
+                  className="px-3 py-2 bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-200 rounded-xl font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-600 transition flex items-center gap-1.5"
+                  title="Download CSV Template"
+                >
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> Template
+                </button>
+                
+                <label className="cursor-pointer px-3 py-2 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 rounded-xl font-bold text-xs hover:bg-emerald-100 transition flex items-center gap-1.5">
+                  <FileSpreadsheet className="w-3.5 h-3.5" /> Import CSV
+                  <input 
+                    type="file" 
+                    accept=".csv" 
+                    className="hidden" 
+                    onChange={handleImportCsv}
+                  />
+                </label>
+
+                <button 
+                  onClick={handleSubmitAdjustment}
+                  className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl shadow-md shadow-indigo-600/30 font-black text-xs hover:from-indigo-700 hover:to-violet-700 transition flex items-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" /> Submit for Approval
+                </button>
+              </div>
             </div>
           </div>
 
-          {/* Reason Code Selection */}
-          <div className="mb-6 w-1/3">
-            <label className="block text-sm font-bold text-slate-700 mb-2">Adjustment Reason Code</label>
-            <select 
-              value={reason} 
-              onChange={(e) => setReason(e.target.value)}
-              className="w-full p-2.5 border rounded-lg outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-700 bg-slate-50"
-            >
-              <option value="DAMAGE">DAMAGE (Write-off damaged / broken goods)</option>
-              <option value="EXPIRED">EXPIRED (Write-off expired goods)</option>
-              <option value="THEFT">THEFT (Write-off shrinkage / theft)</option>
-              <option value="FOUND">FOUND (Write-in found surplus stock)</option>
-              <option value="MARKET_PURCHASE">MARKET_PURCHASE (New Purchase from market without PO)</option>
-            </select>
-          </div>
-
-          <div className="mb-4 flex justify-between items-center border-t pt-4">
-            <h4 className="text-md font-bold text-slate-800">Adjustment Lines</h4>
-            <div className="flex items-center space-x-4">
-              <button 
-                onClick={downloadTemplate}
-                className="text-slate-500 hover:text-slate-700 font-bold text-sm flex items-center"
-                title="Download CSV template"
-              >
-                <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Template
-              </button>
-              <label className="cursor-pointer text-emerald-600 font-bold text-sm flex items-center hover:text-emerald-800">
-                <FileSpreadsheet className="w-4 h-4 mr-1.5" /> Import CSV
-                <input 
-                  type="file" 
-                  accept=".csv" 
-                  className="hidden" 
-                  onChange={handleImportCsv}
-                />
-              </label>
-              <button 
-                onClick={handleAddRow}
-                className="text-indigo-600 font-bold text-sm flex items-center hover:text-indigo-800"
-              >
-                <PlusCircle className="w-4 h-4 mr-1.5" /> Add Product Row
-              </button>
+          {/* LAYER 3: Top Eye-Level Quick-Entry Command Bar (PRIMARY WORKING ZONE) */}
+          <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-xl border border-slate-800 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="text-[11px] text-indigo-400 font-extrabold uppercase tracking-widest flex items-center gap-2">
+                <Search className="w-4 h-4 text-indigo-400" /> Fast Product Scanner & Quick-Add Entry Bar (Top Eye-Level)
+              </div>
+              <span className="text-[10px] text-slate-400 font-bold">
+                Press <kbd className="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-indigo-300">↓ / ↑</kbd> to navigate, <kbd className="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-indigo-300">Enter</kbd> to select
+              </span>
             </div>
-          </div>          <table className="w-full border-collapse">
-            <thead className="bg-slate-50 dark:bg-slate-900 border-b-2 border-blue-200 dark:border-blue-800 text-slate-500 dark:text-slate-400 text-xs font-bold uppercase tracking-wider">
-              <tr>
-                <th className="p-3 text-left w-5/12 border-r-2 border-blue-200 dark:border-blue-800">Product Search</th>
-                <th className="p-3 text-left w-3/12 border-r-2 border-blue-200 dark:border-blue-800">Select Batch</th>
-                <th className="p-3 text-center w-1.5/12 border-r-2 border-blue-200 dark:border-blue-800">Current Stock</th>
-                <th className="p-3 text-center w-1.5/12 border-r-2 border-blue-200 dark:border-blue-800">Adjusted Qty (- / +)</th>
-                <th className="p-3 text-center w-1/12"></th>
-              </tr>
-            </thead>
-            <tbody className="bg-white dark:bg-slate-800">
-              {formItems.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="p-8 text-center text-slate-400 text-sm border-b-2 border-blue-200 dark:border-blue-800/80">
-                    No rows added yet. Click "Add Product Row" to begin.
-                  </td>
-                </tr>
-              ) : (
-                formItems.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-slate-50/20 dark:hover:bg-slate-700/20 transition">
-                    
-                    {/* Product Search Input */}
-                    <td className="p-3 relative border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-2.5 text-slate-400 w-4 h-4" />
-                        <input 
-                          type="text" 
-                          placeholder="Search product..." 
-                          className="w-full pl-9 pr-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 font-semibold bg-white dark:bg-slate-950 text-slate-900 dark:text-white"
-                          value={item.searchQuery}
-                          onChange={(e) => handleProductSearch(idx, e.target.value)}
-                        />
-                      </div>
-                      
-                      {/* Dropdown search overlay */}
-                      {item.searchResults.length > 0 && (
-                        <div className="absolute left-3 right-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xl mt-1 z-50 max-h-48 overflow-y-auto">
-                          {item.searchResults.map((p) => (
-                            <div 
-                              key={p.id}
-                              onClick={() => selectProduct(idx, p)}
-                              className="px-4 py-2 cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-950 flex justify-between items-center text-xs font-semibold text-slate-800 dark:text-slate-200"
-                            >
-                              <div>
-                                <p className="font-bold text-slate-800 dark:text-white">{p.name}</p>
-                                <p className="text-[10px] text-slate-400 dark:text-slate-500">Code: {p.productCode}</p>
-                              </div>
-                              <span className="text-indigo-650 dark:text-indigo-400 font-bold">MRP: ₹{p.sellingPrice.toFixed(2)}</span>
-                            </div>
-                          ))}
+
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+              
+              {/* Product Search & Dropdown Input (6 cols) */}
+              <div className="md:col-span-5 relative">
+                <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">
+                  1. Search Product Name or Barcode
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-3 text-slate-400 w-4 h-4" />
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    placeholder="Type name or scan barcode..."
+                    className="w-full pl-10 pr-9 py-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition placeholder:text-slate-500"
+                    value={quickSearchQuery}
+                    onChange={(e) => handleQuickSearch(e.target.value)}
+                    onKeyDown={handleQuickKeyDown}
+                  />
+                  {quickSearchQuery && (
+                    <button
+                      onClick={() => { setQuickSearchQuery(''); setQuickSearchResults([]); setQuickSelectedProduct(null); }}
+                      className="absolute right-3 top-3 text-slate-400 hover:text-white text-xs font-bold"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Live Search Overlay Dropdown with Scroll Sync */}
+                {quickSearchResults.length > 0 && (
+                  <div className="absolute left-0 right-0 mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl z-50 max-h-52 overflow-y-auto divide-y divide-slate-800 custom-scrollbar">
+                    {quickSearchResults.map((p, pIdx) => {
+                      const isHighlighted = pIdx === quickSearchHighlightIndex;
+                      return (
+                        <div
+                          key={p.id}
+                          id={`quick-search-item-${pIdx}`}
+                          onClick={() => selectQuickProduct(p)}
+                          onMouseEnter={() => setQuickSearchHighlightIndex(pIdx)}
+                          className={`px-4 py-2.5 cursor-pointer flex justify-between items-center text-xs transition-colors ${
+                            isHighlighted ? 'bg-indigo-600 text-white font-bold' : 'hover:bg-slate-800 text-slate-200'
+                          }`}
+                        >
+                          <div>
+                            <p className="font-bold">{p.name}</p>
+                            <p className={`text-[10px] ${isHighlighted ? 'text-indigo-200' : 'text-slate-400'}`}>
+                              Code: {p.productCode} | Barcode: {p.barcode || 'N/A'}
+                            </p>
+                          </div>
+                          <span className={`font-black ${isHighlighted ? 'text-white' : 'text-indigo-400'}`}>
+                            ₹{(p.costPrice || p.sellingPrice * 0.7).toFixed(2)}
+                          </span>
                         </div>
-                      )}
-                    </td>
- 
-                    {/* Batch Selector */}
-                    <td className="p-3 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
-                      {item.batches.length > 0 ? (
-                        <div className="space-y-1">
-                          <select
-                            className="w-full p-2 border border-slate-200 dark:border-slate-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-indigo-500 font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-950"
-                            value={item.batchId || (item.batchNumber ? '__custom__' : '')}
-                            onChange={(e) => {
-                              if (e.target.value === '__custom__') {
-                                setFormItems(prev => prev.map((row, i) => i === idx ? { ...row, batchId: '', batchNumber: '', currentStock: 0 } : row));
-                              } else {
-                                handleBatchChange(idx, e.target.value);
-                              }
-                            }}
-                          >
-                            {item.batches.map((b) => (
-                              <option key={b.id} value={b.id}>
-                                {b.batchNumber} {b.expiryDate ? `(Exp: ${b.expiryDate.substring(0, 10)})` : '(No Exp)'} [Stock: {b.currentStock}]
-                              </option>
-                            ))}
-                            <option value="__custom__">+ Enter Custom Batch No...</option>
-                          </select>
-                          {(!item.batchId || item.batchId === '') && (
-                            <input
-                              type="text"
-                              placeholder="Custom Batch No (e.g. BATCH-01)"
-                              className="w-full p-1.5 border border-indigo-300 dark:border-indigo-700 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500 text-indigo-900 dark:text-indigo-200 bg-indigo-50/50 dark:bg-indigo-950/50"
-                              value={item.batchNumber === 'NO BATCH' ? '' : item.batchNumber}
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Batch Selector Dropdown (3 cols) */}
+              <div className="md:col-span-3">
+                <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">
+                  2. Select Batch
+                </label>
+                {quickBatches.length > 0 ? (
+                  <select
+                    className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500"
+                    value={quickBatchId || (quickBatchNumber ? '__custom__' : '')}
+                    onChange={(e) => handleQuickBatchChange(e.target.value)}
+                  >
+                    {quickBatches.map(b => (
+                      <option key={b.id} value={b.id}>
+                        {b.batchNumber} {b.expiryDate ? `(Exp: ${b.expiryDate.substring(0, 10)})` : ''} [Stock: {b.currentStock}]
+                      </option>
+                    ))}
+                    <option value="__custom__">+ Custom Batch...</option>
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    placeholder="Batch No (e.g. BATCH-01)"
+                    className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-500"
+                    value={quickBatchNumber}
+                    onChange={(e) => { setQuickBatchNumber(e.target.value); setQuickBatchId(''); }}
+                  />
+                )}
+              </div>
+
+              {/* Delta Quantity Stepper (2 cols) */}
+              <div className="md:col-span-2">
+                <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">
+                  3. Adjusted Qty
+                </label>
+                <div className="flex items-center">
+                  <button
+                    type="button"
+                    onClick={() => setQuickQty(prev => prev - 1)}
+                    className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-rose-400 rounded-l-xl font-black text-sm border border-r-0 border-slate-700"
+                  >
+                    -
+                  </button>
+                  <input
+                    type="number"
+                    className={`w-full py-2 text-center bg-slate-950 border-t border-b border-slate-700 text-xs font-black outline-none ${
+                      quickQty < 0 ? 'text-rose-400' : 'text-emerald-400'
+                    }`}
+                    value={quickQty}
+                    onChange={(e) => setQuickQty(parseInt(e.target.value) || 0)}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setQuickQty(prev => prev + 1)}
+                    className="px-3 py-2.5 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-r-xl font-black text-sm border border-l-0 border-slate-700"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+
+              {/* Add Button (2 cols) */}
+              <div className="md:col-span-2">
+                <button
+                  onClick={handleQuickAddLine}
+                  className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-extrabold text-xs shadow-md hover:from-indigo-700 hover:to-violet-700 transition flex items-center justify-center gap-1.5"
+                >
+                  <PlusCircle className="w-4 h-4" /> Add to Sheet
+                </button>
+              </div>
+
+            </div>
+          </div>
+
+          {/* LAYER 4: Bounded Worksheet Table Container */}
+          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 overflow-hidden">
+            <div className="flex justify-between items-center mb-3">
+              <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider">Adjustment Lines Worksheet</h4>
+              <span className="text-xs font-bold text-slate-400">{formItems.length} Products Added</span>
+            </div>
+
+            <div className="max-h-[380px] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 custom-scrollbar">
+              <table className="w-full border-collapse text-left">
+                <thead className="sticky top-0 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs font-extrabold uppercase tracking-wider z-10">
+                  <tr>
+                    <th className="p-3">Product Name & Code</th>
+                    <th className="p-3">Batch Number</th>
+                    <th className="p-3 text-center">Live Batch Stock</th>
+                    <th className="p-3 text-center">Adjusted Qty (- / +)</th>
+                    <th className="p-3 text-right">Unit Cost</th>
+                    <th className="p-3 text-center">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 bg-white dark:bg-slate-800 text-xs">
+                  {formItems.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-12 text-center text-slate-400 font-semibold">
+                        No rows added to worksheet yet. Use the top Quick-Entry bar above to add items.
+                      </td>
+                    </tr>
+                  ) : (
+                    formItems.map((item, idx) => (
+                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition">
+                        
+                        {/* Product Info & Code Badge */}
+                        <td className="p-3">
+                          <p className="font-bold text-slate-800 dark:text-white">{item.productName}</p>
+                          {item.productCode && (
+                            <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Code: {item.productCode}</p>
+                          )}
+                        </td>
+
+                        {/* Inline Batch Selector */}
+                        <td className="p-3">
+                          {item.batches && item.batches.length > 0 ? (
+                            <select
+                              className="p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
+                              value={item.batchId || (item.batchNumber ? '__custom__' : '')}
                               onChange={(e) => {
-                                const val = e.target.value;
-                                setFormItems(prev => prev.map((row, i) => i === idx ? { ...row, batchNumber: val, batchId: '' } : row));
+                                const selectedBatchId = e.target.value;
+                                const updated = [...formItems];
+                                const selectedB = item.batches.find(b => b.id === selectedBatchId);
+                                if (selectedB) {
+                                  updated[idx].batchId = selectedB.id;
+                                  updated[idx].batchNumber = selectedB.batchNumber;
+                                  updated[idx].currentStock = selectedB.currentStock;
+                                  updated[idx].unitCost = selectedB.costPrice || updated[idx].unitCost;
+                                }
+                                setFormItems(updated);
+                              }}
+                            >
+                              {item.batches.map(b => (
+                                <option key={b.id} value={b.id}>
+                                  {b.batchNumber} [Stock: {b.currentStock}]
+                                </option>
+                              ))}
+                            </select>
+                          ) : (
+                            <span className="font-bold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">
+                              {item.batchNumber || 'NO BATCH'}
+                            </span>
+                          )}
+                        </td>
+
+                        {/* Live Current Stock */}
+                        <td className="p-3 text-center">
+                          <span className={`font-black text-xs px-2 py-0.5 rounded ${
+                            item.currentStock === 0 ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'text-slate-700 dark:text-slate-200'
+                          }`}>
+                            {item.currentStock} pcs
+                          </span>
+                        </td>
+
+                        {/* Inline Adjusted Qty Stepper & Direct Typing with Section 5 Validation */}
+                        <td className="p-3 text-center">
+                          <div className="flex items-center justify-center space-x-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newQty = item.adjustedQuantity - 1;
+                                // Section 5 Validation check
+                                if (newQty < 0 && Math.abs(newQty) > item.currentStock) {
+                                  alert(`Cannot write off ${Math.abs(newQty)} units of "${item.productName}". Available stock in batch is only ${item.currentStock}.`);
+                                  return;
+                                }
+                                const updated = [...formItems];
+                                updated[idx].adjustedQuantity = newQty;
+                                setFormItems(updated);
+                              }}
+                              className="w-6 h-6 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded font-black text-xs flex items-center justify-center"
+                            >
+                              -
+                            </button>
+                            <input
+                              type="number"
+                              className={`w-16 p-1 border rounded-lg text-center font-black text-xs outline-none focus:ring-2 focus:ring-indigo-500 ${
+                                item.adjustedQuantity < 0 
+                                  ? 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-900/50' 
+                                  : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-900/50'
+                              }`}
+                              value={item.adjustedQuantity}
+                              onChange={(e) => {
+                                const val = parseInt(e.target.value) || 0;
+                                // Section 5 Validation check
+                                if (val < 0 && Math.abs(val) > item.currentStock) {
+                                  alert(`Cannot write off ${Math.abs(val)} units of "${item.productName}". Available stock in batch is only ${item.currentStock}.`);
+                                  return;
+                                }
+                                const updated = [...formItems];
+                                updated[idx].adjustedQuantity = val;
+                                setFormItems(updated);
                               }}
                             />
-                          )}
-                        </div>
-                      ) : (
-                        <input
-                          type="text"
-                          placeholder="Type Batch No (e.g. BATCH-01)"
-                          className="w-full p-2 border border-amber-300 dark:border-amber-700 rounded-lg text-xs outline-none focus:ring-2 focus:ring-amber-500 font-bold text-amber-900 dark:text-amber-200 bg-amber-50/40 dark:bg-amber-950/40"
-                          value={item.batchNumber === 'NO BATCH' ? '' : item.batchNumber}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setFormItems(prev => prev.map((row, i) => i === idx ? { ...row, batchNumber: val, batchId: '' } : row));
-                          }}
-                        />
-                      )}
-                    </td>
- 
-                    {/* Current Stock */}
-                    <td className="p-3 text-center font-bold text-slate-800 dark:text-slate-200 text-sm border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
-                      {item.productId ? item.currentStock : '-'}
-                    </td>
- 
-                    {/* Delta adjustment quantity */}
-                    <td className="p-3 border-b-2 border-r-2 border-blue-200 dark:border-blue-800/80">
-                      <input 
-                        type="number"
-                        placeholder="-1"
-                        className={`w-full p-2 border rounded-lg text-center font-black text-sm outline-none focus:ring-2 focus:ring-indigo-500 ${
-                          item.adjustedQuantity < 0 
-                            ? 'text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-900/50 focus:border-red-500' 
-                            : 'text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/40 border-green-200 dark:border-green-900/50 focus:border-green-500'
-                        }`}
-                        value={item.adjustedQuantity}
-                        onChange={(e) => {
-                          const newItems = [...formItems];
-                          newItems[idx].adjustedQuantity = parseInt(e.target.value) || 0;
-                          setFormItems(newItems);
-                        }}
-                      />
-                    </td>
- 
-                    {/* Delete Line Row */}
-                    <td className="p-3 text-center border-b-2 border-blue-200 dark:border-blue-800/80">
-                      <button 
-                        onClick={() => handleRemoveRow(idx)}
-                        className="text-slate-300 hover:text-red-500 transition"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
-                    </td>
- 
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newQty = item.adjustedQuantity + 1;
+                                const updated = [...formItems];
+                                updated[idx].adjustedQuantity = newQty;
+                                setFormItems(updated);
+                              }}
+                              className="w-6 h-6 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 rounded font-black text-xs flex items-center justify-center"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </td>
+
+                        {/* Financial Impact / Unit Cost */}
+                        <td className="p-3 text-right">
+                          <p className="font-bold text-slate-800 dark:text-white">₹{item.unitCost.toFixed(2)}</p>
+                          <p className={`text-[10px] font-black ${item.adjustedQuantity < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
+                            {item.adjustedQuantity < 0 ? '-' : '+'}₹{(Math.abs(item.adjustedQuantity) * item.unitCost).toFixed(2)}
+                          </p>
+                        </td>
+
+                        {/* Action Delete */}
+                        <td className="p-3 text-center">
+                          <button 
+                            onClick={() => handleRemoveRow(idx)}
+                            className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition"
+                            title="Remove Line"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
         </div>
       )}
     </div>

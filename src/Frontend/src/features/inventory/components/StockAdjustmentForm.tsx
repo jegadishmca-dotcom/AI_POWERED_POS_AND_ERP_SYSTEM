@@ -135,10 +135,13 @@ export const StockAdjustmentForm = () => {
       const batchesList = await getProductBatches(product.id);
       setQuickBatches(batchesList || []);
       if (batchesList && batchesList.length > 0) {
-        setQuickBatchId(batchesList[0].id);
-        setQuickBatchNumber(batchesList[0].batchNumber);
-        setQuickCurrentStock(batchesList[0].currentStock);
-        setQuickUnitCost(batchesList[0].costPrice || defaultCost);
+        // Auto-select batch or UNBATCHED entry with highest available stock as preferred default for seamless demo
+        const bestDefault = [...batchesList].sort((a, b) => (b.currentStock || 0) - (a.currentStock || 0))[0] || batchesList[0];
+        const sanitizedId = (bestDefault.id === '00000000-0000-0000-0000-000000000000') ? '' : bestDefault.id;
+        setQuickBatchId(sanitizedId);
+        setQuickBatchNumber(bestDefault.batchNumber);
+        setQuickCurrentStock(bestDefault.currentStock);
+        setQuickUnitCost(bestDefault.costPrice || defaultCost);
       } else {
         setQuickBatchId('');
         setQuickBatchNumber('NO BATCH');

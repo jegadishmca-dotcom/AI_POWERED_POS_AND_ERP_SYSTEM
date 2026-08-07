@@ -95,6 +95,29 @@ public class GetProductBatchesQueryHandler : IRequestHandler<GetProductBatchesQu
             }
         }
 
+        // 3. ALWAYS include a "General / Unbatched Stock" option representing total product stock across unbatched transactions (SEED-001, etc.)
+        if (!resultDict.ContainsKey("UNBATCHED"))
+        {
+            var unbatchedStock = await _context.StockLedger
+                .Where(sl => sl.ProductId == request.ProductId && (sl.BatchId == null || sl.BatchId == Guid.Empty))
+                .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+
+            var totalStock = await _context.StockLedger
+                .Where(sl => sl.ProductId == request.ProductId)
+                .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+
+            resultDict["UNBATCHED"] = new ProductBatchDto
+            {
+                Id = Guid.Empty,
+                BatchNumber = "UNBATCHED (General Stock)",
+                ExpiryDate = null,
+                CurrentStock = unbatchedStock > 0 ? unbatchedStock : totalStock,
+                Mrp = product.Mrp,
+                SellingPrice = product.SellingPrice,
+                CostPrice = product.PurchasePrice
+            };
+        }
+
         return resultDict.Values
             .OrderBy(b => b.ExpiryDate.HasValue ? 0 : 1)
             .ThenBy(b => b.ExpiryDate)

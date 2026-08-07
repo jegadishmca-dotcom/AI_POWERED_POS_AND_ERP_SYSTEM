@@ -65,6 +65,7 @@ export const StockAdjustmentForm = () => {
   const [quickCurrentStock, setQuickCurrentStock] = useState(0);
   const [quickUnitCost, setQuickUnitCost] = useState(0);
   const [quickQty, setQuickQty] = useState(-1);
+  const [isCustomBatchMode, setIsCustomBatchMode] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Worksheet Items
@@ -126,6 +127,7 @@ export const StockAdjustmentForm = () => {
     setQuickSelectedProduct(product);
     setQuickSearchQuery(product.name);
     setQuickSearchResults([]);
+    setIsCustomBatchMode(false);
     const defaultCost = product.costPrice || product.sellingPrice * 0.7;
     setQuickUnitCost(defaultCost);
 
@@ -147,16 +149,19 @@ export const StockAdjustmentForm = () => {
     }
   };
 
-  const handleQuickBatchChange = (batchIdVal: string) => {
-    if (batchIdVal === '__custom__') {
+  const handleQuickBatchChange = (batchVal: string) => {
+    if (batchVal === '__custom__') {
+      setIsCustomBatchMode(true);
       setQuickBatchId('');
       setQuickBatchNumber('');
       setQuickCurrentStock(0);
       return;
     }
-    const selected = quickBatches.find(b => b.id === batchIdVal);
+    setIsCustomBatchMode(false);
+    // Match by batch id or index fallback
+    const selected = quickBatches.find((b, idx) => b.id === batchVal || `batch-${idx}` === batchVal);
     if (selected) {
-      setQuickBatchId(selected.id);
+      setQuickBatchId(selected.id === '00000000-0000-0000-0000-000000000000' ? '' : selected.id);
       setQuickBatchNumber(selected.batchNumber);
       setQuickCurrentStock(selected.currentStock);
       setQuickUnitCost(selected.costPrice || quickUnitCost);
@@ -206,9 +211,9 @@ export const StockAdjustmentForm = () => {
       alert('Adjusted quantity cannot be zero.');
       return;
     }
-    // Section 5 Rule: Check negative adjustment against current stock
-    if (quickQty < 0 && Math.abs(quickQty) > quickCurrentStock) {
-      alert(`Cannot write off ${Math.abs(quickQty)} units of "${quickSelectedProduct.name}". Current batch stock is only ${quickCurrentStock}.`);
+    // Section 5 Rule: Check negative adjustment against current stock if a specific batch is selected
+    if (quickBatchId && quickQty < 0 && Math.abs(quickQty) > quickCurrentStock) {
+      alert(`Cannot write off ${Math.abs(quickQty)} units of "${quickSelectedProduct.name}". Available stock in selected batch (${quickBatchNumber}) is only ${quickCurrentStock}.`);
       return;
     }
 
@@ -790,32 +795,43 @@ export const StockAdjustmentForm = () => {
                 )}
               </div>
 
-              {/* Batch Selector Dropdown (3 cols) */}
+              {/* Batch Selector Dropdown or Custom Batch Input (3 cols) */}
               <div className="md:col-span-3">
                 <label className="block text-[10px] font-extrabold uppercase tracking-wider text-slate-400 mb-1">
                   2. Select Batch
                 </label>
-                {quickBatches.length > 0 ? (
+                {quickBatches.length > 0 && !isCustomBatchMode ? (
                   <select
                     className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500"
-                    value={quickBatchId || (quickBatchNumber ? '__custom__' : '')}
+                    value={quickBatchId || (quickBatchNumber ? quickBatches.find(b => b.batchNumber === quickBatchNumber)?.id || '__custom__' : '')}
                     onChange={(e) => handleQuickBatchChange(e.target.value)}
                   >
-                    {quickBatches.map(b => (
-                      <option key={b.id} value={b.id}>
+                    {quickBatches.map((b, bIdx) => (
+                      <option key={bIdx} value={b.id && b.id !== '00000000-0000-0000-0000-000000000000' ? b.id : `batch-${bIdx}`}>
                         {b.batchNumber} {b.expiryDate ? `(Exp: ${b.expiryDate.substring(0, 10)})` : ''} [Stock: {b.currentStock}]
                       </option>
                     ))}
-                    <option value="__custom__">+ Custom Batch...</option>
+                    <option value="__custom__">+ Custom Batch / Text Entry...</option>
                   </select>
                 ) : (
-                  <input
-                    type="text"
-                    placeholder="Batch No (e.g. BATCH-01)"
-                    className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-500"
-                    value={quickBatchNumber}
-                    onChange={(e) => { setQuickBatchNumber(e.target.value); setQuickBatchId(''); }}
-                  />
+                  <div>
+                    <input
+                      type="text"
+                      placeholder="Batch No (e.g. BATCH-01)"
+                      className="w-full p-2.5 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-white outline-none focus:ring-2 focus:ring-indigo-500 placeholder:text-slate-500"
+                      value={quickBatchNumber}
+                      onChange={(e) => { setQuickBatchNumber(e.target.value); setQuickBatchId(''); }}
+                    />
+                    {quickBatches.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setIsCustomBatchMode(false)}
+                        className="text-[10px] text-indigo-400 font-extrabold hover:underline mt-1 block"
+                      >
+                        ← Back to batch dropdown list
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
 

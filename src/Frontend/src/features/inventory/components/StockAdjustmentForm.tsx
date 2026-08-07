@@ -547,59 +547,67 @@ export const StockAdjustmentForm = () => {
         </div>
       ) : (
         /* Global AI ERP Standard Sheet Creation Form */
-        <div className="space-y-6">
+        <div className="space-y-5">
           
           {/* LAYER 1: Executive KPI Metrics Cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Total Products</p>
+            <div className="relative overflow-hidden bg-gradient-to-br from-white to-indigo-50/50 dark:from-slate-800 dark:to-indigo-950/30 p-4 rounded-2xl border border-indigo-100 dark:border-indigo-900/50 shadow-sm shadow-indigo-100/50 dark:shadow-indigo-950/30 flex items-center justify-between group hover:shadow-md hover:shadow-indigo-200/40 dark:hover:shadow-indigo-900/30 transition-all duration-300">
+              <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-indigo-500 to-violet-500 rounded-l-2xl" />
+              <div className="pl-2">
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-500 dark:text-indigo-400">Total Products</p>
                 <p className="text-2xl font-black text-slate-800 dark:text-white mt-1">{formItems.length}</p>
                 <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Lines in sheet</p>
               </div>
-              <div className="p-3 bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-xl">
+              <div className="p-3 bg-indigo-100/80 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 rounded-xl group-hover:scale-110 transition-transform duration-300">
                 <Package className="w-5 h-5" />
               </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
-              <div>
+            <div className="relative overflow-hidden bg-gradient-to-br from-white to-rose-50/50 dark:from-slate-800 dark:to-rose-950/20 p-4 rounded-2xl border border-rose-100 dark:border-rose-900/40 shadow-sm shadow-rose-100/50 dark:shadow-rose-950/20 flex items-center justify-between group hover:shadow-md hover:shadow-rose-200/40 dark:hover:shadow-rose-900/20 transition-all duration-300">
+              <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-rose-500 to-pink-500 rounded-l-2xl" />
+              <div className="pl-2">
                 <p className="text-[10px] font-extrabold uppercase tracking-wider text-rose-500">Shrinkage / Damage</p>
                 <p className="text-2xl font-black text-rose-600 dark:text-rose-400 mt-1">-{totalShrinkageUnits} <span className="text-xs font-bold">pcs</span></p>
                 <p className="text-[11px] font-bold text-rose-600 dark:text-rose-400 mt-0.5">-₹{totalShrinkageValue.toFixed(2)}</p>
               </div>
-              <div className="p-3 bg-rose-50 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 rounded-xl">
+              <div className="p-3 bg-rose-100/80 dark:bg-rose-950/60 text-rose-600 dark:text-rose-400 rounded-xl group-hover:scale-110 transition-transform duration-300">
                 <ArrowDownRight className="w-5 h-5" />
               </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
-              <div>
+            <div className="relative overflow-hidden bg-gradient-to-br from-white to-emerald-50/50 dark:from-slate-800 dark:to-emerald-950/20 p-4 rounded-2xl border border-emerald-100 dark:border-emerald-900/40 shadow-sm shadow-emerald-100/50 dark:shadow-emerald-950/20 flex items-center justify-between group hover:shadow-md hover:shadow-emerald-200/40 dark:hover:shadow-emerald-900/20 transition-all duration-300">
+              <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-emerald-500 to-teal-500 rounded-l-2xl" />
+              <div className="pl-2">
                 <p className="text-[10px] font-extrabold uppercase tracking-wider text-emerald-500">Surplus / Found</p>
                 <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 mt-1">+{totalSurplusUnits} <span className="text-xs font-bold">pcs</span></p>
                 <p className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 mt-0.5">+₹{totalSurplusValue.toFixed(2)}</p>
               </div>
-              <div className="p-3 bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-xl">
+              <div className="p-3 bg-emerald-100/80 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 rounded-xl group-hover:scale-110 transition-transform duration-300">
                 <ArrowUpRight className="w-5 h-5" />
               </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Net Financial Impact</p>
+            <div className={`relative overflow-hidden p-4 rounded-2xl shadow-sm flex items-center justify-between group hover:shadow-md transition-all duration-300 ${
+              netValuationImpact >= 0 
+                ? 'bg-gradient-to-br from-white to-emerald-50/40 dark:from-slate-800 dark:to-emerald-950/20 border border-emerald-100 dark:border-emerald-900/40 shadow-emerald-100/50 dark:shadow-emerald-950/20 hover:shadow-emerald-200/40' 
+                : 'bg-gradient-to-br from-white to-rose-50/40 dark:from-slate-800 dark:to-rose-950/20 border border-rose-100 dark:border-rose-900/40 shadow-rose-100/50 dark:shadow-rose-950/20 hover:shadow-rose-200/40'
+            }`}>
+              <div className={`absolute left-0 top-0 bottom-0 w-1 rounded-l-2xl ${netValuationImpact >= 0 ? 'bg-gradient-to-b from-emerald-500 to-cyan-500' : 'bg-gradient-to-b from-rose-500 to-orange-500'}`} />
+              <div className="pl-2">
+                <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500 dark:text-slate-400">Net Financial Impact</p>
                 <p className={`text-2xl font-black mt-1 ${netValuationImpact >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
                   {netValuationImpact >= 0 ? `+₹${netValuationImpact.toFixed(2)}` : `-₹${Math.abs(netValuationImpact).toFixed(2)}`}
                 </p>
                 <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Ledger valuation variance</p>
               </div>
-              <div className={`p-3 rounded-xl ${netValuationImpact >= 0 ? 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600' : 'bg-rose-50 dark:bg-rose-950/60 text-rose-600'}`}>
+              <div className={`p-3 rounded-xl group-hover:scale-110 transition-transform duration-300 ${netValuationImpact >= 0 ? 'bg-emerald-100/80 dark:bg-emerald-950/60 text-emerald-600' : 'bg-rose-100/80 dark:bg-rose-950/60 text-rose-600'}`}>
                 <DollarSign className="w-5 h-5" />
               </div>
             </div>
           </div>
 
-          {/* LAYER 2: Protocol Banner & Global Reason Pills Controls */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-5 space-y-4">
+          {/* LAYER 2: Protocol Banner & Global Reason Pills Controls — Distinct Tinted Panel */}
+          <div className="bg-gradient-to-br from-slate-50 via-white to-violet-50/30 dark:from-slate-800/90 dark:via-slate-800 dark:to-violet-950/20 rounded-2xl border border-violet-100 dark:border-violet-900/40 shadow-sm p-5 space-y-4 backdrop-blur-sm">
             
             {/* Manager Review Protocol Banner (Expandable/Collapsible Alert) */}
             <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60 rounded-xl p-3.5 text-amber-900 dark:text-amber-200 text-xs flex items-start justify-between transition-all">
@@ -690,17 +698,20 @@ export const StockAdjustmentForm = () => {
           </div>
 
           {/* LAYER 3: Top Eye-Level Quick-Entry Command Bar (PRIMARY WORKING ZONE) */}
-          <div className="bg-slate-900 text-white p-4 rounded-2xl shadow-xl border border-slate-800 space-y-3">
-            <div className="flex items-center justify-between">
+          <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/80 text-white p-5 rounded-2xl shadow-xl shadow-indigo-950/20 border border-indigo-900/50 space-y-4 relative overflow-hidden">
+            {/* Subtle glow accent */}
+            <div className="absolute -top-20 -right-20 w-40 h-40 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-violet-600/8 rounded-full blur-2xl pointer-events-none" />
+            <div className="flex items-center justify-between relative z-10">
               <div className="text-[11px] text-indigo-400 font-extrabold uppercase tracking-widest flex items-center gap-2">
                 <Search className="w-4 h-4 text-indigo-400" /> Fast Product Scanner & Quick-Add Entry Bar (Top Eye-Level)
               </div>
               <span className="text-[10px] text-slate-400 font-bold">
-                Press <kbd className="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-indigo-300">↓ / ↑</kbd> to navigate, <kbd className="bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700 text-indigo-300">Enter</kbd> to select
+                Press <kbd className="bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700 text-indigo-300">↓ / ↑</kbd> to navigate, <kbd className="bg-slate-800/80 px-1.5 py-0.5 rounded border border-slate-700 text-indigo-300">Enter</kbd> to select
               </span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end relative z-10">
               
               {/* Product Search & Dropdown Input (6 cols) */}
               <div className="md:col-span-5 relative">
@@ -823,7 +834,7 @@ export const StockAdjustmentForm = () => {
               <div className="md:col-span-2">
                 <button
                   onClick={handleQuickAddLine}
-                  className="w-full py-2.5 bg-gradient-to-r from-indigo-600 to-violet-600 text-white rounded-xl font-extrabold text-xs shadow-md hover:from-indigo-700 hover:to-violet-700 transition flex items-center justify-center gap-1.5"
+                  className="w-full py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl font-extrabold text-xs shadow-lg shadow-emerald-600/30 hover:from-emerald-500 hover:to-teal-500 hover:shadow-emerald-500/40 transition-all duration-200 flex items-center justify-center gap-1.5"
                 >
                   <PlusCircle className="w-4 h-4" /> Add to Sheet
                 </button>
@@ -832,38 +843,53 @@ export const StockAdjustmentForm = () => {
             </div>
           </div>
 
-          {/* LAYER 4: Bounded Worksheet Table Container */}
-          <div className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 overflow-hidden">
-            <div className="flex justify-between items-center mb-3">
-              <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider">Adjustment Lines Worksheet</h4>
-              <span className="text-xs font-bold text-slate-400">{formItems.length} Products Added</span>
+          {/* LAYER 4: Bounded Worksheet Table Container — Distinct Data Grid */}
+          <div className="bg-gradient-to-b from-white to-slate-50/80 dark:from-slate-800 dark:to-slate-850 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div className="flex justify-between items-center px-5 py-4 bg-gradient-to-r from-slate-50 to-white dark:from-slate-800 dark:to-slate-800 border-b border-slate-200 dark:border-slate-700">
+              <h4 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider flex items-center gap-2">
+                <div className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                Adjustment Lines Worksheet
+              </h4>
+              <span className="text-xs font-extrabold px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-900/40">{formItems.length} Products Added</span>
             </div>
 
-            <div className="max-h-[380px] overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 custom-scrollbar">
+            <div className="max-h-[380px] overflow-y-auto">
               <table className="w-full border-collapse text-left">
-                <thead className="sticky top-0 bg-slate-100 dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 text-xs font-extrabold uppercase tracking-wider z-10">
+                <thead className="sticky top-0 bg-gradient-to-r from-indigo-600 to-violet-600 text-white text-xs font-extrabold uppercase tracking-wider z-10 shadow-sm">
                   <tr>
-                    <th className="p-3">Product Name & Code</th>
-                    <th className="p-3">Batch Number</th>
-                    <th className="p-3 text-center">Live Batch Stock</th>
-                    <th className="p-3 text-center">Adjusted Qty (- / +)</th>
-                    <th className="p-3 text-right">Unit Cost</th>
-                    <th className="p-3 text-center">Action</th>
+                    <th className="px-5 py-3 font-extrabold">#</th>
+                    <th className="px-4 py-3 font-extrabold">Product Name & Code</th>
+                    <th className="px-4 py-3 font-extrabold">Batch Number</th>
+                    <th className="px-4 py-3 text-center font-extrabold">Live Batch Stock</th>
+                    <th className="px-4 py-3 text-center font-extrabold">Adjusted Qty (- / +)</th>
+                    <th className="px-4 py-3 text-right font-extrabold">Unit Cost</th>
+                    <th className="px-4 py-3 text-center font-extrabold">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/60 bg-white dark:bg-slate-800 text-xs">
+                <tbody className="divide-y divide-slate-100 dark:divide-slate-700/40 text-xs">
                   {formItems.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="p-12 text-center text-slate-400 font-semibold">
+                      <td colSpan={7} className="p-12 text-center text-slate-400 font-semibold bg-white dark:bg-slate-800">
                         No rows added to worksheet yet. Use the top Quick-Entry bar above to add items.
                       </td>
                     </tr>
                   ) : (
                     formItems.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/40 transition">
+                      <tr key={idx} className={`transition-colors duration-150 ${
+                        idx % 2 === 0 
+                          ? 'bg-white dark:bg-slate-800' 
+                          : 'bg-slate-50/70 dark:bg-slate-800/60'
+                      } hover:bg-indigo-50/50 dark:hover:bg-indigo-950/20`}>
                         
+                        {/* Row Number */}
+                        <td className="px-5 py-3">
+                          <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-700 text-[10px] font-black text-slate-500 dark:text-slate-400">
+                            {idx + 1}
+                          </span>
+                        </td>
+
                         {/* Product Info & Code Badge */}
-                        <td className="p-3">
+                        <td className="px-4 py-3">
                           <p className="font-bold text-slate-800 dark:text-white">{item.productName}</p>
                           {item.productCode && (
                             <p className="text-[10px] text-slate-400 font-semibold mt-0.5">Code: {item.productCode}</p>
@@ -871,7 +897,7 @@ export const StockAdjustmentForm = () => {
                         </td>
 
                         {/* Inline Batch Selector */}
-                        <td className="p-3">
+                        <td className="px-4 py-3">
                           {item.batches && item.batches.length > 0 ? (
                             <select
                               className="p-1.5 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-bold bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 outline-none focus:ring-2 focus:ring-indigo-500"
@@ -903,7 +929,7 @@ export const StockAdjustmentForm = () => {
                         </td>
 
                         {/* Live Current Stock */}
-                        <td className="p-3 text-center">
+                        <td className="px-4 py-3 text-center">
                           <span className={`font-black text-xs px-2 py-0.5 rounded ${
                             item.currentStock === 0 ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300' : 'text-slate-700 dark:text-slate-200'
                           }`}>
@@ -912,7 +938,7 @@ export const StockAdjustmentForm = () => {
                         </td>
 
                         {/* Inline Adjusted Qty Stepper & Direct Typing with Section 5 Validation */}
-                        <td className="p-3 text-center">
+                        <td className="px-4 py-3 text-center">
                           <div className="flex items-center justify-center space-x-1">
                             <button
                               type="button"
@@ -967,7 +993,7 @@ export const StockAdjustmentForm = () => {
                         </td>
 
                         {/* Financial Impact / Unit Cost */}
-                        <td className="p-3 text-right">
+                        <td className="px-4 py-3 text-right">
                           <p className="font-bold text-slate-800 dark:text-white">₹{item.unitCost.toFixed(2)}</p>
                           <p className={`text-[10px] font-black ${item.adjustedQuantity < 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
                             {item.adjustedQuantity < 0 ? '-' : '+'}₹{(Math.abs(item.adjustedQuantity) * item.unitCost).toFixed(2)}
@@ -975,7 +1001,7 @@ export const StockAdjustmentForm = () => {
                         </td>
 
                         {/* Action Delete */}
-                        <td className="p-3 text-center">
+                        <td className="px-4 py-3 text-center">
                           <button 
                             onClick={() => handleRemoveRow(idx)}
                             className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/50 rounded-lg transition"

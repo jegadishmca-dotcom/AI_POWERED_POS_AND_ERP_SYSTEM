@@ -38,8 +38,21 @@ export const StockAdjustmentForm = () => {
 
   // Form builder state
   const [showNewForm, setShowNewForm] = useState(false);
-  const [reason, setReason] = useState<'DAMAGE' | 'EXPIRED' | 'THEFT' | 'FOUND' | 'MARKET_PURCHASE'>('DAMAGE');
+  const [reason, setReason] = useState<'DAMAGE' | 'EXPIRED' | 'SHRINKAGE' | 'THEFT' | 'FOUND' | 'MARKET_PURCHASE'>('DAMAGE');
   const [isProtocolBannerCollapsed, setIsProtocolBannerCollapsed] = useState(false);
+
+  const formatReasonLabel = (reasonCode?: string) => {
+    if (!reasonCode) return 'General';
+    switch (reasonCode.toUpperCase()) {
+      case 'SHRINKAGE': return 'Shrinkage';
+      case 'THEFT': return 'Theft / Stolen';
+      case 'DAMAGE': return 'Damage / Broken';
+      case 'EXPIRED': return 'Expired Stock';
+      case 'FOUND': return 'Surplus / Found';
+      case 'MARKET_PURCHASE': return 'Market Purchase';
+      default: return reasonCode;
+    }
+  };
 
   // Top Eye-Level Quick-Add Entry Bar state
   const [quickSearchQuery, setQuickSearchQuery] = useState('');
@@ -84,7 +97,7 @@ export const StockAdjustmentForm = () => {
   }, []);
 
   // Update default Quick Qty sign based on Reason selection (non-destructive to existing lines)
-  const handleReasonChange = (newReason: 'DAMAGE' | 'EXPIRED' | 'THEFT' | 'FOUND' | 'MARKET_PURCHASE') => {
+  const handleReasonChange = (newReason: 'DAMAGE' | 'EXPIRED' | 'SHRINKAGE' | 'THEFT' | 'FOUND' | 'MARKET_PURCHASE') => {
     setReason(newReason);
     if (newReason === 'FOUND' || newReason === 'MARKET_PURCHASE') {
       if (quickQty < 0) setQuickQty(Math.abs(quickQty) || 1);
@@ -446,7 +459,7 @@ export const StockAdjustmentForm = () => {
                       </div>
                       <p className="text-xs text-slate-400 mt-1">Date: {new Date(a.createdAt).toLocaleString()}</p>
                       <p className="text-xs text-slate-500 dark:text-slate-300 font-bold mt-1">
-                        Reason: <span className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-indigo-600 dark:text-indigo-400">{a.reason}</span>
+                        Reason: <span className="bg-slate-100 dark:bg-slate-700 px-2 py-0.5 rounded text-indigo-600 dark:text-indigo-400">{formatReasonLabel(a.reason)}</span>
                       </p>
                     </div>
                     
@@ -484,7 +497,7 @@ export const StockAdjustmentForm = () => {
                   <div className="mb-4">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Adjustment Reason</p>
                     <p className="font-bold text-slate-800 dark:text-slate-100 bg-slate-50 dark:bg-slate-900/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-700 text-sm mt-1">
-                      {selectedAdjustment.reason}
+                      {formatReasonLabel(selectedAdjustment.reason)}
                     </p>
                   </div>
 
@@ -651,7 +664,8 @@ export const StockAdjustmentForm = () => {
                   {[
                     { id: 'DAMAGE', label: 'Damage / Broken', colorClass: 'bg-rose-600 text-white shadow-rose-600/30' },
                     { id: 'EXPIRED', label: 'Expired Stock', colorClass: 'bg-orange-600 text-white shadow-orange-600/30' },
-                    { id: 'THEFT', label: 'Shrinkage / Theft', colorClass: 'bg-purple-600 text-white shadow-purple-600/30' },
+                    { id: 'SHRINKAGE', label: 'Shrinkage', colorClass: 'bg-purple-600 text-white shadow-purple-600/30' },
+                    { id: 'THEFT', label: 'Theft / Stolen', colorClass: 'bg-rose-700 text-white shadow-rose-700/30' },
                     { id: 'FOUND', label: 'Surplus / Found', colorClass: 'bg-emerald-600 text-white shadow-emerald-600/30' },
                     { id: 'MARKET_PURCHASE', label: 'Market Purchase', colorClass: 'bg-blue-600 text-white shadow-blue-600/30' },
                   ].map(p => {

@@ -1,4 +1,4 @@
-﻿using MediatR;
+using MediatR;
 using PosErp.Application.Interfaces;
 using PosErp.Domain.Entities.Inventory;
 using System;
@@ -43,10 +43,11 @@ public class CreateStockAdjustmentCommandHandler : IRequestHandler<CreateStockAd
 
         foreach (var dto in request.Items)
         {
+            var sanitizedBatchId = (dto.BatchId == Guid.Empty) ? null : dto.BatchId;
             adjustment.Items.Add(new StockAdjustmentItem
             {
                 ProductId = dto.ProductId,
-                BatchId = dto.BatchId,
+                BatchId = sanitizedBatchId,
                 AdjustedQuantity = dto.AdjustedQuantity,
                 UnitCost = dto.UnitCost
             });

@@ -310,7 +310,7 @@ export const StockAdjustmentForm = () => {
         reason: reason,
         items: validItems.map((i) => ({
           productId: i.productId,
-          batchId: i.batchId || null,
+          batchId: (!i.batchId || i.batchId === '00000000-0000-0000-0000-000000000000') ? null : i.batchId,
           adjustedQuantity: i.adjustedQuantity,
           unitCost: i.unitCost,
         })),

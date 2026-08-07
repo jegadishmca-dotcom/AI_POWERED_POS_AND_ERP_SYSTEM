@@ -321,9 +321,15 @@ export const StockAdjustmentForm = () => {
       setFormItems([]);
       setShowNewForm(false);
       fetchAdjustments();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Submit adjustment failed', err);
-      alert('Failed to submit adjustment.');
+      const backendMsg = err?.response?.data?.message 
+        || err?.response?.data?.title 
+        || err?.response?.data?.detail
+        || (typeof err?.response?.data === 'string' ? err?.response?.data : null)
+        || err?.message 
+        || 'Unknown error';
+      alert(`Failed to submit adjustment.\n\nReason: ${backendMsg}`);
     }
   };
 
@@ -698,10 +704,10 @@ export const StockAdjustmentForm = () => {
           </div>
 
           {/* LAYER 3: Top Eye-Level Quick-Entry Command Bar (PRIMARY WORKING ZONE) */}
-          <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/80 text-white p-5 rounded-2xl shadow-xl shadow-indigo-950/20 border border-indigo-900/50 space-y-4 relative overflow-hidden">
+          <div className="bg-gradient-to-r from-slate-900 via-slate-900 to-indigo-950/80 text-white p-5 rounded-2xl shadow-xl shadow-indigo-950/20 border border-indigo-900/50 space-y-4 relative" style={{ zIndex: 30 }}>
             {/* Subtle glow accent */}
-            <div className="absolute -top-20 -right-20 w-40 h-40 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" />
-            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-violet-600/8 rounded-full blur-2xl pointer-events-none" />
+            <div className="absolute -top-20 -right-20 w-40 h-40 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none" style={{ zIndex: 0 }} />
+            <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-violet-600/8 rounded-full blur-2xl pointer-events-none" style={{ zIndex: 0 }} />
             <div className="flex items-center justify-between relative z-10">
               <div className="text-[11px] text-indigo-400 font-extrabold uppercase tracking-widest flex items-center gap-2">
                 <Search className="w-4 h-4 text-indigo-400" /> Fast Product Scanner & Quick-Add Entry Bar (Top Eye-Level)

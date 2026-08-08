@@ -39,7 +39,7 @@ import { getServerUrl } from '../../../utils/api';
  * handles that residual gap.
  */
 export const ProtectedRoute: React.FC = () => {
-  const { isAuthenticated, user, setAuth, clearAuth } = useAuthStore();
+  const { isAuthenticated, user, accessToken, setAuth, clearAuth } = useAuthStore();
   const location = useLocation();
 
   // Always start in the "checking" state so we validate on every fresh SPA load.
@@ -55,6 +55,12 @@ export const ProtectedRoute: React.FC = () => {
     hasCheckedRef.current = true;
 
     const validateSession = async () => {
+      // If user is already authenticated with an in-memory access token (e.g. just logged in), skip network check
+      if (isAuthenticated && accessToken) {
+        setIsChecking(false);
+        return;
+      }
+
       if (!user) {
         // No user persisted in store → nothing to restore → go to login.
         setIsChecking(false);

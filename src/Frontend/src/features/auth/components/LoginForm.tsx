@@ -29,25 +29,21 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onSubmit, isLoading, error
     }
   });
 
-  const loginTypeRef = React.useRef(loginType);
-  loginTypeRef.current = loginType;
-
   const handleFormSubmit = (data: LoginFormData) => {
     setTerminalError(null);
-    if (loginTypeRef.current === 'cashier' && (!data.terminalCode || data.terminalCode.trim() === '')) {
+    if (loginType === 'cashier' && (!data.terminalCode || data.terminalCode.trim() === '')) {
       setTerminalError('Terminal Code is required for POS cashier login');
       return;
     }
-    onSubmit(data, loginTypeRef.current);
+    onSubmit(data, loginType);
   };
 
   const handleDemoLogin = () => {
     setLoginType('admin');
     setValue('username', 'demo@supermarket.com', { shouldValidate: true, shouldDirty: true });
     setValue('password', 'Demo@123456', { shouldValidate: true, shouldDirty: true });
-    setTimeout(() => {
-      handleSubmit(handleFormSubmit)();
-    }, 150);
+    setTerminalError(null);
+    onSubmit({ username: 'demo@supermarket.com', password: 'Demo@123456' }, 'admin');
   };
 
   return (

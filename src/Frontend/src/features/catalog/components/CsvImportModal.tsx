@@ -36,7 +36,12 @@ export const CsvImportModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
       setProgress(null);
       queryClient.invalidateQueries({ queryKey: ['products'] });
     } catch (e: any) {
-      setResult({ error: 'Import failed or timed out: ' + (e.response?.data?.message || e.message || 'Server connection issue. Please verify file format and try again.') });
+      const isNetworkErr = e.message === 'Network Error' || e.code === 'ERR_NETWORK';
+      const detailMsg = isNetworkErr
+        ? 'Network Error: Cannot reach backend API server. Please verify that VITE_API_URL is configured in your Vercel deployment settings and pointing to an active backend.'
+        : (e.response?.data?.message || e.message || 'Server connection issue. Please verify file format and try again.');
+
+      setResult({ error: detailMsg });
       setProgress(null);
     } finally {
       setIsUploading(false);

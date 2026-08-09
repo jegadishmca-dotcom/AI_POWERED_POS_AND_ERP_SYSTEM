@@ -251,6 +251,13 @@ export const EnvironmentConfig: React.FC = () => {
             </div>
 
             <form onSubmit={handleToggleSubmit} className="space-y-4">
+              {errorMsg && (
+                <div className="bg-rose-50 border border-rose-200 text-rose-600 p-3 rounded-xl text-xs font-bold flex items-start gap-2">
+                  <AlertTriangle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                  <span>{errorMsg}</span>
+                </div>
+              )}
+
               <div className="space-y-1">
                 <label className="text-xs font-black text-slate-500 uppercase flex items-center gap-1.5">
                   <Key className="w-3.5 h-3.5" /> Developer Password
@@ -260,7 +267,10 @@ export const EnvironmentConfig: React.FC = () => {
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Enter Developer Account Password"
                     value={developerPassword}
-                    onChange={(e) => setDeveloperPassword(e.target.value)}
+                    onChange={(e) => {
+                      setDeveloperPassword(e.target.value);
+                      setErrorMsg(null);
+                    }}
                     required
                     className="w-full px-4 py-2.5 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 pr-10"
                   />

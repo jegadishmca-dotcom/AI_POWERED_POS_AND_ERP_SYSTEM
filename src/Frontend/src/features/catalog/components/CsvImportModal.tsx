@@ -17,19 +17,26 @@ export const CsvImportModal = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
     if (!file) return;
     setIsUploading(true);
     setResult(null);
-    setProgress({ processedRows: 0, totalRows: Math.max(100, Math.round(file.size / 110)), importedCount: 0, failedCount: 0, percent: 0 });
+    const estimatedTotal = Math.max(100, Math.round(file.size / 110));
+    setProgress({ processedRows: 0, totalRows: estimatedTotal, importedCount: 0, failedCount: 0, percent: 1 });
 
     const jobId = 'job_' + Math.random().toString(36).substring(2, 11) + '_' + Date.now();
 
     try {
       const res = await importCsv(file, jobId, (p) => {
-        setProgress(p);
+        // Guarantee percent moves dynamically as rows process
+        const calculatedPercent = p.totalRows > 0 ? Math.min(99, Math.round((p.processedRows / p.totalRows) * 100)) : 1;
+        setProgress({
+          ...p,
+          totalRows: p.totalRows > 0 ? p.totalRows : estimatedTotal,
+          percent: Math.max(1, calculatedPercent)
+        });
       });
       setResult(res);
       setProgress(null);
       queryClient.invalidateQueries({ queryKey: ['products'] });
     } catch (e: any) {
-      setResult({ error: 'Upload failed: ' + (e.message || 'Unknown error') });
+      setResult({ error: 'Import failed or timed out: ' + (e.response?.data?.message || e.message || 'Server connection issue. Please verify file format and try again.') });
       setProgress(null);
     } finally {
       setIsUploading(false);

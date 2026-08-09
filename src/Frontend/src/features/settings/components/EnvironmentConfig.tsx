@@ -4,7 +4,7 @@ import { api } from '../../../utils/api';
 import { useAuthStore } from '../../auth/store/auth.store';
 
 export const EnvironmentConfig: React.FC = () => {
-  const [activeMode, setActiveMode] = useState('LIVE');
+  const [activeMode, setActiveMode] = useState('UAT');
   const [deploymentMode, setDeploymentMode] = useState('SelfHosted');
   const [tenantName, setTenantName] = useState<string | null>(null);
   
@@ -31,12 +31,13 @@ export const EnvironmentConfig: React.FC = () => {
       setLoading(true);
       setErrorMsg(null);
       const res = await api.get('/api/environment/mode');
-      setActiveMode(res.data.activeMode || 'LIVE');
+      setActiveMode(res.data.activeMode || 'UAT');
       setDeploymentMode(res.data.deploymentMode || 'SelfHosted');
       setTenantName(res.data.tenantName || null);
     } catch (err: any) {
       console.error('Failed to load environment mode', err);
-      setErrorMsg('Failed to load environment configuration from server.');
+      setActiveMode('UAT');
+      setErrorMsg('Running in UAT Sandbox mode (server mode configuration endpoint unreachable).');
     } finally {
       setLoading(false);
     }

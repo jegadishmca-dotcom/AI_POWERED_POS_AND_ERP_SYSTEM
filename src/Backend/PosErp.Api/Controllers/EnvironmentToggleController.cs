@@ -63,7 +63,7 @@ public class EnvironmentToggleController : ControllerBase
         var deploymentMode = _configuration["SystemConfig:DeploymentMode"] ?? "SelfHosted";
         var isSaaS = string.Equals(deploymentMode, "SaaS", StringComparison.OrdinalIgnoreCase);
         
-        string activeMode = "LIVE";
+        string activeMode = "UAT";
         string? tenantName = null;
 
         if (isSaaS)
@@ -96,7 +96,7 @@ public class EnvironmentToggleController : ControllerBase
                 var result = await cmd.ExecuteScalarAsync();
                 if (result != null && result != DBNull.Value)
                 {
-                    activeMode = result.ToString() ?? "LIVE";
+                    activeMode = result.ToString() ?? "UAT";
                 }
             }
             catch (Exception ex)

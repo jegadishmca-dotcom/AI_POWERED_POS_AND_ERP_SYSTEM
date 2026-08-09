@@ -139,7 +139,7 @@ public class ConnectionStringProvider : IConnectionStringProvider
                     {
                         if (doc.RootElement.TryGetProperty("ActiveMode", out var prop))
                         {
-                            return prop.GetString() ?? "LIVE";
+                            return prop.GetString() ?? "UAT";
                         }
                     }
                 }
@@ -149,7 +149,7 @@ public class ConnectionStringProvider : IConnectionStringProvider
                 }
             }
         }
-        return "LIVE";
+        return "UAT";
     }
 
     public int GetSelfHostedTokenVersion()

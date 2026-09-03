@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Save, ShieldAlert, Plus, Trash2, CheckCircle, XCircle, Clock, Eye, 
   AlertCircle, FileSpreadsheet, PlusCircle, Search, ChevronDown, ChevronUp,
-  Package, ArrowDownRight, ArrowUpRight, DollarSign, Layers, RefreshCw
+  Package, ArrowDownRight, ArrowUpRight, IndianRupee, Layers, RefreshCw
 } from 'lucide-react';
 import { getStockAdjustments, createStockAdjustment, approveStockAdjustment, rejectStockAdjustment, StockAdjustment } from '../api/stockAdjustment.api';
 import { searchProducts } from '../../catalog/api/catalog.api';
@@ -473,7 +473,14 @@ export const StockAdjustmentForm = () => {
                     
                     <div className="text-right">
                       <p className="text-xs font-black text-slate-700 dark:text-slate-200">{a.items.length} Line items</p>
-                      <button className="text-indigo-600 dark:text-indigo-400 text-xs font-bold hover:underline flex items-center gap-1 mt-2 justify-end">
+                      <button 
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedAdjustment(a);
+                        }}
+                        className="text-indigo-600 dark:text-indigo-400 text-xs font-bold hover:underline flex items-center gap-1 mt-2 justify-end cursor-pointer"
+                      >
                         <Eye className="w-3.5 h-3.5" /> View Sheet
                       </button>
                     </div>
@@ -628,7 +635,7 @@ export const StockAdjustmentForm = () => {
                 <p className="text-[11px] font-semibold text-slate-400 mt-0.5">Ledger valuation variance</p>
               </div>
               <div className={`p-3 rounded-xl group-hover:scale-110 transition-transform duration-300 ${netValuationImpact >= 0 ? 'bg-emerald-100/80 dark:bg-emerald-950/60 text-emerald-600' : 'bg-rose-100/80 dark:bg-rose-950/60 text-rose-600'}`}>
-                <DollarSign className="w-5 h-5" />
+                <IndianRupee className="w-5 h-5" />
               </div>
             </div>
           </div>

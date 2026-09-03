@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { recommendationApi, aiInsightsApi } from '../api/executiveAiApi';
-import { Target, CheckCircle, XCircle, Clock, ShoppingCart, Package, Users, DollarSign, Filter } from 'lucide-react';
+import { Target, CheckCircle, XCircle, Clock, ShoppingCart, Package, Users, IndianRupee, Filter } from 'lucide-react';
 
 export const RecommendationCenter: React.FC = () => {
   const [recommendations, setRecommendations] = useState<any[]>([]);
@@ -39,7 +39,7 @@ export const RecommendationCenter: React.FC = () => {
       case 'Procurement': return <ShoppingCart className="w-5 h-5" />;
       case 'Inventory': return <Package className="w-5 h-5" />;
       case 'CRM': return <Users className="w-5 h-5" />;
-      case 'Finance': return <DollarSign className="w-5 h-5" />;
+      case 'Finance': return <IndianRupee className="w-5 h-5" />;
       default: return <Target className="w-5 h-5" />;
     }
   };

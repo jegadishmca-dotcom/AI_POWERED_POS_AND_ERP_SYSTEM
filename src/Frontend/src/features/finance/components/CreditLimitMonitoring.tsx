@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { getCreditMonitoring, CreditMonitoring } from '../services/finance.service';
+import { exportToCsv } from '../../../utils/exportToCsv';
 import { 
   ShieldAlert, 
   Search, 
@@ -10,8 +11,7 @@ import {
   ChevronRight, 
   AlertTriangle,
   CheckCircle,
-  XCircle,
-  DollarSign
+  XCircle
 } from 'lucide-react';
 import { formatCurrency } from '../../../utils/formatters';
 
@@ -35,6 +35,20 @@ export const CreditLimitMonitoring: React.FC = () => {
       setSortBy(field);
       setSortOrder('desc');
     }
+  };
+
+  const handleExport = () => {
+    exportToCsv(filteredMonitors, 'Credit_Limit_Monitoring_Report', [
+      { key: 'customerName', label: 'Customer Name' },
+      { key: 'phone', label: 'Phone' },
+      { key: 'creditLimit', label: 'Credit Limit (₹)' },
+      { key: 'outstandingBalance', label: 'Outstanding Balance (₹)' },
+      { key: 'availableCredit', label: 'Available Credit (₹)' },
+      { key: 'utilizationPercentage', label: 'Utilization %' },
+      { key: 'overdueDays', label: 'Overdue Days' },
+      { key: 'riskLevel', label: 'Risk Level' },
+      { key: 'isBlocked', label: 'Status' },
+    ]);
   };
 
   // Filter records
@@ -103,7 +117,10 @@ export const CreditLimitMonitoring: React.FC = () => {
           <p className="text-slate-500 dark:text-slate-400 mt-1">Track credit exposure, B2B customer limits, and outstanding risk profiles</p>
         </div>
         <div>
-          <button className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-sm transition-all text-sm">
+          <button 
+            onClick={handleExport}
+            className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-sm transition-all text-sm cursor-pointer"
+          >
             <Download className="w-4 h-4" />
             Export Credit Report
           </button>

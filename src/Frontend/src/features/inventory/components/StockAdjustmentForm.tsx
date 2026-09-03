@@ -397,8 +397,8 @@ export const StockAdjustmentForm = () => {
             <div>
               <h2 className="text-2xl font-black text-slate-800 dark:text-white flex items-center gap-2">
                 Stock Adjustment Manager
-                <span className="text-xs font-bold px-2 py-0.5 rounded bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  v1.3 Global Standard
+                <span className="text-xs font-bold px-2 py-0.5 rounded bg-red-100 dark:bg-red-950 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800">
+                  v1.0.0-rc2 Global Standard
                 </span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">

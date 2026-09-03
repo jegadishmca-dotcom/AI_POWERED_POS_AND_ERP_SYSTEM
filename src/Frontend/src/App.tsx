@@ -29,7 +29,10 @@ import {
   BookOpen,
   CalendarClock,
   Banknote,
-  Tag
+  Tag,
+  Activity,
+  Trophy,
+  BarChart2
 } from 'lucide-react';
 import { useAuthStore } from './features/auth/store/auth.store';
 import { api } from './utils/api';
@@ -49,6 +52,8 @@ import { ShiftReport } from './features/pos/components/ShiftReport';
 import { BusinessDateDashboard } from './features/pos/components/BusinessDateDashboard';
 import { Suppliers } from './features/purchasing/routes/Suppliers';
 import { PurchaseOrders } from './features/purchasing/routes/PurchaseOrders';
+import { ProcurementDashboard } from './features/purchasing/components/ProcurementDashboard';
+import { SupplierDashboard } from './features/purchasing/components/SupplierDashboard';
 import { Settings } from './pages/Settings';
 import { PriceChangeModule } from './features/catalog/components/PriceChangeModule';
 import { OffersManager } from './features/offers/components/OffersManager';
@@ -58,6 +63,10 @@ import { AiChat } from './features/ai/routes/AiChat';
 import { AiForecaster } from './features/ai/routes/AiForecaster';
 import { AiMarkdowns } from './features/ai/routes/AiMarkdowns';
 import { LossPreventionDashboard } from './features/analytics/components/LossPreventionDashboard';
+import { ExecutiveDashboard } from './features/ai/routes/ExecutiveDashboard';
+import { ForecastDashboard } from './features/ai/routes/ForecastDashboard';
+import { StorePerformanceDashboard } from './features/ai/routes/StorePerformanceDashboard';
+import { HealthDashboard } from './features/ai/routes/HealthDashboard';
 
 // Finance Phase F1
 import { FinanceDashboard } from './features/finance/components/FinanceDashboard';
@@ -154,6 +163,10 @@ const AppLayout: React.FC = () => {
     { path: '/finance/credit-limit', name: 'Credit Monitoring', icon: ShieldAlert, roles: ['Owner', 'Manager', 'Accountant'], category: 'finance' },
 
     // AI Co-Pilot Hub
+    { path: '/ai/executive', name: 'Executive Intelligence', icon: BarChart2, roles: ['Owner', 'Manager'], category: 'ai' },
+    { path: '/ai/forecast-dashboard', name: 'Forecast Trends', icon: TrendingUp, roles: ['Owner', 'Manager'], category: 'ai' },
+    { path: '/ai/store-performance', name: 'Store Benchmarks', icon: Trophy, roles: ['Owner', 'Manager'], category: 'ai' },
+    { path: '/ai/health', name: 'System Health', icon: Activity, roles: ['Owner', 'Manager'], category: 'ai' },
     { path: '/ai/chat', name: 'AI Co-pilot Chat', icon: Bot, roles: ['Owner', 'Manager'], category: 'ai' },
     { path: '/ai/forecaster', name: 'AI Demand Forecaster', icon: TrendingUp, roles: ['Owner', 'Manager'], category: 'ai' },
     { path: '/ai/markdowns', name: 'AI Smart Markdowns', icon: TrendingDown, roles: ['Owner', 'Manager'], category: 'ai' },
@@ -429,7 +442,7 @@ const AppLayout: React.FC = () => {
             </button>
             <h1 className="text-xl font-extrabold text-slate-800 dark:text-white flex items-center">
               {navItems.find(item => item.path === location.pathname)?.name || 'ERP System'}
-              <span className="ml-3 text-xs font-bold text-slate-500 bg-slate-200 dark:bg-slate-700 dark:text-slate-300 px-2 py-1 rounded">v1.3</span>
+              <span className="ml-3 text-xs font-black tracking-wider bg-red-600 text-white px-2.5 py-0.5 rounded shadow-sm border border-red-500">v1.0.0-rc2</span>
             </h1>
           </div>
           <div className="flex items-center space-x-4">
@@ -559,8 +572,26 @@ const AppLayout: React.FC = () => {
             <Route path="/ai/loss-prevention" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <LossPreventionDashboard />
             } />
+            <Route path="/ai/executive" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <ExecutiveDashboard />
+            } />
+            <Route path="/ai/forecast-dashboard" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <ForecastDashboard />
+            } />
+            <Route path="/ai/store-performance" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <StorePerformanceDashboard />
+            } />
+            <Route path="/ai/health" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <HealthDashboard />
+            } />
             <Route path="/warehouses" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <WarehouseLocationsList />
+            } />
+            <Route path="/purchasing/procurement" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <ProcurementDashboard />
+            } />
+            <Route path="/purchasing/supplier-analytics" element={
+              user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <SupplierDashboard />
             } />
             <Route path="/settings" element={
               user?.role === 'Cashier' ? <Navigate to="/pos" replace /> : <Settings />

@@ -450,8 +450,8 @@ export const StockTakeForm = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-xl md:text-2xl font-black text-white tracking-tight">Stock Take Manager</h1>
-                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-violet-950 text-violet-300 border border-violet-700/50">
-                  v1.3 Global Standard
+                <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-red-950 text-red-300 border border-red-700/50">
+                  v1.0.0-rc2 Global Standard
                 </span>
               </div>
               <p className="text-xs text-slate-400 font-medium">
@@ -538,7 +538,11 @@ export const StockTakeForm = () => {
                           </button>
                         )}
                         {t.status !== 'DRAFT' && (
-                          <button className="text-indigo-400 text-xs font-bold hover:underline flex items-center gap-1 mt-2 justify-end">
+                          <button 
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); handleSelectTake(t); }}
+                            className="text-indigo-400 text-xs font-bold hover:underline flex items-center gap-1 mt-2 justify-end cursor-pointer"
+                          >
                             <Eye className="w-3.5 h-3.5" /> Details
                           </button>
                         )}

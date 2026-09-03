@@ -64,6 +64,14 @@ public class PurchasingController : ControllerBase
         var batches = await context.ProductBatches.Where(b => b.IsActive).ToListAsync();
         var allSuppliers = await context.Suppliers.Where(s => s.IsActive).ToListAsync();
         
+        // Idempotency check: Exclude products that already have open, draft, or partially-received POs
+        var pendingProductIds = await context.PurchaseOrderItems
+            .Where(poi => poi.PurchaseOrderHeader.Status != "FULL_GRN" && poi.PurchaseOrderHeader.Status != "CANCELLED")
+            .Select(poi => poi.ProductId)
+            .Distinct()
+            .ToListAsync();
+        var pendingProductSet = new HashSet<Guid>(pendingProductIds);
+
         var defaultSupplier = allSuppliers.FirstOrDefault();
         if (defaultSupplier == null)
         {
@@ -79,47 +87,85 @@ public class PurchasingController : ControllerBase
             allSuppliers.Add(defaultSupplier);
         }
 
+        // PERMANENT SAFETY LIMIT:
+        // An interactive HTTP endpoint must never issue hundreds of synchronous database writes in one call.
+        // Full store replenishment across thousands of catalog items must be handled via a background queue.
+        // Cap interactive auto-generation to a safe operational batch: max 3 POs (up to 90 items).
+        const int MaxPoPerInteractiveRun = 3;
+        const int MaxItemsPerPo = 30;
+        const int MaxTotalItemsPerRun = MaxPoPerInteractiveRun * MaxItemsPerPo;
+
+        // Evaluate low stock candidates, prioritizing:
+        // 1. Items with depleted active stock (currentStock > 0) before never-stocked catalog items (currentStock == 0)
+        // 2. Items with a designated PreferredSupplier
+        // 3. Lowest stock first
+        var candidates = lowStockProducts
+            .Where(p => !pendingProductSet.Contains(p.Id))
+            .Select(p =>
+            {
+                var currentStock = batches.Where(b => b.ProductId == p.Id).Sum(b => b.AvailableQuantity);
+                var reorderThreshold = p.ReorderPoint > 0 ? p.ReorderPoint : 10m;
+                return new 
+                { 
+                    Product = p, 
+                    CurrentStock = currentStock, 
+                    ReorderThreshold = reorderThreshold,
+                    IsLowStock = currentStock <= reorderThreshold
+                };
+            })
+            .Where(x => x.IsLowStock)
+            .OrderByDescending(x => x.CurrentStock > 0) // Depleted active stock first
+            .ThenByDescending(x => x.Product.PreferredSupplierId != null) // Preferred supplier first
+            .ThenBy(x => x.CurrentStock) // Lowest stock first
+            .Take(MaxTotalItemsPerRun)
+            .ToList();
+
         var itemsBySupplier = new Dictionary<Guid, List<PurchaseOrderItemDto>>();
         int totalItemsOrderedCount = 0;
 
-        foreach (var p in lowStockProducts)
+        foreach (var c in candidates)
         {
-            var currentStock = batches.Where(b => b.ProductId == p.Id).Sum(b => b.AvailableQuantity);
-            var reorderThreshold = p.ReorderPoint > 0 ? p.ReorderPoint : 10m;
+            var p = c.Product;
+            var orderQty = Math.Max((c.ReorderThreshold * 2m) - c.CurrentStock, 10m);
+            var unitCost = p.PurchasePrice > 0 ? p.PurchasePrice : (p.SellingPrice * 0.75m);
+            var itemDto = new PurchaseOrderItemDto(p.Id, orderQty, unitCost);
 
-            if (currentStock <= reorderThreshold)
+            var targetSupplierId = (p.PreferredSupplierId != null && allSuppliers.Any(s => s.Id == p.PreferredSupplierId))
+                ? p.PreferredSupplierId.Value
+                : defaultSupplier.Id;
+
+            if (!itemsBySupplier.ContainsKey(targetSupplierId))
             {
-                var orderQty = Math.Max((reorderThreshold * 2m) - currentStock, 10m);
-                var unitCost = p.PurchasePrice > 0 ? p.PurchasePrice : (p.SellingPrice * 0.75m);
-                var itemDto = new PurchaseOrderItemDto(p.Id, orderQty, unitCost);
-
-                var targetSupplierId = (p.PreferredSupplierId != null && allSuppliers.Any(s => s.Id == p.PreferredSupplierId))
-                    ? p.PreferredSupplierId.Value
-                    : defaultSupplier.Id;
-
-                if (!itemsBySupplier.ContainsKey(targetSupplierId))
-                {
-                    itemsBySupplier[targetSupplierId] = new List<PurchaseOrderItemDto>();
-                }
-                itemsBySupplier[targetSupplierId].Add(itemDto);
-                totalItemsOrderedCount++;
+                itemsBySupplier[targetSupplierId] = new List<PurchaseOrderItemDto>();
             }
+            itemsBySupplier[targetSupplierId].Add(itemDto);
+            totalItemsOrderedCount++;
         }
 
         int poGeneratedCount = 0;
         foreach (var entry in itemsBySupplier)
         {
+            if (poGeneratedCount >= MaxPoPerInteractiveRun)
+            {
+                break;
+            }
+
             var supplierId = entry.Key;
             var supplierItems = entry.Value;
 
             var itemChunks = supplierItems
                 .Select((item, index) => new { item, index })
-                .GroupBy(x => x.index / 30)
+                .GroupBy(x => x.index / MaxItemsPerPo)
                 .Select(g => g.Select(x => x.item).ToList())
                 .ToList();
 
             foreach (var chunk in itemChunks)
             {
+                if (poGeneratedCount >= MaxPoPerInteractiveRun)
+                {
+                    break;
+                }
+
                 var poCommand = new CreatePurchaseOrderCommand(
                     null,
                     supplierId,
@@ -140,7 +186,7 @@ public class PurchasingController : ControllerBase
             TotalItemsOrdered = totalItemsOrderedCount,
             Message = totalItemsOrderedCount > 0 
                 ? $"Successfully auto-generated {poGeneratedCount} Purchase Orders across {itemsBySupplier.Count} vendors for {totalItemsOrderedCount} low-stock items." 
-                : "All items are currently above reorder threshold. No new POs needed."
+                : "All items are currently above reorder threshold or already have open purchase orders. No new POs needed."
         });
     }
 

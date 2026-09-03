@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getSupplierBills, PurchaseBill } from '../services/finance.service';
+import { exportToCsv } from '../../../utils/exportToCsv';
+import { Modal } from '../../../components/common/Modal';
+import { api } from '../../../utils/api';
 import { 
   FileText, 
   Search, 
@@ -16,12 +19,21 @@ import {
 import { formatCurrency } from '../../../utils/formatters';
 
 export const SupplierBills: React.FC = () => {
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sortBy, setSortBy] = useState<keyof PurchaseBill>('billDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [page, setPage] = useState(1);
   const pageSize = 10;
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [billNumber, setBillNumber] = useState('');
+  const [billDate, setBillDate] = useState(new Date().toISOString().split('T')[0]);
+  const [grnHeaderId, setGrnHeaderId] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { data: bills = [], isLoading, error } = useQuery({
     queryKey: ['supplierBills'],
@@ -34,6 +46,43 @@ export const SupplierBills: React.FC = () => {
     } else {
       setSortBy(field);
       setSortOrder('desc');
+    }
+  };
+
+  const handleExport = () => {
+    exportToCsv(filteredBills, 'Supplier_Bills_Report', [
+      { key: 'billNumber', label: 'Bill #' },
+      { key: 'supplierName', label: 'Supplier Name' },
+      { key: 'billDate', label: 'Bill Date' },
+      { key: 'dueDate', label: 'Due Date' },
+      { key: 'totalAmount', label: 'Total Amount (₹)' },
+      { key: 'status', label: 'Status' },
+    ]);
+  };
+
+  const handleCreateBill = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    if (!billNumber.trim()) {
+      setErrorMessage('Vendor Bill Number is required.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await api.post('/api/AccountsPayable/bills', {
+        billNumber: billNumber.trim(),
+        billDate,
+        grnHeaderId: grnHeaderId.trim() || undefined
+      });
+      queryClient.invalidateQueries({ queryKey: ['supplierBills'] });
+      setIsModalOpen(false);
+      setBillNumber('');
+      setGrnHeaderId('');
+    } catch (err: any) {
+      setErrorMessage(err.response?.data?.message || err.message || 'Failed to enter supplier bill.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -97,11 +146,17 @@ export const SupplierBills: React.FC = () => {
           <p className="text-slate-500 dark:text-slate-400 mt-1">Manage vendor invoices and accounts payable</p>
         </div>
         <div className="flex gap-3">
-          <button className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-sm transition-all text-sm">
+          <button 
+            onClick={handleExport}
+            className="bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-sm transition-all text-sm cursor-pointer"
+          >
             <Download className="w-4 h-4" />
             Export
           </button>
-          <button className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-rose-600/30 transition-all text-sm">
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-rose-600/30 transition-all text-sm cursor-pointer"
+          >
             <Plus className="w-4 h-4" />
             Enter Bill
           </button>
@@ -122,11 +177,11 @@ export const SupplierBills: React.FC = () => {
         </div>
         <div className="flex gap-3 w-full md:w-auto">
           <div className="relative flex-1 md:w-[180px]">
-            <Filter className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Filter className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <select
               value={statusFilter}
               onChange={(e) => { setStatusFilter(e.target.value); setPage(1); }}
-              className="w-full pl-9 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm font-bold text-slate-700 dark:text-slate-200 focus:ring-2 focus:ring-rose-500 outline-none transition-all"
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm text-slate-800 dark:text-white focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-rose-500 outline-none transition-all cursor-pointer"
             >
               <option value="">All Statuses</option>
               <option value="PENDING_PAYMENT">Pending Payment</option>
@@ -153,7 +208,7 @@ export const SupplierBills: React.FC = () => {
         </div>
       ) : paginatedBills.length === 0 ? (
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 p-12 text-center text-slate-400">
-          No supplier bills found matching the filters.
+          No supplier bills found.
         </div>
       ) : (
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -163,13 +218,13 @@ export const SupplierBills: React.FC = () => {
                 <tr className="border-b border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 text-slate-500 dark:text-slate-400 font-bold">
                   <th className="p-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => handleSort('billNumber')}>
                     <span className="flex items-center gap-1.5">
-                      Bill Number
+                      Bill #
                       <ArrowUpDown className="w-3.5 h-3.5" />
                     </span>
                   </th>
                   <th className="p-4 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => handleSort('supplierName')}>
                     <span className="flex items-center gap-1.5">
-                      Supplier
+                      Supplier Name
                       <ArrowUpDown className="w-3.5 h-3.5" />
                     </span>
                   </th>
@@ -185,15 +240,15 @@ export const SupplierBills: React.FC = () => {
                       <ArrowUpDown className="w-3.5 h-3.5" />
                     </span>
                   </th>
-                  <th className="p-4 text-right cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => handleSort('totalAmount')}>
-                    <span className="flex items-center justify-end gap-1.5">
-                      Total Amount
-                      <ArrowUpDown className="w-3.5 h-3.5" />
-                    </span>
-                  </th>
                   <th className="p-4 text-center cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => handleSort('status')}>
                     <span className="flex items-center justify-center gap-1.5">
                       Status
+                      <ArrowUpDown className="w-3.5 h-3.5" />
+                    </span>
+                  </th>
+                  <th className="p-4 text-right cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800" onClick={() => handleSort('totalAmount')}>
+                    <span className="flex items-center justify-end gap-1.5">
+                      Total Amount
                       <ArrowUpDown className="w-3.5 h-3.5" />
                     </span>
                   </th>
@@ -202,7 +257,7 @@ export const SupplierBills: React.FC = () => {
               <tbody className="divide-y divide-slate-150 dark:divide-slate-800/80">
                 {paginatedBills.map(bill => (
                   <tr key={bill.id} className="hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors">
-                    <td className="p-4 font-bold text-slate-800 dark:text-slate-100">{bill.billNumber}</td>
+                    <td className="p-4 font-mono font-bold text-slate-800 dark:text-slate-100">{bill.billNumber}</td>
                     <td className="p-4 font-bold text-slate-700 dark:text-slate-300">{bill.supplierName}</td>
                     <td className="p-4 text-slate-600 dark:text-slate-400">
                       <span className="flex items-center gap-2">
@@ -211,20 +266,18 @@ export const SupplierBills: React.FC = () => {
                       </span>
                     </td>
                     <td className="p-4 text-slate-600 dark:text-slate-400">
-                      {bill.dueDate ? (
-                        <span className="flex items-center gap-2">
-                          <Calendar className="w-4 h-4 text-slate-400" />
-                          {new Date(bill.dueDate).toLocaleDateString()}
-                        </span>
-                      ) : '-'}
-                    </td>
-                    <td className="p-4 text-right font-black text-slate-850 dark:text-white">
-                      {formatCurrency(bill.totalAmount)}
+                      <span className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4 text-slate-400" />
+                        {bill.dueDate ? new Date(bill.dueDate).toLocaleDateString() : '-'}
+                      </span>
                     </td>
                     <td className="p-4 text-center">
-                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-black uppercase tracking-wider border ${getStatusBadgeClass(bill.status)}`}>
+                      <span className={`inline-block px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${getStatusBadgeClass(bill.status)}`}>
                         {getStatusLabel(bill.status)}
                       </span>
+                    </td>
+                    <td className="p-4 text-right font-black text-slate-800 dark:text-white">
+                      {formatCurrency(bill.totalAmount)}
                     </td>
                   </tr>
                 ))}
@@ -232,7 +285,7 @@ export const SupplierBills: React.FC = () => {
             </table>
           </div>
 
-          {/* Pagination Footer */}
+          {/* Pagination */}
           {totalPages > 1 && (
             <div className="p-4 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-900/50">
               <span className="text-xs font-bold text-slate-500">
@@ -261,6 +314,73 @@ export const SupplierBills: React.FC = () => {
           )}
         </div>
       )}
+
+      {/* ENTER BILL MODAL */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Enter Supplier Bill (AP)"
+      >
+        <form onSubmit={handleCreateBill} className="space-y-4">
+          {errorMessage && (
+            <div className="p-3 bg-red-50 border border-red-200 dark:bg-red-950/40 dark:border-red-800 rounded-xl text-red-600 dark:text-red-300 text-sm flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Vendor Bill Number *</label>
+            <input
+              type="text"
+              required
+              placeholder="e.g. INV-2026-904"
+              value={billNumber}
+              onChange={(e) => setBillNumber(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg text-sm dark:text-white outline-none focus:ring-2 focus:ring-rose-500 font-mono"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">Bill Date *</label>
+            <input
+              type="date"
+              required
+              value={billDate}
+              onChange={(e) => setBillDate(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg text-sm dark:text-white outline-none focus:ring-2 focus:ring-rose-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 uppercase mb-1">GRN Header ID (Optional)</label>
+            <input
+              type="text"
+              placeholder="GUID for linked Goods Receipt Note..."
+              value={grnHeaderId}
+              onChange={(e) => setGrnHeaderId(e.target.value)}
+              className="w-full px-3 py-2 border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 rounded-lg text-sm dark:text-white outline-none focus:ring-2 focus:ring-rose-500 font-mono"
+            />
+          </div>
+
+          <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-5 py-2 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg shadow-md shadow-rose-600/30 transition flex items-center gap-2 cursor-pointer"
+            >
+              {isSubmitting ? 'Saving...' : 'Enter Bill'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

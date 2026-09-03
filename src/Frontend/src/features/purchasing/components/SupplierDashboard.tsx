@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend } from 'recharts';
+import { exportToCsv } from '../../../utils/exportToCsv';
 
 export function SupplierDashboard() {
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -13,6 +14,18 @@ export function SupplierDashboard() {
       { SupplierName: 'Agro Suppliers', DeliveryAccuracy: 75, LeadTimeCompliance: 70, FillRate: 80, QualityScore: 85, SupplierRating: 77.5, PurchaseValue: 620000 },
     ]);
   }, []);
+
+  const handleExport = () => {
+    exportToCsv(suppliers, 'Supplier_Scorecards_Report', [
+      { key: 'SupplierName', label: 'Supplier Name' },
+      { key: 'DeliveryAccuracy', label: 'Delivery Accuracy (%)' },
+      { key: 'FillRate', label: 'Fill Rate (%)' },
+      { key: 'QualityScore', label: 'Quality Score (%)' },
+      { key: 'LeadTimeCompliance', label: 'Lead Time Compliance (%)' },
+      { key: 'SupplierRating', label: 'Overall Rating' },
+      { key: 'PurchaseValue', label: 'Purchase Value (₹)' },
+    ]);
+  };
 
   // Format data for Radar Chart
   const radarData = suppliers.map(s => ({
@@ -35,7 +48,10 @@ export function SupplierDashboard() {
       <div className="flex justify-between items-center">
         <h1 className="text-2xl font-bold text-white">Supplier Analytics</h1>
         <div className="flex space-x-2">
-          <button className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors">
+          <button 
+            onClick={handleExport}
+            className="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
+          >
             Export Report
           </button>
         </div>

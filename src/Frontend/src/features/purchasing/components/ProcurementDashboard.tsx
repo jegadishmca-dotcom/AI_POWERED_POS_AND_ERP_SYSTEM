@@ -1,8 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend, PieChart, Pie, Cell } from 'recharts';
+import { api } from '../../../utils/api';
+import { Modal } from '../../../components/common/Modal';
 
 export function ProcurementDashboard() {
   const [recommendations, setRecommendations] = useState<any[]>([]);
+  const [addedProductIds, setAddedProductIds] = useState<string[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [feedbackMessage, setFeedbackMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     // Mocking procurement data based on the newly designed IPurchaseRecommendationEngine
@@ -15,6 +22,35 @@ export function ProcurementDashboard() {
     ]);
   }, []);
 
+  const handleConfirmGenerateDraftPOs = async () => {
+    if (isGenerating) return; // Immediate double-click lock
+    setIsGenerating(true);
+    setShowConfirmModal(false);
+    setFeedbackMessage(null);
+    setErrorMessage(null);
+    try {
+      const response = await api.post<any>('/api/Purchasing/purchase-orders/auto-generate-reorder');
+      const msg = response.data?.message || response.data?.Message || 'Successfully auto-generated draft purchase orders in PostgreSQL.';
+      setFeedbackMessage(msg);
+    } catch (err: any) {
+      const errorDetail = err.response?.data?.message || err.response?.data || err.message || 'Failed to auto-generate draft purchase orders.';
+      setErrorMessage(typeof errorDetail === 'string' ? errorDetail : 'Failed to auto-generate draft purchase orders.');
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  // NOTE: Add to PO operates on local UI toggle state for now.
+  // The recommendations list above currently uses mock product IDs;
+  // wiring to backend requires creating a real recommendation query endpoint first.
+  const handleAddToPO = (productId: string) => {
+    if (addedProductIds.includes(productId)) {
+      setAddedProductIds(prev => prev.filter(id => id !== productId));
+    } else {
+      setAddedProductIds(prev => [...prev, productId]);
+    }
+  };
+
   const getPriorityBadge = (priority: string) => {
     switch (priority) {
       case 'Critical': return <span className="px-2 py-1 bg-red-900 text-red-300 text-xs font-medium rounded-full border border-red-700">Critical (≤ 7 days)</span>;
@@ -26,10 +62,36 @@ export function ProcurementDashboard() {
 
   return (
     <div className="p-6 space-y-6 bg-slate-900 min-h-screen text-slate-200">
+      {errorMessage && (
+        <div className="bg-rose-950/80 border border-rose-500/50 text-rose-300 px-4 py-3 rounded-xl flex items-center justify-between shadow-lg">
+          <span className="text-sm font-medium">✕ {errorMessage}</span>
+          <button onClick={() => setErrorMessage(null)} className="text-rose-400 hover:text-rose-200 text-xs font-bold cursor-pointer">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {feedbackMessage && (
+        <div className="bg-emerald-950/80 border border-emerald-500/50 text-emerald-300 px-4 py-3 rounded-xl flex items-center justify-between shadow-lg">
+          <span className="text-sm font-medium">✓ {feedbackMessage}</span>
+          <button onClick={() => setFeedbackMessage(null)} className="text-emerald-400 hover:text-emerald-200 text-xs font-bold cursor-pointer">
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-white">Procurement Intelligence</h1>
-        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors">
-          Generate Draft POs
+        <div>
+          <h1 className="text-2xl font-bold text-white">Procurement Intelligence</h1>
+          <p className="text-xs text-slate-400 mt-1">Automated stock velocity and EOQ purchase forecasting</p>
+        </div>
+        <button 
+          type="button"
+          onClick={() => setShowConfirmModal(true)}
+          disabled={isGenerating}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer shadow-lg shadow-blue-600/30 disabled:opacity-50 disabled:pointer-events-none"
+        >
+          {isGenerating ? 'Generating POs...' : 'Generate Draft POs'}
         </button>
       </div>
 
@@ -82,8 +144,16 @@ export function ProcurementDashboard() {
                   <td className="px-6 py-4">{item.DaysUntilStockout} days</td>
                   <td className="px-6 py-4 text-slate-400">{item.SupplierName}</td>
                   <td className="px-6 py-4 text-right">
-                    <button className="text-blue-500 hover:text-blue-400 font-medium text-xs border border-blue-500/30 hover:border-blue-400 px-3 py-1 rounded">
-                      Add to PO
+                    <button 
+                      type="button"
+                      onClick={() => handleAddToPO(item.ProductId)}
+                      className={`font-medium text-xs border px-3 py-1 rounded transition-colors cursor-pointer ${
+                        addedProductIds.includes(item.ProductId)
+                          ? 'bg-emerald-950 text-emerald-300 border-emerald-600 font-bold'
+                          : 'text-blue-500 hover:text-blue-400 border-blue-500/30 hover:border-blue-400'
+                      }`}
+                    >
+                      {addedProductIds.includes(item.ProductId) ? '✓ In Draft PO' : 'Add to PO'}
                     </button>
                   </td>
                 </tr>
@@ -92,6 +162,33 @@ export function ProcurementDashboard() {
           </table>
         </div>
       </div>
+
+      {/* Confirmation Modal */}
+      <Modal isOpen={showConfirmModal} onClose={() => !isGenerating && setShowConfirmModal(false)} title="Generate Draft Purchase Orders?">
+        <div className="space-y-4">
+          <p className="text-sm text-slate-300">
+            Generate draft purchase orders for all low-stock items at or below their reorder point? Products that already have open or pending purchase orders will be automatically skipped.
+          </p>
+          <div className="flex justify-end gap-3 pt-3 border-t border-slate-700/60">
+            <button
+              type="button"
+              onClick={() => setShowConfirmModal(false)}
+              disabled={isGenerating}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded-lg text-sm font-medium transition cursor-pointer disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={handleConfirmGenerateDraftPOs}
+              disabled={isGenerating}
+              className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-bold transition cursor-pointer shadow-lg shadow-blue-600/30 disabled:opacity-50 disabled:pointer-events-none"
+            >
+              {isGenerating ? 'Generating...' : 'Confirm & Generate'}
+            </button>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }

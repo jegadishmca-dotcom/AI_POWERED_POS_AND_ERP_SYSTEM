@@ -8,6 +8,7 @@ export const ForecastDashboard: React.FC = () => {
   const [accuracy, setAccuracy] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [viewType, setViewType] = useState('PRODUCT');
+  const [exporting, setExporting] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -26,6 +27,40 @@ export const ForecastDashboard: React.FC = () => {
       console.error('Error fetching forecasts:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleExportForecastData = () => {
+    setExporting(true);
+    try {
+      const lines = [
+        ['AI Demand Forecast Export', `View: ${viewType}`, `Generated: ${new Date().toISOString()}`],
+        [],
+        ['Forecast Date', 'Predicted Quantity', 'Lower Bound (95%)', 'Upper Bound (95%)', 'Entity']
+      ];
+
+      forecasts.forEach((f: any) => {
+        lines.push([
+          f.forecastDate ? new Date(f.forecastDate).toLocaleDateString() : 'N/A',
+          f.predictedQuantity ?? 0,
+          f.lowerBoundQuantity ?? 0,
+          f.upperBoundQuantity ?? 0,
+          f.entityName || f.productId || f.categoryId || f.storeId || viewType
+        ]);
+      });
+
+      const csvContent = 'data:text/csv;charset=utf-8,' + lines.map(e => e.join(',')).join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `ai_demand_forecast_${viewType.toLowerCase()}_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Failed to export forecast data:', err);
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -56,9 +91,13 @@ export const ForecastDashboard: React.FC = () => {
                </button>
              ))}
            </div>
-           <button className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm">
+           <button 
+             onClick={handleExportForecastData}
+             disabled={exporting}
+             className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm disabled:opacity-50 transition-all"
+           >
              <Download className="w-4 h-4 mr-2" />
-             Export Data
+             {exporting ? 'Exporting...' : 'Export Data'}
            </button>
         </div>
       </div>

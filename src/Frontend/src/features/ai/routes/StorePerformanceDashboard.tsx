@@ -6,11 +6,12 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip,
 export const StorePerformanceDashboard: React.FC = () => {
   const [benchmarks, setBenchmarks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showRegionModal, setShowRegionModal] = useState(false);
 
   useEffect(() => {
     // Since API might not exist yet, we'll gracefully handle it and use mock data if needed
     storePerformanceApi.getBenchmarks()
-      .then(data => setBenchmarks(data))
+      .then((data: any) => setBenchmarks(data))
       .catch(() => {
         setBenchmarks([
           { storeName: 'Store 1', region: 'North', rank: 1, revenueVariance: 12.5, percentile: 98, aiScore: 92 },
@@ -22,24 +23,142 @@ export const StorePerformanceDashboard: React.FC = () => {
       .finally(() => setLoading(false));
   }, []);
 
+  // Compute regional aggregates
+  const regionalData = React.useMemo(() => {
+    const map: Record<string, { count: number; totalScore: number; totalVariance: number; topStore: string; maxScore: number }> = {};
+    benchmarks.forEach(b => {
+      const reg = b.region || 'Other';
+      if (!map[reg]) {
+        map[reg] = { count: 0, totalScore: 0, totalVariance: 0, topStore: b.storeName, maxScore: b.aiScore };
+      }
+      map[reg].count += 1;
+      map[reg].totalScore += b.aiScore || 0;
+      map[reg].totalVariance += b.revenueVariance || 0;
+      if ((b.aiScore || 0) > map[reg].maxScore) {
+        map[reg].maxScore = b.aiScore;
+        map[reg].topStore = b.storeName;
+      }
+    });
+
+    return Object.entries(map).map(([region, data]) => ({
+      region,
+      storeCount: data.count,
+      avgScore: Math.round(data.totalScore / data.count),
+      avgVariance: +(data.totalVariance / data.count).toFixed(1),
+      topStore: data.topStore
+    }));
+  }, [benchmarks]);
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
+      {/* Transparency Alert Banner */}
+      <div className="mb-6 p-4 rounded-xl bg-amber-50 border border-amber-200 flex items-start gap-3 text-amber-900 shadow-sm">
+        <div className="p-1.5 bg-amber-100 rounded-lg text-amber-700 mt-0.5">
+          <Trophy className="w-5 h-5" />
+        </div>
+        <div className="text-xs leading-relaxed">
+          <span className="font-bold text-sm block mb-0.5 text-amber-950">DEMO PREVIEW: Multi-Store Franchise Simulation</span>
+          Apple Supermarket currently operates as a <strong>single flagship store (Branch 1 – Kumbakonam)</strong> with 394,867 historical transactions. Because no physical multi-branch territories exist in the customer's production database, the cross-store rankings, regional comparison (North/South/East/West), and territory AI scores shown below are <em>simulated prototype benchmarks</em> demonstrating multi-unit franchise reporting capabilities.
+        </div>
+      </div>
+
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center">
-            <Trophy className="w-8 h-8 mr-3 text-yellow-500" />
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
+            <Trophy className="w-8 h-8 text-yellow-500" />
             Store Benchmark Dashboard
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-amber-100 text-amber-800 border border-amber-300">
+              Demo Simulation
+            </span>
           </h1>
-          <p className="text-gray-500 mt-1">Cross-store performance, rankings, and AI scoring</p>
+          <p className="text-gray-500 mt-1">Cross-store performance, rankings, and AI scoring (Prototype View)</p>
         </div>
         
         <div className="flex space-x-3">
-           <button className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm">
+           <button 
+             onClick={() => setShowRegionModal(true)}
+             className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm shadow-indigo-200 transition-all"
+           >
              <Map className="w-4 h-4 mr-2" />
-             Compare Regions
+             Compare Regions (Demo)
            </button>
         </div>
       </div>
+
+      {/* Regional Comparison Modal */}
+      {showRegionModal && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-2xl w-full p-6 shadow-2xl border border-gray-100 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center pb-4 border-b border-gray-100 mb-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+                  <Map className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    Regional Performance Benchmarks
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 border border-amber-300">
+                      Simulated Demo
+                    </span>
+                  </h3>
+                  <p className="text-xs text-gray-500">Cross-territory prototype data (Simulated multi-branch expansion)</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowRegionModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-2 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+              {regionalData.map((reg) => (
+                <div key={reg.region} className="p-4 rounded-xl border border-gray-100 bg-gray-50/50 hover:bg-white hover:shadow-md transition-all">
+                  <div className="flex justify-between items-start mb-2">
+                    <span className="font-bold text-gray-900 text-base">{reg.region} Region</span>
+                    <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                      reg.avgScore >= 85 ? 'bg-emerald-100 text-emerald-700' :
+                      reg.avgScore >= 70 ? 'bg-amber-100 text-amber-700' : 'bg-rose-100 text-rose-700'
+                    }`}>
+                      Score: {reg.avgScore}/100
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 text-xs text-gray-600">
+                    <div className="flex justify-between">
+                      <span>Active Stores:</span>
+                      <span className="font-semibold text-gray-900">{reg.storeCount}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Avg Revenue Variance:</span>
+                      <span className={`font-semibold ${reg.avgVariance >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                        {reg.avgVariance >= 0 ? `+${reg.avgVariance}%` : `${reg.avgVariance}%`}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Top Benchmark Store:</span>
+                      <span className="font-semibold text-indigo-600">{reg.topStore}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-indigo-50/60 p-4 rounded-xl border border-indigo-100/80 mb-6 text-xs text-indigo-900 leading-relaxed">
+              <strong>AI Recommendation:</strong> North and South regional stores are exceeding operational benchmarks with strong basket sizes. Recommend reallocating seasonal promotional budget toward East and West regions to stabilize inventory velocity.
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                onClick={() => setShowRegionModal(false)}
+                className="px-5 py-2.5 bg-gray-900 text-white rounded-xl text-sm font-semibold hover:bg-gray-800 transition-colors shadow-sm"
+              >
+                Close Comparison
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {loading ? (
         <div className="flex justify-center items-center h-64 text-gray-400">Loading Benchmarks...</div>

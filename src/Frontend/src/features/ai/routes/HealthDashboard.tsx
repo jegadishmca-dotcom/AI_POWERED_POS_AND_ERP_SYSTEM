@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
+import { getServerUrl } from '../../../utils/api';
 import { Activity, Database, Server, Settings, RefreshCw, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 export const HealthDashboard: React.FC = () => {
@@ -9,7 +10,9 @@ export const HealthDashboard: React.FC = () => {
   const fetchHealth = async () => {
     setLoading(true);
     try {
-      const response = await axios.get('http://localhost:5000/health');
+      const base = getServerUrl();
+      const url = base ? `${base}/health` : '/health';
+      const response = await axios.get(url);
       setHealthData(response.data);
     } catch (error: any) {
       if (error.response?.data) {

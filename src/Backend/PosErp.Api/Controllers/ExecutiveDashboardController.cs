@@ -17,10 +17,26 @@ public class ExecutiveDashboardController : ControllerBase
         _context = context;
     }
 
+    private static DateTime GetTodayIst()
+    {
+        TimeZoneInfo istTz;
+        try
+        {
+            istTz = TimeZoneInfo.FindSystemTimeZoneById("Asia/Kolkata");
+        }
+        catch
+        {
+            istTz = TimeZoneInfo.FindSystemTimeZoneById("India Standard Time");
+        }
+        return TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, istTz).Date;
+    }
+
     [HttpGet("kpis")]
     public async Task<IActionResult> GetExecutiveKpis()
     {
+        var todayIst = GetTodayIst();
         var latestSnapshot = await _context.ExecutiveKpiSnapshots
+            .Where(s => s.SnapshotDate <= todayIst)
             .OrderByDescending(s => s.SnapshotDate)
             .FirstOrDefaultAsync();
 
@@ -47,9 +63,10 @@ public class ExecutiveDashboardController : ControllerBase
     [HttpGet("trends")]
     public async Task<IActionResult> GetKpiTrends([FromQuery] int days = 30)
     {
-        var start = DateTime.UtcNow.AddDays(-days).Date;
+        var todayIst = GetTodayIst();
+        var start = todayIst.AddDays(-days);
         var snapshots = await _context.ExecutiveKpiSnapshots
-            .Where(s => s.SnapshotDate >= start)
+            .Where(s => s.SnapshotDate >= start && s.SnapshotDate <= todayIst)
             .OrderBy(s => s.SnapshotDate)
             .ToListAsync();
             

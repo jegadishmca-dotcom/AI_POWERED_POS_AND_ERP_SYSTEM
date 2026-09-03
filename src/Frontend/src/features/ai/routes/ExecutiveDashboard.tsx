@@ -1,20 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { executiveDashboardApi, aiInsightsApi, alertCenterApi } from '../api/executiveAiApi';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
-import { DollarSign, TrendingUp, Package, Users, AlertTriangle, Download, Filter, Brain } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, AreaChart, Area, ReferenceArea, ReferenceLine } from 'recharts';
+import { IndianRupee, TrendingUp, Package, Users, AlertTriangle, Download, Filter, Brain } from 'lucide-react';
 
 export const ExecutiveDashboard: React.FC = () => {
   const [kpis, setKpis] = useState<any>(null);
   const [trends, setTrends] = useState<any[]>([]);
   const [insights, setInsights] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [timeRange, setTimeRange] = useState<number>(7);
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [exporting, setExporting] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [kpiData, trendData, insightData] = await Promise.all([
           executiveDashboardApi.getKpis(),
-          executiveDashboardApi.getTrends(7),
+          executiveDashboardApi.getTrends(timeRange),
           aiInsightsApi.getInsights('New')
         ]);
         setKpis(kpiData);
@@ -27,25 +30,128 @@ export const ExecutiveDashboard: React.FC = () => {
       }
     };
     fetchData();
-  }, []);
+  }, [timeRange]);
+
+  const handleTimeRangeChange = async (days: number) => {
+    setTimeRange(days);
+    setShowFilters(false);
+    try {
+      const trendData = await executiveDashboardApi.getTrends(days);
+      setTrends(trendData);
+    } catch (err) {
+      console.error('Error updating trends for time range:', err);
+    }
+  };
+
+  const handleExportReport = () => {
+    setExporting(true);
+    try {
+      const lines = [
+        ['Executive Intelligence Report', `Generated at: ${new Date().toISOString()}`, `Window: ${timeRange} Days`],
+        [],
+        ['Key Performance Indicators', 'Value'],
+        [`Daily Revenue (${timeRange}d Average)`, avgDailySales],
+        [`Daily Profit (${timeRange}d Average)`, avgDailyProfit],
+        ['Realized Margin %', `${realizedMargin}%`],
+        ['Total Inventory Value', kpis?.totalInventoryValue || 0],
+        ['Dead Stock Value', kpis?.deadStockValue || 0],
+        ['Active Loyalty Members', kpis?.activeLoyaltyMembers || 0],
+        [],
+        ['Trend Date', 'Revenue', 'Profit', 'Profit Source']
+      ];
+
+      trends.forEach((t: any) => {
+        const dateStr = t.snapshotDate ? new Date(t.snapshotDate).toLocaleDateString() : 'N/A';
+        const profitSource = t.snapshotDate && t.snapshotDate >= '2026-03-24' ? 'Measured (per-line-item)' : 'Estimated (2026 margin applied)';
+        lines.push([
+          dateStr,
+          t.dailySales || 0,
+          t.dailyProfit || 0,
+          profitSource
+        ]);
+      });
+
+      const csvContent = 'data:text/csv;charset=utf-8,' + lines.map(e => e.join(',')).join('\n');
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `executive_report_${new Date().toISOString().slice(0,10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (e) {
+      console.error('Failed to export executive report:', e);
+    } finally {
+      setExporting(false);
+    }
+  };
 
   if (loading) return <div className="p-8 text-center text-gray-500 animate-pulse">Loading Intelligence...</div>;
 
+  // Compute dynamic daily averages across the active filter window
+  const activeDays = trends.length > 0 ? trends.length : 1;
+  const totSales = trends.reduce((acc, t) => acc + (t.dailySales || 0), 0);
+  const totProfit = trends.reduce((acc, t) => acc + (t.dailyProfit || 0), 0);
+  const avgDailySales = Math.round(totSales / activeDays);
+  const avgDailyProfit = Math.round((totProfit / activeDays) * 100) / 100;
+  const realizedMargin = totSales > 0 ? ((totProfit / totSales) * 100).toFixed(1) : '8.4';
+
+  // Find exact data points in trends array for Recharts category axis
+  const firstEstimated = trends.find((t: any) => t.snapshotDate < '2026-03-24');
+  const lastEstimated = [...trends].reverse().find((t: any) => t.snapshotDate < '2026-03-24');
+  const firstMeasured = trends.find((t: any) => t.snapshotDate >= '2026-03-24');
+
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
+      {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Executive Intelligence</h1>
-          <p className="text-gray-500 mt-1">AI-Powered Business Overview</p>
+          <p className="text-gray-500 mt-1">AI-Powered Business Overview (Last {timeRange} Days)</p>
         </div>
-        <div className="flex space-x-3">
-          <button className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition-all">
-            <Filter className="w-4 h-4 mr-2" />
-            Filters
-          </button>
-          <button className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm shadow-indigo-200 transition-all">
+        
+        <div className="flex space-x-3 relative">
+          <div className="relative">
+            <button 
+              onClick={() => setShowFilters(!showFilters)}
+              className="flex items-center px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 shadow-sm transition-all"
+            >
+              <Filter className="w-4 h-4 mr-2" />
+              Filters ({timeRange}d)
+            </button>
+            
+            {showFilters && (
+              <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-100 py-1 z-20">
+                <div className="px-3 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider">
+                  Select Time Range
+                </div>
+                {[
+                  { label: 'Last 7 Days', days: 7 },
+                  { label: 'Last 30 Days', days: 30 },
+                  { label: 'Last 90 Days', days: 90 },
+                  { label: 'Past Year (365d)', days: 365 },
+                ].map((opt) => (
+                  <button
+                    key={opt.days}
+                    onClick={() => handleTimeRangeChange(opt.days)}
+                    className={`w-full text-left px-4 py-2 text-sm hover:bg-indigo-50 transition-colors ${
+                      timeRange === opt.days ? 'text-indigo-600 font-semibold bg-indigo-50/50' : 'text-gray-700'
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <button 
+            onClick={handleExportReport}
+            disabled={exporting}
+            className="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 shadow-sm transition-all disabled:opacity-50"
+          >
             <Download className="w-4 h-4 mr-2" />
-            Export Report
+            {exporting ? 'Exporting...' : 'Export Report'}
           </button>
         </div>
       </div>
@@ -54,15 +160,17 @@ export const ExecutiveDashboard: React.FC = () => {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <KpiCard 
           title="Daily Revenue" 
-          value={`₹${kpis?.dailySales?.toLocaleString() || '0'}`} 
+          value={`₹${avgDailySales.toLocaleString()}`} 
+          subtitle={`${timeRange}-Day Daily Average`}
           trend="+12%" 
-          icon={<DollarSign className="w-6 h-6 text-green-600" />} 
+          icon={<IndianRupee className="w-6 h-6 text-green-600" />} 
           color="bg-green-100" 
         />
         <KpiCard 
           title="Daily Profit" 
-          value={`₹${kpis?.dailyProfit?.toLocaleString() || '0'}`} 
-          trend="+8%" 
+          value={`₹${avgDailyProfit.toLocaleString()}`} 
+          subtitle={`${timeRange}-Day Daily Average (${timeRange <= 30 ? 'Per-line-item measured' : 'Blend: measured + estimated'})`}
+          trend={`Realized ~${realizedMargin}%`} 
           icon={<TrendingUp className="w-6 h-6 text-blue-600" />} 
           color="bg-blue-100" 
         />
@@ -87,7 +195,22 @@ export const ExecutiveDashboard: React.FC = () => {
       {/* Charts & AI Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900 mb-6">Revenue & Profit Trends</h2>
+          <div className="mb-4">
+            <div className="flex justify-between items-start">
+              <h2 className="text-lg font-semibold text-gray-900">Revenue & Profit Trends</h2>
+              <div className="flex gap-2">
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                  ● Measured (Apr 2026+)
+                </span>
+                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200">
+                  ● Estimated (pre-Apr 2026)
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+              Revenue is authentic across all dates. <strong>Post Mar-24 2026:</strong> profit is per-line-item measured from Trans_Inventory_SOM (realized ~8.4% margin). <strong>Pre Mar-24 2026:</strong> profit is estimated using the verified 2026 margin rate applied to real daily revenue, due to a legacy carton-cost calculation defect in the source system.
+            </p>
+          </div>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={trends} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
@@ -98,11 +221,44 @@ export const ExecutiveDashboard: React.FC = () => {
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                <XAxis dataKey="snapshotDate" tickFormatter={(val) => new Date(val).toLocaleDateString()} stroke="#9CA3AF" fontSize={12} />
+                <XAxis dataKey="snapshotDate" tickFormatter={(val: string) => new Date(val).toLocaleDateString()} stroke="#9CA3AF" fontSize={12} />
                 <YAxis stroke="#9CA3AF" fontSize={12} />
-                <RechartsTooltip 
+                {/* Shade the estimated (pre-2026-03-24) region in amber */}
+                {firstEstimated && lastEstimated && (
+                  <ReferenceArea
+                    x1={firstEstimated.snapshotDate}
+                    x2={lastEstimated.snapshotDate}
+                    y1={0}
+                    fill="#F59E0B"
+                    fillOpacity={0.12}
+                    stroke="#D97706"
+                    strokeOpacity={0.4}
+                    strokeDasharray="3 3"
+                  />
+                )}
+                {/* Mark the boundary between estimated and measured */}
+                {firstEstimated && firstMeasured && (
+                  <ReferenceLine
+                    x={firstMeasured.snapshotDate}
+                    stroke="#D97706"
+                    strokeDasharray="6 3"
+                    strokeWidth={2}
+                    label={{
+                      value: 'Measured →',
+                      position: 'top',
+                      fill: '#92400E',
+                      fontSize: 11,
+                      fontWeight: 700
+                    }}
+                  />
+                )}
+                <RechartsTooltip
                   contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }}
-                  labelFormatter={(val) => new Date(val).toLocaleDateString()}
+                  labelFormatter={(val: string) => {
+                    const d = new Date(val);
+                    const label = d.toLocaleDateString();
+                    return val < '2026-03-24' ? `${label}  ⚠ Profit: Estimated` : `${label}  ✓ Profit: Measured`;
+                  }}
                 />
                 <Area type="monotone" dataKey="dailySales" stroke="#4F46E5" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
               </AreaChart>

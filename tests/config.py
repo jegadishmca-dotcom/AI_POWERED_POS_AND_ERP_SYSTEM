@@ -13,23 +13,6 @@ TEST_MODE    = True
 TEST_RUN_ID  = uuid.uuid4().hex[:8].upper()    # e.g. "A3F2C9B1" — changes each run
 TEST_PREFIX  = f"TEST-{TEST_RUN_ID}"           # e.g. "TEST-A3F2C9B1-WF1-..." prefix
 
-# ── Database ──────────────────────────────────────────────────────────────────
-# Direct DB connection used by Layer 1 (schema scanner) and Layer 4 (accounting).
-# Points at posdb_uat so schema/accounting checks never touch live data.
-DB_CONFIG = {
-    "host":     os.environ.get("TEST_DB_HOST",     "192.168.1.5"),
-    "port":     int(os.environ.get("TEST_DB_PORT", "5432")),
-    "database": os.environ.get("TEST_DB_NAME",     "posdb_uat"),
-    "user":     os.environ.get("TEST_DB_USER",     "posadmin"),
-    "password": os.environ.get("TEST_DB_PASS",     "pospassword"),
-}
-
-# ── Backend API ───────────────────────────────────────────────────────────────
-# The test runner calls the live API endpoint (always).  The API itself decides
-# which database to write to based on the server's active mode (LIVE/UAT).
-# Before running tests, ensure the server is toggled to UAT mode via the admin UI.
-API_BASE_URL = os.environ.get("TEST_API_URL", "http://192.168.1.5:8000")
-
 # Load local .env variables into environment if not present
 def _load_local_env():
     env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env")
@@ -42,6 +25,23 @@ def _load_local_env():
                     os.environ.setdefault(k.strip(), v.strip())
 
 _load_local_env()
+
+# ── Database ──────────────────────────────────────────────────────────────────
+# Direct DB connection used by Layer 1 (schema scanner) and Layer 4 (accounting).
+# Points at posdb_uat so schema/accounting checks never touch live data.
+DB_CONFIG = {
+    "host":     os.environ.get("TEST_DB_HOST",     "192.168.1.5"),
+    "port":     int(os.environ.get("TEST_DB_PORT", "5432")),
+    "database": os.environ.get("TEST_DB_NAME",     "posdb_uat"),
+    "user":     os.environ.get("TEST_DB_USER",     "pos_uat_admin"),
+    "password": os.environ.get("POS_UAT_PASSWORD") or os.environ.get("TEST_DB_PASS", ""),
+}
+
+# ── Backend API ───────────────────────────────────────────────────────────────
+# The test runner calls the live API endpoint (always).  The API itself decides
+# which database to write to based on the server's active mode (LIVE/UAT).
+# Before running tests, ensure the server is toggled to UAT mode via the admin UI.
+API_BASE_URL = os.environ.get("TEST_API_URL", "http://192.168.1.5:8000")
 
 # ── Test Credentials ──────────────────────────────────────────────────────────
 ADMIN_USER = {

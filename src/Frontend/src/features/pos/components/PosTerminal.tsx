@@ -1136,7 +1136,8 @@ export const PosTerminal = () => {
     if (e.key === 'Enter') {
       e.preventDefault();
 
-      const val = productQuery.trim();
+      const inputVal = (e.currentTarget as HTMLInputElement)?.value ?? productQuery;
+      const val = (inputVal || '').trim();
       if (!val) return;
 
       try {

@@ -20,8 +20,8 @@ export const useBarcodeScanner = (onScan: (barcode: string, weight?: number) => 
 
     const currentTime = Date.now();
 
-    // Scanner types very fast (< 50ms between strokes). Humans type slower.
-    if (currentTime - lastKeyTime.current > 50) {
+    // Scanner types very fast (< 100ms between strokes). Humans type slower (> 150ms).
+    if (currentTime - lastKeyTime.current > 100) {
       barcodeBuffer.current = ''; // Reset if typing too slow (human)
     }
 

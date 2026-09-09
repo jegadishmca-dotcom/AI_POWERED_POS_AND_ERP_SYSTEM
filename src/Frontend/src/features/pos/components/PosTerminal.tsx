@@ -964,12 +964,31 @@ export const PosTerminal = () => {
   };
 
   // Barcode Scanner Integration
-  useBarcodeScanner(async (barcode: string, weight?: number) => {
+  useBarcodeScanner(async (scannedBarcode: string, weight?: number) => {
+    const barcode = scannedBarcode?.trim();
+    if (!barcode) return;
     try {
         const results = await searchProducts(barcode);
-        const product = results.find(p => p.primaryBarcode === barcode || p.productCode === barcode);
+        // Robust barcode lookup matching:
+        // 1. Primary barcode match (case-insensitive, trimmed)
+        // 2. Product code / SKU match
+        // 3. Secondary barcode array match (p.barcodes list)
+        // 4. Exact 1-result fallback if the backend returned exactly the scanned item
+        const product = results.find((p: any) =>
+            p.primaryBarcode?.trim().toLowerCase() === barcode.toLowerCase() ||
+            p.productCode?.trim().toLowerCase() === barcode.toLowerCase() ||
+            (Array.isArray(p.barcodes) && p.barcodes.some((b: any) => {
+                const str = typeof b === 'string' ? b : b?.barcodeValue;
+                return str?.trim().toLowerCase() === barcode.toLowerCase();
+            }))
+        ) || (results.length === 1 ? results[0] : undefined);
+
         if (product) {
             addProductToCart(product, weight);
+            setProductQuery('');
+            setSearchResults([]);
+            setShowProductDropdown(false);
+            setFocusedProductIndex(-1);
             setTimeout(() => productInputRef.current?.focus(), 50);
         } else {
             showToastNotification(`Barcode not found: "${barcode}"`, 'error');

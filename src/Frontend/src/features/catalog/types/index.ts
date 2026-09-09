@@ -16,6 +16,7 @@ export interface ProductSearchResult {
   taxSlabId: string;
   categoryId?: string;
   unitOfMeasureId?: string;
+  barcodes?: string[];
 }
 
 export interface ImportResult {

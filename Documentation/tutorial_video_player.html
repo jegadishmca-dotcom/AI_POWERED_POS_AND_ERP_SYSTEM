@@ -1,0 +1,1403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Apple Supermarket POS & ERP — Interactive Product Training & Tutorial</title>
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --accent: #06b6d4;
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text-main: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Nirmala UI", "Latha", Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation Header */
+    header {
+      background: rgba(15, 23, 42, 0.9);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--card-border);
+      padding: 12px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .brand-wrap {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      height: 42px;
+      object-fit: contain;
+      border-radius: 6px;
+      background: white;
+      padding: 2px 8px;
+    }
+
+    .brand-title {
+      font-size: 1.15rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      background: linear-gradient(135deg, #ffffff, #cbd5e1);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .brand-sub {
+      font-size: 0.72rem;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+    }
+
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .lang-btn {
+      background: #1e293b;
+      color: var(--text-main);
+      border: 1px solid var(--card-border);
+      padding: 6px 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      font-size: 0.85rem;
+      transition: all 0.2s ease;
+    }
+
+    .lang-btn.active {
+      background: var(--primary);
+      border-color: var(--primary-hover);
+      box-shadow: 0 0 12px rgba(79, 70, 229, 0.4);
+    }
+
+    .audio-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #1e293b;
+      border: 1px solid var(--card-border);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      color: var(--text-main);
+    }
+
+    .audio-toggle.active {
+      border-color: var(--success);
+      color: #6ee7b7;
+    }
+
+    /* Main Container */
+    main {
+      flex: 1;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Mode Switcher Tabs */
+    .view-tabs {
+      display: flex;
+      gap: 10px;
+      background: var(--card-bg);
+      padding: 6px;
+      border-radius: 12px;
+      border: 1px solid var(--card-border);
+      align-self: flex-start;
+    }
+
+    .view-tab {
+      padding: 8px 18px;
+      border-radius: 8px;
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .view-tab.active {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 2px 8px rgba(79, 70, 229, 0.3);
+    }
+
+    /* Chapter Navigation Bar */
+    .chapter-nav {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 6px;
+      scrollbar-width: thin;
+    }
+
+    .chapter-btn {
+      flex-shrink: 0;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      color: var(--text-muted);
+      padding: 10px 16px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+    }
+
+    .chapter-btn:hover {
+      border-color: #64748b;
+      color: var(--text-main);
+    }
+
+    .chapter-btn.active {
+      background: linear-gradient(135deg, rgba(79, 70, 229, 0.2), rgba(6, 182, 212, 0.1));
+      border-color: var(--primary);
+      color: white;
+    }
+
+    .chapter-badge {
+      background: #334155;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 800;
+    }
+
+    .chapter-btn.active .chapter-badge {
+      background: var(--primary);
+      color: white;
+    }
+
+    /* Presentation Screen Viewer */
+    .screen-stage {
+      display: grid;
+      grid-template-columns: 1fr 340px;
+      gap: 20px;
+      min-height: 580px;
+    }
+
+    @media (max-width: 1024px) {
+      .screen-stage {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .viewer-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .screen-img-container {
+      flex: 1;
+      background: #020617;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #1e293b;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 400px;
+    }
+
+    .screen-img {
+      width: 100%;
+      height: 100%;
+      max-height: 520px;
+      object-fit: contain;
+      transition: transform 0.3s ease;
+    }
+
+    /* Master Video Player */
+    .video-container {
+      width: 100%;
+      height: 100%;
+      min-height: 480px;
+      background: #000;
+      border-radius: 10px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    video {
+      width: 100%;
+      height: 100%;
+      outline: none;
+      object-fit: contain;
+    }
+
+    /* Synchronized Captions & Subtitles Banner */
+    .subtitles-banner {
+      background: linear-gradient(90deg, #090d16, #1e293b, #090d16);
+      border: 1px solid #3b82f6;
+      border-radius: 10px;
+      padding: 14px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    }
+
+    .caption-icon {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+    }
+
+    .caption-text {
+      flex: 1;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      font-weight: 500;
+      color: #e2e8f0;
+    }
+
+    .caption-tamil {
+      color: #38bdf8;
+      font-weight: 600;
+      margin-top: 4px;
+      display: block;
+    }
+
+    /* Side Detail & Checklist Panel */
+    .info-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .info-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .info-desc {
+      font-size: 0.88rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .workflow-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .workflow-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.82rem;
+      color: #cbd5e1;
+      background: #0f172a;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .workflow-num {
+      background: var(--accent);
+      color: #020617;
+      font-weight: 800;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      flex-shrink: 0;
+    }
+
+    /* Interactive POS Simulator Counter */
+    .pos-simulator {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 16px;
+      padding: 20px;
+      display: grid;
+      grid-template-columns: 1fr 380px;
+      gap: 20px;
+    }
+
+    @media (max-width: 960px) {
+      .pos-simulator {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .sim-products {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .sim-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+      gap: 10px;
+    }
+
+    .sim-item-btn {
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 12px 10px;
+      color: white;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      align-items: center;
+    }
+
+    .sim-item-btn:hover {
+      border-color: var(--primary);
+      transform: translateY(-2px);
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.2);
+    }
+
+    .sim-item-btn:active {
+      transform: scale(0.96);
+    }
+
+    .sim-price {
+      color: #34d399;
+      font-weight: 800;
+      font-size: 0.95rem;
+    }
+
+    .sim-name {
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .sim-cart {
+      background: #090d16;
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .cart-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+    }
+
+    .cart-table th {
+      text-align: left;
+      padding: 6px;
+      border-bottom: 1px solid #334155;
+      color: var(--text-muted);
+    }
+
+    .cart-table td {
+      padding: 8px 6px;
+      border-bottom: 1px solid #1e293b;
+    }
+
+    .cart-summary {
+      margin-top: 14px;
+      padding-top: 12px;
+      border-top: 1px solid #334155;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .sum-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      color: #cbd5e1;
+    }
+
+    .sum-total {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #38bdf8;
+      border-top: 1px dashed #475569;
+      padding-top: 8px;
+    }
+
+    .sim-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .btn-checkout {
+      grid-column: span 2;
+      background: var(--success);
+      color: white;
+      border: none;
+      padding: 12px;
+      border-radius: 8px;
+      font-weight: 800;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    .btn-checkout:hover {
+      background: #059669;
+    }
+
+    .btn-secondary {
+      background: #334155;
+      color: white;
+      border: none;
+      padding: 8px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    /* Download Manuals Bar */
+    .download-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 12px;
+      padding: 14px 20px;
+    }
+
+    .pdf-links {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .pdf-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #0f172a;
+      border: 1px solid var(--card-border);
+      color: #e2e8f0;
+      text-decoration: none;
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .pdf-btn:hover {
+      border-color: var(--primary);
+      background: var(--primary);
+      color: white;
+    }
+
+    /* Speech engine notice */
+    .notice-box {
+      font-size: 0.76rem;
+      color: #94a3b8;
+      background: #090d16;
+      border: 1px dashed #334155;
+      padding: 8px 12px;
+      border-radius: 6px;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Header with Branding & Controls -->
+  <header>
+    <div class="brand-wrap">
+      <img src="./assets/logo.png" alt="Apple Supermarket ERP" class="brand-logo" id="headerLogo" />
+      <div>
+        <div class="brand-title" id="txtBrandTitle">Apple Supermarket POS & ERP</div>
+        <div class="brand-sub" id="txtBrandSub">Enterprise Interactive Training & Demo</div>
+      </div>
+    </div>
+
+    <div class="header-controls">
+      <!-- Language Switcher -->
+      <button class="lang-btn active" id="btnLangEn" onclick="switchLang('en')">English</button>
+      <button class="lang-btn" id="btnLangTa" onclick="switchLang('ta')">தமிழ் (Tamil)</button>
+
+      <!-- Audio Narration Toggle -->
+      <button class="audio-toggle" id="btnAudioToggle" onclick="toggleAudio()">
+        <span id="audioIcon">🔊</span>
+        <span id="audioLabel">Narration: ON</span>
+      </button>
+    </div>
+  </header>
+
+  <main>
+    <!-- View Switcher -->
+    <div class="view-tabs">
+      <button class="view-tab active" id="tabScreens" onclick="switchView('screens')">Interactive Walkthrough</button>
+      <button class="view-tab" id="tabVideo" onclick="switchView('video')">Master Video (.WebM)</button>
+      <button class="view-tab" id="tabPos" onclick="switchView('pos')">Live POS Simulator</button>
+    </div>
+
+    <!-- Chapter Navigation -->
+    <div class="chapter-nav" id="chapterNav">
+      <!-- Populated via Javascript -->
+    </div>
+
+    <!-- Mode 1: Interactive Screen Stage -->
+    <div class="screen-stage" id="stageScreens">
+      <div class="viewer-card">
+        <div class="screen-img-container">
+          <img src="./screenshots/01_login.png" alt="Current UI Screen" class="screen-img" id="mainScreenImg" />
+        </div>
+
+        <!-- Subtitles / Captions Banner -->
+        <div class="subtitles-banner">
+          <div class="caption-icon">💬</div>
+          <div class="caption-text">
+            <div id="subEnglish">Welcome to the Apple Supermarket POS & ERP Platform. Select your role to access billing or back-office.</div>
+            <span class="caption-tamil" id="subTamil">ஆப்பிள் சூப்பர்மார்க்கெட் பி.ஓ.எஸ் & ஈஆர்பி தளத்திற்கு வரவேற்கிறோம். பில்லிங் அல்லது பின்-அலுவலகத்தை அணுக உங்கள் பொறுப்பைத் தேர்ந்தெடுக்கவும்.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Detail & Workflow Panel -->
+      <div class="info-card">
+        <div class="info-title" id="panelTitle">Chapter 1: System Access</div>
+        <div class="info-desc" id="panelDesc">
+          Role-based security ensures cashiers access only checkout terminals, while managers and owners access consolidated financial reports.
+        </div>
+
+        <div style="font-weight: 700; font-size: 0.85rem; color: #94a3b8; text-transform: uppercase;">Key Procedures:</div>
+        <ul class="workflow-list" id="workflowList">
+          <li class="workflow-item"><span class="workflow-num">1</span> Enter registered username and secure PIN.</li>
+          <li class="workflow-item"><span class="workflow-num">2</span> Dynamic redirection routes cashiers to POS and owners to Dashboard.</li>
+          <li class="workflow-item"><span class="workflow-num">3</span> Encrypted JWT session tokens protect against tampering.</li>
+        </ul>
+
+        <div class="notice-box" id="ttsNotice">
+          ℹ️ <strong>Speech Synthesis Quality Notice:</strong> Web Speech audio uses your local device's synthesized voice. For studio-recorded human voiceover, refer to the side-by-side audio script in <code>TUTORIAL_VIDEO_SCRIPT_EN_TA.md</code>.
+        </div>
+      </div>
+    </div>
+
+    <!-- Mode 2: Master WebM Video Player -->
+    <div class="viewer-card" id="stageVideo" style="display: none;">
+      <div class="video-container">
+        <video controls id="walkthroughVideo">
+          <source src="./videos/supermarket_erp_walkthrough.webm" type="video/webm" />
+          Your browser does not support the video tag.
+        </video>
+      </div>
+      <!-- Video Chapter Timeline Bar -->
+      <div id="videoChapterTimeline" style="display:flex; flex-wrap:wrap; gap:4px; padding:10px 8px; justify-content:center;">
+      </div>
+      <div style="font-size: 0.85rem; color: #94a3b8; text-align: center;">
+        Direct Video Master Asset: <code>Documentation/videos/supermarket_erp_walkthrough.webm</code> (Native WebM format for browsers, WhatsApp, and email).
+      </div>
+    </div>
+
+    <!-- Mode 3: Interactive POS Simulator -->
+    <div class="pos-simulator" id="stagePos" style="display: none;">
+      <div class="sim-products">
+        <div style="font-weight: 800; font-size: 1.1rem; color: white;">Quick-Tap / Scan Products (Live POS Test)</div>
+        <div style="font-size: 0.85rem; color: #94a3b8;">Click any item below to simulate real-time barcode scanning into the active counter cart:</div>
+        
+        <div class="sim-grid">
+          <button class="sim-item-btn" onclick="addToSimCart('Aashirvaad Atta 5kg', 245.00, '5%')">
+            <span style="font-size: 1.5rem;">🌾</span>
+            <span class="sim-name">Atta 5kg</span>
+            <span class="sim-price">₹245.00</span>
+          </button>
+          <button class="sim-item-btn" onclick="addToSimCart('Fortune Sun Lite 1L', 135.00, '5%')">
+            <span style="font-size: 1.5rem;">🌻</span>
+            <span class="sim-name">Oil 1 Litre</span>
+            <span class="sim-price">₹135.00</span>
+          </button>
+          <button class="sim-item-btn" onclick="addToSimCart('Tata Salt 1kg', 28.00, '0%')">
+            <span style="font-size: 1.5rem;">🧂</span>
+            <span class="sim-name">Tata Salt 1kg</span>
+            <span class="sim-price">₹28.00</span>
+          </button>
+          <button class="sim-item-btn" onclick="addToSimCart('Toor Dal Premium 1kg', 165.00, '0%')">
+            <span style="font-size: 1.5rem;">🍲</span>
+            <span class="sim-name">Toor Dal 1kg</span>
+            <span class="sim-price">₹165.00</span>
+          </button>
+          <button class="sim-item-btn" onclick="addToSimCart('Surf Excel Matic 2kg', 390.00, '18%')">
+            <span style="font-size: 1.5rem;">🧼</span>
+            <span class="sim-name">Surf Excel 2kg</span>
+            <span class="sim-price">₹390.00</span>
+          </button>
+          <button class="sim-item-btn" onclick="addToSimCart('Amul Butter 500g', 275.00, '12%')">
+            <span style="font-size: 1.5rem;">🧈</span>
+            <span class="sim-name">Amul Butter</span>
+            <span class="sim-price">₹275.00</span>
+          </button>
+        </div>
+
+        <div style="background: #0f172a; border-radius: 8px; padding: 12px; border: 1px solid #334155; font-size: 0.82rem;">
+          💡 <strong>Hotkeys Supported:</strong> Press <code>F6</code> to Hold, <code>F7</code> to Recall, <code>F10</code> for Cash, <code>F11</code> for UPI QR.
+        </div>
+      </div>
+
+      <div class="sim-cart">
+        <div>
+          <div style="font-weight: 800; font-size: 1rem; color: white; margin-bottom: 10px; display: flex; justify-content: space-between;">
+            <span>Customer Cart</span>
+            <span style="color: #38bdf8; font-size: 0.85rem;" id="simCustomerTier">Silver (Loyalty: 120 pts)</span>
+          </div>
+          <table class="cart-table">
+            <thead>
+              <tr>
+                <th>Item</th>
+                <th>Qty</th>
+                <th>Price</th>
+                <th>Total</th>
+              </tr>
+            </thead>
+            <tbody id="simCartBody">
+              <tr>
+                <td colspan="4" style="text-align: center; color: #64748b; padding: 24px;">Cart is empty. Tap products on left to scan.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="cart-summary">
+          <div class="sum-row"><span>Subtotal:</span> <span id="simSubtotal">₹0.00</span></div>
+          <div class="sum-row"><span>GST Tax:</span> <span id="simTax">₹0.00</span></div>
+          <div class="sum-row"><span>Offers / Loyalty:</span> <span id="simDiscount" style="color: #34d399;">- ₹0.00</span></div>
+          <div class="sum-row sum-total"><span>Net Payable:</span> <span id="simNetTotal">₹0.00</span></div>
+
+          <div class="sim-actions">
+            <button class="btn-secondary" onclick="holdSimCart()">Hold Bill (F6)</button>
+            <button class="btn-secondary" onclick="recallSimCart()">Recall Bill (F7)</button>
+            <button class="btn-checkout" onclick="checkoutSimCart()">Complete Sale & Print Receipt (F12)</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Download Printable Manuals -->
+    <div class="download-bar">
+      <div>
+        <div style="font-weight: 700; font-size: 0.95rem;">Official Documentation & Client Handouts</div>
+        <div style="font-size: 0.8rem; color: #94a3b8;">Formatted with cover page, table of contents, headers, and page numbers for client distribution.</div>
+      </div>
+
+      <div class="pdf-links">
+        <a href="./USER_MANUAL_EN.pdf" class="pdf-btn" target="_blank">📄 User Manual (English PDF)</a>
+        <a href="./USER_MANUAL_TA.pdf" class="pdf-btn" target="_blank">📄 பயனர் கையேடு (Tamil PDF)</a>
+        <a href="./GLOSSARY_EN_TA.md" class="pdf-btn" target="_blank">📖 Bilingual Glossary</a>
+        <a href="./TUTORIAL_VIDEO_SCRIPT_EN_TA.md" class="pdf-btn" target="_blank">🎬 Video Script</a>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // Chapter Presentation Data with Real Screenshots and Synchronized Narration
+    const chapters = [
+      {
+        id: 1, videoTs: 0,
+        titleEn: "1. Authentication & Security",
+        titleTa: "1. உள்நுழைவு & பாதுகாப்பு",
+        screen: "./screenshots/01_login.png",
+        subEn: "Welcome to the Apple Supermarket POS & ERP Platform. Enter your credentials or use the role selector to access Cashier or Back-Office.",
+        subTa: "ஆப்பிள் சூப்பர்மார்க்கெட் பி.ஓ.எஸ் & ஈஆர்பி தளத்திற்கு வரவேற்கிறோம். காசாளர் அல்லது பின்-அலுவலகத்தை அணுக உங்கள் தகவல்களை உள்ளிடவும்.",
+        descEn: "Role-based access control enforces strict segregation of duties between Cashiers, Store Managers, Accountants, and Owners.",
+        descTa: "பாதுகாப்பான அணுகல் முறை மூலம் காசாளர், மேலாளர், கணக்காளர் மற்றும் உரிமையாளர் என தனித்தனி கட்டுப்பாடுகள் செயல்படுத்தப்படுகின்றன.",
+        stepsEn: [
+          "Select Cashier Terminal for fast register login or ERP Back-Office for admin tools.",
+          "Secure PIN authentication prevents unauthorized terminal usage.",
+          "Dynamic role routing places staff on their exact operational screen."
+        ],
+        stepsTa: [
+          "பில்லிங் செய்ய காசாளர் முனையத்தையும், நிர்வாகத்திற்கு ஈஆர்பி பின்-அலுவலகத்தையும் தேர்வு செய்யவும்.",
+          "பின் (PIN) எண் மூலம் அனுமதியற்ற நபர்கள் கவுண்டரை இயக்குவது தடுக்கப்படுகிறது.",
+          "பணியாளர்கள் அவரவர் பொறுப்பிற்குரிய திரைக்கு நேரடியாக வழிநடத்தப்படுகிறார்கள்."
+        ]
+      },
+      {
+        id: 2, videoTs: 14,
+        titleEn: "2. Executive KPI Dashboard",
+        titleTa: "2. நிர்வாகத் தகவல் பலகை",
+        screen: "./screenshots/02_dashboard.png",
+        subEn: "Consolidated Executive KPI Dashboard provides real-time gross revenue, sales trends, counter velocity, and store health.",
+        subTa: "கடையின் நேரடி விற்பனை, மொத்த வருவாய், மணிநேர பில்லிங் வேகம் மற்றும் கடைகளின் நிலையை ஒரே பார்வையில் கண்காணிக்கலாம்.",
+        descEn: "Gives business owners 360-degree visibility over single and multi-branch supermarket performance from any device.",
+        descTa: "ஒன்று அல்லது பல கிளைகளின் வணிக வளர்ச்சியை உரிமையாளர்கள் எங்கிருந்தும் எளிதாகக் கண்காணிக்க உதவுகிறது.",
+        stepsEn: [
+          "Live gross revenue, net margin, and customer transaction counts.",
+          "Hourly checkout velocity curves highlighting peak shopping hours.",
+          "Store health indicators tracking online POS terminals and cache latency."
+        ],
+        stepsTa: [
+          "நேரடி வருவாய், லாப விகிதம் மற்றும் வாடிக்கையாளர் பில் எண்ணிக்கையைக் காட்டுகிறது.",
+          "கூட்டம் அதிகம் உள்ள நேரங்களைக் கண்டறிய மணிநேர விற்பனை வரைபடம்.",
+          "இயங்கும் கவுண்டர்கள் மற்றும் சர்வர் இணைப்பின் நிலையை உடனுக்குடன் அறியலாம்."
+        ]
+      },
+      {
+        id: 3, videoTs: 25,
+        titleEn: "3. POS Counter Billing",
+        titleTa: "3. விற்பனை கவுண்டர் பில்லிங்",
+        screen: "./screenshots/03_pos_billing.png",
+        subEn: "High-speed barcode checkout processes items in under 50 milliseconds with multi-tender split payments and thermal invoice printing.",
+        subTa: "50 மில்லி விநாடிக்குள் பார்கோடுகளை அதிவேகமாக ஸ்கேன் செய்து, ரொக்கம், கார்டு மற்றும் யு.பி.ஐ மூலம் கட்டணம் பெறும் வசதி.",
+        descEn: "Built for peak hour supermarket rushes with zero lag, instant cart holding, and integrated loyalty rewards.",
+        descTa: "கூட்ட நெரிசலான நேரங்களிலும் தாமதமின்றி பில் செய்யவும், பில்லை நிறுத்தி வைக்கவும், விசுவாசப் புள்ளிகளைக் கழிக்கவும் உதவுகிறது.",
+        stepsEn: [
+          "Scan barcode or look up loose produce by weight.",
+          "Use F6 to Hold Cart when a customer steps away, and F7 to Recall instantly.",
+          "Split tender seamlessly across Cash, Card, and dynamic UPI QR code."
+        ],
+        stepsTa: [
+          "பார்கோடை ஸ்கேன் செய்யவும் அல்லது எடை இயந்திரம் மூலம் காய்கறிகளை சேர்க்கவும்.",
+          "வாடிக்கையாளர் காத்திருக்க F6 அழுத்தி பில்லை நிறுத்தி, F7 மூலம் உடனே மீட்டெடுக்கலாம்.",
+          "ரொக்கம், கார்டு மற்றும் யு.பி.ஐ க்யூ.ஆர் வழிகளில் கட்டணத்தை பிரித்துப் பெறலாம்."
+        ]
+      },
+      {
+        id: 4, videoTs: 75,
+        titleEn: "4. Shift & EOD Reconciliation",
+        titleTa: "4. ஷிப்ட் & நாள் முடிவு அறிக்கை",
+        screen: "./screenshots/04_shift_eod.png",
+        subEn: "Cashiers perform blind cash drops at shift close, preventing register shortages and ensuring 100% financial accountability.",
+        subTa: "காசாளர்கள் பணப்பெட்டியில் உள்ள தொகையை நேரடியாக எண்ணி சமர்ப்பிப்பதன் மூலம் கணக்கு முரண்பாடுகள் தவிர்க்கப்படுகின்றன.",
+        descEn: "Reconcile opening float, cash collections, card slips, and UPI settlements before locking the daily books.",
+        descTa: "தொடக்க ரொக்கம், விற்பனையான பணம், கார்டு ரசீதுகள் மற்றும் யு.பி.ஐ தொகைகளை சரிபார்த்து அன்றைய கணக்கை முடிக்கலாம்.",
+        stepsEn: [
+          "Count physical cash denominations into the blind drop register.",
+          "System instantly flags any Over / Short discrepancy for supervisor review.",
+          "End-of-Day (EOD) locks the daily ledger and triggers automated nightly backups."
+        ],
+        stepsTa: [
+          "பணப்பெட்டியில் உள்ள ரூபாய் தாள்களை எண்ணி உள்ளிடவும்.",
+          "கணக்கில் ஏதேனும் கூடுதல் அல்லது குறைவு இருந்தால் மேற்பார்வையாளருக்கு காட்டப்படும்.",
+          "நாள் முடிவு (EOD) மூலம் அன்றைய கணக்குகள் பூட்டப்பட்டு ஆட்டோ-பேக்கப் எடுக்கப்படும்."
+        ]
+      },
+      {
+        id: 5, videoTs: 87,
+        titleEn: "5. Master Product Catalog",
+        titleTa: "5. பொருட்கள் பட்டியல் மேலாண்மை",
+        screen: "./screenshots/05_product_catalog.png",
+        subEn: "Centralized SKU master manages barcodes, HSN tax codes, multi-tier pricing, and bulk wholesale volume slabs.",
+        subTa: "பொருட்களின் பார்கோடு, எச்.எஸ்.என் ஜிஎஸ்டி வரிகள், சில்லறை விலை மற்றும் மொத்த விற்பனை விலைகளை ஒரே இடத்தில் பராமரிக்கலாம்.",
+        descEn: "Easily import thirty thousand supplier SKUs via CSV with automated barcoding and bin tracking.",
+        descTa: "முப்பதாயிரத்திற்கும் மேற்பட்ட பொருட்களை சி.எஸ்.வி (CSV) மூலம் நொடிகளில் பதிவேற்றலாம்.",
+        stepsEn: [
+          "Configure MRP, Selling Price, and purchase landing cost.",
+          "Establish bulk discount thresholds (e.g. buy 10+ units for lower price).",
+          "Map aisle, rack, and bin locations for fast warehouse picking."
+        ],
+        stepsTa: [
+          "எம்.ஆர்.பி, விற்பனை விலை மற்றும் கொள்முதல் அடக்க விலையை அமைக்கலாம்.",
+          "அதிக எண்ணிக்கையில் வாங்கும் போது குறைந்த விலையை தானாகப் பொருந்தச் செய்யலாம்.",
+          "பொருட்களை அடுக்க கிடங்கு மற்றும் வரிசை எண்களைக் குறிப்பிடலாம்."
+        ]
+      },
+      {
+        id: 6, videoTs: 97,
+        titleEn: "6. Multi-Tier Price Management",
+        titleTa: "6. பலநிலை விலை நிர்ணயம்",
+        screen: "./screenshots/06_price_management.png",
+        subEn: "Set differentiated price slabs for retail shoppers, wholesale B2B buyers, and institutional customers with automated volume pricing.",
+        subTa: "சில்லறை வாடிக்கையாளர்கள் மற்றும் மொத்த கொள்முதல் வாடிக்கையாளர்களுக்கு ஏற்ப பல அடுக்கு விலைகளை எளிதாக நிர்ணயிக்கலாம்.",
+        descEn: "Empowers supermarket operators to compete on wholesale volume without manual cashier overrides.",
+        descTa: "காசாளரின் தலையீடின்றி மொத்த எண்ணிக்கைக்குரிய தள்ளுபடி விலையை தானாகவே பில்லில் சேர்க்க உதவுகிறது.",
+        stepsEn: [
+          "Define volume thresholds (e.g., 1-9 units @ ₹100, 10+ units @ ₹90).",
+          "Schedule promotional time-bound price overrides for festive sales.",
+          "Audit trail tracks all user-initiated price adjustments."
+        ],
+        stepsTa: [
+          "எண்ணிக்கை வரம்புகளை அமைக்கலாம் (எ.கா. 1-9 பாக்கெட் ₹100, 10-க்கு மேல் ₹90).",
+          "பண்டிகைக் கால சிறப்பு தள்ளுபடி விலைகளை குறிப்பிட்ட நாட்களுக்கு மட்டும் அமைக்கலாம்.",
+          "விலை மாற்றங்களை யார் செய்தார் என்பதை தணிக்கைப் பதிவேடு பதிவு செய்யும்."
+        ]
+      },
+      {
+        id: 7, videoTs: 106,
+        titleEn: "7. Purchase Orders (PO)",
+        titleTa: "7. கொள்முதல் ஆணை மேலாண்மை",
+        screen: "./screenshots/07_purchasing_po.png",
+        subEn: "Create structured Purchase Orders with automated AI reorder suggestions based on sales velocity and lead times.",
+        subTa: "விற்பனை வேகத்தைக் கணக்கிட்டு ஏஐ தானாக பரிந்துரைக்கும் கொள்முதல் ஆணைகளை உருவாக்கி சப்ளையர்களுக்கு அனுப்பலாம்.",
+        descEn: "Standardizes procurement workflows and ensures agreed purchase pricing before goods are dispatched.",
+        descTa: "சரக்குகள் புறப்படும் முன்னரே ஒப்புக்கொள்ளப்பட்ட கொள்முதல் விலையை உறுதி செய்து இழப்புகளைத் தவிர்க்கிறது.",
+        stepsEn: [
+          "Select supplier from pre-registered vendor directory.",
+          "Click Load AI Recommendations to populate low-stock items automatically.",
+          "Submit for Manager authorization and export PO as clean PDF."
+        ],
+        stepsTa: [
+          "பதிவு செய்யப்பட்ட சப்ளையர் பட்டியலிலிருந்து ஒருவரைத் தேர்ந்தெடுக்கவும்.",
+          "இருப்பு குறைந்த பொருட்களை ஏஐ தானாக சேர்க்க பரிந்துரையைப் பெறலாம்.",
+          "மேலாளர் ஒப்புதலுடன் கொள்முதல் ஆணையை பிடிஎஃப் (PDF) வடிவில் அனுப்பலாம்."
+        ]
+      },
+      {
+        id: 8, videoTs: 109,
+        titleEn: "8. Supplier Master Directory",
+        titleTa: "8. சப்ளையர் பட்டியல் மேலாண்மை",
+        screen: "./screenshots/08_suppliers.png",
+        subEn: "Centralized vendor profiles maintain GSTIN numbers, bank details, credit terms, and historical supply performance.",
+        subTa: "சப்ளையர்களின் ஜிஎஸ்டி எண், வங்கிக் கணக்கு, கடன் கால அவகாசம் மற்றும் கொள்முதல் வரலாற்றை ஒரே இடத்தில் பராமரிக்கலாம்.",
+        descEn: "Evaluate supplier fulfillment reliability and lead-time accuracy across all grocery product categories.",
+        descTa: "சப்ளையர்கள் உரிய நேரத்தில் சரியான அளவில் சரக்குகளை அனுப்புகிறார்களா என்பதைக் கண்காணிக்கலாம்.",
+        stepsEn: [
+          "Store contact information, tax identification, and payment terms.",
+          "Map vendor-specific SKU codes to internal store barcodes.",
+          "Track supplier on-time delivery scorecards."
+        ],
+        stepsTa: [
+          "தொடர்பு எண்கள், ஜிஎஸ்டி வரி விவரங்கள் மற்றும் கடன் நாட்களைப் பதியலாம்.",
+          "சப்ளையர் கோடுகளை கடையின் உள் பார்கோடுகளுடன் இணைக்கலாம்.",
+          "சப்ளையர்களின் செயல்பாட்டுத் தரவரிசையைக் கண்காணிக்கலாம்."
+        ]
+      },
+      {
+        id: 9, videoTs: 115,
+        titleEn: "9. Goods Receipt Note (GRN)",
+        titleTa: "9. சரக்கு வரவு ரசீது (GRN)",
+        screen: "./screenshots/09_inventory_grn.png",
+        subEn: "Goods Receipt Note (GRN) conducts 3-way matching between Purchase Orders, Supplier Invoices, and physical delivery.",
+        subTa: "சரக்கு வரவு ரசீது (GRN) மூலம் கொள்முதல் ஆணை, சப்ளையர் பில் மற்றும் வந்த சரக்குகளை ஒப்பிட்டு சரிபார்க்கலாம்.",
+        descEn: "Eliminates damaged or short shipments while updating real-time stock positions and accounts payable ledgers.",
+        descTa: "சேதமடைந்த பொருட்களை நிராகரித்து, உண்மையான இருப்பை உடனுக்குடன் இருப்புப் பதிவேட்டில் ஏற்றலாம்.",
+        stepsEn: [
+          "Generate Purchase Orders manually or via AI EOQ recommendation.",
+          "Verify physical carton counts, batch codes, and expiry dates on arrival.",
+          "Confirming GRN immediately increments store stock and credits vendor payable."
+        ],
+        stepsTa: [
+          "கொள்முதல் ஆணைகளை கைமுறையாகவோ அல்லது ஏஐ பரிந்துரை மூலமாகவோ உருவாக்கலாம்.",
+          "வந்திறங்கிய சரக்குகள், பேட்ச் எண் மற்றும் காலாவதி தேதியை சரிபார்க்கவும்.",
+          "ஜி.ஆர்.என் உறுதி செய்யப்பட்டதும் கடை இருப்பு உயர்ந்து, சப்ளையர் கணக்கில் வரவு ஏறும்."
+        ]
+      },
+      {
+        id: 10, videoTs: 126,
+        titleEn: "10. Real-Time Stock Ledger",
+        titleTa: "10. சரக்கு இருப்புப் பதிவேடு",
+        screen: "./screenshots/10_stock_ledger.png",
+        subEn: "Immutable audit trail records every inward receipt, POS checkout deduction, and manual stock adjustment chronologically.",
+        subTa: "ஒவ்வொரு சரக்கு வரவு, பில்லிங் விற்பனை மற்றும் இருப்பு மாற்றங்களையும் கால வாரியாகப் பதிவு செய்யும் பாதுகாப்பான ஏடு.",
+        descEn: "Eliminates phantom stock discrepancies and pilferage by pinpointing exact user timestamps for every SKU movement.",
+        descTa: "சரக்கு திருட்டு மற்றும் இழப்புகளை முற்றிலும் தடுத்து, ஒவ்வொரு பொருளின் அசைவையும் துல்லியமாக அறிய உதவுகிறது.",
+        stepsEn: [
+          "Filter transaction history by date, SKU barcode, or warehouse location.",
+          "Audit opening balance, inward additions, POS sales, and closing stock.",
+          "Export ledger logs for statutory auditor reviews."
+        ],
+        stepsTa: [
+          "தேதி, பொருள் பார்கோடு அல்லது கிடங்கு வாரியாக இருப்பு வரலாற்றைப் பார்க்கலாம்.",
+          "தொடக்க இருப்பு, வரவு, விற்பனை மற்றும் இறுதி இருப்பை ஒப்பிட்டுப் பார்க்கலாம்.",
+          "தணிக்கையாளர்களுக்காக அறிக்கையை உடனடியாக ஏற்றுமதி செய்யலாம்."
+        ]
+      },
+      {
+        id: 11, videoTs: 135,
+        titleEn: "11. Customer CRM & Loyalty",
+        titleTa: "11. வாடிக்கையாளர் மேலாண்மை (CRM)",
+        screen: "./screenshots/11_crm_loyalty.png",
+        subEn: "Turn one-time shoppers into lifelong customers with automated loyalty tiers, points redemption, and store credit ledgers.",
+        subTa: "வாடிக்கையாளர் விசுவாசப் புள்ளிகள், சில்வர்/கோல்ட் அடுக்குகள் மற்றும் கடை கடன் கணக்குகளை (காதா) சுலபமாக நிர்வகிக்கலாம்.",
+        descEn: "Drives customer retention and basket value through personalized discounts and flexible khata management.",
+        descTa: "வாடிக்கையாளர்களைத் தக்கவைத்து விற்பனையை அதிகரிக்கவும், நம்பிக்கையானவர்களுக்கு கடன் வசதி தரவும் உதவுகிறது.",
+        stepsEn: [
+          "Automate Silver, Gold, and Platinum tier promotions based on annual spend.",
+          "Redeem points directly as checkout cash discounts.",
+          "Enforce store credit limits for trusted local accounts."
+        ],
+        stepsTa: [
+          "ஆண்டு செலவின் அடிப்படையில் சில்வர், கோல்ட், பிளாட்டினம் என தரம் உயர்த்தலாம்.",
+          "புள்ளிகளை பில்லிங் கவுண்டரிலேயே பணத் தள்ளுபடியாகக் கழிக்கலாம்.",
+          "நம்பிக்கையான வாடிக்கையாளர்களுக்கு கடன் வரம்புகளை நிர்ணயிக்கலாம்."
+        ]
+      },
+      {
+        id: 12, videoTs: 142,
+        titleEn: "12. Offers & Promotions Engine",
+        titleTa: "12. சிறப்பு தள்ளுபடி சலுகைகள்",
+        screen: "./screenshots/12_offers_promotions.png",
+        subEn: "Configure Buy-One-Get-One (BOGO), combo bundle pricing, category percentages, and basket spend thresholds.",
+        subTa: "ஒன்றிற்கு ஒன்று இலவசம் (BOGO), காம்போ சலுகைகள் மற்றும் குறிப்பிட்ட தொகைக்கு மேலான தள்ளுபடிகளை எளிதில் அமைக்கலாம்.",
+        descEn: "Promotions trigger automatically during barcode scanning without requiring cashiers to memorize discount codes.",
+        descTa: "பில்லிங் செய்யும் போதே சலுகைகள் தானாகக் கணக்கிடப்படுவதால் காசாளர்களின் வேலை எளிதாகிறது.",
+        stepsEn: [
+          "Set valid date windows and participating product categories.",
+          "Support volume mix-and-match bundle promotions.",
+          "Analyze promotional margin impact before publishing deals."
+        ],
+        stepsTa: [
+          "சலுகைக்கான தேதிகள் மற்றும் தயாரிப்புப் பிரிவுகளைத் தேர்வு செய்யவும்.",
+          "பொருட்களை ஒன்றாக இணைத்து விற்கும் காம்போ சலுகைகளை அமைக்கலாம்.",
+          "சலுகையால் வரும் லாப விகிதத்தை முன்கூட்டியே கணக்கிடலாம்."
+        ]
+      },
+      {
+        id: 13, videoTs: 149,
+        titleEn: "13. Finance Dashboard & GL",
+        titleTa: "13. நிதி மற்றும் கணக்கியல் மையம்",
+        screen: "./screenshots/13_finance_dashboard.png",
+        subEn: "Integrated double-entry accounting center ties POS sales, inventory valuations, and supplier payables to the General Ledger.",
+        subTa: "தனியாக கணக்கு மென்பொருளின்றி, விற்பனை, சரக்கு மதிப்பு மற்றும் சப்ளையர் பாக்கி அனைத்தும் பொதுப் பேரேட்டில் பதியும்.",
+        descEn: "Provides financial controllers with real-time liquidity tracking, working capital metrics, and tax liability overviews.",
+        descTa: "கடையின் பணப்புழக்கம், மூலதன நிலை மற்றும் வரி பொறுப்புகளை உடனுக்குடன் கண்காணிக்க உதவுகிறது.",
+        stepsEn: [
+          "Real-time visibility over Cash, Bank, and Accounts Receivable assets.",
+          "Automated journal entries for every completed sales invoice and GRN.",
+          "Unified Chart of Accounts tailored for multi-category retail supermarkets."
+        ],
+        stepsTa: [
+          "ரொக்கம், வங்கி மற்றும் வரவேண்டிய பாக்கிகளை ஒரே இடத்தில் காணலாம்.",
+          "விற்பனை பில் மற்றும் ஜி.ஆர்.என் பதிவுகளுக்கு தானியங்கி ஜர்னல் என்ட்ரி.",
+          "சூப்பர்மார்க்கெட்டுகளுக்கு உகந்த கணக்கு வகை அட்டவணை (Chart of Accounts)."
+        ]
+      },
+      {
+        id: 14, videoTs: 157,
+        titleEn: "14. Profit & Loss Statement (P&L)",
+        titleTa: "14. லாப நஷ்ட அறிக்கை (P&L)",
+        screen: "./screenshots/14_finance_pl.png",
+        subEn: "Automated double-entry accounting records sales, purchases, and expenses directly to the Chart of Accounts in real-time.",
+        subTa: "விற்பனை வருவாய், விற்ற பொருட்களின் அடக்க விலை மற்றும் இயக்கச் செலவுகளை எந்தத் தேதியிலும் ஒப்பிட்டு லாபத்தை அறியலாம்.",
+        descEn: "Generate instant Profit & Loss statements, Balance Sheets, and AP/AR aging analysis without monthly closing delays.",
+        descTa: "மாதக் கணக்கு முடிக்கும் தாமதமின்றி, எந்த நாளிலும் துல்லியமான லாப நஷ்ட அறிக்கை (P&L) உடனடியாகத் தயாராகும்.",
+        stepsEn: [
+          "View real-time Gross Margin, COGS, and Operating Profit.",
+          "Monitor AP aging to track vendor credit periods and upcoming payments.",
+          "Enforce customer credit limits to protect store working capital."
+        ],
+        stepsTa: [
+          "மொத்த லாபம், விற்ற பொருட்களின் அடக்க விலை மற்றும் நிகர லாபத்தைக் காணலாம்.",
+          "சப்ளையர்களுக்கு வழங்க வேண்டிய நிலுவைத் தொகையை கால வாரியாகக் கண்காணிக்கலாம்.",
+          "வாடிக்கையாளர் கடன் வரம்புகளைக் கட்டுப்படுத்தி பணப்புழக்கத்தைப் பாதுகாக்கலாம்."
+        ]
+      },
+      {
+        id: 15, videoTs: 168,
+        titleEn: "15. AI Executive Intelligence",
+        titleTa: "15. ஏஐ ஸ்மார்ட் வழிகாட்டி",
+        screen: "./screenshots/15_ai_copilot.png",
+        subEn: "Natural language retail co-pilot analyzes cross-module data to provide store executives with actionable strategic recommendations.",
+        subTa: "இயற்கை மொழியில் உரையாடும் ஏஐ வழிகாட்டி, கடையின் ஒட்டுமொத்த செயல்பாடுகளை ஆராய்ந்து மேலாண்மை ஆலோசனைகளை வழங்குகிறது.",
+        descEn: "Transforms complex transactional databases into clear, executive-level revenue optimization insights.",
+        descTa: "சிக்கலான வணிகத் தரவுகளை எளிமையாக்கி, வருவாயை அதிகரிக்கும் திட்டங்களை உரிமையாளர்களுக்கு பரிந்துரைக்கிறது.",
+        stepsEn: [
+          "Ask conversational questions about top margin SKUs and slow-moving aisles.",
+          "Synthesizes sales velocity, supplier fill rates, and customer churn.",
+          "Delivers instant executive summaries for daily standup meetings."
+        ],
+        stepsTa: [
+          "அதிக லாபம் தரும் பொருட்கள் மற்றும் விற்காத பொருட்கள் பற்றி ஏஐ-யிடம் கேட்கலாம்.",
+          "விற்பனை வேகம் மற்றும் சப்ளையர் சேவையை ஒருங்கிணைத்து ஆராய்கிறது.",
+          "தினசரி நிர்வாகக் கூட்டங்களுக்கு தேவையான சுருக்க அறிக்கைகளை உடனே தருகிறது."
+        ]
+      },
+      {
+        id: 16, videoTs: 175,
+        titleEn: "16. AI Demand Forecaster",
+        titleTa: "16. ஏஐ தேவை முன்னறிவிப்பு",
+        screen: "./screenshots/16_ai_forecaster.png",
+        subEn: "Machine learning algorithms forecast product demand spikes 7 to 14 days ahead, taking seasonality and festival trends into account.",
+        subTa: "பண்டிகைக் காலங்கள் மற்றும் முந்தைய விற்பனையைக் கணக்கிட்டு, அடுத்த 14 நாட்களில் தேவைப்படும் பொருட்களை ஏஐ முன்கூட்டியே கணிக்கிறது.",
+        descEn: "Prevents lost revenue from out-of-stock shelves while reducing excess working capital tied up in slow stock.",
+        descTa: "இருப்புத் தட்டுப்பாட்டினால் ஏற்படும் விற்பனை இழப்பைத் தடுத்து, தேவையற்ற சரக்குக் குவிப்பைக் குறைக்கிறது.",
+        stepsEn: [
+          "Forecast daily sales velocity across dairy, staples, and packaged goods.",
+          "Calculates Economic Order Quantity (EOQ) based on supplier lead times.",
+          "Converts forecasts into one-click Purchase Order drafts."
+        ],
+        stepsTa: [
+          "பால் மற்றும் மளிகைப் பொருட்களின் தினசரி தேவை அளவை முன்கூட்டியே கணிக்கிறது.",
+          "சரக்கு வந்து சேரும் நாட்களைக் கணக்கிட்டு உகந்த ஆர்டர் அளவை பரிந்துரைக்கிறது.",
+          "ஒரே கிளிக்கில் இந்த முன்னறிவிப்பை கொள்முதல் ஆணையாக மாற்றலாம்."
+        ]
+      },
+      {
+        id: 17, videoTs: 182,
+        titleEn: "17. AI Loss Prevention",
+        titleTa: "17. இழப்பு மற்றும் திருட்டு தடுப்பு",
+        screen: "./screenshots/17_ai_loss_prevention.png",
+        subEn: "Surveillance AI continuously audits counter transactions for abnormal voids, unrecorded drawer opens, and suspicious returns.",
+        subTa: "அனுமதியற்ற பில் ரத்து, பணப்பெட்டியை வீணாகத் திறப்பது போன்ற வழக்கத்திற்கு மாறான செயல்களை ஏஐ தொடர்ந்து கண்காணிக்கிறது.",
+        descEn: "Protects supermarket profit margins from internal shrinkage, cash theft, and unauthorized employee discounts.",
+        descTa: "பணப்பெட்டி திருட்டு மற்றும் முறைகேடான தள்ளுபடிகளிலிருந்து சூப்பர்மார்க்கெட் லாபத்தை 100% பாதுகாக்கிறது.",
+        stepsEn: [
+          "Flag high-frequency cashier void ratios and post-tender cancellations.",
+          "Alert store owners instantly via dashboard notifications and email.",
+          "Log immutable incident timestamps linked to terminal IDs."
+        ],
+        stepsTa: [
+          "அடிக்கடி பில் ரத்து செய்யும் காசாளர்களின் செயல்பாடுகளை உடனடியாக எச்சரிக்கும்.",
+          "உரிமையாளருக்கு அறிவிப்புகள் மற்றும் மின்னஞ்சல் மூலம் தகவல் அனுப்பும்.",
+          "கவுண்டர் எண் மற்றும் நேரத்துடன் சம்பவங்களை மாற்ற முடியாதபடி பதிவு செய்யும்."
+        ]
+      },
+      {
+        id: 18, videoTs: 184,
+        titleEn: "18. System Settings & Hardware",
+        titleTa: "18. கணினி & வன்பொருள் அமைப்புகள்",
+        screen: "./screenshots/18_system_settings.png",
+        subEn: "Configure ESC/POS thermal printers, barcode scanners, electronic cash drawers, digital scales, and user permissions.",
+        subTa: "தெர்மல் பில் பிரிண்டர், பார்கோடு ஸ்கேனர், பணப்பெட்டி, எடை தராசு மற்றும் பயனர் அனுமதிகளை அமைக்கும் பகுதி.",
+        descEn: "Streamlines counter peripheral onboarding with plug-and-play USB and network printer integration.",
+        descTa: "பில்லிங் கவுண்டர் உபகரணங்களை எளிதில் இணைத்து வேலை செய்ய உதவும் நேரடி அமைப்பு.",
+        stepsEn: [
+          "Select 80mm or 58mm thermal receipt format and customize store tax headers.",
+          "Configure RS-232 digital weighing scale baud rates.",
+          "Manage encrypted user roles and database backup policies."
+        ],
+        stepsTa: [
+          "80மிமீ அல்லது 58மிமீ பில் அளவு மற்றும் கடையின் ஜிஎஸ்டி முகவரியை அமைக்கலாம்.",
+          "எடை இயந்திரத்தின் இணைப்பை எளிதாக கட்டமைக்கலாம்.",
+          "பணியாளர் கடவுச்சொற்கள் மற்றும் டேட்டாபேஸ் பேக்கப் அமைப்புகளை நிர்வகிக்கலாம்."
+        ]
+      }
+    ];
+
+    let currentChapterIndex = 0;
+    let currentLang = 'en';
+    let isAudioEnabled = true;
+
+    // Initialize Chapter Navigation
+    function initChapters() {
+      const nav = document.getElementById('chapterNav');
+      nav.innerHTML = '';
+      chapters.forEach((chap, idx) => {
+        const btn = document.createElement('button');
+        btn.className = `chapter-btn ${idx === currentChapterIndex ? 'active' : ''}`;
+        btn.innerHTML = `<span class="chapter-badge">CH ${chap.id}</span> <span>${currentLang === 'en' ? chap.titleEn : chap.titleTa}</span>`;
+        btn.onclick = () => selectChapter(idx);
+        nav.appendChild(btn);
+      });
+    }
+
+    // Select Chapter — also seeks the video when in video view mode
+    function selectChapter(idx) {
+      currentChapterIndex = idx;
+      initChapters();
+      renderChapter();
+
+      // If the user is viewing the Master Video tab, seek to the chapter's timestamp
+      const videoStage = document.getElementById('stageVideo');
+      if (videoStage && videoStage.style.display !== 'none') {
+        const video = document.getElementById('walkthroughVideo');
+        const chap = chapters[idx];
+        if (video && typeof chap.videoTs === 'number') {
+          video.currentTime = chap.videoTs;
+          video.play().catch(() => {});
+        }
+      }
+    }
+
+    // Render Active Chapter Details
+    function renderChapter() {
+      const chap = chapters[currentChapterIndex];
+      document.getElementById('mainScreenImg').src = chap.screen;
+      document.getElementById('subEnglish').innerText = chap.subEn;
+      document.getElementById('subTamil').innerText = chap.subTa;
+
+      document.getElementById('panelTitle').innerText = currentLang === 'en' ? chap.titleEn : chap.titleTa;
+      document.getElementById('panelDesc').innerText = currentLang === 'en' ? chap.descEn : chap.descTa;
+
+      const list = document.getElementById('workflowList');
+      list.innerHTML = '';
+      const steps = currentLang === 'en' ? chap.stepsEn : chap.stepsTa;
+      steps.forEach((st, i) => {
+        const li = document.createElement('li');
+        li.className = 'workflow-item';
+        li.innerHTML = `<span class="workflow-num">${i + 1}</span> ${st}`;
+        list.appendChild(li);
+      });
+
+      // Play Speech Narration if Enabled
+      if (isAudioEnabled) {
+        speakNarration(currentLang === 'en' ? chap.subEn : chap.subTa, currentLang);
+      }
+    }
+
+    // Language Switcher
+    function switchLang(lang) {
+      currentLang = lang;
+      document.getElementById('btnLangEn').classList.toggle('active', lang === 'en');
+      document.getElementById('btnLangTa').classList.toggle('active', lang === 'ta');
+
+      if (lang === 'ta') {
+        document.getElementById('txtBrandSub').innerText = "முழுமையான செயல்முறை பயிற்சி மற்றும் மாதிரி செயல்விளக்கம்";
+        document.getElementById('tabScreens').innerText = "செயல்முறை வழிகாட்டி";
+        document.getElementById('tabVideo').innerText = "முழுமையான காணொளி (.WebM)";
+        document.getElementById('tabPos').innerText = "நேரடி பில்லிங் மாதிரி";
+      } else {
+        document.getElementById('txtBrandSub').innerText = "Enterprise Interactive Training & Demo";
+        document.getElementById('tabScreens').innerText = "Interactive Walkthrough";
+        document.getElementById('tabVideo').innerText = "Master Video (.WebM)";
+        document.getElementById('tabPos').innerText = "Live POS Simulator";
+      }
+
+      initChapters();
+      renderChapter();
+    }
+
+    // View Switcher
+    function switchView(view) {
+      document.getElementById('tabScreens').classList.toggle('active', view === 'screens');
+      document.getElementById('tabVideo').classList.toggle('active', view === 'video');
+      document.getElementById('tabPos').classList.toggle('active', view === 'pos');
+
+      document.getElementById('stageScreens').style.display = view === 'screens' ? 'grid' : 'none';
+      document.getElementById('stageVideo').style.display = view === 'video' ? 'flex' : 'none';
+      document.getElementById('stagePos').style.display = view === 'pos' ? 'grid' : 'none';
+
+      const video = document.getElementById('walkthroughVideo');
+      if (view === 'video') {
+        // Seek to the currently selected chapter's timestamp
+        const chap = chapters[currentChapterIndex];
+        if (chap && typeof chap.videoTs === 'number') {
+          video.currentTime = chap.videoTs;
+        }
+        video.play().catch(() => {});
+        buildVideoChapterTimeline();
+      } else {
+        video.pause();
+      }
+    }
+
+    // Audio Narration Toggle
+    function toggleAudio() {
+      isAudioEnabled = !isAudioEnabled;
+      const btn = document.getElementById('btnAudioToggle');
+      btn.classList.toggle('active', isAudioEnabled);
+      document.getElementById('audioIcon').innerText = isAudioEnabled ? '🔊' : '🔇';
+      document.getElementById('audioLabel').innerText = isAudioEnabled ? 'Narration: ON' : 'Narration: OFF';
+      if (!isAudioEnabled && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      } else if (isAudioEnabled) {
+        renderChapter();
+      }
+    }
+
+    // Web Speech API Voice Synthesis with Graceful Fallback
+    function speakNarration(text, lang) {
+      if (!window.speechSynthesis) return;
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = lang === 'ta' ? 'ta-IN' : 'en-US';
+      utterance.rate = 0.95;
+
+      // Select matching voice if installed on system
+      const voices = window.speechSynthesis.getVoices();
+      if (voices.length > 0) {
+        const matchVoice = voices.find(v => v.lang.startsWith(lang === 'ta' ? 'ta' : 'en'));
+        if (matchVoice) utterance.voice = matchVoice;
+      }
+
+      window.speechSynthesis.speak(utterance);
+    }
+
+    // ── Build Video Chapter Timeline Buttons ──────────────────────────────
+    function buildVideoChapterTimeline() {
+      const container = document.getElementById('videoChapterTimeline');
+      if (!container) return;
+      container.innerHTML = '';
+      chapters.forEach((chap, idx) => {
+        const mins = Math.floor(chap.videoTs / 60);
+        const secs = chap.videoTs % 60;
+        const timeLabel = `${mins}:${secs.toString().padStart(2, '0')}`;
+        const btn = document.createElement('button');
+        btn.style.cssText = 'background:rgba(99,102,241,0.15); border:1px solid rgba(99,102,241,0.4); color:#a5b4fc; padding:4px 10px; border-radius:6px; font-size:0.72rem; cursor:pointer; transition:all 0.2s; white-space:nowrap;';
+        btn.innerHTML = `<strong>${chap.id}</strong> ${timeLabel}`;
+        btn.title = (currentLang === 'en' ? chap.titleEn : chap.titleTa) + ` @ ${timeLabel}`;
+        btn.onmouseenter = () => { btn.style.background = 'rgba(99,102,241,0.35)'; btn.style.color = '#fff'; };
+        btn.onmouseleave = () => { btn.style.background = 'rgba(99,102,241,0.15)'; btn.style.color = '#a5b4fc'; };
+        btn.onclick = () => {
+          const video = document.getElementById('walkthroughVideo');
+          if (video) {
+            video.currentTime = chap.videoTs;
+            video.play().catch(() => {});
+          }
+          selectChapter(idx);
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    // ── Interactive POS Counter Simulator Logic ──────────────────────────────
+    let simCart = [];
+
+    function addToSimCart(name, price, taxRate) {
+      const existing = simCart.find(item => item.name === name);
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        simCart.push({ name, price, qty: 1, taxRate });
+      }
+      renderSimCart();
+    }
+
+    function renderSimCart() {
+      const tbody = document.getElementById('simCartBody');
+      if (simCart.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: #64748b; padding: 24px;">Cart is empty. Tap products on left to scan.</td></tr>`;
+        document.getElementById('simSubtotal').innerText = '₹0.00';
+        document.getElementById('simTax').innerText = '₹0.00';
+        document.getElementById('simNetTotal').innerText = '₹0.00';
+        return;
+      }
+
+      let subtotal = 0;
+      let tax = 0;
+
+      tbody.innerHTML = '';
+      simCart.forEach((item, index) => {
+        const itemTotal = item.price * item.qty;
+        subtotal += itemTotal;
+        const rateNum = parseFloat(item.taxRate) / 100 || 0;
+        tax += itemTotal * rateNum;
+
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td><strong>${item.name}</strong> <span style="font-size:0.7rem; color:#94a3b8;">(${item.taxRate} GST)</span></td>
+          <td>${item.qty}</td>
+          <td>₹${item.price.toFixed(2)}</td>
+          <td><strong>₹${itemTotal.toFixed(2)}</strong></td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const netTotal = subtotal + tax;
+      document.getElementById('simSubtotal').innerText = `₹${subtotal.toFixed(2)}`;
+      document.getElementById('simTax').innerText = `₹${tax.toFixed(2)}`;
+      document.getElementById('simNetTotal').innerText = `₹${netTotal.toFixed(2)}`;
+    }
+
+    let heldCarts = [];
+    function holdSimCart() {
+      if (simCart.length === 0) {
+        alert(currentLang === 'en' ? "Cart is already empty." : "கார்ட் காலியாக உள்ளது.");
+        return;
+      }
+      heldCarts.push([...simCart]);
+      simCart = [];
+      renderSimCart();
+      alert(currentLang === 'en' ? "Bill parked securely. Next customer can be billed!" : "பில் வெற்றிகரமாக நிறுத்தி வைக்கப்பட்டது. அடுத்த வாடிக்கையாளருக்கு பில் போடலாம்!");
+    }
+
+    function recallSimCart() {
+      if (heldCarts.length === 0) {
+        alert(currentLang === 'en' ? "No held carts in queue." : "நிறுத்தி வைக்கப்பட்ட பில்கள் எதுவும் இல்லை.");
+        return;
+      }
+      simCart = heldCarts.pop();
+      renderSimCart();
+      alert(currentLang === 'en' ? "Held bill restored to checkout counter!" : "நிறுத்தி வைக்கப்பட்ட பில் மீண்டும் பில்லிங் திரைக்குக் கொண்டுவரப்பட்டது!");
+    }
+
+    function checkoutSimCart() {
+      if (simCart.length === 0) {
+        alert(currentLang === 'en' ? "Scan items before checkout!" : "கட்டணம் முடிக்கும் முன் பொருட்களை ஸ்கேன் செய்யவும்!");
+        return;
+      }
+      const net = document.getElementById('simNetTotal').innerText;
+      const msg = currentLang === 'en' 
+        ? `✅ SALE SUCCESSFUL!\nTotal Paid: ${net}\nTender: UPI & Cash Split\nReceipt sent to thermal printer & Cash drawer opened.` 
+        : `✅ விற்பனை வெற்றிகரமாக முடிந்தது!\nமொத்தத் தொகை: ${net}\nகட்டண முறை: ரொக்கம் & யு.பி.ஐ\nதெர்மல் ரசீது அச்சிடப்பட்டது. பணப்பெட்டி திறக்கப்பட்டது.`;
+      alert(msg);
+      simCart = [];
+      renderSimCart();
+    }
+
+    // Keyboard Shortcuts Listener
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'F6') { e.preventDefault(); holdSimCart(); }
+      if (e.key === 'F7') { e.preventDefault(); recallSimCart(); }
+      if (e.key === 'F12') { e.preventDefault(); checkoutSimCart(); }
+    });
+
+    // Initialize on Page Load
+    window.addEventListener('DOMContentLoaded', () => {
+      initChapters();
+      renderChapter();
+    });
+  </script>
+</body>
+</html>

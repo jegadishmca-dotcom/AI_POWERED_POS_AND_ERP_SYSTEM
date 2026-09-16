@@ -1,0 +1,40 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Apple Supermarket POS & ERP System — Unattended Install Answers
+# ═══════════════════════════════════════════════════════════════════════
+# Usage:  sudo bash install.sh --unattended --config answers.conf
+#
+# Copy this file, fill in every value, and pass it to install.sh.
+# Any empty required field will cause the installer to abort.
+# ═══════════════════════════════════════════════════════════════════════
+
+# ── Company / Store Identity ─────────────────────────────────────────
+COMPANY_NAME="Apple Supermarket"
+
+# ── Server Access ────────────────────────────────────────────────────
+# ACCESS_MODE: "domain" or "ip"
+ACCESS_MODE="ip"
+
+# If ACCESS_MODE=domain, set the FQDN (e.g. pos.mystore.com)
+# If ACCESS_MODE=ip, leave empty — the installer auto-detects the LAN IP
+SERVER_FQDN=""
+
+# ── Admin Account ────────────────────────────────────────────────────
+ADMIN_EMAIL="admin@mystore.com"
+ADMIN_PASSWORD="ChangeMe!Str0ng#2026"
+
+# ── Timezone ─────────────────────────────────────────────────────────
+# Must be a valid tz database name (e.g., Asia/Kolkata, America/New_York)
+SYSTEM_TIMEZONE="Asia/Kolkata"
+
+# ── SMTP / Email ─────────────────────────────────────────────────────
+# Set SMTP_ENABLED=false to skip email configuration
+SMTP_ENABLED=false
+SMTP_HOST=""
+SMTP_PORT="587"
+SMTP_FROM=""
+SMTP_PASSWORD=""
+SMTP_TLS="starttls"   # starttls | ssl | none
+
+# ── Optional Features ────────────────────────────────────────────────
+ENABLE_MONITORING=true    # Prometheus + Grafana
+ENABLE_AI=false           # Ollama AI Co-Pilot (~4 GB download)

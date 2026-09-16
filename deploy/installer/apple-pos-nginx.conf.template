@@ -1,0 +1,91 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Apple Supermarket POS & ERP System — Host Nginx Reverse Proxy
+# ═══════════════════════════════════════════════════════════════════════
+# Installed to: /etc/nginx/sites-available/apple-pos.conf
+# Symlinked to: /etc/nginx/sites-enabled/apple-pos.conf
+#
+# This is the HOST-level Nginx (not the containerised one). It handles:
+#   - TLS termination (Let's Encrypt or self-signed)
+#   - HTTP → HTTPS redirect (301)
+#   - Proxying to the Docker stack at 127.0.0.1:8000
+# ═══════════════════════════════════════════════════════════════════════
+
+# ── HTTP: redirect everything to HTTPS ────────────────────────────────
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __SERVER_NAME__;
+
+    # Let's Encrypt ACME challenge (certbot webroot)
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+        allow all;
+    }
+
+    # Redirect all other HTTP traffic to HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ── HTTPS: TLS termination + reverse proxy ────────────────────────────
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name __SERVER_NAME__;
+
+    # ── TLS Certificates ─────────────────────────────────────────────
+    ssl_certificate     __SSL_CERT_PATH__;
+    ssl_certificate_key __SSL_KEY_PATH__;
+
+    # ── TLS Hardening ────────────────────────────────────────────────
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305;
+    ssl_prefer_server_ciphers off;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # OCSP Stapling (works with Let's Encrypt, ignored for self-signed)
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 8.8.8.8 1.1.1.1 valid=300s;
+    resolver_timeout 5s;
+
+    # ── Security Headers ─────────────────────────────────────────────
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains" always;
+    add_header Permissions-Policy "camera=(), microphone=(), geolocation=()" always;
+
+    # ── Request Limits ───────────────────────────────────────────────
+    client_max_body_size 50M;
+    proxy_read_timeout 180s;
+    proxy_connect_timeout 10s;
+    proxy_send_timeout 60s;
+
+    # ── Proxy to Docker Stack ────────────────────────────────────────
+    # All traffic goes to the containerised Nginx on 127.0.0.1:8000
+    # which handles internal routing to frontend/backend containers.
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Forwarded-Host $host;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+
+    # ── Direct Health Check (bypass container nginx) ─────────────────
+    # Useful for external monitoring / load balancer probes
+    location = /nginx-health {
+        access_log off;
+        return 200 "healthy\n";
+        add_header Content-Type text/plain;
+    }
+}

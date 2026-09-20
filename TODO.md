@@ -11,7 +11,7 @@
 
 ## 2. [BUG-FIN-001] [STATUS: RESOLVED] Trial Balance Contra/Abnormal Account Netting Inversion
 - **Issue**: Trial Balance report endpoint `GET /api/financialreports/trial-balance` previously reported an artificial cumulative discrepancy of **₹1,426,017.08** between `totalDebits` (₹291,673,961.02) and `totalCredits` (₹293,099,978.10), despite the underlying PostgreSQL General Ledger being **100.0000% balanced** (Total Posted Debits: ₹563,030,950.63 == Total Posted Credits: ₹563,030,950.63, Delta: ₹0.00).
-- **Resolution**: Fixed in `FinancialReportingService.cs`. When `bal.CreditBalance < bal.DebitBalance` for Liability/Revenue/Equity accounts, `-net` is now assigned to `bal.DebitBalance = -net; bal.CreditBalance = 0;`.
+- **Resolution**: Fixed in [FinancialReportingService.cs](file:///d:/JEGADISH/APPLE_SUPERMARKET_POS_PROJECT/AI_POWERED_POS_AND_ERP_SYSTEM/src/Backend/PosErp.Application/Features/Finance/Services/FinancialReportingService.cs). When `bal.CreditBalance < bal.DebitBalance` for Liability/Revenue/Equity accounts, `-net` is now assigned to `bal.DebitBalance = -net; bal.CreditBalance = 0;`.
 - **Commit**: `859beb51`
 - **Reconciliation & Verification**:
   - `totalDebits`: **₹292,389,183.06**
@@ -40,7 +40,7 @@
 ## 4. [BUG-FIN-004] [STATUS: RESOLVED] Customer Receipt Wallet Ledger Corruption & UAT Ledger Correction
 - **Issue**: Processing an Accounts Receivable customer receipt (`ProcessCustomerReceiptCommand`) previously added a credit entry to `wallet_ledger` and increased the customer's `running_wallet_balance`, giving the customer unearned shopping credit while also not clearing invoices correctly.
 - **Resolution**:
-  - In `ARCommandsAndQueries.cs`, removed the improper `walletLedgerRepository.AddAsync(walletEntry)` call and `running_wallet_balance` modification. Receipts now strictly reduce Accounts Receivable debt.
+  - In [ARCommandsAndQueries.cs](file:///d:/JEGADISH/APPLE_SUPERMARKET_POS_PROJECT/AI_POWERED_POS_AND_ERP_SYSTEM/src/Backend/PosErp.Application/Features/Finance/Commands/ARCommandsAndQueries.cs), removed the improper `walletLedgerRepository.AddAsync(walletEntry)` call and `running_wallet_balance` modification. Receipts now strictly reduce Accounts Receivable debt.
   - Added structured audit logging and authorization.
   - Executed atomic data repair on `posdb_uat` for test receipt `CR-000001` (Uma): reset wallet to ₹0.0000, customer ledger to ₹0.0000 with compensating debit, marked receipt `VOIDED`, posted balancing JE `JE-CORR-CR000001` (Dr `20200` ₹350 / Cr `10100` ₹350), and logged to `audit_logs`.
 - **Commit**: `3b6ecf3e`
@@ -49,11 +49,11 @@
 
 ## 5. [BUG-FIN-005] [STATUS: RESOLVED] Finance & Accounting Audit Remediation (AP Aging, Tax Slab, GST Net Turnover, Balance Sheet, P&L COGS)
 - **Scope**: Comprehensive audit fixes across finance reporting, multi-tenancy, and accounting endpoints:
-  1. **AP Purchase Bills Tax Slabs**: Purchase bill creation now inherits explicit CGST/SGST/IGST rates from `TaxSlabId` when items specify 0% / null (`APCommandsAndQueries.cs`).
-  2. **AP Aging Breakdown**: Added `GET /api/accountspayable/aging` endpoint to `AccountsPayableController.cs` returning structured aging buckets (`0-30`, `31-60`, `61-90`, `90+` days) to fulfill frontend contract.
-  3. **GST Report Formula**: Corrected turnover reporting in `GetGSTReportQuery.cs` to be strictly net of tax (`GrossSales - TotalTax`).
-  4. **Balance Sheet Asset Account Visibility**: Removed restrictive client-side filter (`.filter(a => a.accountCode.startsWith('10') || a.accountCode.startsWith('11'))`) in `BalanceSheet.tsx`; all 276 previously hidden asset accounts (including non-10/11 prefix asset accounts and Account 1) now render completely under Assets.
-  5. **Profit & Loss Structure**: Grouped Cost of Goods Sold accounts (`cogsAccounts`) into a dedicated COGS section distinct from operating expenses in `FinancialReportingService.cs`.
+  1. **AP Purchase Bills Tax Slabs**: Purchase bill creation now inherits explicit CGST/SGST/IGST rates from `TaxSlabId` when items specify 0% / null ([APCommandsAndQueries.cs](file:///d:/JEGADISH/APPLE_SUPERMARKET_POS_PROJECT/AI_POWERED_POS_AND_ERP_SYSTEM/src/Backend/PosErp.Application/Features/Finance/Commands/APCommandsAndQueries.cs)).
+  2. **AP Aging Breakdown**: Added `GET /api/accountspayable/aging` endpoint to [AccountsPayableController.cs](file:///d:/JEGADISH/APPLE_SUPERMARKET_POS_PROJECT/AI_POWERED_POS_AND_ERP_SYSTEM/src/Backend/PosErp.Api/Controllers/AccountsPayableController.cs) returning structured aging buckets (`0-30`, `31-60`, `61-90`, `90+` days) to fulfill frontend contract.
+  3. **GST Report Formula**: Corrected turnover reporting in [GetGSTReportQuery.cs](file:///d:/JEGADISH/APPLE_SUPERMARKET_POS_PROJECT/AI_POWERED_POS_AND_ERP_SYSTEM/src/Backend/PosErp.Application/Features/Reports/Queries/GetGSTReport/GetGSTReportQuery.cs) to be strictly net of tax (`GrossSales - TotalTax`).
+  4. **Balance Sheet Asset Account Visibility**: Removed restrictive client-side filter (`.filter(a => a.accountCode.startsWith('10') || a.accountCode.startsWith('11'))`) in [BalanceSheet.tsx](file:///d:/JEGADISH/APPLE_SUPERMARKET_POS_PROJECT/AI_POWERED_POS_AND_ERP_SYSTEM/src/Frontend/src/features/finance/components/BalanceSheet.tsx); all 276 previously hidden asset accounts (including non-10/11 prefix asset accounts and Account 1) now render completely under Assets.
+  5. **Profit & Loss Structure**: Grouped Cost of Goods Sold accounts (`cogsAccounts`) into a dedicated COGS section distinct from operating expenses in [FinancialReportingService.cs](file:///d:/JEGADISH/APPLE_SUPERMARKET_POS_PROJECT/AI_POWERED_POS_AND_ERP_SYSTEM/src/Backend/PosErp.Application/Features/Finance/Services/FinancialReportingService.cs).
   6. **Multi-Tenancy StoreId Integrity**: Unified active store resolution across 6 financial frontend views.
 - **Commit**: `3b6ecf3e`
 

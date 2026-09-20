@@ -52,7 +52,7 @@
   1. **AP Purchase Bills Tax Slabs**: Purchase bill creation now inherits explicit CGST/SGST/IGST rates from `TaxSlabId` when items specify 0% / null (`APCommandsAndQueries.cs`).
   2. **AP Aging Breakdown**: Added `GET /api/accountspayable/aging` endpoint to `AccountsPayableController.cs` returning structured aging buckets (`0-30`, `31-60`, `61-90`, `90+` days) to fulfill frontend contract.
   3. **GST Report Formula**: Corrected turnover reporting in `GetGSTReportQuery.cs` to be strictly net of tax (`GrossSales - TotalTax`).
-  4. **Balance Sheet Account Visibility**: Removed arbitrary frontend filter (`a.accountNumber > 1`) in `BalanceSheet.tsx`; Account 1 (`Cash Account`) and all valid asset accounts now render correctly.
+  4. **Balance Sheet Asset Account Visibility**: Removed restrictive client-side filter (`.filter(a => a.accountCode.startsWith('10') || a.accountCode.startsWith('11'))`) in `BalanceSheet.tsx`; all 276 previously hidden asset accounts (including non-10/11 prefix asset accounts and Account 1) now render completely under Assets.
   5. **Profit & Loss Structure**: Grouped Cost of Goods Sold accounts (`cogsAccounts`) into a dedicated COGS section distinct from operating expenses in `FinancialReportingService.cs`.
   6. **Multi-Tenancy StoreId Integrity**: Unified active store resolution across 6 financial frontend views.
 - **Commit**: `3b6ecf3e`

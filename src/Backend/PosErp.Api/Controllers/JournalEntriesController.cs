@@ -1,6 +1,7 @@
 using MediatR;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 using PosErp.Application.Features.Finance.Commands;
 using PosErp.Application.Features.Finance.Queries;
 using System;
@@ -11,14 +12,16 @@ namespace PosErp.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Roles = "Owner,Manager,Developer,Admin")]
 public class JournalEntriesController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly ILogger<JournalEntriesController> _logger;
 
-    public JournalEntriesController(IMediator mediator)
+    public JournalEntriesController(IMediator mediator, ILogger<JournalEntriesController> logger)
     {
         _mediator = mediator;
+        _logger = logger;
     }
 
     [HttpGet]

@@ -59,6 +59,7 @@ public class ProfitAndLossDto
     public decimal NetProfit => GrossProfit - TotalOperatingExpenses;
     
     public List<AccountBalanceDto> RevenueAccounts { get; set; } = new();
+    public List<AccountBalanceDto> CogsAccounts { get; set; } = new();
     public List<AccountBalanceDto> ExpenseAccounts { get; set; } = new();
 }
 
@@ -483,12 +484,17 @@ public class FinancialReportingService : IFinancialReportingService
             {
                 decimal netExpense = b.DebitBalance - b.CreditBalance;
                 b.DebitBalance = netExpense; b.CreditBalance = 0;
-                report.ExpenseAccounts.Add(b);
                 
                 if (b.AccountCode == "5000" || b.AccountCode == "50100" || b.AccountName.Contains("COGS") || b.AccountName.Contains("Cost of Goods"))
+                {
+                    report.CogsAccounts.Add(b);
                     report.TotalCOGS += netExpense;
+                }
                 else
+                {
+                    report.ExpenseAccounts.Add(b);
                     report.TotalOperatingExpenses += netExpense;
+                }
             }
         }
 

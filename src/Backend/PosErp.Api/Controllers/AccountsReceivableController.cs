@@ -16,33 +16,45 @@ namespace PosErp.Api.Controllers;
 public class AccountsReceivableController : ControllerBase
 {
     private readonly IMediator _mediator;
+    private readonly Microsoft.Extensions.Logging.ILogger<AccountsReceivableController> _logger;
 
-    public AccountsReceivableController(IMediator mediator)
+    public AccountsReceivableController(IMediator mediator, Microsoft.Extensions.Logging.ILogger<AccountsReceivableController> logger)
     {
         _mediator = mediator;
+        _logger = logger;
     }
 
     [HttpPost("receipts")]
     public async Task<IActionResult> ProcessReceipt([FromBody] ProcessCustomerReceiptRequest request)
     {
-        var callerIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        Guid.TryParse(callerIdStr, out Guid userId);
+        try
+        {
+            var callerIdStr = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            Guid.TryParse(callerIdStr, out Guid userId);
 
-        var command = new ProcessCustomerReceiptCommand(
-            request.StoreId,
-            request.CustomerId,
-            request.ReceiptDate,
-            request.PaymentMode,
-            request.ReferenceNumber,
-            request.Amount,
-            request.Notes,
-            request.AllocationMode,
-            request.ManualAllocations,
-            userId
-        );
+            var storeId = request.StoreId != Guid.Empty ? request.StoreId : Guid.Parse("00000000-0000-0000-0000-000000000000");
 
-        var id = await _mediator.Send(command);
-        return Ok(new { id });
+            var command = new ProcessCustomerReceiptCommand(
+                storeId,
+                request.CustomerId,
+                request.ReceiptDate,
+                request.PaymentMode,
+                request.ReferenceNumber,
+                request.Amount,
+                request.Notes,
+                request.AllocationMode,
+                request.ManualAllocations,
+                userId
+            );
+
+            var id = await _mediator.Send(command);
+            return Ok(new { id });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error processing customer receipt for customer {CustomerId}", request.CustomerId);
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpPost("returns")]

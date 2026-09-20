@@ -101,6 +101,25 @@ public class AccountsPayableController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("aging")]
+    public async Task<IActionResult> GetAging([FromQuery] Guid? storeId, [FromQuery] DateTime? asOfDate)
+    {
+        try
+        {
+            var activeStoreId = (storeId.HasValue && storeId.Value != Guid.Empty) 
+                ? storeId.Value 
+                : Guid.Parse("00000000-0000-0000-0000-000000000000");
+            var date = asOfDate ?? DateTime.UtcNow.Date;
+            var result = await _mediator.Send(new GetSupplierAgingReportQuery(activeStoreId, date));
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating supplier aging report for store {StoreId}", storeId);
+            return StatusCode(500, new { message = "Error generating supplier aging report.", detail = ex.Message });
+        }
+    }
+
     [HttpGet("bills")]
     public async Task<IActionResult> GetBills([FromQuery] Guid? storeId, [FromQuery] Guid? supplierId)
     {

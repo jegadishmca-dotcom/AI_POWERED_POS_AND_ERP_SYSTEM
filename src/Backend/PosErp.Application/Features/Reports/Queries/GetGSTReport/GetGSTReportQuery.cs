@@ -39,7 +39,7 @@ public class GetGSTReportQueryHandler : IRequestHandler<GetGSTReportQuery, List<
             .Where(ii => ii.Invoice.BusinessDate >= fromDate && ii.Invoice.BusinessDate <= toDate && ii.Invoice.Status == "COMPLETED")
             .Select(ii => new {
                 TaxRate = ii.CgstRate + ii.SgstRate,
-                Taxable = ii.TotalAmount,
+                Taxable = ii.TotalAmount - (ii.CgstAmount + ii.SgstAmount + ii.CessAmount),
                 Cgst = ii.CgstAmount,
                 Sgst = ii.SgstAmount,
                 Cess = ii.CessAmount

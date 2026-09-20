@@ -164,14 +164,54 @@ public class APCommandsAndQueriesHandler :
 
             DateTime dueDate = request.BillDate.AddDays(creditDays);
 
-            // Compute total CGST and SGST on purchase bill items
-            // For simplicity, we calculate 9% CGST and 9% SGST on cost items if not explicitly set,
-            // or sum from the items.
+            // Compute CGST and SGST on purchase bill items based on each product's configured TaxSlab
+            var productIds = grn.Items.Select(i => i.ProductId).Distinct().ToList();
+            var products = await _context.Products
+                .Where(p => productIds.Contains(p.Id))
+                .Select(p => new { p.Id, p.TaxSlabId })
+                .ToListAsync(cancellationToken);
+
+            var taxSlabIds = products.Select(p => p.TaxSlabId).Distinct().ToList();
+            var taxSlabs = await _context.TaxSlabs
+                .Where(t => taxSlabIds.Contains(t.Id))
+                .ToDictionaryAsync(t => t.Id, cancellationToken);
+
+            var productTaxMap = products.ToDictionary(
+                p => p.Id,
+                p => taxSlabs.TryGetValue(p.TaxSlabId, out var ts) ? ts : null
+            );
+
             decimal itemsCost = grn.Items.Sum(i => i.TotalCost);
-            decimal cgstRate = 0.09m;
-            decimal sgstRate = 0.09m;
-            decimal cgstAmount = itemsCost * cgstRate;
-            decimal sgstAmount = itemsCost * sgstRate;
+            decimal totalCgst = 0m;
+            decimal totalSgst = 0m;
+
+            var billItems = new List<PurchaseBillItem>();
+            foreach (var item in grn.Items)
+            {
+                decimal itemCgstRate = 0m;
+                decimal itemSgstRate = 0m;
+                if (productTaxMap.TryGetValue(item.ProductId, out var slab) && slab != null)
+                {
+                    itemCgstRate = slab.CgstRate / 100m;
+                    itemSgstRate = slab.SgstRate / 100m;
+                }
+                decimal itemCgst = Math.Round(item.TotalCost * itemCgstRate, 4);
+                decimal itemSgst = Math.Round(item.TotalCost * itemSgstRate, 4);
+                totalCgst += itemCgst;
+                totalSgst += itemSgst;
+
+                billItems.Add(new PurchaseBillItem
+                {
+                    ProductId = item.ProductId,
+                    Quantity = item.AcceptedQuantity,
+                    UnitCost = item.UnitCost,
+                    TaxAmount = itemCgst + itemSgst,
+                    TotalAmount = item.TotalCost + itemCgst + itemSgst
+                });
+            }
+
+            decimal cgstAmount = totalCgst;
+            decimal sgstAmount = totalSgst;
             decimal totalAmount = itemsCost + cgstAmount + sgstAmount;
 
             var bill = new PurchaseBillHeader
@@ -190,16 +230,9 @@ public class APCommandsAndQueriesHandler :
                 CreatedBy = request.UserId
             };
 
-            foreach (var item in grn.Items)
+            foreach (var bItem in billItems)
             {
-                bill.Items.Add(new PurchaseBillItem
-                {
-                    ProductId = item.ProductId,
-                    Quantity = item.AcceptedQuantity,
-                    UnitCost = item.UnitCost,
-                    TaxAmount = item.TotalCost * (cgstRate + sgstRate),
-                    TotalAmount = item.TotalCost * (1 + cgstRate + sgstRate)
-                });
+                bill.Items.Add(bItem);
             }
 
             _context.PurchaseBills.Add(bill);

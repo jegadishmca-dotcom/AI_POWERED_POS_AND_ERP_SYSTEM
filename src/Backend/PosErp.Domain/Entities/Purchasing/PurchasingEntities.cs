@@ -40,7 +40,7 @@ public class GRNHeader
 {
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid? StoreId { get; set; }
-    public Guid PurchaseOrderHeaderId { get; set; }
+    public Guid? PurchaseOrderHeaderId { get; set; }
     public Guid SupplierId { get; set; }
     
     public string GrnNumber { get; set; } = string.Empty;

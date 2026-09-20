@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CalendarClock, Download } from 'lucide-react';
 import { api } from '../../../utils/api';
 import { formatCurrency } from '../../../utils/formatters';
+import { useAuthStore } from '../../auth/store/auth.store';
 
 interface AgingDto {
   customerId: string;
@@ -15,6 +16,7 @@ interface AgingDto {
 }
 
 export const ARAging: React.FC = () => {
+  const { user } = useAuthStore();
   const [asOfDate, setAsOfDate] = useState<string>(new Date().toISOString().split('T')[0]);
   const [agingData, setAgingData] = useState<AgingDto[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -23,7 +25,7 @@ export const ARAging: React.FC = () => {
   useEffect(() => {
     setLoading(true);
     setError('');
-    const storeId = '00000000-0000-0000-0000-000000000000';
+    const storeId = user?.storeId || '00000000-0000-0000-0000-000000000000';
     api.get(`/api/AccountsReceivable/aging?storeId=${storeId}&asOfDate=${asOfDate}`)
       .then(res => {
         setAgingData(res.data || []);

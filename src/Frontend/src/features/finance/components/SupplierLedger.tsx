@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, Download, Calendar } from 'lucide-react';
 import { api } from '../../../utils/api';
 import { formatCurrency } from '../../../utils/formatters';
+import { useAuthStore } from '../../auth/store/auth.store';
 
 interface Supplier {
   id: string;
@@ -23,6 +24,7 @@ interface LedgerEntry {
 }
 
 export const SupplierLedger: React.FC = () => {
+  const { user } = useAuthStore();
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [selectedSupplierId, setSelectedSupplierId] = useState<string>('');
   const [ledgerEntries, setLedgerEntries] = useState<LedgerEntry[]>([]);
@@ -49,8 +51,8 @@ export const SupplierLedger: React.FC = () => {
 
     setLoading(true);
     setError('');
-    // Use default Head Office storeId
-    const storeId = '00000000-0000-0000-0000-000000000000';
+    // Use user storeId with fallback to default Head Office storeId
+    const storeId = user?.storeId || '00000000-0000-0000-0000-000000000000';
     api.get(`/api/AccountsPayable/ledger?supplierId=${selectedSupplierId}&storeId=${storeId}`)
       .then(res => {
         setLedgerEntries(res.data || []);

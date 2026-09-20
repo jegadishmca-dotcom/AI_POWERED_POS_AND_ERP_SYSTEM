@@ -167,7 +167,7 @@ public class ARCommandsAndQueriesHandler :
                 {
                     debitAccountCode = await ResolveAccountCodeAsync("ASSET", "Current A/C", _configuration?["Finance:AccountDefaults:DigitalBank"] ?? "10200", cancellationToken);
                 }
-                string arAccountCode = await ResolveAccountCodeAsync("LIABILITY", "Wallet", _configuration?["Finance:AccountDefaults:WalletLiability"] ?? "20200", cancellationToken);
+                string arAccountCode = await ResolveAccountCodeAsync("ASSET", "Receivable", _configuration?["Finance:AccountDefaults:AccountsReceivable"] ?? "10400", cancellationToken);
 
                 var lines = new List<JournalLineDto>
                 {
@@ -215,9 +215,6 @@ public class ARCommandsAndQueriesHandler :
                     CreatedAt = DateTime.UtcNow
                 };
                 _context.CustomerLedger.Add(ledgerEntry);
-
-                // Update customer wallet balance and record ledger entry via WalletService
-                await _walletService.RecordTransactionAsync(customer.Id, request.StoreId, "TOPUP", request.Amount, recNumber, request.UserId, cancellationToken);
 
                 await _context.SaveChangesAsync(cancellationToken);
 

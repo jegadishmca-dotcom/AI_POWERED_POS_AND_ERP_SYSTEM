@@ -95,7 +95,7 @@ export const BalanceSheet: React.FC = () => {
           {/* Left Column: Assets */}
           <div className="bg-white dark:bg-slate-900 rounded-xl shadow-sm border border-slate-200 dark:border-slate-800 p-6">
             <h2 className="text-xl font-extrabold text-indigo-900 dark:text-indigo-400 mb-6 border-b-2 border-indigo-100 dark:border-indigo-900/50 pb-3 uppercase tracking-widest">Assets</h2>
-            {renderSection('Current Assets', data.assetAccounts?.filter((a: any) => a.accountCode.startsWith('10') || a.accountCode.startsWith('11')), data.totalAssets)}
+            {renderSection('Assets', data.assetAccounts, data.totalAssets)}
             {/* If more granular classification exists, map it here. For now, showing all assets under total */}
             {data.assetAccounts && data.assetAccounts.length > 0 && (
               <div className="mt-8 pt-4 border-t-4 border-slate-200 dark:border-slate-700 flex justify-between items-center">

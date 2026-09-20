@@ -34,4 +34,12 @@
   2. Frontend UI:
      - Add "Void Payment" button with manager authorization dialog in `SupplierBills.tsx` / `SupplierLedger.tsx`.
 
+---
+
+## 4. [STYLE-FIN-003] [PRIORITY: LOW / COSMETIC] Harmonize PO and GRN Numbering with DocumentSequences
+- **Issue**: Purchase Orders ([CreatePurchaseOrderCommand.cs:42](file:///d:/JEGADISH/APPLE_SUPERMARKET_POS_PROJECT/AI_POWERED_POS_AND_ERP_SYSTEM/src/Backend/PosErp.Application/Features/Purchasing/Commands/CreatePurchaseOrder/CreatePurchaseOrderCommand.cs#L42)) and Goods Receipt Notes ([CreateGRNCommand.cs:64](file:///d:/JEGADISH/APPLE_SUPERMARKET_POS_PROJECT/AI_POWERED_POS_AND_ERP_SYSTEM/src/Backend/PosErp.Application/Features/Purchasing/Commands/CreateGRN/CreateGRNCommand.cs#L64)) generate reference numbers using randomized GUID string suffixes (e.g. `PO-20260920-ABCD1234`, `GRN-20260920-EBD8`), whereas Finance transactions (`JOURNAL_ENTRY`, `SUPPLIER_PAYMENT`, `CUSTOMER_RECEIPT`, `SALES_RETURN`) use monotonically incrementing counters from `document_sequences`.
+- **Classification**: Architectural style inconsistency / cosmetic only; not a functional defect or numbering collision bug.
+- **Recommended Action**: Migrate PO and GRN number generation to `IDocumentSequenceService` in a future refactoring cycle.
+
+
 

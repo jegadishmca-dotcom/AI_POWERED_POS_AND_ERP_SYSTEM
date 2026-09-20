@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BookOpen, Download, Search, Calendar } from 'lucide-react';
 import { api } from '../../../utils/api';
 import { formatCurrency } from '../../../utils/formatters';
+import { useAuthStore } from '../../auth/store/auth.store';
 
 interface Customer {
   id: string;
@@ -37,6 +38,7 @@ interface LoyaltyLedgerItem {
 }
 
 export const CustomerLedger: React.FC = () => {
+  const { user } = useAuthStore();
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState<string>('');
@@ -77,7 +79,7 @@ export const CustomerLedger: React.FC = () => {
 
     setLoading(true);
     setError('');
-    const storeId = '00000000-0000-0000-0000-000000000000';
+    const storeId = user?.storeId || '00000000-0000-0000-0000-000000000000';
 
     Promise.all([
       api.get(`/api/AccountsReceivable/ledger?customerId=${selectedCustomerId}&storeId=${storeId}`),

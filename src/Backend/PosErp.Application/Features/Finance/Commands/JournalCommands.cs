@@ -229,6 +229,19 @@ public class JournalCommandsHandler :
                 if (original == null) throw new InvalidOperationException("Original journal entry not found.");
                 if (original.Status != "POSTED") throw new InvalidOperationException("Only posted journals can be reversed.");
 
+                if (original.SourceDocumentType == "REVERSAL")
+                {
+                    throw new InvalidOperationException("Cannot reverse a reversal journal entry.");
+                }
+
+                bool alreadyReversed = await _context.JournalEntries
+                    .AnyAsync(e => e.SourceDocumentType == "REVERSAL" && e.SourceDocumentId == original.Id, cancellationToken);
+
+                if (alreadyReversed)
+                {
+                    throw new InvalidOperationException($"Journal entry {original.EntryNumber} has already been reversed.");
+                }
+
                 // Verify period lock for original entry date (reversals are posted at the current date or original entry date? 
                 // In retail ERPs, reversals are typically posted as of the current business date, which must be validated.)
                 DateTime currentDate = DateTime.UtcNow.Date;

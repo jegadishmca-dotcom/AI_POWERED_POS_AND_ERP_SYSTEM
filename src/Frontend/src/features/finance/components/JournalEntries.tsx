@@ -5,6 +5,7 @@ import { api } from '../../../utils/api';
 import { Modal } from '../../../components/common/Modal';
 import { FileText, Plus, Search, Trash2, AlertCircle } from 'lucide-react';
 import { formatCurrency } from '../../../utils/formatters';
+import { useAuthStore } from '../../auth/store/auth.store';
 
 interface JournalLineItem {
   accountCode: string;
@@ -14,6 +15,7 @@ interface JournalLineItem {
 }
 
 export const JournalEntries: React.FC = () => {
+  const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
@@ -72,7 +74,7 @@ export const JournalEntries: React.FC = () => {
     setIsSubmitting(true);
     try {
       await api.post('/api/journalentries', {
-        storeId: '00000000-0000-0000-0000-000000000000',
+        storeId: user?.storeId || '00000000-0000-0000-0000-000000000000',
         entryDate: new Date(entryDate).toISOString(),
         description: description.trim() || 'Manual Journal Entry',
         referenceDocument: referenceDocument.trim() || undefined,

@@ -21,8 +21,10 @@ import {
   Loader2
 } from 'lucide-react';
 import { formatCurrency } from '../../../utils/formatters';
+import { useAuthStore } from '../../auth/store/auth.store';
 
 export const CustomerReceipts: React.FC = () => {
+  const { user } = useAuthStore();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<keyof CustomerReceipt>('receiptDate');
@@ -112,7 +114,7 @@ export const CustomerReceipts: React.FC = () => {
     setIsSubmitting(true);
     try {
       await api.post('/api/AccountsReceivable/receipts', {
-        storeId: '00000000-0000-0000-0000-000000000000',
+        storeId: user?.storeId || '00000000-0000-0000-0000-000000000000',
         customerId: selectedCustomer.id,
         customerName: selectedCustomer.name,
         amount: Number(amount),

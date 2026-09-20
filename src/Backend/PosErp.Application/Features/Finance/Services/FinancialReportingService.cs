@@ -428,7 +428,7 @@ public class FinancialReportingService : IFinancialReportingService
             {
                 decimal net = bal.CreditBalance - bal.DebitBalance;
                 if (net >= 0) { bal.CreditBalance = net; bal.DebitBalance = 0; }
-                else { bal.DebitBalance = 0; bal.CreditBalance = -net; }
+                else { bal.DebitBalance = -net; bal.CreditBalance = 0; }
             }
         }
 

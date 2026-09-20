@@ -12,7 +12,7 @@ namespace PosErp.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "Owner,Manager,Developer,Admin")]
+[Authorize(Roles = "Owner,Manager,Developer")]
 public class JournalEntriesController : ControllerBase
 {
     private readonly IMediator _mediator;

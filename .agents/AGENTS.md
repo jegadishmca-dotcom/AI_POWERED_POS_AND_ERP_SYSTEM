@@ -6,11 +6,12 @@ The current Git working branch is 'release/v1.0-rc1'. ALWAYS use this branch nam
 ## Ubuntu Production Server — Docker Deployment
 
 The production server for this ERP system (Apple Supermarket POS) runs on an **Ubuntu server using Docker**.
+The project directory on the server is `/home/jegadish/AI_POWERED_POS_AND_ERP_SYSTEM`.
 When providing deployment, update, or restart instructions for the production server, ALWAYS use this exact sequence:
 
 ```bash
 # 1. Pull the latest code
-cd /opt/apple-pos   # or the actual project directory on the server
+cd /home/jegadish/AI_POWERED_POS_AND_ERP_SYSTEM
 git pull origin release/v1.0-rc1
 
 # 2. Rebuild and restart all containers
@@ -24,7 +25,10 @@ SQL migrations run automatically on backend container startup via the migration 
 
 ## Mandatory Pre-Deployment Backup & Scratch Restore-Verification Protocol
 
-Before performing any production release, deployment, or database migration, an automated backup and test restore MUST be executed to guarantee disaster recoverability.
+Before performing ANY production release, deployment, container rebuild, or database migration, an automated backup and test restore MUST be executed to guarantee disaster recoverability.
+
+**HARD RULE — NO EXCEPTIONS FOR HOTFIXES OR QUICK PATCHES**:
+Every production deployment or container restart — including same-session hotfixes, single-file bug patches, or adjustments discovered during verification — MUST execute the complete 3-step backup and scratch-restore-verification protocol BEFORE `docker compose up` or container rebuild is invoked. There are ZERO exceptions for "quick patches" or "we just backed up 10 minutes ago."
 
 **CRITICAL RULE**: NEVER run `docker exec -t` (with TTY) when capturing binary `pg_dump` streams, as the pseudo-TTY driver converts `0x0A` (LF) to `0x0D 0x0A` (CRLF), silently corrupting binary dumps. ALWAYS dump directly to a file inside the container using `-f` or non-interactive redirection (`docker exec -i` without `-t`).
 

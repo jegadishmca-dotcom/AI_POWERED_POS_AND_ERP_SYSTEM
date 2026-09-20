@@ -277,6 +277,14 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             }
             string generatedInvoiceNumber = isTest ? request.InvoiceNumber : $"INV-{terminal.TerminalCode}-{today:yyyyMMdd}-{nextSeq:D4}";
 
+            var cashierStoreId = await _context.Users
+                .Where(u => u.Id == request.CashierId)
+                .Select(u => u.StoreId)
+                .FirstOrDefaultAsync(cancellationToken);
+            var storeId = (cashierStoreId.HasValue && cashierStoreId.Value != Guid.Empty)
+                ? cashierStoreId.Value
+                : Guid.Parse("00000000-0000-0000-0000-000000000000");
+
             var invoiceId = Guid.NewGuid();
             var invoice = new Invoice
             {
@@ -287,7 +295,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
                 TerminalSequence = nextSeq,
                 CustomerId = customer?.Id,
                 BusinessDate = today,
-                StoreId = Guid.Empty,
+                StoreId = storeId,
                 IsTest = isTest,
                 // SubTotal = sum of post-discount line totals (what's printed in the item section)
                 SubTotal = cartEvaluation.Items.Sum(i => i.FinalLineTotal),
@@ -363,7 +371,6 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
 
             _context.Invoices.Add(invoice);
             
-            Guid storeId = Guid.Empty;
             // Record Offer Usage Logs
             if (cartEvaluation.AppliedOfferIds.Any())
             {
@@ -714,7 +721,7 @@ public class CreateInvoiceCommandHandler : IRequestHandler<CreateInvoiceCommand,
             if (journalLines.Count > 0)
             {
                 jeId = await _financialPostingService.PostJournalEntryAsync(
-                    null, DateTime.UtcNow, $"POS Invoice {invoice.InvoiceNumber}", $"INV-{invoice.Id}", journalLines, cancellationToken);
+                    invoice.StoreId, DateTime.UtcNow, $"POS Invoice {invoice.InvoiceNumber}", $"INV-{invoice.Id}", journalLines, cancellationToken);
             }
 
             if (creditSaleAmount > 0 && customer != null && jeId != Guid.Empty)

@@ -60,6 +60,8 @@ public class ConfirmGRNCommandHandler : IRequestHandler<ConfirmGRNCommand, bool>
                     
                 if (po == null) throw new Exception("Purchase Order not found");
 
+                grn.StoreId ??= po.StoreId ?? Guid.Parse("00000000-0000-0000-0000-000000000000");
+
                 foreach (var item in grn.Items)
                 {
                     if (item.AcceptedQuantity <= 0) continue;

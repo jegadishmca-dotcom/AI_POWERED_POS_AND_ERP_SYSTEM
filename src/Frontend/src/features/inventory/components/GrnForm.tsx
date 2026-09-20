@@ -140,6 +140,7 @@ export const GrnForm = () => {
     try {
       // 1. Create GRN
       const grnPayload = {
+        storeId: selectedPo.storeId || '00000000-0000-0000-0000-000000000000',
         purchaseOrderHeaderId: selectedPo.id,
         supplierId: selectedPo.supplierId,
         supplierInvoiceNumber: invoiceNumber,

@@ -133,13 +133,21 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                         return;
                     }
 
+                    var cashierStoreId = await _context.Users
+                        .Where(u => u.Id == dto.CashierId)
+                        .Select(u => u.StoreId)
+                        .FirstOrDefaultAsync(cancellationToken);
+                    var resolvedStoreId = (cashierStoreId.HasValue && cashierStoreId.Value != Guid.Empty)
+                        ? cashierStoreId.Value
+                        : Guid.Parse("00000000-0000-0000-0000-000000000000");
+
                     // ... Invoice mapping same as before ...
                     var invoice = new Invoice {
                         Id = dto.Id, BusinessDate = dto.BusinessDate, InvoiceNumber = dto.InvoiceNumber,
                         TerminalId = dto.TerminalId, TerminalSequence = dto.TerminalSequence, CashierId = dto.CashierId,
                         SubTotal = dto.SubTotal, DiscountAmount = dto.DiscountAmount, TaxAmount = dto.TaxAmount,
                         TotalAmount = dto.TotalAmount, RoundOff = dto.RoundOff, NetPayable = dto.NetPayable,
-                        PaymentMode = dto.PaymentMode, Status = "COMPLETED", StoreId = Guid.Empty,
+                        PaymentMode = dto.PaymentMode, Status = "COMPLETED", StoreId = resolvedStoreId,
                         CustomerId = dto.CustomerId,
                         CashAmount = dto.CashAmount,
                         UpiAmount = dto.UpiAmount,
@@ -248,7 +256,7 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                         decimal unitCost = productsInfo.TryGetValue(itemDto.ProductId, out var prod) ? prod.PurchasePrice : 0m;
                         
                         await _stockLedgerService.RecordMovementAsync(
-                            storeId: Guid.Empty,
+                            storeId: resolvedStoreId,
                             warehouseId: null,
                             terminalId: dto.TerminalId,
                             businessDate: dto.BusinessDate.Date,
@@ -340,7 +348,7 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                             var walletLedger = new WalletLedgerEntry
                             {
                                 CustomerId = customerId,
-                                StoreId = Guid.Empty,
+                                StoreId = invoice.StoreId,
                                 TransactionType = "SPEND",
                                 Amount = -dto.WalletAmountUsed,
                                 ReferenceDocument = finalInvoiceRef,
@@ -535,10 +543,10 @@ public class SyncInvoicesCommandHandler : IRequestHandler<SyncInvoicesCommand, S
                     if (totalSgst > 0) journalLines.Add(new PosErp.Application.Features.Finance.Services.JournalLineDto { AccountCode = outputSgstAccountCode, Description = "Output SGST", Debit = 0, Credit = totalSgst });
 
                     await _financialPostingService.PostJournalEntryAsync(
-                        null, dto.BusinessDate.Date, $"Offline POS Invoice {dto.InvoiceNumber}", $"INV-{dto.Id}", journalLines, cancellationToken);
+                        invoice.StoreId, dto.BusinessDate.Date, $"Offline POS Invoice {dto.InvoiceNumber}", $"INV-{dto.Id}", journalLines, cancellationToken);
 
                     await _financialPostingService.RecordGstTransactionAsync(
-                        null, "SALE", dto.InvoiceNumber, dto.BusinessDate.Date, taxableValue, totalCgst, totalSgst, totalCess, null, cancellationToken);
+                        invoice.StoreId, "SALE", dto.InvoiceNumber, dto.BusinessDate.Date, taxableValue, totalCgst, totalSgst, totalCess, null, cancellationToken);
 
                     await _context.SaveChangesAsync(cancellationToken);
                     await transaction.CommitAsync(cancellationToken);

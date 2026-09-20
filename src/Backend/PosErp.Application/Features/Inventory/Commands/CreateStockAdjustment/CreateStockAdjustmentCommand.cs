@@ -35,7 +35,7 @@ public class CreateStockAdjustmentCommandHandler : IRequestHandler<CreateStockAd
     {
         var adjustment = new StockAdjustment
         {
-            StoreId = request.StoreId,
+            StoreId = request.StoreId ?? Guid.Parse("00000000-0000-0000-0000-000000000000"),
             AdjustmentNumber = $"ADJ-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0,4).ToUpper()}",
             Reason = request.Reason,
             Status = "PENDING"

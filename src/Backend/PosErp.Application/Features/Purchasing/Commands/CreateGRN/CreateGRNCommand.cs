@@ -14,7 +14,8 @@ public record CreateGRNCommand(
     string SupplierInvoiceNumber,
     DateTime ReceivedDate,
     List<CreateGRNItemDto> Items,
-    Guid? UserId
+    Guid? UserId,
+    Guid? StoreId = null
 ) : IRequest<Guid>;
 
 public record CreateGRNItemDto(
@@ -52,8 +53,12 @@ public class CreateGRNCommandHandler : IRequestHandler<CreateGRNCommand, Guid>
         if (!hasAccepted)
             throw new Exception("Cannot create a GRN with zero accepted quantities. Please enter accepted quantity for at least one item.");
 
+        var po = await _context.PurchaseOrders.FindAsync(new object[] { request.PurchaseOrderHeaderId }, cancellationToken);
+        var resolvedStoreId = request.StoreId ?? po?.StoreId ?? Guid.Parse("00000000-0000-0000-0000-000000000000");
+
         var grn = new GRNHeader
         {
+            StoreId = resolvedStoreId,
             PurchaseOrderHeaderId = request.PurchaseOrderHeaderId,
             SupplierId = request.SupplierId,
             GrnNumber = $"GRN-{DateTime.UtcNow:yyyyMMdd}-{Guid.NewGuid().ToString().Substring(0, 4).ToUpper()}",

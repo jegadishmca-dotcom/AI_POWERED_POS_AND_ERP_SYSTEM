@@ -79,7 +79,9 @@ public class ClosePosSessionCommandHandler : IRequestHandler<ClosePosSessionComm
                 await EnsureAccountExistsAsync("4200", "Cash Drawer Overage (Other Income)", "REVENUE", cancellationToken);
                 await EnsureAccountExistsAsync("5200", "Cash Drawer Shortage (Expense)", "EXPENSE", cancellationToken);
 
-                await _financialPostingService.PostJournalEntryAsync(null, endTime.Date, $"Cash Discrepancy Session {session.Id}", $"SES-{session.Id}", journalLines, cancellationToken);
+                var resolvedStoreId = session.StoreId ?? Guid.Parse("00000000-0000-0000-0000-000000000000");
+
+                await _financialPostingService.PostJournalEntryAsync(resolvedStoreId, endTime.Date, $"Cash Discrepancy Session {session.Id}", $"SES-{session.Id}", journalLines, cancellationToken);
             }
 
             // Commit all changes (session status + accounts + journal) atomically

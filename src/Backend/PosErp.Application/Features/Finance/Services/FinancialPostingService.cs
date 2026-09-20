@@ -8,6 +8,8 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
+using Microsoft.Extensions.Logging;
+
 namespace PosErp.Application.Features.Finance.Services;
 
 public interface IFinancialPostingService
@@ -54,17 +56,20 @@ public class FinancialPostingService : IFinancialPostingService
     private readonly IPeriodLockService _periodLockService;
     private readonly IDocumentSequenceService _sequenceService;
     private readonly IApprovalWorkflowService _approvalService;
+    private readonly ILogger<FinancialPostingService>? _logger;
 
     public FinancialPostingService(
         IApplicationDbContext context,
         IPeriodLockService periodLockService,
         IDocumentSequenceService sequenceService,
-        IApprovalWorkflowService approvalService)
+        IApprovalWorkflowService approvalService,
+        ILogger<FinancialPostingService>? logger = null)
     {
         _context = context;
         _periodLockService = periodLockService;
         _sequenceService = sequenceService;
         _approvalService = approvalService;
+        _logger = logger;
     }
 
     public async Task<Guid> PostJournalEntryAsync(
@@ -94,7 +99,11 @@ public class FinancialPostingService : IFinancialPostingService
         string? sourceDocType = null,
         Guid? sourceDocId = null)
     {
-        Guid activeStoreId = storeId ?? Guid.Parse("00000000-0000-0000-0000-000000000000");
+        if (!storeId.HasValue || storeId.Value == Guid.Empty)
+        {
+            _logger?.LogWarning("Financial posting invoked without explicit StoreId for refDoc {RefDoc}. Defaulting to Head Office store.", refDoc);
+        }
+        Guid activeStoreId = (storeId.HasValue && storeId.Value != Guid.Empty) ? storeId.Value : Guid.Parse("00000000-0000-0000-0000-000000000000");
 
         // 1. Active Store Validation
         var store = await _context.Stores.FirstOrDefaultAsync(s => s.Id == activeStoreId, cancellationToken);

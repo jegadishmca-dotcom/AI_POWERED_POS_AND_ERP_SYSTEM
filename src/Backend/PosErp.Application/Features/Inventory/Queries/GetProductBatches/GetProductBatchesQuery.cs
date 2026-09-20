@@ -70,38 +70,13 @@ public class GetProductBatchesQueryHandler : IRequestHandler<GetProductBatchesQu
             }
         }
 
-        // 2. ALSO check all registered Barcodes for this product so every barcode variant acts as a batch selection
-        if (product.Barcodes != null)
+        // 2. Only include an "UNBATCHED (General Stock)" option if there is actual unbatched stock (> 0) OR if no batches exist at all
+        var unbatchedStock = await _context.StockLedger
+            .Where(sl => sl.ProductId == request.ProductId && (sl.BatchId == null || sl.BatchId == Guid.Empty))
+            .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
+
+        if (resultDict.Count == 0 || unbatchedStock > 0)
         {
-            foreach (var bc in product.Barcodes)
-            {
-                if (!string.IsNullOrWhiteSpace(bc.BarcodeValue) && !resultDict.ContainsKey(bc.BarcodeValue.Trim()))
-                {
-                    var currentStock = await _context.StockLedger
-                        .Where(sl => sl.ProductId == request.ProductId)
-                        .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
-
-                    resultDict[bc.BarcodeValue.Trim()] = new ProductBatchDto
-                    {
-                        Id = Guid.Empty, // Set Guid.Empty so barcode fallbacks don't pass ProductBarcode.Id as ProductBatch.Id
-                        BatchNumber = bc.BarcodeValue.Trim(),
-                        ExpiryDate = null,
-                        CurrentStock = currentStock,
-                        Mrp = product.Mrp,
-                        SellingPrice = product.SellingPrice,
-                        CostPrice = product.PurchasePrice
-                    };
-                }
-            }
-        }
-
-        // 3. ALWAYS include a "General / Unbatched Stock" option representing total product stock across unbatched transactions (SEED-001, etc.)
-        if (!resultDict.ContainsKey("UNBATCHED"))
-        {
-            var unbatchedStock = await _context.StockLedger
-                .Where(sl => sl.ProductId == request.ProductId && (sl.BatchId == null || sl.BatchId == Guid.Empty))
-                .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
-
             var totalStock = await _context.StockLedger
                 .Where(sl => sl.ProductId == request.ProductId)
                 .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;

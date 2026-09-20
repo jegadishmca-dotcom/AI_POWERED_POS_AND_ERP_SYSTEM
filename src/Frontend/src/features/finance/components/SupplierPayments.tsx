@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getSupplierPayments, SupplierPayment } from '../services/finance.service';
 import { exportToCsv } from '../../../utils/exportToCsv';
 import { Modal } from '../../../components/common/Modal';
 import { api } from '../../../utils/api';
+import { useAuthStore } from '../../auth/store/auth.store';
 import { 
   Banknote, 
   Search, 
@@ -21,6 +22,7 @@ import { formatCurrency } from '../../../utils/formatters';
 
 export const SupplierPayments: React.FC = () => {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<keyof SupplierPayment>('paymentDate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -29,13 +31,60 @@ export const SupplierPayments: React.FC = () => {
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [supplierNameInput, setSupplierNameInput] = useState('');
+  const [selectedSupplierId, setSelectedSupplierId] = useState('');
   const [amount, setAmount] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentMode, setPaymentMode] = useState('BANK_TRANSFER');
   const [referenceNumber, setReferenceNumber] = useState('');
+  const [notes, setNotes] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Suppliers & Bills for Dropdown & Auto-fill
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [pendingBills, setPendingBills] = useState<any[]>([]);
+  const [loadingBills, setLoadingBills] = useState(false);
+  const [totalOutstanding, setTotalOutstanding] = useState(0);
+
+  // Fetch active suppliers when modal opens
+  useEffect(() => {
+    if (isModalOpen && suppliers.length === 0) {
+      api.get('/api/suppliers')
+        .then(res => {
+          const active = (res.data || []).filter((s: any) => s.isActive !== false);
+          setSuppliers(active);
+        })
+        .catch(err => console.error('Failed to load suppliers', err));
+    }
+  }, [isModalOpen]);
+
+  // When supplier is selected, fetch unpaid bills and auto-calculate outstanding
+  const handleSupplierChange = async (suppId: string) => {
+    setSelectedSupplierId(suppId);
+    setErrorMessage(null);
+    if (!suppId) {
+      setPendingBills([]);
+      setTotalOutstanding(0);
+      setAmount('');
+      return;
+    }
+
+    setLoadingBills(true);
+    try {
+      const res = await api.get(`/api/accountspayable/bills?supplierId=${suppId}`);
+      const bills = (res.data || []).filter((b: any) => b.status === 'PENDING_PAYMENT' || b.status === 'PARTIALLY_PAID');
+      setPendingBills(bills);
+      const outstanding = bills.reduce((sum: number, b: any) => sum + (Number(b.totalAmount || 0) - Number(b.paidAmount || 0)), 0);
+      setTotalOutstanding(outstanding);
+      setAmount(outstanding > 0 ? outstanding.toFixed(2) : '0.00');
+    } catch (err: any) {
+      console.error('Failed to fetch bills for supplier', err);
+      setPendingBills([]);
+      setTotalOutstanding(0);
+    } finally {
+      setLoadingBills(false);
+    }
+  };
 
   const { data: payments = [], isLoading, error } = useQuery({
     queryKey: ['supplierPayments'],
@@ -65,25 +114,40 @@ export const SupplierPayments: React.FC = () => {
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
-    if (!supplierNameInput.trim() || !amount || Number(amount) <= 0) {
-      setErrorMessage('Please provide a valid supplier name and positive amount.');
+    if (!selectedSupplierId) {
+      setErrorMessage('Please select a supplier from the dropdown.');
+      return;
+    }
+    const paymentAmount = Number(amount);
+    if (!paymentAmount || paymentAmount <= 0) {
+      setErrorMessage('Please provide a positive payment amount.');
+      return;
+    }
+    if (totalOutstanding > 0 && paymentAmount > totalOutstanding) {
+      setErrorMessage(`Payment amount (${formatCurrency(paymentAmount)}) cannot exceed total outstanding balance of ${formatCurrency(totalOutstanding)}.`);
       return;
     }
 
     setIsSubmitting(true);
     try {
       await api.post('/api/AccountsPayable/payments', {
-        supplierName: supplierNameInput.trim(),
-        amount: Number(amount),
+        storeId: user?.storeId || '00000000-0000-0000-0000-000000000000',
+        supplierId: selectedSupplierId,
+        amount: paymentAmount,
         paymentDate,
         paymentMode,
-        referenceNumber: referenceNumber.trim() || undefined
+        referenceNumber: referenceNumber.trim() || undefined,
+        notes: notes.trim() || undefined,
+        allocationMode: 'AUTO_FIFO'
       });
       queryClient.invalidateQueries({ queryKey: ['supplierPayments'] });
       setIsModalOpen(false);
-      setSupplierNameInput('');
+      setSelectedSupplierId('');
       setAmount('');
       setReferenceNumber('');
+      setNotes('');
+      setPendingBills([]);
+      setTotalOutstanding(0);
     } catch (err: any) {
       setErrorMessage(err.response?.data?.message || err.message || 'Failed to record supplier payment.');
     } finally {
@@ -167,45 +231,165 @@ export const SupplierPayments: React.FC = () => {
       {/* Record Payment Modal */}
       <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} title="Record Supplier Payment">
         <form onSubmit={handleRecordPayment} className="space-y-4">
-          {errorMessage && <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-bold flex items-center gap-2"><AlertCircle className="w-4 h-4" />{errorMessage}</div>}
+          {errorMessage && (
+            <div className="p-3 bg-red-50 text-red-600 rounded-lg text-sm font-bold flex items-center gap-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
           <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Supplier Name</label>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Select Supplier</label>
             <div className="relative">
-              <Building2 className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-              <input type="text" value={supplierNameInput} onChange={(e) => setSupplierNameInput(e.target.value)} required className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Enter supplier name" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Payment Date</label>
-              <input type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Payment Mode</label>
-              <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)} className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white">
-                <option value="BANK_TRANSFER">BANK TRANSFER</option>
-                <option value="UPI">UPI</option>
-                <option value="CASH">CASH</option>
-                <option value="CHEQUE">CHEQUE</option>
+              <Building2 className="absolute left-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+              <select
+                value={selectedSupplierId}
+                onChange={(e) => handleSupplierChange(e.target.value)}
+                required
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white text-sm"
+              >
+                <option value="">-- Choose Supplier --</option>
+                {suppliers.map(s => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} {s.code ? `(${s.code})` : ''}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Amount (₹)</label>
-            <input type="number" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} required className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="0.00" />
+
+          {selectedSupplierId && (
+            <div className="bg-slate-50 dark:bg-slate-800/60 p-3 rounded-lg border border-slate-200 dark:border-slate-700 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500">Unpaid Bills</span>
+                {loadingBills ? (
+                  <span className="text-xs text-slate-400">Loading bills...</span>
+                ) : (
+                  <span className="text-xs font-bold text-rose-600 bg-rose-50 dark:bg-rose-950/40 px-2 py-0.5 rounded-full border border-rose-200 dark:border-rose-900">
+                    Total Due: {formatCurrency(totalOutstanding)}
+                  </span>
+                )}
+              </div>
+
+              {pendingBills.length > 0 ? (
+                <div className="max-h-36 overflow-y-auto divide-y divide-slate-200 dark:divide-slate-700 text-xs">
+                  {pendingBills.map(b => {
+                    const balance = Number(b.totalAmount || 0) - Number(b.paidAmount || 0);
+                    return (
+                      <div key={b.id} className="py-1.5 flex justify-between items-center text-slate-700 dark:text-slate-300">
+                        <div>
+                          <span className="font-bold text-indigo-600">{b.billNumber}</span>
+                          <span className="text-slate-400 ml-2">({new Date(b.billDate).toLocaleDateString()})</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-rose-600">{formatCurrency(balance)}</span>
+                          <button
+                            type="button"
+                            onClick={() => setAmount(balance.toFixed(2))}
+                            className="px-2 py-0.5 text-[10px] font-bold bg-indigo-50 text-indigo-600 hover:bg-indigo-100 rounded border border-indigo-200 cursor-pointer"
+                            title="Auto-fill this bill amount"
+                          >
+                            Pay Bill
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : !loadingBills && (
+                <p className="text-xs text-slate-400 italic">No pending bills for this supplier. Amount entered will be recorded as advance credit.</p>
+              )}
+            </div>
+          )}
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Payment Date</label>
+              <input
+                type="date"
+                value={paymentDate}
+                onChange={(e) => setPaymentDate(e.target.value)}
+                required
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Payment Mode</label>
+              <select
+                value={paymentMode}
+                onChange={(e) => setPaymentMode(e.target.value)}
+                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+              >
+                <option value="BANK_TRANSFER">BANK TRANSFER (Cr Bank 10200)</option>
+                <option value="CASH">CASH (Cr Cash 10100)</option>
+                <option value="UPI">UPI (Cr Bank 10200)</option>
+                <option value="CHEQUE">CHEQUE (Cr Bank 10200)</option>
+              </select>
+            </div>
           </div>
+
+          <div>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-xs font-bold text-slate-500 uppercase">Amount (₹)</label>
+              {totalOutstanding > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setAmount(totalOutstanding.toFixed(2))}
+                  className="text-xs text-indigo-600 dark:text-indigo-400 font-bold hover:underline cursor-pointer"
+                >
+                  Pay Full ({formatCurrency(totalOutstanding)})
+                </button>
+              )}
+            </div>
+            <input
+              type="number"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              required
+              className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white font-bold text-base"
+              placeholder="0.00"
+            />
+          </div>
+
           <div>
             <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Reference Number</label>
             <div className="relative">
-              <FileText className="absolute left-3 top-3 w-4 h-4 text-slate-400" />
-              <input type="text" value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white" placeholder="Transaction Ref / Cheque No" />
+              <FileText className="absolute left-3 top-3 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                value={referenceNumber}
+                onChange={(e) => setReferenceNumber(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white"
+                placeholder="Transaction Ref / UTR / Cheque No"
+              />
             </div>
           </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-500 uppercase mb-1">Notes / Remarks</label>
+            <input
+              type="text"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-lg outline-none focus:ring-2 focus:ring-rose-500 dark:bg-slate-800 dark:border-slate-700 dark:text-white text-sm"
+              placeholder="Optional payment notes"
+            />
+          </div>
+
           <div className="pt-4 flex justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
-            <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2 text-sm font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition cursor-pointer"
+            >
               Cancel
             </button>
-            <button type="submit" disabled={isSubmitting} className="px-5 py-2 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg shadow-md shadow-rose-600/30 transition flex items-center gap-2 cursor-pointer">
+            <button
+              type="submit"
+              disabled={isSubmitting || !selectedSupplierId}
+              className="px-5 py-2 text-sm font-bold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-50 rounded-lg shadow-md shadow-rose-600/30 transition flex items-center gap-2 cursor-pointer"
+            >
               {isSubmitting ? 'Saving...' : 'Save Payment'}
             </button>
           </div>

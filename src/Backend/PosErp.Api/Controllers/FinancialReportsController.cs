@@ -18,11 +18,16 @@ public class FinancialReportsController : ControllerBase
 {
     private readonly IFinancialReportingService _reportingService;
     private readonly IApplicationDbContext _context;
+    private readonly Microsoft.Extensions.Logging.ILogger<FinancialReportsController> _logger;
 
-    public FinancialReportsController(IFinancialReportingService reportingService, IApplicationDbContext context)
+    public FinancialReportsController(
+        IFinancialReportingService reportingService, 
+        IApplicationDbContext context,
+        Microsoft.Extensions.Logging.ILogger<FinancialReportsController> logger)
     {
         _reportingService = reportingService;
         _context = context;
+        _logger = logger;
     }
 
     private async Task<string> GetStoreCodeAsync(Guid? storeId)
@@ -55,19 +60,29 @@ public class FinancialReportsController : ControllerBase
     [HttpGet("trial-balance")]
     public async Task<IActionResult> GetTrialBalance([FromQuery] Guid? storeId, [FromQuery] DateTime? asOfDate, [FromQuery] string format = "json")
     {
-        var targetDate = asOfDate ?? DateTime.Today;
-        var data = await _reportingService.GetTrialBalanceAsync(storeId, targetDate, HttpContext.RequestAborted);
-
-        if (format.Equals("json", StringComparison.OrdinalIgnoreCase))
+        try
         {
-            return Ok(data);
+            var targetDate = asOfDate ?? DateTime.Today;
+            var data = await _reportingService.GetTrialBalanceAsync(storeId, targetDate, HttpContext.RequestAborted);
+
+            if (format.Equals("json", StringComparison.OrdinalIgnoreCase))
+            {
+                var totalDebits = data.Sum(x => x.DebitBalance);
+                var totalCredits = data.Sum(x => x.CreditBalance);
+                return Ok(new { lines = data, totalDebits, totalCredits });
+            }
+
+            var storeCode = await GetStoreCodeAsync(storeId);
+            var dateStr = targetDate.ToString("yyyyMMdd");
+            var fileName = $"TrialBalance_{storeCode}_{dateStr}";
+
+            return ExportData(data, "Trial Balance", storeCode, dateStr, format, fileName);
         }
-
-        var storeCode = await GetStoreCodeAsync(storeId);
-        var dateStr = targetDate.ToString("yyyyMMdd");
-        var fileName = $"TrialBalance_{storeCode}_{dateStr}";
-
-        return ExportData(data, "Trial Balance", storeCode, dateStr, format, fileName);
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error generating trial balance for store {StoreId} as of {AsOfDate}", storeId, asOfDate);
+            return StatusCode(500, new { message = "Error loading trial balance.", detail = ex.Message });
+        }
     }
 
     [HttpGet("profit-and-loss")]

@@ -37,6 +37,7 @@ public class ApproveStockAdjustmentCommandHandler : IRequestHandler<ApproveStock
 
                 adj.Status = "APPROVED";
                 adj.ApprovedBy = request.ApproverId;
+                adj.StoreId ??= Guid.Parse("00000000-0000-0000-0000-000000000000");
 
                 foreach(var item in adj.Items)
                 {

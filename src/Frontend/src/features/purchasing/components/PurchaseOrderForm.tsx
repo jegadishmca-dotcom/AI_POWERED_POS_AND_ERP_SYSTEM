@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Save, Search, Trash2, ArrowLeft } from 'lucide-react';
 import { Supplier } from './SupplierList';
 import { api } from '../../../utils/api';
+import { useAuthStore } from '../../auth/store/auth.store';
 
 interface PurchaseOrderFormProps {
   purchaseOrderId?: string | null;
@@ -27,6 +28,7 @@ interface ProductSearchResult {
 }
 
 export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOrderId, onClose, onSaved }) => {
+  const { user } = useAuthStore();
   const [items, setItems] = useState<POItem[]>([]);
   const [supplierId, setSupplierId] = useState('');
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
@@ -192,7 +194,7 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
       } else {
         // Create flow (POST)
         const payload = {
-          storeId: null,
+          storeId: user?.storeId || '00000000-0000-0000-0000-000000000000',
           supplierId: supplierId,
           expectedDeliveryDate: new Date(expectedDeliveryDate).toISOString(),
           items: items.map(item => ({
@@ -200,7 +202,7 @@ export const PurchaseOrderForm: React.FC<PurchaseOrderFormProps> = ({ purchaseOr
             orderedQuantity: item.orderedQty,
             unitCost: item.unitCost
           })),
-          userId: null
+          userId: user?.id || null
         };
         await api.post('/api/purchasing/purchase-orders', payload);
         alert("Purchase Order created successfully as DRAFT!");

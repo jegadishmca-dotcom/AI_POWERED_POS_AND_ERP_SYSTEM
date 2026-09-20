@@ -85,7 +85,7 @@ public class PurchaseBillHeader
     public Guid Id { get; set; } = Guid.NewGuid();
     public Guid? StoreId { get; set; }
     public Guid SupplierId { get; set; }
-    public Guid GRNHeaderId { get; set; }
+    public Guid? GRNHeaderId { get; set; }
     
     public string BillNumber { get; set; } = string.Empty;
     public DateTime BillDate { get; set; }

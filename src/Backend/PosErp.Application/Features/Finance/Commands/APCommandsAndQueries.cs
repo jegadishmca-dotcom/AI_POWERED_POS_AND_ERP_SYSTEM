@@ -72,7 +72,7 @@ public class PurchaseBillDto
     public Guid? StoreId { get; set; }
     public Guid SupplierId { get; set; }
     public string SupplierName { get; set; } = string.Empty;
-    public Guid GRNHeaderId { get; set; }
+    public Guid? GRNHeaderId { get; set; }
     public string BillNumber { get; set; } = string.Empty;
     public DateTime BillDate { get; set; }
     public decimal SubTotal { get; set; }

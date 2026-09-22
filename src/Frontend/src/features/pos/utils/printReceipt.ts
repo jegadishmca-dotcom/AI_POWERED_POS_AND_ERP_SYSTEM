@@ -283,28 +283,27 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Receipt - ${invoice.invoiceNumber || ''}</title>
+  <title></title>
   <style>
     @page {
       size: 80mm auto;
-      margin: 0 auto !important;
+      margin: 0;
     }
     @media print {
       html, body {
         width: 100% !important;
         margin: 0 !important;
         padding: 0 !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: flex-start !important;
         background: #fff !important;
         color: #000 !important;
         -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
       }
       .receipt-container {
         width: 72mm !important;
+        max-width: 72mm !important;
         margin: 0 auto !important;
-        padding: 2mm 1mm !important;
+        padding: 0 1mm !important;
       }
     }
     * {
@@ -316,18 +315,16 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
     }
     body {
       width: 100%;
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      margin: 0 auto;
+      margin: 0;
       padding: 0;
       background: #fff;
       -webkit-font-smoothing: antialiased;
     }
     .receipt-container {
       width: 72mm;
+      max-width: 72mm;
       margin: 0 auto;
-      padding: 2mm 1mm;
+      padding: 0 1mm;
       font-size: 11px;
       line-height: 1.25;
       background: #fff;
@@ -366,7 +363,7 @@ function triggerSystemPrint(invoice: any, terminalCode: string, langMode: string
   <div class="receipt-container">
 
   <!-- STORE HEADER -->
-  <div class="text-center font-black" style="font-size: 18px; line-height: 1.1; margin-top: 1px;">${STORE.nameTamil}</div>
+  <div class="text-center font-black" style="font-size: 18px; line-height: 1.1; margin-top: 0; padding-top: 0;">${STORE.nameTamil}</div>
   <div class="text-center font-black" style="font-size: 11px; letter-spacing: 0.5px; margin-top: 1px; margin-bottom: 2px;">${STORE.nameEn}</div>
   <div class="text-center" style="font-size: 10px; font-weight: 700; line-height: 1.3;">
     ${STORE.address} ${STORE.city}<br/>

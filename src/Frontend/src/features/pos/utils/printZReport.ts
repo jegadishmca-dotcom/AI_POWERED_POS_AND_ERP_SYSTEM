@@ -30,14 +30,16 @@ export function printZReport(report: any, openingCash: number, declaredCash: num
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Z-Report - ${terminalCode}</title>
+  <title></title>
   <style>
+    @page { size: 80mm auto; margin: 0; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: monospace; font-size: 11px; width: 80mm; color: #000; background: #fff; padding: 0 3mm; line-height: 1.2; }
-    @media print { body { width: 80mm; } }
+    html, body { margin: 0 !important; padding: 0 !important; width: 100% !important; background: #fff !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    body { font-family: monospace; font-size: 11px; width: 80mm; color: #000; padding: 0 3mm; line-height: 1.2; }
+    @media print { html, body { margin: 0 !important; padding: 0 !important; } body { width: 80mm !important; padding: 0 3mm !important; } }
     .center { text-align: center; }
     .bold { font-weight: bold; }
-    .title-ta { font-size: 14px; font-weight: bold; margin-top: 6px; }
+    .title-ta { font-size: 14px; font-weight: bold; margin-top: 0; padding-top: 0; }
     .title-en { font-size: 12px; font-weight: bold; }
   </style>
 </head>

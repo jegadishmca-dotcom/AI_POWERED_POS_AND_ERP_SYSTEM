@@ -10,7 +10,7 @@ using System.Threading.Tasks;
 
 namespace PosErp.Application.Features.Pos.Queries.CalculateCart;
 
-public record CalculateCartItemDto(Guid ProductId, decimal Quantity);
+public record CalculateCartItemDto(Guid ProductId, decimal Quantity, decimal? UnitPrice = null, Guid? BatchId = null);
 
 public record CalculateCartQuery(
     List<CalculateCartItemDto> Items,
@@ -42,7 +42,8 @@ public record CartItemCalculationResultDto(
     decimal SgstRate,
     decimal SgstAmount,
     decimal CessRate,
-    decimal CessAmount
+    decimal CessAmount,
+    Guid? BatchId = null
 );
 
 public class CalculateCartQueryHandler : IRequestHandler<CalculateCartQuery, CartCalculationResultDto>
@@ -79,7 +80,9 @@ public class CalculateCartQueryHandler : IRequestHandler<CalculateCartQuery, Car
                 ProductId = i.ProductId,
                 CategoryId = products.TryGetValue(i.ProductId, out var pInfo) ? pInfo.CategoryId : null,
                 Quantity = i.Quantity,
-                UnitPrice = products.TryGetValue(i.ProductId, out var pInfo2) ? pInfo2.SellingPrice : 0
+                UnitPrice = (i.UnitPrice.HasValue && i.UnitPrice.Value > 0)
+                    ? i.UnitPrice.Value 
+                    : (products.TryGetValue(i.ProductId, out var pInfo2) ? pInfo2.SellingPrice : 0)
             }).ToList()
         };
 
@@ -96,10 +99,17 @@ public class CalculateCartQueryHandler : IRequestHandler<CalculateCartQuery, Car
         decimal totalDiscountExTax = 0;
 
         // 3. Map results and calculate taxes based on post-discount prices
-        foreach (var item in cartEvaluation.Items)
+        for (int idx = 0; idx < cartEvaluation.Items.Count; idx++)
         {
+            var item = cartEvaluation.Items[idx];
+            var requestItem = idx < request.Items.Count ? request.Items[idx] : null;
+
             if (products.TryGetValue(item.ProductId, out var product))
             {
+                decimal effectiveUnitPrice = (requestItem?.UnitPrice.HasValue == true && requestItem.UnitPrice.Value > 0)
+                    ? requestItem.UnitPrice.Value
+                    : (item.UnitPrice > 0 ? item.UnitPrice : product.SellingPrice);
+
                 decimal cgstRate = product.TaxSlab?.CgstRate ?? 0;
                 decimal sgstRate = product.TaxSlab?.SgstRate ?? 0;
                 decimal cessRate = product.TaxSlab?.CessRate ?? 0;
@@ -128,7 +138,7 @@ public class CalculateCartQueryHandler : IRequestHandler<CalculateCartQuery, Car
                     ProductId: product.Id,
                     ProductName: product.Name,
                     Quantity: item.Quantity,
-                    UnitPrice: product.SellingPrice,
+                    UnitPrice: effectiveUnitPrice,
                     LineTotal: item.LineTotal,
                     DiscountAmount: item.DiscountAmount,
                     FinalLineTotal: item.FinalLineTotal,
@@ -138,7 +148,8 @@ public class CalculateCartQueryHandler : IRequestHandler<CalculateCartQuery, Car
                     SgstRate: sgstRate,
                     SgstAmount: sgstAmount,
                     CessRate: cessRate,
-                    CessAmount: cessAmount
+                    CessAmount: cessAmount,
+                    BatchId: requestItem?.BatchId
                 ));
             }
         }

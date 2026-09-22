@@ -626,7 +626,12 @@ export const PosTerminal = () => {
     // --- BACKGROUND SERVER CALCULATION FOR PROMOS ---
     try {
       const payload = {
-        items: items.map(i => ({ productId: i.productId, quantity: i.qty === '' ? 0 : Number(i.qty) })),
+        items: items.map(i => ({ 
+          productId: i.productId, 
+          quantity: i.qty === '' ? 0 : Number(i.qty),
+          unitPrice: i.unitPrice,
+          batchId: i.batchId
+        })),
         promoCode: promoCode,
         customerId: overrideCustomerId !== undefined ? (overrideCustomerId || undefined) : customer?.id,
         suppressOffers: suppressOffers
@@ -635,8 +640,11 @@ export const PosTerminal = () => {
       const data = await calculateCart(payload);
       
       setCart((prevCart: any) => {
-        const evaluatedItems = prevCart.items.map((origItem: any) => {
-          const calcItem = data.items.find((i: any) => i.productId === origItem.productId);
+        const evaluatedItems = prevCart.items.map((origItem: any, idx: number) => {
+          const calcItem = (idx < data.items.length && data.items[idx].productId === origItem.productId)
+            ? data.items[idx]
+            : data.items.find((i: any) => i.productId === origItem.productId && (origItem.batchId ? i.batchId === origItem.batchId : true));
+
           if (!calcItem) return origItem;
           return {
             ...origItem,
@@ -686,17 +694,27 @@ export const PosTerminal = () => {
     }
   }, [cart?.items?.length, selectedCartIndex]);
 
-  const updateItemBatch = (productId: string, batchId: string) => {
+  const updateItemBatch = (productId: string, batchId: string, itemCartId?: string) => {
     const updatedItems = cart.items.map((item: any) => {
-      if (item.productId === productId) {
-        return { ...item, batchId: batchId };
+      const isMatch = itemCartId ? item.id === itemCartId : item.productId === productId;
+      if (isMatch) {
+        const foundBatch = item.batches?.find((b: any) => b.id === batchId);
+        const newUnitPrice = foundBatch && foundBatch.sellingPrice ? foundBatch.sellingPrice : (foundBatch?.mrp || item.unitPrice);
+        const newMrp = foundBatch && foundBatch.mrp ? foundBatch.mrp : item.mrp;
+        const qtyNum = item.qty === '' ? 0 : Number(item.qty);
+        return { 
+          ...item, 
+          batchId: batchId,
+          batchNumber: foundBatch?.batchNumber || item.batchNumber,
+          unitPrice: newUnitPrice,
+          mrp: newMrp,
+          lineTotal: qtyNum * newUnitPrice,
+          finalLineTotal: qtyNum * newUnitPrice
+        };
       }
       return item;
     });
-    setCart((prev: any) => ({
-      ...prev,
-      items: updatedItems
-    }));
+    recalculateCart(updatedItems);
   };
 
   const [batchModalData, setBatchModalData] = useState<{ product: any; batches: any[]; overrideQty?: number } | null>(null);
@@ -719,13 +737,15 @@ export const PosTerminal = () => {
         e.stopPropagation();
         const chosenBatch = batchModalData.batches[selectedBatchIndex];
         if (chosenBatch) {
-          addProductToCart(batchModalData.product, batchModalData.overrideQty, chosenBatch);
+          addProductToCart(batchModalData.product, batchModalData.overrideQty, chosenBatch, batchModalData.batches);
           setBatchModalData(null);
+          setTimeout(() => productInputRef.current?.focus(), 50);
         }
       } else if (e.key === 'Escape') {
         e.preventDefault();
         e.stopPropagation();
         setBatchModalData(null);
+        setTimeout(() => productInputRef.current?.focus(), 50);
       }
     };
 
@@ -771,9 +791,9 @@ export const PosTerminal = () => {
     return () => window.removeEventListener('keydown', handleCartQtyShortcut);
   }, [cart.items, selectedCartIndex]);
 
-  const addProductToCart = async (product: any, overrideQty?: number, selectedBatch?: any) => {
+  const addProductToCart = async (product: any, overrideQty?: number, selectedBatch?: any, allBatches?: any[]) => {
     if (selectedBatch) {
-      addSingleProductToCartDirect(product, selectedBatch, overrideQty);
+      addSingleProductToCartDirect(product, selectedBatch, overrideQty, allBatches);
       return;
     }
 
@@ -784,39 +804,37 @@ export const PosTerminal = () => {
       console.warn('Failed to fetch batches', err);
     }
 
-    // Feature 1 (Price Change Module): Filter out price-change batches (AvailableQuantity = 0)
-    // from the POS batch selection popup. These batches exist purely to record a price-change
-    // event and have no physical stock. The product's current MRP/SellingPrice (already updated
-    // on the Product master record) is used for pricing — not the batch.
-    const stockBatches = fetchedBatches.filter((b: any) =>
-      b.availableQuantity !== undefined
-        ? b.availableQuantity > 0
-        : b.currentStock !== undefined
-          ? b.currentStock > 0
-          : true // if qty field name unknown, include (safe fallback)
+    // Filter out synthetic/system unbatched labels when real batches exist
+    const realBatches = fetchedBatches.filter(
+      (b: any) => b.batchNumber && !b.batchNumber.startsWith('UNBATCHED')
     );
+    const candidateBatches = realBatches.length > 0 ? realBatches : fetchedBatches;
 
-    if (stockBatches.length >= 2) {
+    // If 2 or more batches exist (matching Sigma POS), popup the batch selection modal
+    // so cashier picks the exact batch price
+    if (candidateBatches.length >= 2) {
       setSelectedBatchIndex(0);
-      setBatchModalData({ product, batches: stockBatches, overrideQty });
+      setBatchModalData({ product, batches: candidateBatches, overrideQty });
       return;
     }
 
-    const chosenBatch = stockBatches.length === 1 ? stockBatches[0] : null;
-    addSingleProductToCartDirect(product, chosenBatch, overrideQty, stockBatches);
+    const chosenBatch = candidateBatches.length === 1 ? candidateBatches[0] : null;
+    addSingleProductToCartDirect(product, chosenBatch, overrideQty, candidateBatches);
   };
 
   const addSingleProductToCartDirect = (product: any, batch?: any, overrideQty?: number, allBatches?: any[]) => {
     const sellingPrice = batch && batch.sellingPrice ? batch.sellingPrice : product.sellingPrice;
     const mrp = batch && batch.mrp ? batch.mrp : (product.mrp || sellingPrice);
 
-    const existingIndex = cart.items.findIndex((item: any) => item.productId === product.id && (batch ? item.batchId === batch.id : true));
+    const existingIndex = cart.items.findIndex(
+      (item: any) => item.productId === product.id && (batch ? item.batchId === batch.id : true)
+    );
     const qtyToAdd = overrideQty !== undefined ? overrideQty : 1;
 
     if (existingIndex >= 0) {
       setSelectedCartIndex(existingIndex);
-      const updatedItems = cart.items.map((item: any) =>
-        item.productId === product.id && (batch ? item.batchId === batch.id : true)
+      const updatedItems = cart.items.map((item: any, idx: number) =>
+        idx === existingIndex
           ? { ...item, qty: item.qty + qtyToAdd, lineTotal: (item.qty + qtyToAdd) * item.unitPrice }
           : item
       );
@@ -844,8 +862,9 @@ export const PosTerminal = () => {
           (product.uomName && /kg|gram|gm|ltr|liter/i.test(product.uomName)) ||
           (product.uom && /kg|gram|gm|ltr|liter/i.test(product.uom))
         ),
-        batches: allBatches || (batch ? [batch] : []),
-        batchId: batch ? batch.id : undefined
+        batches: allBatches && allBatches.length > 0 ? allBatches : (batch ? [batch] : []),
+        batchId: batch ? batch.id : undefined,
+        batchNumber: batch ? batch.batchNumber : undefined
       };
 
       const isWeighableItem = !!(
@@ -1667,13 +1686,13 @@ export const PosTerminal = () => {
                           <div className="mt-2 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
                             <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-1 py-0.5 rounded border border-indigo-200">Batch</span>
                             <select
-                              className="text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded p-1 outline-none focus:ring-1 focus:ring-indigo-500 max-w-[200px]"
+                              className="text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded p-1 outline-none focus:ring-1 focus:ring-indigo-500 max-w-[220px]"
                               value={item.batchId || ''}
-                              onChange={(e) => updateItemBatch(item.productId, e.target.value)}
+                              onChange={(e) => updateItemBatch(item.productId, e.target.value, item.id)}
                             >
                               {item.batches.map((b: any) => (
                                 <option key={b.id} value={b.id}>
-                                  {b.batchNumber} {b.expiryDate ? `(Exp: ${b.expiryDate.substring(0, 10)})` : '(No Exp)'} [Qty: {b.currentStock}]
+                                  {b.batchNumber} - ₹{(b.sellingPrice || b.mrp).toFixed(2)} [Stock: {b.currentStock ?? 0}]
                                 </option>
                               ))}
                             </select>
@@ -2217,27 +2236,31 @@ export const PosTerminal = () => {
         user={user || undefined}
       />
 
-      {/* Batch Selection Modal (matching Sigma POS Image 1) */}
+      {/* Batch Selection Modal (matching Sigma POS Image) */}
       {batchModalData && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-xl w-full p-6 border border-slate-200">
-            <div className="flex justify-between items-center pb-3 border-b border-slate-200">
-              <div>
-                <h3 className="text-xl font-black text-slate-800 underline decoration-slate-400">Batch Selection:</h3>
-                <p className="text-sm font-bold text-slate-600 mt-1">Product Name: <span className="text-slate-900 font-extrabold">{batchModalData.product.name}</span></p>
-              </div>
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full p-6 border-2 border-slate-300">
+            <div className="flex justify-between items-center pb-3 border-b border-slate-300">
+              <h3 className="text-2xl font-black text-slate-800 underline decoration-slate-400">
+                Batch Selection:
+              </h3>
               <button 
-                onClick={() => setBatchModalData(null)} 
-                className="text-slate-400 hover:text-slate-600 font-bold text-xl px-2"
+                onClick={() => {
+                  setBatchModalData(null);
+                  setTimeout(() => productInputRef.current?.focus(), 50);
+                }} 
+                className="text-slate-400 hover:text-slate-700 font-bold text-2xl px-2 transition-colors"
+                title="Close (Esc)"
               >
                 ✕
               </button>
             </div>
 
-            <div className="mt-4 overflow-x-auto border border-slate-400 rounded-lg">
-              <table className="w-full text-left border-collapse">
-                <thead className="bg-slate-200">
-                  <tr className="border-b border-slate-400 text-xs font-black text-slate-800">
+            <div className="mt-4 overflow-x-auto border-2 border-slate-500 rounded-md shadow-inner bg-slate-100">
+              <table className="w-full text-left border-collapse select-none">
+                <thead className="bg-slate-200 border-b-2 border-slate-500">
+                  <tr className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                    <th className="p-2 border-r border-slate-400 w-8 text-center"></th>
                     <th className="p-2.5 border-r border-slate-400 text-center">Batch No</th>
                     <th className="p-2.5 border-r border-slate-400 text-center">Unit</th>
                     <th className="p-2.5 border-r border-slate-400 text-right">MRP</th>
@@ -2252,31 +2275,48 @@ export const PosTerminal = () => {
                     const stockVal = batch.currentStock ?? 0;
                     const isSelected = index === selectedBatchIndex;
 
+                    // Sigma POS exact row color cycling: Red, Yellow, Lime Green, Magenta, Cyan
+                    const colorSchemes = [
+                      { bg: 'bg-[#FF0000]', text: 'text-white', border: 'border-red-700' },
+                      { bg: 'bg-[#FFFF00]', text: 'text-slate-950 font-black', border: 'border-yellow-500' },
+                      { bg: 'bg-[#00FF00]', text: 'text-slate-950 font-black', border: 'border-green-600' },
+                      { bg: 'bg-[#FF00FF]', text: 'text-white font-black', border: 'border-fuchsia-600' },
+                      { bg: 'bg-[#00FFFF]', text: 'text-slate-950 font-black', border: 'border-cyan-600' }
+                    ];
+                    const scheme = colorSchemes[index % colorSchemes.length];
+
                     return (
                       <tr 
                         key={batch.id || index}
                         onClick={() => {
-                          addProductToCart(batchModalData.product, batchModalData.overrideQty, batch);
+                          addProductToCart(batchModalData.product, batchModalData.overrideQty, batch, batchModalData.batches);
                           setBatchModalData(null);
+                          setTimeout(() => productInputRef.current?.focus(), 50);
                         }}
                         onMouseEnter={() => setSelectedBatchIndex(index)}
-                        className={`border-b border-slate-300 cursor-pointer font-bold text-xs transition transform ${
-                          isSelected
-                            ? 'bg-red-700 text-white ring-4 ring-indigo-600 ring-offset-1 z-10 scale-[1.01] shadow-lg' 
-                            : index === 0 
-                              ? 'bg-red-600 text-white hover:bg-red-700' 
-                              : 'bg-orange-500 text-white hover:bg-orange-600'
+                        className={`border-b border-slate-400/80 cursor-pointer font-extrabold text-sm transition-all ${scheme.bg} ${scheme.text} ${
+                          isSelected 
+                            ? 'ring-4 ring-blue-600 ring-inset brightness-95 scale-[1.002] shadow-md z-10' 
+                            : 'hover:brightness-95'
                         }`}
                       >
-                        <td className="p-2.5 border-r border-white/30 text-center font-black">
-                          <span className="inline-flex items-center justify-center gap-1">
-                            {isSelected && <span className="text-yellow-300 font-black text-sm">▶</span>}
-                            {batch.batchNumber || 'DEFAULT'}
-                          </span>
+                        <td className="p-2 border-r border-black/20 text-center w-8">
+                          {isSelected ? (
+                            <span className="text-black font-black text-base inline-block transform translate-x-0.5">▶</span>
+                          ) : (
+                            <span className="opacity-0">▶</span>
+                          )}
                         </td>
-                        <td className="p-2.5 border-r border-white/30 text-center">Nos</td>
-                        <td className="p-2.5 border-r border-white/30 text-right font-black">₹{mrpVal.toFixed(2)}</td>
-                        <td className="p-2.5 border-r border-white/30 text-right font-black">₹{priceVal.toFixed(2)}</td>
+                        <td className="p-2.5 border-r border-black/20 text-center font-black tracking-wide">
+                          {batch.batchNumber || 'DEFAULT'}
+                        </td>
+                        <td className="p-2.5 border-r border-black/20 text-center">Nos</td>
+                        <td className="p-2.5 border-r border-black/20 text-right font-black">
+                          {mrpVal.toFixed(2)}
+                        </td>
+                        <td className="p-2.5 border-r border-black/20 text-right font-black">
+                          {priceVal.toFixed(2)}
+                        </td>
                         <td className="p-2.5 text-right font-black">
                           {stockVal.toFixed(2)}
                         </td>
@@ -2287,15 +2327,26 @@ export const PosTerminal = () => {
               </table>
             </div>
 
-            <div className="mt-5 pt-3 border-t border-slate-100 flex justify-between items-center">
-              <span className="text-xs text-indigo-700 font-extrabold flex items-center gap-1 bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-200">
-                <span>⌨ Use <kbd className="bg-white border px-1 rounded shadow-xs">↑</kbd> <kbd className="bg-white border px-1 rounded shadow-xs">↓</kbd> Arrow keys & press <kbd className="bg-white border px-1 rounded shadow-xs">Enter</kbd> or <kbd className="bg-white border px-1 rounded shadow-xs">Space</kbd> to select batch</span>
+            {/* Sigma-matching Product Name Box */}
+            <div className="mt-4 flex items-center gap-2">
+              <span className="text-sm font-bold text-slate-700 whitespace-nowrap">Product Name:</span>
+              <div className="flex-1 bg-white border border-slate-400 px-3 py-1.5 rounded text-sm font-black text-slate-900 truncate shadow-xs">
+                {batchModalData.product.name}
+              </div>
+            </div>
+
+            <div className="mt-5 pt-3 border-t border-slate-200 flex justify-between items-center gap-3">
+              <span className="text-xs text-indigo-800 font-extrabold flex items-center gap-1.5 bg-indigo-50 px-3 py-1.5 rounded-lg border border-indigo-200 shadow-xs">
+                <span>⌨ Use <kbd className="bg-white border border-slate-300 px-1.5 py-0.5 rounded shadow-xs font-mono font-bold">↑</kbd> <kbd className="bg-white border border-slate-300 px-1.5 py-0.5 rounded shadow-xs font-mono font-bold">↓</kbd> Arrow keys to navigate & press <kbd className="bg-white border border-slate-300 px-1.5 py-0.5 rounded shadow-xs font-mono font-bold">Enter</kbd> or <kbd className="bg-white border border-slate-300 px-1.5 py-0.5 rounded shadow-xs font-mono font-bold">Space</kbd> to select batch</span>
               </span>
               <button
-                onClick={() => setBatchModalData(null)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs rounded-lg transition"
+                onClick={() => {
+                  setBatchModalData(null);
+                  setTimeout(() => productInputRef.current?.focus(), 50);
+                }}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 font-extrabold text-xs rounded-lg transition-colors border border-slate-300"
               >
-                Cancel
+                Cancel (Esc)
               </button>
             </div>
           </div>

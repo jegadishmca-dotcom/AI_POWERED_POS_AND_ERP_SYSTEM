@@ -46,14 +46,24 @@ public class GetProductBatchesQueryHandler : IRequestHandler<GetProductBatchesQu
 
         var resultDict = new Dictionary<string, ProductBatchDto>(StringComparer.OrdinalIgnoreCase);
 
+        // Derive price difference between master MRP and SellingPrice
+        decimal discount = Math.Max(0, product.Mrp - product.SellingPrice);
+
         foreach (var b in explicitBatches)
         {
-            var currentStock = await _context.StockLedger
+            var stockLedgerQty = await _context.StockLedger
                 .Where(sl => sl.ProductId == request.ProductId && sl.BatchId == b.Id)
                 .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
 
+            // Prioritize StockLedger if tracked, otherwise fallback to AvailableQuantity
+            var currentStock = stockLedgerQty != 0 ? stockLedgerQty : b.AvailableQuantity;
+
             decimal mrpVal = b.Mrp > 0 ? b.Mrp : product.Mrp;
-            decimal sellingPriceVal = b.Mrp > 0 ? b.Mrp : product.SellingPrice;
+            
+            // Calculate SellingPrice matching product discount ratio or difference
+            decimal sellingPriceVal = mrpVal > 0 
+                ? (product.Mrp > 0 && discount > 0 ? Math.Max(b.CostPrice > 0 ? b.CostPrice : 0, mrpVal - discount) : mrpVal)
+                : product.SellingPrice;
 
             if (!string.IsNullOrWhiteSpace(b.BatchNumber))
             {
@@ -70,12 +80,8 @@ public class GetProductBatchesQueryHandler : IRequestHandler<GetProductBatchesQu
             }
         }
 
-        // 2. Only include an "UNBATCHED (General Stock)" option if there is actual unbatched stock (> 0) OR if no batches exist at all
-        var unbatchedStock = await _context.StockLedger
-            .Where(sl => sl.ProductId == request.ProductId && (sl.BatchId == null || sl.BatchId == Guid.Empty))
-            .SumAsync(sl => (decimal?)sl.Quantity, cancellationToken) ?? 0;
-
-        if (resultDict.Count == 0 || unbatchedStock > 0)
+        // 2. Only include an "UNBATCHED (General Stock)" option if NO explicit batches exist
+        if (resultDict.Count == 0)
         {
             var totalStock = await _context.StockLedger
                 .Where(sl => sl.ProductId == request.ProductId)
@@ -86,7 +92,7 @@ public class GetProductBatchesQueryHandler : IRequestHandler<GetProductBatchesQu
                 Id = Guid.Empty,
                 BatchNumber = "UNBATCHED (General Stock)",
                 ExpiryDate = null,
-                CurrentStock = unbatchedStock > 0 ? unbatchedStock : totalStock,
+                CurrentStock = totalStock,
                 Mrp = product.Mrp,
                 SellingPrice = product.SellingPrice,
                 CostPrice = product.PurchasePrice
@@ -94,8 +100,8 @@ public class GetProductBatchesQueryHandler : IRequestHandler<GetProductBatchesQu
         }
 
         return resultDict.Values
-            .OrderBy(b => b.ExpiryDate.HasValue ? 0 : 1)
-            .ThenBy(b => b.ExpiryDate)
+            .OrderByDescending(b => b.CurrentStock > 0 ? 1 : 0)
+            .ThenBy(b => b.Mrp)
             .ThenBy(b => b.BatchNumber)
             .ToList();
     }

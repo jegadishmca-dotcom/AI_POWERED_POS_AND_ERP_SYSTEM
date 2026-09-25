@@ -60,4 +60,17 @@ The system uses the following IP assignments and database settings for developme
 - **Production Live Database Name**: `posdb_live`
 - **Integration Test Database Name**: `posdb_integration_tests` (Dedicated ephemeral database inside `pos_postgres` used exclusively by `IntegrationTestDbFactory.Build()`. Recreated/wiped on automated test runs. Never contains real business data.)
 - **PostgreSQL Database User**: `posadmin`
+
+## Zero-Plaintext-Credential Policy Across ALL Tools
+- Credentials, passwords, PINs, secret tokens, and cryptographic password hashes MUST NEVER appear as inline literals in any shell command (`bash`, `powershell`, `curl`, `psql`, `python -c`, etc.).
+- All credentials must be sourced strictly from environment variables or a local `.env` file read programmatically by scripts using parameterized queries or standard config loaders.
+- Command-line arguments (`argv`), process strings (`ps aux`), and shell history must NEVER contain credentials.
+- When running automated scripts, use parameterized subprocess calls (e.g. `subprocess.run(..., input=...)` or `os.environ[...]`) instead of string interpolation.
+
+## Dedicated Test/QA Account Policy
+- Smoke tests, browser automation, and manual verification MUST NEVER modify, mutate, or overwrite the credentials, password hashes, or PIN hashes of real named accounts (e.g., `admin@supermarket.local`, manager, or cashier accounts).
+- All testing requiring authenticated UI or API sessions must use a dedicated QA/test account (e.g. `qa_smoketest@supermarket.local`) created specifically for non-production verification with documented, test-scoped credentials.
+
+## User Escalation Protocol
+- If unable to move forward due to missing credentials, authentication failures, or ambiguous requirements, ALWAYS pause and ask the user directly rather than attempting intrusive workarounds or credential overrides on production data.
 </RULE[project]>

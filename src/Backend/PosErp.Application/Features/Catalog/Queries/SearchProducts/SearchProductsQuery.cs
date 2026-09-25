@@ -62,7 +62,7 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, L
                         EF.Functions.ILike(p.Name, $"%{w}%")
                         || EF.Functions.ILike(p.ProductCode, $"%{w}%")
                         || (p.TamilName != null && EF.Functions.ILike(p.TamilName, $"%{w}%"))
-                        || p.Barcodes.Any(b => b.BarcodeValue == w));
+                        || p.Barcodes.Any(b => b.BarcodeValue.ToLower() == w.ToLower()));
                 }
             }
             else
@@ -71,8 +71,39 @@ public class SearchProductsQueryHandler : IRequestHandler<SearchProductsQuery, L
                     EF.Functions.ILike(p.Name, $"%{q}%")
                     || EF.Functions.ILike(p.ProductCode, $"%{q}%")
                     || (p.TamilName != null && EF.Functions.ILike(p.TamilName, $"%{q}%"))
-                    || p.Barcodes.Any(b => b.BarcodeValue == q));
+                    || p.Barcodes.Any(b => b.BarcodeValue.ToLower() == q.ToLower()));
             }
+        }
+
+        // ── Relevance-based ordering: best match first ──────────────────
+        // Priority:
+        // Rank 5: exact barcode match (case-insensitive)
+        // Rank 4: exact product name match (case-insensitive)
+        // Rank 3: exact product code match (case-insensitive)
+        // Rank 2: name starts with the full search query (or TamilName starts-with)
+        // Rank 1: (multi-word only) name starts with the first word
+        // Rank 0: alphabetical fallback by name
+        if (!string.IsNullOrEmpty(q))
+        {
+            var words = q.Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            var firstWord = words.Length > 0 ? words[0] : q;
+
+            var ordered = productsQuery
+                .OrderByDescending(p => p.Barcodes.Any(b => b.BarcodeValue.ToLower() == q.ToLower()))
+                .ThenByDescending(p => p.Name.ToLower() == q.ToLower())
+                .ThenByDescending(p => p.ProductCode.ToLower() == q.ToLower())
+                .ThenByDescending(p => EF.Functions.ILike(p.Name, $"{q}%") || (p.TamilName != null && EF.Functions.ILike(p.TamilName, $"{q}%")));
+
+            if (words.Length > 1)
+            {
+                ordered = ordered.ThenByDescending(p => EF.Functions.ILike(p.Name, $"{firstWord}%") || (p.TamilName != null && EF.Functions.ILike(p.TamilName, $"{firstWord}%")));
+            }
+
+            productsQuery = ordered.ThenBy(p => p.Name);
+        }
+        else
+        {
+            productsQuery = productsQuery.OrderBy(p => p.Name);
         }
 
         var results = await productsQuery

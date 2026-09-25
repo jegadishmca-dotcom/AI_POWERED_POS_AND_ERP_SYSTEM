@@ -58,5 +58,6 @@ The system uses the following IP assignments and database settings for developme
 - **Ubuntu Production Server** (hosting the application containers via Docker): `192.168.1.5`
 - **Development & UAT Testing Database Name**: `posdb_uat`
 - **Production Live Database Name**: `posdb_live`
+- **Integration Test Database Name**: `posdb_integration_tests` (Dedicated ephemeral database inside `pos_postgres` used exclusively by `IntegrationTestDbFactory.Build()`. Recreated/wiped on automated test runs. Never contains real business data.)
 - **PostgreSQL Database User**: `posadmin`
 </RULE[project]>

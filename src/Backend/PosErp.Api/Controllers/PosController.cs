@@ -10,6 +10,7 @@ using System;
 using PosErp.Application.Features.Pos.Queries.GetZReport;
 using PosErp.Domain.Entities.Pos;
 using PosErp.Domain.Entities.Crm;
+using PosErp.Api.Helpers;
 
 namespace PosErp.Api.Controllers;
 
@@ -38,15 +39,23 @@ public class PosController : ControllerBase
         _auditLogger = auditLogger;
     }
 
-    [HttpGet("invoice/search")]
-    public async Task<IActionResult> SearchInvoices([FromQuery] string query, CancellationToken cancellationToken)
-    {
-        if (string.IsNullOrWhiteSpace(query))
-        {
-            return BadRequest("Search query cannot be empty.");
-        }
+    private StoreScope GetCallerStoreScope() => StoreScopeHelper.GetCallerStoreScope(User);
 
-        var normalizedQuery = query.Trim().ToLower();
+    [HttpGet("invoice/search")]
+    [HttpGet("invoices/recent-for-return")]
+    public async Task<IActionResult> SearchInvoices(
+        [FromQuery] string? query = null, 
+        [FromQuery] int limit = 50, 
+        [FromQuery] bool? todayOnly = null,
+        CancellationToken cancellationToken = default)
+    {
+        limit = Math.Clamp(limit, 1, 100);
+
+        var scope = GetCallerStoreScope();
+        if (scope.IsDenied)
+        {
+            return Ok(Array.Empty<object>());
+        }
 
         var queryable = from inv in _context.Invoices.Include(i => i.Items)
                         join cashier in _context.Users on inv.CashierId equals cashier.Id into cashiers
@@ -55,13 +64,7 @@ public class PosController : ControllerBase
                         from t in terminals.DefaultIfEmpty()
                         join cust in _context.Customers on inv.CustomerId equals cust.Id into customers
                         from cu in customers.DefaultIfEmpty()
-                        where inv.InvoiceNumber.ToLower() == normalizedQuery
-                           || inv.InvoiceNumber.ToLower().EndsWith("-" + normalizedQuery)
-                           || inv.InvoiceNumber.ToLower().Contains(normalizedQuery)
-                           || (cu != null && cu.Phone != null && cu.Phone.Contains(normalizedQuery))
-                           || (cu != null && cu.Name != null && cu.Name.ToLower().Contains(normalizedQuery))
-                           || inv.Items.Any(item => item.Barcode == normalizedQuery)
-                        orderby inv.CreatedAt descending
+                        where !inv.IsDeleted && inv.Status == "COMPLETED"
                         select new {
                             Invoice = inv,
                             CashierName = c != null ? c.FullName : "Cashier",
@@ -70,7 +73,57 @@ public class PosController : ControllerBase
                             CustomerPhone = cu != null ? cu.Phone : ""
                         };
 
-        var results = await queryable.Take(20).ToListAsync(cancellationToken);
+        if (scope.StoreId.HasValue)
+        {
+            queryable = queryable.Where(x => x.Invoice.StoreId == scope.StoreId.Value);
+        }
+
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            var normalizedQuery = query.Trim().ToLower();
+
+            queryable = queryable.Where(x =>
+                x.Invoice.InvoiceNumber.ToLower() == normalizedQuery
+                || x.Invoice.InvoiceNumber.ToLower().EndsWith("-" + normalizedQuery)
+                || x.Invoice.InvoiceNumber.ToLower().Contains(normalizedQuery)
+                || (x.CustomerPhone != null && x.CustomerPhone.Contains(normalizedQuery))
+                || (x.CustomerName != null && x.CustomerName.ToLower().Contains(normalizedQuery))
+                || x.Invoice.Items.Any(item => item.Barcode != null && item.Barcode.ToLower() == normalizedQuery));
+        }
+
+        if (todayOnly == true)
+        {
+            var activeSession = await _context.StoreBusinessDates
+                .Where(d => d.Status == "OPEN")
+                .OrderByDescending(d => d.BusinessDate)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            var filterDate = activeSession != null ? activeSession.BusinessDate : DateTime.UtcNow.Date;
+            queryable = queryable.Where(x => x.Invoice.BusinessDate == filterDate);
+        }
+        else if (todayOnly == null && string.IsNullOrWhiteSpace(query))
+        {
+            // Default when no query: Prefer today's business date if any completed invoices exist today
+            var activeSession = await _context.StoreBusinessDates
+                .Where(d => d.Status == "OPEN")
+                .OrderByDescending(d => d.BusinessDate)
+                .FirstOrDefaultAsync(cancellationToken);
+
+            if (activeSession != null)
+            {
+                var todayDate = activeSession.BusinessDate;
+                var todayCount = await queryable.CountAsync(x => x.Invoice.BusinessDate == todayDate, cancellationToken);
+                if (todayCount > 0)
+                {
+                    queryable = queryable.Where(x => x.Invoice.BusinessDate == todayDate);
+                }
+            }
+        }
+
+        var results = await queryable
+            .OrderByDescending(x => x.Invoice.CreatedAt)
+            .Take(limit)
+            .ToListAsync(cancellationToken);
 
         var list = results.Select(data => {
             var invoice = data.Invoice;
@@ -121,25 +174,42 @@ public class PosController : ControllerBase
         return Ok(list);
     }
 
+    [NonAction]
+    public Task<IActionResult> SearchInvoices(string? query, CancellationToken cancellationToken)
+        => SearchInvoices(query, 50, null, cancellationToken);
+
     [HttpGet("invoice/number/{invoiceNumber}")]
-    public async Task<IActionResult> GetInvoiceByNumber(string invoiceNumber, CancellationToken cancellationToken)
+    public async Task<IActionResult> GetInvoiceByNumber(string invoiceNumber, CancellationToken cancellationToken = default)
     {
-        var data = await (from inv in _context.Invoices.Include(i => i.Items)
-                          join cashier in _context.Users on inv.CashierId equals cashier.Id into cashiers
-                          from c in cashiers.DefaultIfEmpty()
-                          join terminal in _context.Terminals on inv.TerminalId equals terminal.Id into terminals
-                          from t in terminals.DefaultIfEmpty()
-                          join cust in _context.Customers on inv.CustomerId equals cust.Id into customers
-                          from cu in customers.DefaultIfEmpty()
-                          where inv.InvoiceNumber == invoiceNumber
-                          select new {
-                              Invoice = inv,
-                              CashierName = c != null ? c.FullName : "Cashier",
-                              TerminalCode = t != null ? t.TerminalCode : "POS-01",
-                              CustomerName = cu != null ? cu.Name : "",
-                              CustomerPhone = cu != null ? cu.Phone : ""
-                          })
-                          .FirstOrDefaultAsync(cancellationToken);
+        var normalizedNumber = invoiceNumber.Trim().ToLower();
+        var scope = GetCallerStoreScope();
+        if (scope.IsDenied)
+        {
+            return NotFound("Invoice not found.");
+        }
+
+        var query = from inv in _context.Invoices.Include(i => i.Items)
+                    join cashier in _context.Users on inv.CashierId equals cashier.Id into cashiers
+                    from c in cashiers.DefaultIfEmpty()
+                    join terminal in _context.Terminals on inv.TerminalId equals terminal.Id into terminals
+                    from t in terminals.DefaultIfEmpty()
+                    join cust in _context.Customers on inv.CustomerId equals cust.Id into customers
+                    from cu in customers.DefaultIfEmpty()
+                    where !inv.IsDeleted && inv.InvoiceNumber.ToLower() == normalizedNumber
+                    select new {
+                        Invoice = inv,
+                        CashierName = c != null ? c.FullName : "Cashier",
+                        TerminalCode = t != null ? t.TerminalCode : "POS-01",
+                        CustomerName = cu != null ? cu.Name : "",
+                        CustomerPhone = cu != null ? cu.Phone : ""
+                    };
+
+        if (scope.StoreId.HasValue)
+        {
+            query = query.Where(x => x.Invoice.StoreId == scope.StoreId.Value);
+        }
+
+        var data = await query.FirstOrDefaultAsync(cancellationToken);
 
         if (data == null)
         {
@@ -197,9 +267,22 @@ public class PosController : ControllerBase
     [HttpGet("invoice/{id}")]
     public async Task<IActionResult> GetInvoice(Guid id)
     {
-        var invoice = await _context.Invoices
+        var scope = GetCallerStoreScope();
+        if (scope.IsDenied)
+        {
+            return NotFound("Invoice not found.");
+        }
+
+        var query = _context.Invoices
             .Include(i => i.Items)
-            .FirstOrDefaultAsync(i => i.Id == id);
+            .Where(i => i.Id == id);
+
+        if (scope.StoreId.HasValue)
+        {
+            query = query.Where(i => i.StoreId == scope.StoreId.Value);
+        }
+
+        var invoice = await query.FirstOrDefaultAsync();
 
         if (invoice == null)
         {
@@ -364,9 +447,22 @@ public class PosController : ControllerBase
     [HttpPost("print/{invoiceId}")]
     public async Task<IActionResult> PrintReceipt(Guid invoiceId, [FromQuery] string printerIp = "192.168.1.100")
     {
-        var invoice = await _context.Invoices
+        var scope = GetCallerStoreScope();
+        if (scope.IsDenied)
+        {
+            return NotFound("Invoice not found.");
+        }
+
+        var query = _context.Invoices
             .Include(i => i.Items)
-            .FirstOrDefaultAsync(i => i.Id == invoiceId);
+            .AsQueryable();
+
+        if (scope.StoreId.HasValue)
+        {
+            query = query.Where(i => i.StoreId == scope.StoreId.Value);
+        }
+
+        var invoice = await query.FirstOrDefaultAsync(i => i.Id == invoiceId);
 
         if (invoice == null)
         {

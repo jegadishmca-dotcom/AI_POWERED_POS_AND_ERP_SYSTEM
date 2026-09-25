@@ -12,7 +12,9 @@ import {
   Eye,
   CreditCard,
   Wallet,
-  Receipt
+  Receipt,
+  RotateCcw,
+  Printer
 } from 'lucide-react';
 import { 
   getGstReport, 
@@ -25,7 +27,8 @@ import {
   InvoiceSalesRow 
 } from '../api/reports.api';
 import { getInvoiceByNumber } from '../../pos/api/pos.api';
-import { printReceipt } from '../../pos/utils/printReceipt';
+import { printReceipt, printSalesReturnReceipt } from '../../pos/utils/printReceipt';
+import { api } from '../../../utils/api';
 
 export const ReportsHub: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'margins' | 'gst' | 'invoices' | 'inventory'>('invoices');
@@ -39,6 +42,12 @@ export const ReportsHub: React.FC = () => {
   const [gstData, setGstData] = useState<GstReportRow[]>([]);
   const [inventoryData, setInventoryData] = useState<InventoryInsights | null>(null);
   const [invoiceSalesData, setInvoiceSalesData] = useState<InvoiceSalesRow[]>([]);
+
+  // Sub-tab: Sales Invoices vs Sales Returns
+  const [invoiceSubTab, setInvoiceSubTab] = useState<'sales' | 'returns'>('sales');
+  const [returnsData, setReturnsData] = useState<any[]>([]);
+  const [returnSearchQuery, setReturnSearchQuery] = useState('');
+  const [returnRefundModeFilter, setReturnRefundModeFilter] = useState<string>('ALL');
 
   // Filters for Invoice-Wise Sales
   const [invoiceSearchQuery, setInvoiceSearchQuery] = useState('');
@@ -60,8 +69,12 @@ export const ReportsHub: React.FC = () => {
         const data = await getGstReport(fromDate, toDate);
         setGstData(data);
       } else if (activeTab === 'invoices') {
-        const data = await getInvoiceSalesReport(fromDate, toDate);
-        setInvoiceSalesData(data);
+        const [salesData, retRes] = await Promise.all([
+          getInvoiceSalesReport(fromDate, toDate),
+          api.get(`/api/AccountsReceivable/returns?fromDate=${fromDate}&toDate=${toDate}&limit=100`).catch(() => ({ data: [] }))
+        ]);
+        setInvoiceSalesData(salesData);
+        setReturnsData(retRes.data || []);
       } else if (activeTab === 'inventory') {
         const data = await getInventoryInsights();
         setInventoryData(data);
@@ -91,6 +104,41 @@ export const ReportsHub: React.FC = () => {
       alert('Could not load invoice receipt details.');
     }
   };
+
+  const handlePrintSalesReturn = async (returnId: string) => {
+    try {
+      const res = await api.get(`/api/AccountsReceivable/returns/${returnId}`);
+      if (res.data) {
+        printSalesReturnReceipt(res.data);
+      } else {
+        alert('Sales return details not found.');
+      }
+    } catch (err) {
+      console.error('Error opening sales return receipt:', err);
+      alert('Could not load sales return receipt details.');
+    }
+  };
+
+  // Filtered Returns calculation
+  const filteredReturns = returnsData.filter((ret) => {
+    const q = returnSearchQuery.toLowerCase().trim();
+    const matchesQuery = !q || (
+      (ret.returnNumber && ret.returnNumber.toLowerCase().includes(q)) ||
+      (ret.originalInvoiceNumber && ret.originalInvoiceNumber.toLowerCase().includes(q)) ||
+      (ret.cashierName && ret.cashierName.toLowerCase().includes(q)) ||
+      (ret.customerName && ret.customerName.toLowerCase().includes(q)) ||
+      (ret.customerPhone && ret.customerPhone.includes(q))
+    );
+    const matchesRefundMode = returnRefundModeFilter === 'ALL' || (
+      ret.refundMode && ret.refundMode.toUpperCase() === returnRefundModeFilter.toUpperCase()
+    );
+    return matchesQuery && matchesRefundMode;
+  });
+
+  const totalReturnsCount = filteredReturns.length;
+  const totalRefundAmount = filteredReturns.reduce((sum, r) => sum + (r.refundAmount || r.totalAmount || 0), 0);
+  const totalReturnUnits = filteredReturns.reduce((sum, r) => sum + (r.totalQty || 0), 0);
+  const totalReturnTaxReversal = filteredReturns.reduce((sum, r) => sum + (r.taxAmount || 0), 0);
 
   // Filtered Invoices calculation
   const filteredInvoices = invoiceSalesData.filter((inv) => {
@@ -160,6 +208,40 @@ export const ReportsHub: React.FC = () => {
         inv.netPayable.toFixed(2),
         inv.paymentMode || 'Cash',
         inv.status || 'Completed'
+      ]);
+    } else if (type === 'returns') {
+      filename = `Sales_Returns_Report_${fromDate}_to_${toDate}.csv`;
+      headers = [
+        'S.No',
+        'Return Number',
+        'Date & Time',
+        'Original Invoice Number',
+        'Cashier',
+        'Customer Name',
+        'Customer Phone',
+        'Items Count',
+        'Total Qty Returned',
+        'Subtotal (₹)',
+        'Tax Reversal (₹)',
+        'Refund Amount (₹)',
+        'Refund Mode',
+        'Status'
+      ];
+      rows = filteredReturns.map((ret, idx) => [
+        (idx + 1).toString(),
+        ret.returnNumber || '',
+        ret.returnDate ? new Date(ret.returnDate).toLocaleString('en-IN') : 'N/A',
+        ret.originalInvoiceNumber || '',
+        ret.cashierName || 'Cashier',
+        ret.customerName || 'WALK-IN',
+        ret.customerPhone || '',
+        (ret.itemCount || 0).toString(),
+        (ret.totalQty || 0).toString(),
+        (ret.subTotal || 0).toFixed(2),
+        (ret.taxAmount || 0).toFixed(2),
+        (ret.refundAmount || ret.totalAmount || 0).toFixed(2),
+        ret.refundMode || 'CASH',
+        ret.status || 'COMPLETED'
       ]);
     } else if (type === 'gst') {
       filename = `GST_Tax_Report_${fromDate}_to_${toDate}.csv`;
@@ -336,9 +418,36 @@ export const ReportsHub: React.FC = () => {
       {/* Reports Content Panels */}
       {!loading && !error && (
         <div>
-          {/* TAB: INVOICE-WISE SALES REPORT */}
+          {/* TAB: INVOICE-WISE SALES & RETURNS REPORT */}
           {activeTab === 'invoices' && (
             <div className="space-y-6">
+              {/* Segmented Sub-Tab Toggle */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setInvoiceSubTab('sales')}
+                  className={`px-4 py-2 rounded-xl text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
+                    invoiceSubTab === 'sales'
+                      ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20'
+                      : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
+                  }`}
+                >
+                  <Receipt className="w-4 h-4" /> Sales Invoices ({completedInvoicesList.length})
+                </button>
+                <button
+                  onClick={() => setInvoiceSubTab('returns')}
+                  className={`px-4 py-2 rounded-xl text-sm font-black transition-all flex items-center gap-2 cursor-pointer ${
+                    invoiceSubTab === 'returns'
+                      ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20'
+                      : 'bg-white text-slate-600 hover:text-slate-900 border border-slate-200'
+                  }`}
+                >
+                  <RotateCcw className="w-4 h-4" /> Sales Returns & Refunds ({returnsData.length})
+                </button>
+              </div>
+
+              {/* VIEW 1: SALES INVOICES */}
+              {invoiceSubTab === 'sales' && (
+                <div className="space-y-6">
               {/* Summary KPIs */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
@@ -536,6 +645,167 @@ export const ReportsHub: React.FC = () => {
               </div>
             </div>
           )}
+
+          {/* VIEW 2: SALES RETURNS & REFUNDS (WITH RECEIPT REPRINT) */}
+          {invoiceSubTab === 'returns' && (
+            <div className="space-y-6">
+              {/* Summary KPIs */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Total Returns</p>
+                  <h2 className="text-3xl font-black text-slate-800">{totalReturnsCount}</h2>
+                  <p className="text-xs text-slate-400 mt-1 font-semibold">Processed return transactions</p>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Total Refund Paid</p>
+                  <h2 className="text-3xl font-black text-rose-600">₹{totalRefundAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h2>
+                  <p className="text-xs text-rose-600/80 mt-1 font-bold">Cash / UPI / Credit Note refunded</p>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Total Items Returned</p>
+                  <h2 className="text-3xl font-black text-amber-600">{totalReturnUnits} units</h2>
+                  <p className="text-xs text-amber-600/80 mt-1 font-bold">Restocked to active inventory</p>
+                </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">GST Tax Reversal</p>
+                  <h2 className="text-3xl font-black text-indigo-600">₹{totalReturnTaxReversal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</h2>
+                  <p className="text-xs text-indigo-600/80 mt-1 font-bold">Input tax credit reversed</p>
+                </div>
+              </div>
+
+              {/* Table Controls Bar */}
+              <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap gap-4 justify-between items-center">
+                <div className="flex flex-wrap gap-3 items-center flex-1">
+                  <div className="relative min-w-[280px]">
+                    <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                    <input 
+                      type="text"
+                      placeholder="Search Return #, Orig Bill #, Cashier, Customer..."
+                      value={returnSearchQuery}
+                      onChange={(e) => setReturnSearchQuery(e.target.value)}
+                      className="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-lg text-sm font-semibold text-slate-800 bg-slate-50 focus:outline-none focus:ring-2 focus:ring-rose-500"
+                    />
+                  </div>
+
+                  {/* Refund Mode Filter Pills */}
+                  <div className="flex items-center gap-1.5 bg-slate-100 p-1 rounded-lg">
+                    {['ALL', 'CASH', 'UPI', 'CARD', 'CREDIT NOTE'].map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => setReturnRefundModeFilter(mode)}
+                        className={`px-3 py-1.5 rounded-md text-xs font-black transition-all cursor-pointer ${
+                          returnRefundModeFilter === mode
+                            ? 'bg-rose-600 text-white shadow-xs'
+                            : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/60'
+                        }`}
+                      >
+                        {mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => handleExportCSV('returns')}
+                  className="bg-slate-800 hover:bg-slate-900 text-white px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-2 transition shadow-sm cursor-pointer"
+                >
+                  <Download className="w-4 h-4" /> Export CSV
+                </button>
+              </div>
+
+              {/* Returns List Table */}
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                {filteredReturns.length === 0 ? (
+                  <div className="p-12 text-center text-slate-400 font-semibold">
+                    No sales returns found for the selected date range and filter criteria.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-sm border-collapse">
+                      <thead>
+                        <tr className="bg-slate-100 border-b border-slate-200 text-slate-700 font-black text-xs uppercase tracking-wider">
+                          <th className="p-3.5 text-center w-12">S.No</th>
+                          <th className="p-3.5">Return #</th>
+                          <th className="p-3.5">Date & Time</th>
+                          <th className="p-3.5">Orig Bill #</th>
+                          <th className="p-3.5">Cashier</th>
+                          <th className="p-3.5">Customer</th>
+                          <th className="p-3.5 text-center">Items / Units</th>
+                          <th className="p-3.5 text-right">Subtotal (₹)</th>
+                          <th className="p-3.5 text-right">GST Reversal (₹)</th>
+                          <th className="p-3.5 text-right">Refund Amount (₹)</th>
+                          <th className="p-3.5 text-center">Refund Mode</th>
+                          <th className="p-3.5 text-center">Status</th>
+                          <th className="p-3.5 text-center">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200 text-slate-800">
+                        {filteredReturns.map((ret, idx) => {
+                          const isEven = idx % 2 === 0;
+                          return (
+                            <tr key={ret.id || idx} className={`transition-colors ${isEven ? 'bg-white hover:bg-rose-50/40' : 'bg-slate-50/60 hover:bg-rose-50/40'}`}>
+                              <td className="p-3.5 text-center font-bold text-slate-500 text-xs">{idx + 1}</td>
+                              <td className="p-3.5 font-black text-slate-900 font-mono text-xs flex items-center gap-1.5">
+                                <span className="bg-rose-100 text-rose-800 border border-rose-200 text-[10px] px-1.5 py-0.5 rounded font-black">
+                                  RET
+                                </span>
+                                {ret.returnNumber}
+                              </td>
+                              <td className="p-3.5 text-xs font-bold text-slate-600 whitespace-nowrap">
+                                {ret.returnDate ? new Date(ret.returnDate).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' }) : 'N/A'}
+                              </td>
+                              <td className="p-3.5 font-mono font-bold text-indigo-700 text-xs">
+                                {ret.originalInvoiceNumber || '-'}
+                              </td>
+                              <td className="p-3.5 font-bold text-slate-700 text-xs">{ret.cashierName || 'Cashier'}</td>
+                              <td className="p-3.5">
+                                <p className="font-bold text-slate-800 text-xs">{ret.customerName || 'WALK-IN'}</p>
+                                {ret.customerPhone && <p className="text-[11px] text-slate-400 font-semibold">{ret.customerPhone}</p>}
+                              </td>
+                              <td className="p-3.5 text-center font-bold text-xs text-slate-700">
+                                {ret.itemCount} items ({ret.totalQty} units)
+                              </td>
+                              <td className="p-3.5 text-right font-semibold text-slate-600">₹{(ret.subTotal || 0).toFixed(2)}</td>
+                              <td className="p-3.5 text-right font-semibold text-slate-600">₹{(ret.taxAmount || 0).toFixed(2)}</td>
+                              <td className="p-3.5 text-right">
+                                <span className="font-black text-rose-700 text-base">₹{(ret.refundAmount || ret.totalAmount || 0).toFixed(2)}</span>
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-black uppercase tracking-wider ${
+                                  (ret.refundMode || '').toUpperCase().includes('CASH') ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' :
+                                  (ret.refundMode || '').toUpperCase().includes('UPI') ? 'bg-blue-100 text-blue-800 border border-blue-300' :
+                                  (ret.refundMode || '').toUpperCase().includes('CARD') ? 'bg-purple-100 text-purple-800 border border-purple-300' :
+                                  'bg-amber-100 text-amber-900 border border-amber-300'
+                                }`}>
+                                  {ret.refundMode || 'CASH'}
+                                </span>
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                                  {ret.status || 'COMPLETED'}
+                                </span>
+                              </td>
+                              <td className="p-3.5 text-center">
+                                <button 
+                                  onClick={() => handlePrintSalesReturn(ret.id)}
+                                  className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-2.5 py-1.5 rounded-lg font-bold transition flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                                  title="View & Print Sales Return Receipt"
+                                >
+                                  <Printer className="w-3.5 h-3.5" /> Receipt
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
           {/* TAB 1: PROFIT MARGINS */}
           {activeTab === 'margins' && marginData && (

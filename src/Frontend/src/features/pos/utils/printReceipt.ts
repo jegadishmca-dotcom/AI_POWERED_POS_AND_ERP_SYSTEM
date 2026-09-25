@@ -563,3 +563,359 @@ export async function printReceipt(invoice: any): Promise<void> {
     triggerSystemPrint(invoice, terminalCode);
   }
 }
+
+function generateSalesReturnReceiptText(salesReturn: any, terminalCode: string, langMode: string = 'secondary'): string {
+  const returnNo = salesReturn.returnNumber || salesReturn.ReturnNumber || '-';
+  const origInvNo = salesReturn.originalInvoiceNumber || salesReturn.OriginalInvoiceNumber || '-';
+  const cashierName = salesReturn.cashierName || salesReturn.CashierName || 'Cashier';
+  const customerName = salesReturn.customerName || salesReturn.CustomerName || '';
+  const customerPhone = salesReturn.customerPhone || salesReturn.CustomerPhone || '';
+  const dateVal = salesReturn.returnDate || salesReturn.ReturnDate || salesReturn.createdAt || salesReturn.CreatedAt;
+  const dateStr = dateVal ? new Date(dateVal).toLocaleDateString('en-IN') : '-';
+  const timeStr = dateVal ? new Date(dateVal).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
+  const refundAmount = safe(salesReturn.refundAmount ?? salesReturn.RefundAmount ?? salesReturn.totalAmount ?? salesReturn.TotalAmount);
+  const refundMode = (salesReturn.refundMode || salesReturn.RefundMode || 'CASH').toUpperCase();
+  const subTotal = safe(salesReturn.subTotal ?? salesReturn.SubTotal);
+  const taxAmount = safe(salesReturn.taxAmount ?? salesReturn.TaxAmount);
+  const items = salesReturn.items || salesReturn.Items || [];
+
+  let sb = "";
+  sb += "         ஆப்பிள் சூப்பர் மார்க்கெட்\n";
+  sb += "            Apple Super Market\n";
+  sb += `       ${STORE.address}\n`;
+  sb += `          ${STORE.city}\n`;
+  sb += `      Ph: ${STORE.phone}\n`;
+  sb += `          GSTIN: ${STORE.gstin}\n`;
+  sb += `          FSSAI: ${STORE.fssai}\n`;
+  sb += "         SALES RETURN / CREDIT NOTE\n";
+  sb += "----------------------------------------\n";
+  sb += `Return No: ${returnNo}\n`;
+  if (origInvNo && origInvNo !== '-') sb += `Orig Bill: ${origInvNo}\n`;
+  sb += `Date: ${dateStr}  Time: ${timeStr}\n`;
+  sb += `Cashier: ${cashierName.padEnd(15, ' ')} Term: ${terminalCode}\n`;
+  if (customerName) {
+    sb += `Customer: ${customerName} | ${customerPhone}\n`;
+  }
+  sb += "----------------------------------------\n";
+  sb += "Item                     Qty  Rate   Amt\n";
+  sb += "----------------------------------------\n";
+
+  items.forEach((item: any) => {
+    const qty = safe(item.quantity ?? item.Quantity ?? item.qty);
+    const unitPrice = safe(item.unitPrice ?? item.UnitPrice ?? item.rate);
+    const amt = safe(item.totalAmount ?? item.TotalAmount ?? (qty * unitPrice));
+    let name = getItemDisplayName(item, langMode);
+    if (name.length > 20) name = name.substring(0, 19) + ".";
+
+    sb += `${name.padEnd(20, ' ')} ${qty.toString().padStart(3, ' ')} ${fmt(unitPrice).padStart(6, ' ')} ${fmt(amt).padStart(7, ' ')}\n`;
+  });
+
+  const totalQty = items.reduce((s: number, i: any) => s + safe(i.quantity ?? i.Quantity ?? i.qty), 0);
+  sb += "----------------------------------------\n";
+  sb += `Items Count: ${items.length.toString().padEnd(4, ' ')} Total Qty: ${totalQty}\n`;
+  if (subTotal > 0) sb += `Sub Total:                     ₹${fmt(subTotal)}\n`;
+  if (taxAmount > 0) sb += `Tax / GST:                      ₹${fmt(taxAmount)}\n`;
+  sb += "----------------------------------------\n";
+  sb += `TOTAL REFUND:                  ₹${fmt(refundAmount)}\n`;
+  sb += `Refund Mode:                   ${refundMode.padStart(10, ' ')}\n`;
+  sb += `Status:                        ${'COMPLETED'.padStart(10, ' ')}\n`;
+  sb += "----------------------------------------\n";
+  sb += "             அனைத்தும் வாங்க\n";
+  sb += "            ஆப்பிளுக்கு வாங்க\n";
+  sb += "   Thank you! Please visit again!\n";
+
+  return sb;
+}
+
+function triggerSalesReturnSystemPrint(salesReturn: any, terminalCode: string, langMode: string = 'secondary') {
+  const returnNo = salesReturn.returnNumber || salesReturn.ReturnNumber || '-';
+  const origInvNo = salesReturn.originalInvoiceNumber || salesReturn.OriginalInvoiceNumber || '-';
+  const cashierName = salesReturn.cashierName || salesReturn.CashierName || 'Cashier';
+  const customerName = salesReturn.customerName || salesReturn.CustomerName || '';
+  const customerPhone = salesReturn.customerPhone || salesReturn.CustomerPhone || '';
+  const dateVal = salesReturn.returnDate || salesReturn.ReturnDate || salesReturn.createdAt || salesReturn.CreatedAt;
+  const dateStr = dateVal ? new Date(dateVal).toLocaleDateString('en-IN') : '-';
+  const timeStr = dateVal ? new Date(dateVal).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '-';
+  const refundAmount = safe(salesReturn.refundAmount ?? salesReturn.RefundAmount ?? salesReturn.totalAmount ?? salesReturn.TotalAmount);
+  const refundMode = (salesReturn.refundMode || salesReturn.RefundMode || 'CASH').toUpperCase();
+  const subTotal = safe(salesReturn.subTotal ?? salesReturn.SubTotal);
+  const taxAmount = safe(salesReturn.taxAmount ?? salesReturn.TaxAmount);
+  const items = salesReturn.items || salesReturn.Items || [];
+
+  let itemsRowsHtml = '';
+  items.forEach((item: any, idx: number) => {
+    const qty = safe(item.quantity ?? item.Quantity ?? item.qty);
+    const unitPrice = safe(item.unitPrice ?? item.UnitPrice ?? item.rate);
+    const amt = safe(item.totalAmount ?? item.TotalAmount ?? (qty * unitPrice));
+    const name = getItemDisplayName(item, langMode);
+
+    itemsRowsHtml += `
+      <tr style="border-bottom: 1px dashed #ddd;">
+        <td style="text-align: center; font-size: 9.5px; padding: 3px 1px; border-right: 1px solid #000;">${idx + 1}</td>
+        <td style="text-align: left; font-size: 10px; font-weight: 700; padding: 3px; border-right: 1px solid #000; word-break: break-word;">${name}</td>
+        <td style="text-align: center; font-size: 10px; font-weight: 800; padding: 3px 1px; border-right: 1px solid #000;">${qty}</td>
+        <td style="text-align: right; font-size: 10px; padding: 3px 2px; border-right: 1px solid #000;">${fmt(unitPrice)}</td>
+        <td style="text-align: right; font-size: 10px; font-weight: 800; padding: 3px 2px;">${fmt(amt)}</td>
+      </tr>
+    `;
+  });
+
+  const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Sales Return Receipt - ${returnNo}</title>
+  <style>
+    @page {
+      margin: 0;
+      size: 80mm auto;
+    }
+    body {
+      margin: 0;
+      padding: 2mm 0;
+      font-family: 'Courier New', Courier, monospace;
+      color: #000;
+      background: #fff;
+      -webkit-font-smoothing: antialiased;
+    }
+    .receipt-container {
+      width: 72mm;
+      max-width: 72mm;
+      margin: 0 auto;
+      padding: 0 1mm;
+      font-size: 11px;
+      line-height: 1.25;
+      background: #fff;
+    }
+    .text-center { text-align: center; }
+    .text-right { text-align: right; }
+    .text-left { text-align: left; }
+    .font-black { font-weight: 900; }
+    
+    table.receipt-table {
+      width: 100% !important;
+      max-width: 100% !important;
+      table-layout: fixed !important;
+      border-collapse: collapse !important;
+      margin: 0 0 5px 0 !important;
+    }
+    table.receipt-table td, table.receipt-table th {
+      padding: 3px 2px;
+      vertical-align: middle;
+    }
+    
+    .border-box {
+      border: 1.5px solid #000;
+    }
+    .divider-dash {
+      border-top: 1px dashed #000;
+      margin: 4px 0;
+    }
+    .divider-solid {
+      border-top: 1.5px solid #000;
+      margin: 4px 0;
+    }
+  </style>
+</head>
+<body>
+  <div class="receipt-container">
+
+  <!-- STORE HEADER -->
+  <div class="text-center font-black" style="font-size: 18px; line-height: 1.1; margin-top: 0; padding-top: 0;">${STORE.nameTamil}</div>
+  <div class="text-center font-black" style="font-size: 11px; letter-spacing: 0.5px; margin-top: 1px; margin-bottom: 2px;">${STORE.nameEn}</div>
+  <div class="text-center" style="font-size: 10px; font-weight: 700; line-height: 1.3;">
+    ${STORE.address} ${STORE.city}<br/>
+    GSTIN: ${STORE.gstin} | FSSAI: ${STORE.fssai}<br/>
+    Ph: ${STORE.phone}
+  </div>
+
+  <div class="divider-solid"></div>
+  <div class="text-center font-black" style="font-size: 13px; letter-spacing: 1px; margin: 2px 0 1px 0;">CREDIT NOTE / SALES RETURN</div>
+  <div class="text-center font-bold" style="font-size: 10px; margin-bottom: 4px;">விற்பனை திருப்ப ரசீது</div>
+
+  <!-- METADATA BOX -->
+  <table class="receipt-table border-box">
+    <tr>
+      <td style="width: 58%; padding: 4px 5px; border-right: 1.5px solid #000; vertical-align: top;">
+        <span style="font-size: 8.5px; font-weight: 800; color: #444; display: block; text-transform: uppercase;">Return No</span>
+        <strong style="font-size: 11px; font-weight: 900; font-family: monospace; display: block; line-height: 1.2;">${returnNo}</strong>
+        <span style="font-size: 9px; font-weight: 800; display: block; margin-top: 2px;">Orig Bill: ${origInvNo}</span>
+        <span style="font-size: 9px; font-weight: 800; display: block;">Cashier: ${cashierName}</span>
+      </td>
+      <td style="width: 42%; padding: 4px 5px; vertical-align: top;">
+        <span style="font-size: 8.5px; font-weight: 800; color: #444; display: block; text-transform: uppercase;">Date & Time</span>
+        <strong style="font-size: 10px; font-weight: 800;">${dateStr}</strong><br/>
+        <span style="font-size: 10px; font-weight: 800;">${timeStr}</span><br/>
+        <span style="font-size: 9px; font-weight: 800; color: #444;">Term: ${terminalCode}</span>
+      </td>
+    </tr>
+    ${customerName ? `
+    <tr style="border-top: 1px solid #000;">
+      <td style="padding: 3px 5px; border-right: 1.5px solid #000; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+        <strong style="font-weight: 800;">NAME:</strong> ${customerName}
+      </td>
+      <td style="padding: 3px 5px; white-space: nowrap;">
+        <strong style="font-weight: 800;">CELL:</strong> ${customerPhone || '-'}
+      </td>
+    </tr>` : ''}
+  </table>
+
+  <!-- RETURNED ITEMS TABLE -->
+  <table class="receipt-table border-box">
+    <thead>
+      <tr style="background: #f0f0f0; border-bottom: 1.5px solid #000;">
+        <th style="width: 8%; text-align: center; font-weight: 900; font-size: 10px; padding: 4px 1px; border-right: 1px solid #000;">#</th>
+        <th style="width: 44%; text-align: left; font-weight: 900; font-size: 10px; padding: 4px 3px; border-right: 1px solid #000;">Item</th>
+        <th style="width: 12%; text-align: center; font-weight: 900; font-size: 10px; padding: 4px 1px; border-right: 1px solid #000;">Qty</th>
+        <th style="width: 16%; text-align: right; font-weight: 900; font-size: 10px; padding: 4px 2px; border-right: 1px solid #000;">Rate</th>
+        <th style="width: 20%; text-align: right; font-weight: 900; font-size: 10px; padding: 4px 3px;">Amt</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${itemsRowsHtml}
+    </tbody>
+  </table>
+
+  <!-- TOTAL REFUND BANNER -->
+  <table class="receipt-table border-box">
+    <tr>
+      <td style="width: 45%; padding: 6px 8px; font-size: 15px; font-weight: 900; text-align: left; vertical-align: middle; border-right: 1.5px solid #000;">
+        TOTAL REFUND
+      </td>
+      <td style="width: 55%; padding: 6px 8px; font-size: 21px; font-weight: 900; text-align: right; vertical-align: middle;">
+        ₹${fmt(refundAmount)}
+      </td>
+    </tr>
+  </table>
+
+  <!-- REFUND SUMMARY -->
+  <table class="receipt-table" style="font-size: 10.5px; font-weight: 800; margin-top: 4px; margin-bottom: 2px;">
+    <tr>
+      <td style="width: 55%; text-align: left; padding: 1.5px 0;">Refund Mode</td>
+      <td style="width: 45%; text-align: right; padding: 1.5px 0; font-weight: 900;">${refundMode}</td>
+    </tr>
+    <tr>
+      <td style="width: 55%; text-align: left; padding: 1.5px 0;">Items Returned</td>
+      <td style="width: 45%; text-align: right; padding: 1.5px 0; font-weight: 900;">${items.length} items (${items.reduce((s: number, i: any) => s + safe(i.quantity ?? i.Quantity ?? i.qty), 0)} qty)</td>
+    </tr>
+    ${subTotal > 0 ? `
+    <tr>
+      <td style="width: 55%; text-align: left; padding: 1.5px 0;">Sub Total (excl tax)</td>
+      <td style="width: 45%; text-align: right; padding: 1.5px 0;">₹${fmt(subTotal)}</td>
+    </tr>` : ''}
+    ${taxAmount > 0 ? `
+    <tr>
+      <td style="width: 55%; text-align: left; padding: 1.5px 0;">Tax Reversal (GST)</td>
+      <td style="width: 45%; text-align: right; padding: 1.5px 0;">₹${fmt(taxAmount)}</td>
+    </tr>` : ''}
+    <tr>
+      <td style="width: 55%; text-align: left; padding: 1.5px 0;">Status</td>
+      <td style="width: 45%; text-align: right; padding: 1.5px 0; font-weight: 900; color: #16a34a;">COMPLETED</td>
+    </tr>
+  </table>
+
+  <!-- FOOTER TAMIL SLOGAN -->
+  <div class="divider-dash"></div>
+  <div class="text-center" style="font-size: 14px; font-weight: 900; margin-top: 4px; margin-bottom: 3px; line-height: 1.35;">
+    அனைத்தும் வாங்க<br/>
+    ஆப்பிளுக்கு வாங்க
+  </div>
+  <div class="text-center" style="font-size: 10px; font-weight: 700; color: #222; margin-top: 2px;">
+    Thank you for shopping with us! Visit Again!
+  </div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      window.print();
+      setTimeout(function() { window.close(); }, 500);
+    };
+  </script>
+</body>
+</html>`;
+
+  const printWindow = window.open('', '_blank', 'width=400,height=600,scrollbars=yes');
+  if (printWindow) {
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+  } else {
+    alert('Please allow popups for this site to print receipts.');
+  }
+}
+
+export async function printSalesReturnReceipt(salesReturn: any): Promise<void> {
+  if (!salesReturn) return;
+
+  const terminalCode = (() => { try { return localStorage.getItem('pos_terminal_code') || 'POS-01'; } catch { return 'POS-01'; } })();
+
+  let receiptLangMode = 'secondary';
+  try {
+    const perms = await getPosPermissions();
+    if (perms && perms.receiptProductLanguage) {
+      receiptLangMode = perms.receiptProductLanguage;
+    }
+  } catch (err) {
+    console.warn('Could not fetch receipt language setting, using default (secondary/Tamil)', err);
+  }
+
+  const savedConfig = localStorage.getItem('pos_printer_config');
+  let config: any = { receiptMode: 'system', receiptIp: '', receiptBaudRate: 9600 };
+  if (savedConfig) {
+    try {
+      config = JSON.parse(savedConfig);
+    } catch (e) {
+      console.error('Failed to parse printer config:', e);
+    }
+  }
+
+  if (config.receiptMode === 'usb') {
+    if (!('serial' in navigator)) {
+      alert('Web Serial API is not supported in this browser. Please use Chrome.');
+      triggerSalesReturnSystemPrint(salesReturn, terminalCode, receiptLangMode);
+      return;
+    }
+    try {
+      let port;
+      // @ts-ignore
+      const ports = await navigator.serial.getPorts();
+      if (ports && ports.length > 0) {
+        port = ports[0];
+      } else {
+        // @ts-ignore
+        port = await navigator.serial.requestPort();
+      }
+      await port.open({ baudRate: config.receiptBaudRate || 9600 });
+      const writer = port.writable.getWriter();
+      const encoder = new TextEncoder();
+      
+      const textContent = generateSalesReturnReceiptText(salesReturn, terminalCode, receiptLangMode);
+      
+      // Init ESC/POS
+      await writer.write(new Uint8Array([0x1B, 0x40]));
+      // Write text
+      await writer.write(encoder.encode(textContent));
+      // Cut paper
+      await writer.write(new Uint8Array([0x0A, 0x0A, 0x0A, 0x0A, 0x1D, 0x56, 0x00]));
+      
+      writer.releaseLock();
+      await port.close();
+    } catch (err: any) {
+      console.error('USB print failed:', err);
+      alert('USB print failed: ' + (err.message || err) + '. Falling back to system print.');
+      triggerSalesReturnSystemPrint(salesReturn, terminalCode, receiptLangMode);
+    }
+  } else if (config.receiptMode === 'network') {
+    try {
+      const printerIp = config.receiptIp || '192.168.1.100';
+      await api.post(`/api/AccountsReceivable/returns/${salesReturn.id || salesReturn.Id}/print?printerIp=${encodeURIComponent(printerIp)}`);
+    } catch (err: any) {
+      console.error('Network print failed:', err);
+      alert('Network print failed. Falling back to system print.');
+      triggerSalesReturnSystemPrint(salesReturn, terminalCode, receiptLangMode);
+    }
+  } else {
+    triggerSalesReturnSystemPrint(salesReturn, terminalCode, receiptLangMode);
+  }
+}
+

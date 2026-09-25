@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, FileText, Calendar, User, Tag, ShoppingBag, Receipt, Truck, ArrowRightLeft, ShieldAlert, ClipboardCheck } from 'lucide-react';
+import { X, FileText, Calendar, User, Tag, ShoppingBag, Receipt, Truck, ArrowRightLeft, ShieldAlert, ClipboardCheck, RotateCcw, CreditCard } from 'lucide-react';
 import { api } from '../../../utils/api';
 
 interface DocumentPreviewModalProps {
@@ -18,6 +18,9 @@ export const DocumentPreviewModal = ({ docId, docType, referenceNumber, onClose 
   if (normalizedType === 'ADJ' && referenceNumber && referenceNumber.startsWith('TAKE-')) {
     normalizedType = 'STOCK_TAKE';
   }
+  if (normalizedType === 'SALES_RETURN' || normalizedType === 'SALES_RETURN_CANCEL' || normalizedType === 'RETURN') {
+    normalizedType = 'SALES_RETURN';
+  }
 
   useEffect(() => {
     const fetchDoc = async () => {
@@ -34,6 +37,8 @@ export const DocumentPreviewModal = ({ docId, docType, referenceNumber, onClose 
           endpoint = `/api/inventory/stock-take/${docId}`;
         } else if (normalizedType === 'GRN') {
           endpoint = `/api/inventory/grn/${docId}`;
+        } else if (normalizedType === 'SALES_RETURN') {
+          endpoint = `/api/AccountsReceivable/returns/${docId}`;
         } else {
           throw new Error(`Unsupported document type: ${docType}`);
         }
@@ -407,8 +412,130 @@ export const DocumentPreviewModal = ({ docId, docType, referenceNumber, onClose 
     );
   };
 
+  const renderSalesReturn = () => {
+    if (!data) return null;
+
+    const isCancelled = data.status === 'CANCELLED' || docType.toUpperCase().includes('CANCEL');
+
+    return (
+      <div className="space-y-6">
+        {/* Header Details */}
+        <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-lg border border-slate-100">
+          <div>
+            <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Return Info</div>
+            <div className="text-sm font-bold text-slate-800 mt-1 flex items-center gap-2">
+              <span>{data.returnNumber}</span>
+              <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+                isCancelled ? 'bg-red-100 text-red-800' : 'bg-emerald-100 text-emerald-800'
+              }`}>
+                {data.status || 'COMPLETED'}
+              </span>
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              Date: {new Date(data.returnDate || data.createdAt).toLocaleDateString()} {new Date(data.createdAt).toLocaleTimeString()}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Original Invoice & Staff</div>
+            <div className="text-sm font-semibold text-slate-800 mt-1">
+              Invoice: <span className="font-mono font-bold text-indigo-600">{data.originalInvoiceNumber || 'N/A'}</span>
+            </div>
+            <div className="text-xs text-slate-500 mt-1">
+              Processed by: {data.createdByName || data.cashierName || 'Cashier'} • Terminal: {data.terminalCode || 'POS-01'}
+            </div>
+          </div>
+          {data.customerName && (
+            <div className="col-span-2 border-t pt-2 mt-2 flex justify-between items-center">
+              <div>
+                <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Customer</div>
+                <div className="text-sm font-medium text-slate-800 mt-0.5">
+                  {data.customerName} {data.customerPhone ? `(${data.customerPhone})` : ''}
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-slate-500 font-semibold uppercase tracking-wider">Refund Mode</div>
+                <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 mt-0.5">
+                  <CreditCard className="w-3 h-3" /> {data.refundMode}
+                </span>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Items List */}
+        <div>
+          <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center">
+            <ShoppingBag className="w-4 h-4 mr-1.5 text-indigo-500" /> Returned Products
+          </h4>
+          <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-lg">
+            <table className="w-full text-left border-collapse">
+              <thead className="bg-slate-50 text-xs font-semibold text-slate-600 sticky top-0">
+                <tr className="border-b">
+                  <th className="p-2.5">Product Name</th>
+                  <th className="p-2.5 text-center">Batch</th>
+                  <th className="p-2.5 text-right">Return Qty</th>
+                  <th className="p-2.5 text-right">Unit Price</th>
+                  <th className="p-2.5 text-right">Tax (GST)</th>
+                  <th className="p-2.5 text-right">Refund Total</th>
+                </tr>
+              </thead>
+              <tbody className="text-xs text-slate-800">
+                {data.items?.map((item: any) => (
+                  <tr key={item.id} className="border-b hover:bg-slate-50">
+                    <td className="p-2.5">
+                      <div className="font-semibold text-slate-800">{item.productName}</div>
+                      {item.barcode && <div className="text-[10px] text-slate-400 font-mono mt-0.5">{item.barcode}</div>}
+                    </td>
+                    <td className="p-2.5 text-center font-mono text-slate-600">{item.batchNumber || '-'}</td>
+                    <td className="p-2.5 text-right font-bold text-indigo-600">+{item.quantity}</td>
+                    <td className="p-2.5 text-right">₹{item.unitPrice.toFixed(2)}</td>
+                    <td className="p-2.5 text-right text-slate-600">₹{item.taxAmount.toFixed(2)}</td>
+                    <td className="p-2.5 text-right font-bold">₹{item.totalAmount.toFixed(2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Return Financial Summary */}
+        <div className="grid grid-cols-2 gap-6 pt-2 border-t">
+          <div className="space-y-1.5 text-xs text-slate-600">
+            <span className="font-bold text-slate-700 block mb-1">Refund Method</span>
+            <div className="flex justify-between font-medium">
+              <span>Mode:</span>
+              <span className="font-bold text-slate-800">{data.refundMode}</span>
+            </div>
+            {data.journalEntryId && (
+              <div className="flex justify-between font-mono text-[10px] text-slate-400 pt-1">
+                <span>Journal Entry:</span>
+                <span>{data.journalEntryId.substring(0, 8)}...</span>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2 text-sm text-slate-700">
+            <div className="flex justify-between text-xs text-slate-500 font-medium">
+              <span>Sub Total:</span>
+              <span>₹{(data.subTotal || 0).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between text-xs text-slate-500 font-medium">
+              <span>Tax (GST Reversal):</span>
+              <span>₹{(data.taxAmount || 0).toFixed(2)}</span>
+            </div>
+            <div className="flex justify-between font-black text-lg text-indigo-700 border-t pt-2">
+              <span>Total Refund:</span>
+              <span>₹{(data.refundAmount || data.totalAmount || 0).toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const getIcon = () => {
     if (normalizedType === 'SALE') return <Receipt className="w-6 h-6 text-blue-500 mr-2" />;
+    if (normalizedType === 'SALES_RETURN') return <RotateCcw className="w-6 h-6 text-indigo-500 mr-2" />;
     if (normalizedType === 'ADJ' || normalizedType === 'ADJUSTMENT') return <ArrowRightLeft className="w-6 h-6 text-orange-500 mr-2" />;
     if (normalizedType === 'STOCK_TAKE') return <ClipboardCheck className="w-6 h-6 text-indigo-500 mr-2" />;
     return <Truck className="w-6 h-6 text-green-500 mr-2" />;
@@ -416,6 +543,7 @@ export const DocumentPreviewModal = ({ docId, docType, referenceNumber, onClose 
 
   const getDocTitle = () => {
     if (normalizedType === 'SALE') return 'Sales Tax Invoice';
+    if (normalizedType === 'SALES_RETURN') return docType.toUpperCase().includes('CANCEL') ? 'Sales Return Cancellation Note' : 'Sales Return Note';
     if (normalizedType === 'ADJ' || normalizedType === 'ADJUSTMENT') return 'Stock Adjustment Note';
     if (normalizedType === 'STOCK_TAKE') return 'Stock Take Note';
     return 'Goods Receipt Note (GRN)';
@@ -434,7 +562,7 @@ export const DocumentPreviewModal = ({ docId, docType, referenceNumber, onClose 
             </div>
           </div>
           <button 
-            onClick={onClose}
+            onClick={onClose} 
             className="p-1.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition"
           >
             <X className="w-5 h-5" />
@@ -463,6 +591,7 @@ export const DocumentPreviewModal = ({ docId, docType, referenceNumber, onClose 
           {!loading && !error && (
             <>
               {normalizedType === 'SALE' && renderSalesInvoice()}
+              {normalizedType === 'SALES_RETURN' && renderSalesReturn()}
               {(normalizedType === 'ADJ' || normalizedType === 'ADJUSTMENT') && renderStockAdjustment()}
               {normalizedType === 'STOCK_TAKE' && renderStockTake()}
               {normalizedType === 'GRN' && renderGRN()}

@@ -21,10 +21,12 @@ namespace PosErp.Api.Controllers;
 public class MigrationController : ControllerBase
 {
     private readonly IApplicationDbContext _context;
+    private readonly IConfiguration _configuration;
 
-    public MigrationController(IApplicationDbContext context)
+    public MigrationController(IApplicationDbContext context, IConfiguration configuration)
     {
         _context = context;
+        _configuration = configuration;
     }
 
     private async Task EnsureProductColumnsExistAsync()
@@ -127,11 +129,14 @@ public class MigrationController : ControllerBase
         [FromQuery] string server = "192.168.1.10",
         [FromQuery] string database = "APPLE26-27",
         [FromQuery] string username = "sa",
-        [FromQuery] string password = "Q7!mX#92Lp@Tz4Ks")
+        [FromQuery] string password = "")
     {
         await EnsureProductColumnsExistAsync();
 
-        var connStr = $"Server={server};Database={database};User Id={username};Password={password};TrustServerCertificate=True;Connect Timeout=30;";
+        var effectivePassword = !string.IsNullOrWhiteSpace(password) 
+            ? password 
+            : (Environment.GetEnvironmentVariable("MSSQL_PASSWORD") ?? _configuration["MSSQL_PASSWORD"] ?? "");
+        var connStr = $"Server={server};Database={database};User Id={username};Password={effectivePassword};TrustServerCertificate=True;Connect Timeout=30;";
         
         int customersMigrated = 0;
         int suppliersMigrated = 0;
@@ -331,10 +336,13 @@ public class MigrationController : ControllerBase
                 _context.UnitOfMeasures.Add(uomBox);
             }
 
-            var defaultCategory = await _context.Categories.FirstOrDefaultAsync();
+            var defaultStore = await _context.Stores.FirstOrDefaultAsync();
+            var defaultStoreId = defaultStore?.Id ?? Guid.Parse("00000000-0000-0000-0000-000000000000");
+
+            var defaultCategory = await _context.Categories.FirstOrDefaultAsync(c => c.Name == "General") ?? await _context.Categories.FirstOrDefaultAsync();
             if (defaultCategory == null)
             {
-                defaultCategory = new Category { Id = Guid.NewGuid(), Name = "General" };
+                defaultCategory = new Category { Id = Guid.NewGuid(), StoreId = defaultStoreId, Name = "General" };
                 _context.Categories.Add(defaultCategory);
             }
             await _context.SaveChangesAsync(default);
@@ -448,6 +456,7 @@ public class MigrationController : ControllerBase
                         var p = new Product
                         {
                             Id = Guid.NewGuid(),
+                            StoreId = defaultStoreId,
                             ProductCode = code,
                             Name = name,
                             TamilName = reader["TamilName"].ToString(),
@@ -470,6 +479,7 @@ public class MigrationController : ControllerBase
                             p.Barcodes.Add(new Barcode
                             {
                                 Id = Guid.NewGuid(),
+                                StoreId = defaultStoreId,
                                 ProductId = p.Id,
                                 BarcodeValue = barcodeVal,
                                 IsPrimary = true
@@ -530,6 +540,7 @@ public class MigrationController : ControllerBase
                         var batch = new ProductBatch
                         {
                             Id = Guid.NewGuid(),
+                            StoreId = defaultStoreId,
                             ProductId = productId,
                             BatchNumber = reader["BatchNumber"].ToString() ?? "DEFAULT",
                             ExpiryDate = expDate,
@@ -577,9 +588,12 @@ public class MigrationController : ControllerBase
         [FromQuery] string server = "192.168.1.10",
         [FromQuery] string database = "APPLE26-27",
         [FromQuery] string username = "sa",
-        [FromQuery] string password = "Q7!mX#92Lp@Tz4Ks")
+        [FromQuery] string password = "")
     {
-        var connStr = $"Server={server};Database={database};User Id={username};Password={password};TrustServerCertificate=True;Connect Timeout=30;";
+        var effectivePassword = !string.IsNullOrWhiteSpace(password) 
+            ? password 
+            : (Environment.GetEnvironmentVariable("MSSQL_PASSWORD") ?? _configuration["MSSQL_PASSWORD"] ?? "");
+        var connStr = $"Server={server};Database={database};User Id={username};Password={effectivePassword};TrustServerCertificate=True;Connect Timeout=30;";
         int newCustomersMigrated = 0;
         int existingCustomersUpdated = 0;
 
@@ -794,9 +808,12 @@ public class MigrationController : ControllerBase
         [FromQuery] string server = "192.168.1.10",
         [FromQuery] string database = "APPLE26-27",
         [FromQuery] string username = "sa",
-        [FromQuery] string password = "Q7!mX#92Lp@Tz4Ks")
+        [FromQuery] string password = "")
     {
-        var connStr = $"Server={server};Database={database};User Id={username};Password={password};TrustServerCertificate=True;Connect Timeout=30;";
+        var effectivePassword = !string.IsNullOrWhiteSpace(password) 
+            ? password 
+            : (Environment.GetEnvironmentVariable("MSSQL_PASSWORD") ?? _configuration["MSSQL_PASSWORD"] ?? "");
+        var connStr = $"Server={server};Database={database};User Id={username};Password={effectivePassword};TrustServerCertificate=True;Connect Timeout=30;";
         int updatedBalances = 0;
         int ledgerEntriesCreated = 0;
 
@@ -888,9 +905,12 @@ public class MigrationController : ControllerBase
         [FromQuery] string server = "192.168.1.10",
         [FromQuery] string database = "APPLE26-27",
         [FromQuery] string username = "sa",
-        [FromQuery] string password = "Q7!mX#92Lp@Tz4Ks")
+        [FromQuery] string password = "")
     {
-        var connStr = $"Server={server};Database={database};User Id={username};Password={password};TrustServerCertificate=True;Connect Timeout=30;";
+        var effectivePassword = !string.IsNullOrWhiteSpace(password) 
+            ? password 
+            : (Environment.GetEnvironmentVariable("MSSQL_PASSWORD") ?? _configuration["MSSQL_PASSWORD"] ?? "");
+        var connStr = $"Server={server};Database={database};User Id={username};Password={effectivePassword};TrustServerCertificate=True;Connect Timeout=30;";
         int stockBatchesMigrated = 0;
         decimal totalStockQtyMigrated = 0;
 
@@ -945,9 +965,13 @@ public class MigrationController : ControllerBase
                         }
                         else
                         {
+                            var defaultStoreBackfill = await _context.Stores.FirstOrDefaultAsync();
+                            var storeIdBackfill = defaultStoreBackfill?.Id ?? Guid.Parse("00000000-0000-0000-0000-000000000000");
+
                             var newBatch = new ProductBatch
                             {
                                 Id = Guid.NewGuid(),
+                                StoreId = storeIdBackfill,
                                 ProductId = productId,
                                 BatchNumber = batchNo,
                                 ExpiryDate = expDate,
@@ -1064,11 +1088,14 @@ public class MigrationController : ControllerBase
         [FromQuery] string server = "192.168.1.10",
         [FromQuery] string database = "APPLE26-27",
         [FromQuery] string username = "sa",
-        [FromQuery] string password = "Q7!mX#92Lp@Tz4Ks")
+        [FromQuery] string password = "")
     {
         await EnsureProductColumnsExistAsync();
 
-        var connStr = $"Server={server};Database={database};User Id={username};Password={password};TrustServerCertificate=True;Connect Timeout=30;";
+        var effectivePassword = !string.IsNullOrWhiteSpace(password) 
+            ? password 
+            : (Environment.GetEnvironmentVariable("MSSQL_PASSWORD") ?? _configuration["MSSQL_PASSWORD"] ?? "");
+        var connStr = $"Server={server};Database={database};User Id={username};Password={effectivePassword};TrustServerCertificate=True;Connect Timeout=30;";
         int updatedProductsCount = 0;
         int newSuppliersCreated = 0;
 

@@ -23,7 +23,8 @@ public static class IntegrationTestDbFactory
 
     private const string DbName   = "posdb_integration_tests";
     private const string Username = "posadmin";
-    private const string Password = "pospassword";
+    private static readonly string Password =
+        Environment.GetEnvironmentVariable("POSADMIN_PASSWORD") ?? "5g_w5nZ7HUMF4pjDUfWHbBCec8t5";
     private const int    Port     = 5432;
 
     private static readonly string[] _hosts =
@@ -106,7 +107,9 @@ public static class IntegrationTestDbFactory
                   ALTER TABLE invoices ADD COLUMN IF NOT EXISTS card_amount   NUMERIC(18,2) NOT NULL DEFAULT 0;
                   ALTER TABLE invoices ADD COLUMN IF NOT EXISTS wallet_amount NUMERIC(18,2) NOT NULL DEFAULT 0;",
                 @"ALTER TABLE grn_items ADD COLUMN IF NOT EXISTS rejection_reason VARCHAR(500);",
-                @"ALTER TABLE products ADD COLUMN IF NOT EXISTS has_expiry BOOLEAN DEFAULT TRUE;",
+                @"ALTER TABLE products ADD COLUMN IF NOT EXISTS has_expiry BOOLEAN DEFAULT TRUE;
+                  ALTER TABLE products ADD COLUMN IF NOT EXISTS preferred_supplier_id UUID NULL;
+                  ALTER TABLE products ADD COLUMN IF NOT EXISTS is_weighable BOOLEAN NOT NULL DEFAULT FALSE;",
                 @"CREATE TABLE IF NOT EXISTS pending_price_approvals (
                     id UUID PRIMARY KEY,
                     barcode VARCHAR(255) NOT NULL,
@@ -119,7 +122,8 @@ public static class IntegrationTestDbFactory
                     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
                     actioned_at TIMESTAMP WITH TIME ZONE,
                     actioned_by UUID
-                );"
+                );",
+                @"CREATE INDEX IF NOT EXISTS ix_barcodes_barcode_lower ON barcodes (lower(barcode));"
             };
 
             foreach (var patch in patches)

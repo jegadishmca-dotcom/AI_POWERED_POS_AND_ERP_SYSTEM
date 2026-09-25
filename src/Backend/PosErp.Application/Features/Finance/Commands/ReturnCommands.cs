@@ -345,11 +345,25 @@ public class ReturnCommandsHandler :
                 .FirstOrDefaultAsync(i => i.Id == request.InvoiceId, cancellationToken);
             if (invoice == null) throw new InvalidOperationException("Invoice not found.");
 
-            string returnNo = await _sequenceService.GenerateNextNumberAsync(request.StoreId, "SALES_RETURN", cancellationToken);
+            // Store integrity validation:
+            // If caller passed a specific StoreId (from JWT claim or request body), it MUST match the invoice's store.
+            if (request.StoreId != Guid.Empty && invoice.StoreId.HasValue && request.StoreId != invoice.StoreId.Value)
+            {
+                throw new InvalidOperationException($"Store mismatch: Invoice '{invoice.InvoiceNumber}' belongs to store '{invoice.StoreId}', not '{request.StoreId}'.");
+            }
+
+            if (!invoice.StoreId.HasValue && request.StoreId == Guid.Empty)
+            {
+                throw new InvalidOperationException("Cannot determine store for this return — invoice has no store and none was provided.");
+            }
+
+            var actualStoreId = invoice.StoreId ?? request.StoreId;
+
+            string returnNo = await _sequenceService.GenerateNextNumberAsync(actualStoreId, "SALES_RETURN", cancellationToken);
 
             var salesReturn = new SalesReturn
             {
-                StoreId = request.StoreId,
+                StoreId = actualStoreId,
                 InvoiceId = request.InvoiceId,
                 BusinessDate = invoice.BusinessDate,
                 ReturnNumber = returnNo,
@@ -430,7 +444,7 @@ public class ReturnCommandsHandler :
 
                 // Record stock movement (positive for return/restock)
                 await _stockLedgerService.RecordMovementAsync(
-                    storeId: request.StoreId,
+                    storeId: actualStoreId,
                     warehouseId: null,
                     terminalId: null,
                     businessDate: request.ReturnDate.Date,
@@ -510,7 +524,7 @@ public class ReturnCommandsHandler :
             }
 
             Guid jeId = await _postingService.PostJournalEntryWithUserAsync(
-                request.StoreId,
+                actualStoreId,
                 request.ReturnDate,
                 $"Sales Return matching Invoice {invoice.InvoiceNumber} ({returnNo})",
                 returnNo,
@@ -527,7 +541,7 @@ public class ReturnCommandsHandler :
 
             // Record GST Transaction (reduction in output taxes/sales)
             await _postingService.RecordGstTransactionAsync(
-                request.StoreId,
+                actualStoreId,
                 "SALES_RETURN",
                 returnNo,
                 request.ReturnDate,
@@ -546,7 +560,7 @@ public class ReturnCommandsHandler :
                 if (customer != null)
                 {
                     decimal runningBalance = await _context.CustomerLedger
-                        .Where(c => c.CustomerId == invoice.CustomerId.Value && c.StoreId == request.StoreId)
+                        .Where(c => c.CustomerId == invoice.CustomerId.Value && c.StoreId == actualStoreId)
                         .OrderByDescending(c => c.CreatedAt)
                         .Select(c => c.RunningBalance)
                         .FirstOrDefaultAsync(cancellationToken);
@@ -555,7 +569,7 @@ public class ReturnCommandsHandler :
 
                     var ledgerEntry = new CustomerLedgerEntry
                     {
-                        StoreId = request.StoreId,
+                        StoreId = actualStoreId,
                         CustomerId = invoice.CustomerId.Value,
                         EntryDate = request.ReturnDate.Date,
                         TransactionType = "CREDIT_NOTE",

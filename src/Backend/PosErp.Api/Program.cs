@@ -494,89 +494,126 @@ using (var scope = app.Services.CreateScope())
         var wasOpen = connection.State == System.Data.ConnectionState.Open;
         if (!wasOpen) await connection.OpenAsync();
 
-        // Scan and execute all pending raw SQL migrations in alphabetical order
-        var migrationsDir = Path.Combine(AppContext.BaseDirectory, "Persistence", "Migrations");
-        if (Directory.Exists(migrationsDir))
+        // Scan and execute all pending raw SQL migrations in alphabetical order across all configured connections
+        async Task ExecuteMigrationsOnConnectionAsync(string connStr, string targetLabel)
         {
-            var sqlFiles = Directory.GetFiles(migrationsDir, "*.sql")
-                                    .OrderBy(f => Path.GetFileName(f))
-                                    .ToList();
-
-            // Prevent crash if tables were created manually without migration_history
-            using (var checkCmd = connection.CreateCommand())
+            try
             {
-                checkCmd.CommandText = "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'roles')";
-                var rolesExist = (bool)(await checkCmd.ExecuteScalarAsync() ?? false);
+                using var targetConn = new Npgsql.NpgsqlConnection(connStr);
+                await targetConn.OpenAsync();
 
-                if (rolesExist)
+                // Ensure migration_history table exists
+                using (var initCmd = targetConn.CreateCommand())
                 {
-                    // Seed migration_history for the original 17 migrations
-                    foreach (var f in sqlFiles)
+                    initCmd.CommandText = @"
+                        CREATE TABLE IF NOT EXISTS migration_history (
+                            migration_name VARCHAR(255) PRIMARY KEY,
+                            applied_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+                        );";
+                    await initCmd.ExecuteNonQueryAsync();
+                }
+
+                var migrationsDir = Path.Combine(AppContext.BaseDirectory, "Persistence", "Migrations");
+                if (!Directory.Exists(migrationsDir)) return;
+
+                var sqlFiles = Directory.GetFiles(migrationsDir, "*.sql")
+                                        .OrderBy(f => Path.GetFileName(f))
+                                        .ToList();
+
+                // Prevent crash if tables were created manually without migration_history
+                using (var checkCmd = targetConn.CreateCommand())
+                {
+                    checkCmd.CommandText = "SELECT EXISTS(SELECT 1 FROM information_schema.tables WHERE table_name = 'roles')";
+                    var rolesExist = (bool)(await checkCmd.ExecuteScalarAsync() ?? false);
+
+                    if (rolesExist)
                     {
-                        var filename = Path.GetFileName(f);
-                        var prefixStr = filename.Split('_')[0];
-                        if (int.TryParse(prefixStr, out int prefixNum) && prefixNum <= 17)
+                        // Seed migration_history for the original 17 migrations
+                        foreach (var f in sqlFiles)
                         {
-                            var seedCmd = connection.CreateCommand();
-                            seedCmd.CommandText = "INSERT INTO migration_history (migration_name) VALUES (@p0) ON CONFLICT DO NOTHING";
-                            var p = seedCmd.CreateParameter();
-                            p.ParameterName = "@p0";
-                            p.Value = filename;
-                            seedCmd.Parameters.Add(p);
-                            await seedCmd.ExecuteNonQueryAsync();
+                            var filename = Path.GetFileName(f);
+                            var prefixStr = filename.Split('_')[0];
+                            if (int.TryParse(prefixStr, out int prefixNum) && prefixNum <= 17)
+                            {
+                                using var seedCmd = targetConn.CreateCommand();
+                                seedCmd.CommandText = "INSERT INTO migration_history (migration_name) VALUES (@p0) ON CONFLICT DO NOTHING";
+                                var p = seedCmd.CreateParameter();
+                                p.ParameterName = "@p0";
+                                p.Value = filename;
+                                seedCmd.Parameters.Add(p);
+                                await seedCmd.ExecuteNonQueryAsync();
+                            }
                         }
                     }
                 }
-            }
 
-            foreach (var sqlFile in sqlFiles)
+                foreach (var sqlFile in sqlFiles)
+                {
+                    var filename = Path.GetFileName(sqlFile);
+                    bool exists = false;
+
+                    using (var cmd = targetConn.CreateCommand())
+                    {
+                        cmd.CommandText = "SELECT EXISTS(SELECT 1 FROM migration_history WHERE migration_name = @p0)";
+                        var param = cmd.CreateParameter();
+                        param.ParameterName = "@p0";
+                        param.Value = filename;
+                        cmd.Parameters.Add(param);
+
+                        var result = await cmd.ExecuteScalarAsync();
+                        exists = result != null && (bool)result;
+                    }
+
+                    if (!exists)
+                    {
+                        Console.WriteLine($"[{targetLabel}] Applying database migration: {filename}...");
+                        var sqlContent = await File.ReadAllTextAsync(sqlFile);
+
+                        using (var execCmd = targetConn.CreateCommand())
+                        {
+                            execCmd.CommandText = sqlContent;
+                            await execCmd.ExecuteNonQueryAsync();
+                        }
+
+                        using (var histCmd = targetConn.CreateCommand())
+                        {
+                            histCmd.CommandText = "INSERT INTO migration_history (migration_name) VALUES (@mig)";
+                            var migParam = histCmd.CreateParameter();
+                            migParam.ParameterName = "@mig";
+                            migParam.Value = filename;
+                            histCmd.Parameters.Add(migParam);
+                            await histCmd.ExecuteNonQueryAsync();
+                        }
+
+                        Console.WriteLine($"[{targetLabel}] Migration {filename} applied successfully!");
+                    }
+                }
+            }
+            catch (Exception ex)
             {
-                var filename = Path.GetFileName(sqlFile);
-                bool exists = false;
-
-                using (var cmd = connection.CreateCommand())
-                {
-                    cmd.CommandText = "SELECT EXISTS(SELECT 1 FROM migration_history WHERE migration_name = @p0)";
-                    var param = cmd.CreateParameter();
-                    param.ParameterName = "@p0";
-                    param.Value = filename;
-                    cmd.Parameters.Add(param);
-
-                    var result = await cmd.ExecuteScalarAsync();
-                    exists = result != null && (bool)result;
-                }
-
-                if (!exists)
-                {
-                    Console.WriteLine($"Applying database migration: {filename}...");
-                    var sqlContent = await File.ReadAllTextAsync(sqlFile);
-
-                    // Use raw ADO.NET to avoid ExecuteSqlRawAsync interpreting { } in JSON as format placeholders
-                    var conn = context.Database.GetDbConnection();
-                    var connWasOpen = conn.State == System.Data.ConnectionState.Open;
-                    if (!connWasOpen) await conn.OpenAsync();
-
-                    using (var execCmd = conn.CreateCommand())
-                    {
-                        execCmd.CommandText = sqlContent;
-                        await execCmd.ExecuteNonQueryAsync();
-                    }
-
-                    using (var histCmd = conn.CreateCommand())
-                    {
-                        histCmd.CommandText = "INSERT INTO migration_history (migration_name) VALUES (@mig)";
-                        var migParam = histCmd.CreateParameter();
-                        migParam.ParameterName = "@mig";
-                        migParam.Value = filename;
-                        histCmd.Parameters.Add(migParam);
-                        await histCmd.ExecuteNonQueryAsync();
-                    }
-
-                    if (!connWasOpen) await conn.CloseAsync();
-                    Console.WriteLine($"Migration {filename} applied successfully!");
-                }
+                Console.WriteLine($"[{targetLabel}] Error applying migrations: {ex.Message}");
+                throw;
             }
-            if (!wasOpen) await connection.CloseAsync();
+        }
+
+        var configuration = services.GetRequiredService<IConfiguration>();
+        var connectionStringsToMigrate = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        var defaultConn = configuration.GetConnectionString("DefaultConnection");
+        if (!string.IsNullOrWhiteSpace(defaultConn)) connectionStringsToMigrate[defaultConn] = "Default/Live";
+
+        var liveConn = configuration.GetConnectionString("LiveConnection");
+        if (!string.IsNullOrWhiteSpace(liveConn)) connectionStringsToMigrate[liveConn] = "Live";
+
+        var uatConn = configuration.GetConnectionString("UatConnection");
+        if (!string.IsNullOrWhiteSpace(uatConn)) connectionStringsToMigrate[uatConn] = "UAT";
+
+        var activeConn = context.Database.GetDbConnection().ConnectionString;
+        if (!string.IsNullOrWhiteSpace(activeConn)) connectionStringsToMigrate[activeConn] = "ActiveMode";
+
+        foreach (var kvp in connectionStringsToMigrate)
+        {
+            await ExecuteMigrationsOnConnectionAsync(kvp.Key, kvp.Value);
         }
         
         // Execute raw DDL to guarantee refresh_tokens table exists (EnsureCreated skips if other tables are present)
@@ -742,7 +779,7 @@ using (var scope = app.Services.CreateScope())
         
         var passwordHasher = services.GetRequiredService<IPasswordHasher>();
         var hostEnv = services.GetRequiredService<Microsoft.Extensions.Hosting.IHostEnvironment>();
-        var configuration = services.GetRequiredService<IConfiguration>();
+        // configuration already resolved above
         bool usersChanged = false;
         
         // Seed Admin User

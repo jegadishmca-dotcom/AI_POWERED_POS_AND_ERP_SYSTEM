@@ -5,7 +5,7 @@ import { Invoice } from '../types/index';
  * Converts the invoice object into a raw text string suitable for thermal printers.
  */
 const generateEscPosText = (invoice: Invoice): string => {
-  let text = "     ENTERPRISE SUPERMARKET\n";
+  let text = "         VeeWin ERP\n";
   text += "          Tax Invoice\n";
   text += "--------------------------------\n";
   text += `Inv: ${invoice.invoiceNumber}\n`;

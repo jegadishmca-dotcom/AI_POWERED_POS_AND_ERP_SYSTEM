@@ -200,7 +200,7 @@ const AppLayout: React.FC = () => {
             </div>
             <div>
               <span className="font-black text-base bg-gradient-to-r from-white via-slate-200 to-indigo-200 bg-clip-text text-transparent block leading-tight">
-                Supermarket ERP
+                VeeWin ERP
               </span>
               <span className="text-[9px] font-extrabold uppercase tracking-widest text-indigo-400 block">
                 Enterprise AI Edition
